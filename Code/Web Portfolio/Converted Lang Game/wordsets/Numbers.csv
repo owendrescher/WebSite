@@ -1,0 +1,71 @@
+1,un,uno,eins,uno,yī
+2,deux,due,zwei,dos,èr
+3,trois,tre,drei,tres,sān
+4,quatre,quattro,vier,cuatro,sì
+5,cinq,cinque,fünf,cinco,wǔ
+6,six,sei,sechs,seis,liù
+7,sept,sette,sieben,siete,qī
+8,huit,otto,acht,ocho,bā
+9,neuf,nove,neun,nueve,jiǔ
+10,dix,dieci,zehn,diez,shí
+11,onze,undici,elf,once,shíyī
+12,douze,dodici,zwölf,doce,shí'èr
+13,treize,tredici,dreizehn,trece,shísān
+14,quatorze,quattordici,vierzehn,catorce,shísì
+15,quinze,quindici,fünfzehn,quince,shíwǔ
+16,seize,sedici,sechzehn,dieciséis,shíliù
+17,dix-sept,diciassette,siebzehn,diecisiete,shíqī
+18,dix-huit,diciotto,achtzehn,dieciocho,shíbā
+19,dix-neuf,diciannove,neunzehn,diecinueve,shíjiǔ
+20,vingt,venti,zwanzig,veinte,èrshí
+30,trente,trenta,dreißig,treinta,sānshí
+40,quarante,quaranta,vierzig,cuarenta,sìshí
+50,cinquante,cinquanta,fünfzig,cincuenta,wǔshí
+60,soixante,sessanta,sechzig,sesenta,liùshí
+70,soixante-dix,settanta,siebzig,setenta,qīshí
+80,quatre-vingts,ottanta,achtzig,ochenta,bāshí
+90,quatre-vingt-dix,novanta,neunzig,noventa,jiǔshí
+100,cent,cento,hundert,cien,yībǎi
+200,deux cents,duecento,zweihundert,doscientos,èrbǎi
+300,trois cents,trecento,dreihundert,trescientos,sānbǎi
+400,quatre cents,quattrocento,vierhundert,cuatrocientos,sìbǎi
+500,cinq cents,cinquecento,fünfhundert,quinientos,wǔbǎi
+600,six cents,seicento,sechshundert,seiscientos,liùbǎi
+700,sept cents,settecento,siebenhundert,setecientos,qībǎi
+800,huit cents,ottocento,achthundert,ochocientos,bābǎi
+900,neuf cents,novecento,neunhundert,novecientos,jiǔbǎi
+"1,000",mille,mille,tausend,mil,yīqiān
+"10,000",dix mille,diecimila,zehntausend,diez mil,yī wàn
+"100,000",cent mille,centomila,hunderttausend,cien mil,shí wàn
+"1,000,000",un million,un milione,eine Million,un millón,yī bǎi wàn
+"1,000,000,000",un milliard,un miliardo,eine Milliarde,mil millones,yī qiān wàn
+"1,000,000,000,000",un billion,un bilione,eine Billion,un billón,yī zhào
+23,vingt-trois,ventitré,dreiundzwanzig,veintitrés,èrshísān
+37,trente-sept,trentasette,siebenunddreißig,treinta y siete,sānshíqī
+45,quarante-cinq,quarantacinque,fünfundvierzig,cuarenta y cinco,sìshíwǔ
+52,cinquante-deux,cinquantadue,zweiundfünfzig,cincuenta y dos,wǔshí'èr
+66,soixante-six,sessantasei,sechsundsechzig,sesenta y seis,liùshíliù
+71,soixante et onze,settantuno,einundsiebzig,setenta y uno,qīshíyī
+84,quatre-vingt-quatre,ottantaquattro,vierundachtzig,ochenta y cuatro,bāshísì
+91,quatre-vingt-onze,novantuno,einundneunzig,noventa y uno,jiǔshíyī
+29,vingt-neuf,ventinove,neunundzwanzig,veintinueve,èrshíjiǔ
+38,trente-huit,trentotto,achtunddreißig,treinta y ocho,sānshíbā
+47,quarante-sept,quarantasette,siebenundvierzig,cuarenta y siete,sìshíqī
+56,cinquante-six,cinquantasei,sechsundfünfzig,cincuenta y seis,wǔshíliù
+64,soixante-quatre,sessantaquattro,vierundsechzig,sesenta y cuatro,liùshísì
+73,soixante-treize,settantatré,dreiundsiebzig,setenta y tres,qīshísān
+85,quatre-vingt-cinq,ottantacinque,fünfundachtzig,ochenta y cinco,bāshíwǔ
+92,quatre-vingt-douze,novantadue,zweiundneunzig,noventa y dos,jiǔshí'èr
+33,trente-trois,trentatré,dreiunddreißig,treinta y tres,sānshísān
+48,quarante-huit,quarantotto,achtundvierzig,cuarenta y ocho,sìshíbā
+57,cinquante-sept,cinquantasette,siebenundfünfzig,cincuenta y siete,wǔshíqī
+63,soixante-trois,sessantatré,dreiundsechzig,sesenta y tres,liùshísān
+284,deux cent quatre-vingt-quatre,duecentottantaquattro,zweihundertvierundachtzig,doscientos ochenta y cuatro,èrbǎi bāshí sì
+9210,neuf mille deux cent dix,novemiladuecentodieci,neuntausendzweihundertzehn,nueve mil doscientos diez,jiǔqiān èrbǎi shí
+"48,372",quarante-huit mille trois cent soixante-douze,quarantottomilatrecentosettantadue,achtundvierzigtausenddreihundertzweiundsiebzig,cuarenta y ocho mil trescientos setenta y dos,sìshíbā wàn sānbǎi qīshí'èr
+"56,789",cinquante-six mille sept cent quatre-vingt-neuf,cinquantaseimilasettecentottantanove,sechundfünfzigtausendsiebenhundertneunundachtzig,cincuenta y seis mil setecientos ochenta y nueve,wǔshíliù wàn qībǎi bāshí jiǔ
+"101,112",cent un mille cent douze,centounomilacentododici,hundertunderstausendeinhundertzwölf,ciento un mil ciento doce,yībǎi yīqiān yībǎi shí'èr
+"234,567",deux cent trente-quatre mille cinq cent soixante-sept,duecentotrentaquattromilacinquecentosessantasette,zweihundertvierunddreißigtausendfünfhundertsiebenundsechzig,doscientos treinta y cuatro mil quinientos sesenta y siete,èrbǎi sānshísì wàn wǔbǎi liùshí qī
+"876,543",huit cent soixante-seize mille cinq cent quarante-trois,ottocentosettantaseimilaquattrocentoquarantatré,achthundertsechsundsiebzigtausendfünfhundertdreiundvierzig,ochocientos setenta y seis mil quinientos cuarenta y tres,bābǎi qīshíliù wàn wǔbǎi sìshí sān
+"999,999",neuf cent quatre-vingt-dix-neuf mille neuf cent quatre-vingt-dix-neuf,novecentonovantanovemilanovecentonovantanove,neunhundertneunundneunzigtausendneunhundertneunundneunzig,novecientos noventa y nueve mil novecientos noventa y nueve,jiǔbǎi jiǔshíjiǔ wàn jiǔbǎi jiǔshíjiǔ
+"123,456,789",cent vingt-trois millions quatre cent cinquante-six mille sept cent quatre-vingt-neuf,centoventitremilioniquattrocentocinquantaseimilasettecentottantanove,einhundertdreiundzwanzig Millionen vierhundertsechsundfünfzigtausendsiebenhundertneunundachtzig,ciento veintitrés millones cuatrocientos cincuenta y seis mil setecientos ochenta y nueve,yībǎi èrshísān wàn liùbǎi qīshí qī

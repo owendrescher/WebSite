@@ -1,0 +1,563 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8"/>
+  <meta name="viewport" content="width=device-width, initial-scale=1"/>
+  <title>Article Screenshotter</title>
+
+  <!-- Cropper.js -->
+  <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/cropperjs@1.6.2/dist/cropper.min.css">
+
+  <style>
+    :root{
+      --bg:#0b1220;
+      --panel:#0f1a2e;
+      --panel2:#0c162a;
+      --text:#e5e7eb;
+      --muted:#9ca3af;
+      --border:rgba(255,255,255,.10);
+      --border2:rgba(255,255,255,.14);
+      --accent:#60a5fa;
+      --good:#34d399;
+      --danger:#fb7185;
+      --shadow: 0 18px 50px rgba(0,0,0,.45);
+      --radius:16px;
+    }
+
+    *{ box-sizing:border-box; }
+    html,body{ height:100%; }
+    body{
+      margin:0;
+      background: radial-gradient(1200px 800px at 20% 0%, #122548 0%, var(--bg) 55%);
+      color:var(--text);
+      font-family: ui-sans-serif, system-ui, -apple-system, Segoe UI, Roboto, Arial, sans-serif;
+    }
+
+    .wrap{ max-width: 1200px; margin: 0 auto; padding: 22px 18px 40px; }
+
+    .header{ display:flex; justify-content:space-between; gap:14px; align-items:flex-end; flex-wrap:wrap; margin-bottom: 14px; }
+    .title{ display:flex; flex-direction:column; gap:6px; }
+    .title h1{ margin:0; font-size: 26px; letter-spacing:.2px; }
+    .title p{ margin:0; color:var(--muted); font-size: 14px; }
+
+    .panel{
+      background: linear-gradient(180deg, rgba(255,255,255,.04), rgba(255,255,255,.02));
+      border:1px solid var(--border);
+      border-radius: var(--radius);
+      box-shadow: var(--shadow);
+      overflow:hidden;
+    }
+
+    .controls{
+      padding: 14px;
+      display:grid;
+      grid-template-columns: 1.6fr .7fr;
+      gap:12px;
+    }
+
+    textarea{
+      width:100%;
+      min-height: 190px;
+      resize: vertical;
+      padding: 12px;
+      border-radius: 14px;
+      border:1px solid var(--border2);
+      background: rgba(3, 7, 18, .55);
+      color:var(--text);
+      font-size: 14px;
+      outline:none;
+    }
+    textarea::placeholder{ color: rgba(229,231,235,.45); }
+
+    .right{ display:flex; flex-direction:column; gap:12px; }
+
+    .row{ display:flex; gap:10px; align-items:center; flex-wrap:wrap; }
+
+    button{
+      appearance:none;
+      border:1px solid var(--border2);
+      background: rgba(96,165,250,.14);
+      color: var(--text);
+      padding: 10px 14px;
+      border-radius: 12px;
+      font-weight: 650;
+      cursor:pointer;
+      transition: transform .06s ease, background .2s ease, border-color .2s ease;
+    }
+    button:hover{ background: rgba(96,165,250,.20); border-color: rgba(96,165,250,.35); }
+    button:active{ transform: translateY(1px); }
+
+    .ghost{ background: rgba(255,255,255,.05); }
+    .ghost:hover{ background: rgba(255,255,255,.08); border-color: rgba(255,255,255,.22); }
+
+    .good{ background: rgba(52,211,153,.14); }
+    .good:hover{ background: rgba(52,211,153,.20); border-color: rgba(52,211,153,.35); }
+
+    .toggle{ display:flex; gap:10px; align-items:center; color:var(--muted); font-size: 13px; user-select:none; }
+    .toggle input{ width: 18px; height:18px; accent-color: var(--accent); }
+
+    .status{
+      padding: 12px 14px;
+      border-top: 1px solid var(--border);
+      font-family: ui-monospace, SFMono-Regular, Menlo, Monaco, Consolas, monospace;
+      white-space: pre-wrap;
+      color: rgba(229,231,235,.92);
+    }
+
+    .thumbs{
+      margin-top: 16px;
+      display:grid;
+      grid-template-columns: repeat(auto-fill, minmax(280px, 1fr));
+      gap: 14px;
+    }
+
+    .card{
+      border:1px solid var(--border);
+      border-radius: 16px;
+      overflow:hidden;
+      background: rgba(255,255,255,.03);
+    }
+    .cardHead{
+      padding: 10px 12px;
+      display:flex;
+      justify-content:space-between;
+      gap:10px;
+      align-items:center;
+      border-bottom:1px solid var(--border);
+    }
+    .cardHead a{
+      color: var(--accent);
+      text-decoration:none;
+      font-weight:650;
+      font-size: 13px;
+      word-break: break-all;
+    }
+    .cardHead a:hover{ text-decoration:underline; }
+
+    .chip{
+      font-size: 12px;
+      padding: 5px 8px;
+      border:1px solid var(--border2);
+      border-radius: 999px;
+      color: var(--muted);
+      background: rgba(0,0,0,.18);
+    }
+
+    .imgWrap{ padding: 10px; }
+    img.preview{
+      width:100%;
+      height:auto;
+      display:block;
+      border-radius: 12px;
+      border:1px solid rgba(255,255,255,.08);
+      background: rgba(0,0,0,.2);
+    }
+
+    .fail{ padding: 12px; color: var(--danger); font-size: 13px; line-height: 1.3; }
+
+    /* modal */
+    .modalBack{
+      position:fixed; inset:0;
+      background: rgba(0,0,0,.66);
+      display:none;
+      align-items:center;
+      justify-content:center;
+      padding: 18px;
+      z-index: 9999;
+    }
+    .modal{
+      width: min(1100px, 98vw);
+      background: var(--panel2);
+      border:1px solid var(--border);
+      border-radius: 18px;
+      box-shadow: var(--shadow);
+      overflow:hidden;
+    }
+    .modalTop{
+      padding: 12px 14px;
+      display:flex;
+      justify-content:space-between;
+      align-items:center;
+      border-bottom:1px solid var(--border);
+      gap: 10px;
+    }
+    .modalTop b{ font-size: 14px; }
+    .modalBody{ padding: 14px; display:grid; gap: 12px; }
+    .cropArea{
+      background: rgba(0,0,0,.25);
+      border:1px solid rgba(255,255,255,.08);
+      border-radius: 14px;
+      padding: 10px;
+      display:flex;
+      justify-content:center;
+      align-items:center;
+      overflow:hidden;
+    }
+    .cropArea img{ max-width: 100%; max-height: 72vh; display:block; }
+    .modalBtns{
+      display:flex; gap:10px; flex-wrap:wrap;
+      justify-content:space-between;
+      align-items:center;
+    }
+    .leftBtns{ display:flex; gap:10px; flex-wrap:wrap; }
+    .rightBtns{ display:flex; gap:10px; flex-wrap:wrap; justify-content:flex-end; }
+
+    .smallmuted{ color: var(--muted); font-size: 13px; }
+
+    @media (max-width: 900px){
+      .controls{ grid-template-columns: 1fr; }
+      .modalBtns{ flex-direction:column; align-items:stretch; }
+      .leftBtns, .rightBtns{ justify-content:stretch; }
+    }
+  </style>
+</head>
+
+<body>
+  <div class="wrap">
+    <div class="header">
+      <div class="title">
+        <h1>Article Screenshotter</h1>
+        <p>Cookie-accept only → capped screenshots (max 3000px tall) → auto crop (IG square) → raw deleted.</p>
+      </div>
+    </div>
+
+    <div class="panel">
+      <div class="controls">
+        <div>
+          <textarea id="urls" placeholder="Paste one URL per line&#10;https://example.com/article1&#10;https://example.com/article2"></textarea>
+        </div>
+
+        <div class="right">
+          <div class="row">
+            <button id="go">Generate → Crop</button>
+            <a id="zipLink" href="#" style="display:none;color:var(--accent);font-weight:650;text-decoration:none;">Download FINAL ZIP</a>
+          </div>
+
+          <div class="row">
+            <label class="toggle"><input type="checkbox" id="headful">Show browser (debug)</label>
+          </div>
+
+          <div class="row">
+            <button id="clear" class="ghost">Clear</button>
+          </div>
+
+          <div class="smallmuted">
+            Naming: final images are domain-based (domain.png, domain_2.png). Output: output/YYYY-MM-DD/shots_HHMMSS/.
+          </div>
+        </div>
+      </div>
+
+      <div id="status" class="status">Ready.</div>
+    </div>
+
+    <div id="thumbs" class="thumbs"></div>
+  </div>
+
+  <!-- Crop Modal -->
+  <div id="modalBack" class="modalBack" role="dialog" aria-modal="true">
+    <div class="modal">
+      <div class="modalTop">
+        <b id="modalTitle">Crop 1/1 (Instagram 1080×1080)</b>
+        <button id="closeModal" class="ghost">Close</button>
+      </div>
+      <div class="modalBody">
+        <div class="cropArea">
+          <img id="cropImg" alt="">
+        </div>
+        <div class="modalBtns">
+          <div class="leftBtns">
+            <span class="smallmuted" id="progressText"></span>
+          </div>
+          <div class="rightBtns">
+            <button id="saveNext" class="good">Save & Next</button>
+            <button id="skipNext" class="ghost">Skip</button>
+          </div>
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <script src="https://cdn.jsdelivr.net/npm/cropperjs@1.6.2/dist/cropper.min.js"></script>
+  <script>
+    const $ = (id) => document.getElementById(id);
+
+    let cropper = null;
+
+    // queue for sequential cropping
+    let batch = null;
+    let queue = [];
+    let idx = 0;
+
+    // per-domain counters for final naming
+    const finalCounts = new Map();
+
+    function setStatus(s){ $("status").textContent = s; }
+
+    function nextFinalName(domain){
+      const cur = (finalCounts.get(domain) || 0) + 1;
+      finalCounts.set(domain, cur);
+      return cur === 1 ? `${domain}.png` : `${domain}_${cur}.png`;
+    }
+
+    function toBase64PNG(blob){
+      return new Promise((resolve, reject) => {
+        const r = new FileReader();
+        r.onload = () => resolve(r.result);  // data:image/png;base64,...
+        r.onerror = reject;
+        r.readAsDataURL(blob);
+      });
+    }
+
+    function openModalForItem(item){
+      $("modalBack").style.display = "flex";
+      $("cropImg").src = item.raw_url;
+
+      $("modalTitle").textContent = `Crop (Instagram 1080×1080)`;
+      $("progressText").textContent = `Item ${idx + 1} / ${queue.length} — ${item.domain}`;
+
+      if (cropper) { cropper.destroy(); cropper = null; }
+
+      $("cropImg").onload = () => {
+        cropper = new Cropper($("cropImg"), {
+          viewMode: 1,
+          dragMode: "move",
+          aspectRatio: 1,
+          movable: true,
+          zoomable: true,
+          scalable: false,
+          rotatable: false,
+          responsive: true,
+          background: false,
+
+          // --- NEW: start crop at full image width (max square) ---
+          ready() {
+            try {
+              const c = this.cropper;               // cropper instance
+              const img = c.getImageData();         // displayed image box (in cropper coords)
+
+              // Want a square whose width starts as the full image width
+              // but can't exceed image height.
+              const side = Math.min(img.width, img.height);
+
+              // Position: top-left of the image by default
+              // If height is limiting (image not tall), center horizontally.
+              let left = img.left;
+              let top  = img.top;
+
+              if (img.width > img.height) {
+                // center horizontally so square sits nicely
+                left = img.left + (img.width - side) / 2;
+              }
+
+              c.setCropBoxData({
+                left,
+                top,
+                width: side,
+                height: side
+              });
+            } catch (e) {
+              // no-op: fallback to cropper defaults
+            }
+          }
+        });
+
+      };
+    }
+
+    function closeModal(){
+      if (cropper) { cropper.destroy(); cropper = null; }
+      $("modalBack").style.display = "none";
+      $("cropImg").src = "";
+    }
+
+    async function saveCropAndDeleteRaw(item){
+      if (!cropper) throw new Error("Cropper not ready");
+
+      const canvas = cropper.getCroppedCanvas({ width: 1080, height: 1080 });
+      const blob = await new Promise((resolve) => canvas.toBlob(resolve, "image/png"));
+      if (!blob) throw new Error("Could not create PNG");
+
+      const dataUrl = await toBase64PNG(blob);
+      const finalName = nextFinalName(item.domain);
+
+      // save crop to server
+      const saveRes = await fetch("/api/save_crop", {
+        method: "POST",
+        headers: {"Content-Type":"application/json"},
+        body: JSON.stringify({
+          batch,
+          filename: finalName,
+          png_base64: dataUrl
+        })
+      });
+      const saveData = await saveRes.json();
+      if (!saveRes.ok) throw new Error(saveData.error || "save_crop failed");
+
+      // delete raw screenshot on server
+      const delRes = await fetch("/api/delete_raw", {
+        method: "POST",
+        headers: {"Content-Type":"application/json"},
+        body: JSON.stringify({ raw_file: item.raw_file })
+      });
+      const delData = await delRes.json();
+      if (!delRes.ok) throw new Error(delData.error || "delete_raw failed");
+
+      return saveData.final_url;
+    }
+
+    async function processQueue(){
+      if (!queue.length) return;
+
+      idx = 0;
+      openModalForItem(queue[idx]);
+    }
+
+    async function finishBatchZip(){
+      const res = await fetch("/api/zip_final", {
+        method: "POST",
+        headers: {"Content-Type":"application/json"},
+        body: JSON.stringify({ batch })
+      });
+      const data = await res.json();
+      if (!res.ok) throw new Error(data.error || "zip_final failed");
+      return data.zip_url;
+    }
+
+    $("closeModal").addEventListener("click", () => {
+      closeModal();
+      setStatus("Closed cropper. (Run again if you want to crop.)");
+    });
+
+    $("skipNext").addEventListener("click", async () => {
+      idx += 1;
+      if (idx >= queue.length) {
+        closeModal();
+        try {
+          const zipUrl = await finishBatchZip();
+          $("zipLink").href = zipUrl;
+          $("zipLink").style.display = "inline";
+          setStatus(`Done cropping.\nFinal ZIP: ${zipUrl}`);
+        } catch(e){
+          setStatus("Done cropping, but zip failed: " + e.message);
+        }
+        return;
+      }
+      openModalForItem(queue[idx]);
+    });
+
+    $("saveNext").addEventListener("click", async () => {
+      const item = queue[idx];
+      $("saveNext").disabled = true;
+      $("skipNext").disabled = true;
+      setStatus(`Saving crop + deleting raw… (${idx+1}/${queue.length})`);
+
+      try {
+        await saveCropAndDeleteRaw(item);
+      } catch (e) {
+        setStatus(`Save failed for ${item.url}\n${e.message}`);
+        $("saveNext").disabled = false;
+        $("skipNext").disabled = false;
+        return;
+      }
+
+      idx += 1;
+      $("saveNext").disabled = false;
+      $("skipNext").disabled = false;
+
+      if (idx >= queue.length) {
+        closeModal();
+        try {
+          const zipUrl = await finishBatchZip();
+          $("zipLink").href = zipUrl;
+          $("zipLink").style.display = "inline";
+          setStatus(`All done.\nFinal ZIP: ${zipUrl}`);
+        } catch(e){
+          setStatus("All done, but zip failed: " + e.message);
+        }
+        return;
+      }
+
+      openModalForItem(queue[idx]);
+    });
+
+    $("clear").addEventListener("click", () => {
+      $("urls").value = "";
+      $("thumbs").innerHTML = "";
+      $("zipLink").style.display = "none";
+      $("zipLink").href = "#";
+      batch = null;
+      queue = [];
+      idx = 0;
+      finalCounts.clear();
+      setStatus("Cleared.");
+    });
+
+    $("go").addEventListener("click", async () => {
+      $("thumbs").innerHTML = "";
+      $("zipLink").style.display = "none";
+      $("zipLink").href = "#";
+
+      batch = null;
+      queue = [];
+      idx = 0;
+      finalCounts.clear();
+
+      const urls = $("urls").value;
+      if (!urls.trim()) {
+        setStatus("No URLs provided.");
+        return;
+      }
+
+      setStatus("Generating capped screenshots…");
+
+      const res = await fetch("/api/run", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ urls, headful: $("headful").checked })
+      });
+
+      const data = await res.json();
+      if (!res.ok) {
+        setStatus("Error: " + (data.error || res.statusText));
+        return;
+      }
+
+      batch = data.batch;
+
+      // show preview grid (raws)
+      const items = data.items || [];
+      for (const it of items) {
+        const card = document.createElement("div");
+        card.className = "card";
+
+        if (it.error) {
+          card.innerHTML = `<div class="fail"><b>Failed</b><div style="margin-top:6px">${it.url}</div><div style="margin-top:6px">${it.error}</div></div>`;
+          $("thumbs").appendChild(card);
+          continue;
+        }
+
+        card.innerHTML = `
+          <div class="cardHead">
+            <a href="${it.raw_url}" target="_blank" rel="noopener">${it.domain}</a>
+            <span class="chip">raw (capped)</span>
+          </div>
+          <div class="imgWrap">
+            <img class="preview" src="${it.raw_url}" alt="preview">
+          </div>
+        `;
+        $("thumbs").appendChild(card);
+
+        queue.push(it);
+      }
+
+      if (!queue.length) {
+        setStatus("No successful screenshots to crop.");
+        return;
+      }
+
+      setStatus(`Generated ${queue.length} screenshots.\nOpening cropper…`);
+      await processQueue();
+    });
+  </script>
+</body>
+</html>

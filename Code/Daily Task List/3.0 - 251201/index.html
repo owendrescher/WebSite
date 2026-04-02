@@ -1,0 +1,2182 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8" />
+<meta name="viewport" content="width=device-width,initial-scale=1" />
+<title>Daily Checklist</title>
+<style>
+  :root{
+    /* Header fixed sizes (does NOT scale with slider) */
+    --base-font-size:16px;
+    --fixed-title-size: calc(var(--base-font-size) + 2px);
+
+    /* Body font slider variables (body ONLY) */
+    --ui-step:0;
+    --ui-step-px:0px;
+    --font-size: calc(var(--base-font-size) + var(--ui-step-px));
+
+    /* Font families (customizable) */
+    --font-body: system-ui, -apple-system, "Segoe UI", Inter, Roboto, "Helvetica Neue", Arial, "Noto Sans", sans-serif;
+    --font-title: system-ui, -apple-system, "SF Pro Display", "Segoe UI", Inter, sans-serif;
+
+    /* Light palette (defaults; Theme Studio can override via injected styles) */
+    --bg:#f6f7f9;
+    --surface:#ffffff;
+    --text:#111316;
+    --muted:#646a73;
+    --border:#e3e6eb;
+    --accent:#316aff;
+    --accent-weak:#e8efff;
+    --check:#316aff;
+    --lineA:#316aff;   /* % line (blue) */
+    --lineB:#f59e0b;   /* cumulative line (amber) */
+    --grid:#e1e4ea;
+    --warn:#b45309;
+    --err:#dc2626;
+
+    /* Calendar gradient (RGB strings) */
+    --cal-red: rgb(220,38,38);
+    --cal-mid: rgb(255,255,255);
+    --cal-green: rgb(22,163,74);
+
+    /* Stripe overlays for flags/excuses */
+    --stripe-dark: rgba(0,0,0,0.18);
+    --stripe-light: rgba(255,255,255,0.18);
+  }
+  [data-theme="dark"]{
+    --bg:#191b1f;
+    --surface:#22252a;
+    --text:#e9edf3;
+    --muted:#b5bdc9;
+    --border:#343944;
+    --accent:#6aa0ff;
+    --accent-weak:#223153;
+    --check:#6aa0ff;
+    --lineA:#8fbbff;
+    --lineB:#fbbf24;
+    --grid:#394050;
+    --warn:#fbbf24;
+    --err:#ef4444;
+
+    --cal-red: rgb(185,28,28);
+    --cal-mid: rgb(34,39,46);
+    --cal-green: rgb(22,163,74);
+
+    --stripe-dark: rgba(255,255,255,0.22);
+    --stripe-light: rgba(0,0,0,0.22);
+  }
+
+  html,body{height:100%;}
+  body{
+    margin:0;
+    background:var(--bg);
+    color:var(--text);
+    font-family: var(--font-body);
+    font-size: var(--font-size);
+    line-height:1.45;
+    font-weight:400;
+  }
+
+  .wrap{max-width:980px; margin:0 auto; padding:16px;}
+
+  /* ===== HEADER (fixed size) ===== */
+  .topbar{
+    display:flex; align-items:center; gap:10px; flex-wrap:wrap;
+    position:sticky; top:0; background:var(--bg); padding:10px 0; z-index:6;
+    font-size: var(--base-font-size);
+  }
+  .title{
+    font-size: var(--fixed-title-size);
+    font-weight:700;
+    letter-spacing:.2px;
+    cursor:pointer;
+    font-family: var(--font-title);
+  }
+  .spacer{flex:1;}
+  .controls, .controls .group{display:flex; align-items:center; gap:10px; flex-wrap:wrap;}
+  .score-pill{font-weight:700;}
+
+  button, select, input[type="text"], input[type="number"], textarea {
+    font: inherit;
+    color:var(--text);
+  }
+  .btn{
+    border:1px solid var(--border); background:var(--surface); color:var(--text);
+    padding:8px 12px; border-radius:10px; cursor:pointer;
+    transition: border-color .12s ease, background .12s ease, transform .04s ease;
+  }
+  .btn:hover{ border-color:var(--accent); background:color-mix(in srgb, var(--surface) 90%, var(--accent-weak) 10%); }
+  .btn:active{ transform: translateY(1px); }
+  .btn.primary{ background:var(--accent); color:#fff; border-color:transparent; }
+  .btn.primary:hover{ filter:brightness(1.05); }
+  .btn.icon{ padding:6px 9px; line-height:1; display:inline-flex; align-items:center; justify-content:center; }
+  .seg{ display:inline-flex; border:1px solid var(--border); border-radius:10px; overflow:hidden; }
+  .seg button{ border:0; background:var(--surface); padding:8px 10px; }
+  .seg button+button{ border-left:1px solid var(--border); }
+  .seg button:hover{ background:var(--accent-weak); }
+  select, .select, .input, textarea{
+    border:1px solid var(--border); background:var(--surface); color:var(--text);
+    padding:8px 10px; border-radius:10px; outline:none;
+  }
+  .input::placeholder, textarea::placeholder{ color:var(--muted); }
+  .input:focus, select:focus, textarea:focus{
+    outline:2px solid var(--accent); outline-offset:0;
+  }
+
+  .switch{display:inline-flex; align-items:center; gap:6px;}
+  .switch input{
+    appearance:none; width:42px; height:24px; border-radius:999px;
+    position:relative; background:var(--border); border:1px solid var(--border);
+    cursor:pointer; transition:all .15s ease;
+  }
+  .switch input:checked{ background:var(--accent); border-color:var(--accent); }
+  .switch input::after{
+    content:""; position:absolute; top:3px; left:3px;
+    width:18px; height:18px; border-radius:50%; background:#fff;
+    transition:transform .15s ease;
+  }
+  .switch input:checked::after{ transform:translateX(18px); }
+
+  .card{
+    background:var(--surface); border:1px solid var(--border);
+    border-radius:16px; padding:12px 14px;
+    box-shadow: 0 1px 0 rgba(0,0,0,0.04);
+  }
+  .toolbar{display:flex; align-items:center; gap:8px; justify-content:space-between; margin:8px 0 14px; flex-wrap:wrap;}
+  .grid{display:grid; gap:12px;}
+  .group-card{padding:8px 10px;}
+  .group-head{
+    display:flex; align-items:center; justify-content:space-between;
+    padding:6px 2px 8px; border-bottom:1px dashed var(--border);
+  }
+  .group-left{display:flex; flex-direction:column; gap:2px;}
+  .group-title{font-weight:700; cursor:pointer;}
+  .muted{color:var(--muted);}
+  .row{
+    display:flex; align-items:flex-start; gap:8px;
+    padding:8px 2px; border-bottom:1px dashed var(--border);
+  }
+  .row:last-child{border-bottom:none;}
+  .row .name{font-weight:600;}
+  .row .meta{font-size:0.9em; color:var(--muted);}
+  .row .actions{margin-left:auto; display:flex; gap:6px;}
+  .chk{
+    width:26px; height:26px; border-radius:8px;
+    border:1px solid var(--border);
+    background:var(--surface); color:var(--check);
+    display:flex; align-items:center; justify-content:center;
+    font-weight:700; cursor:pointer;
+  }
+  .chk[data-checked="true"]{
+    background:var(--check); color:#fff; border-color:var(--check);
+  }
+  .chk[disabled]{opacity:.6; cursor:not-allowed;}
+
+  .record-wrap{
+    display:flex; gap:8px; margin:6px 0 2px;
+  }
+  .record-wrap textarea{
+    flex:1; min-height:60px; resize:vertical;
+  }
+  .record-side{display:flex; flex-direction:column; gap:4px; align-items:flex-end; white-space:nowrap;}
+  .counter{ font-size:0.9em; color:var(--muted); }
+  .counter.bad{ color: var(--err); font-weight:600; }
+  .note-req{ font-size:0.88em; color:var(--muted); }
+
+  .group-card.selected{ border-color:var(--accent); box-shadow: 0 0 0 2px var(--accent-weak) inset; }
+  .row.selected{ outline:2px solid var(--accent); background:var(--accent-weak); }
+
+  .range{ accent-color: var(--accent); }
+  .pill{padding:6px 10px; border:1px solid var(--border); border-radius:999px; background:var(--surface);}
+
+  input[type="file"]{ display:none; }
+  .file-btn{ cursor:pointer; }
+
+  .notes-box{ width:100%; min-height:110px; resize:vertical; }
+  .notes-box[disabled]{ opacity:.7; background:var(--bg); }
+
+  /* Graph */
+  #graphContainer svg{ width:100%; height:auto; display:block; }
+  .legend{ display:flex; gap:14px; align-items:center; }
+  .legend .key{ display:inline-flex; align-items:center; gap:6px; }
+  .legend .sw{ width:14px; height:6px; border-radius:999px; display:inline-block; }
+  .series{ transition: opacity .12s ease, stroke-width .12s ease; pointer-events: stroke; }
+  .seriesA{ stroke: var(--lineA); }
+  .seriesB{ stroke: var(--lineB); }
+  .dot{ transition: transform .08s ease; }
+  .dot:hover{ transform: scale(1.2); }
+  .dimmed{ opacity:.45; }
+  .hi{ stroke-width:3.5 !important; opacity:1 !important; }
+
+  .warn{ color:var(--warn); font-weight:600; }
+  .small{ font-size:0.9em; }
+
+  /* Dialogs */
+  dialog{
+    border:1px solid var(--border); border-radius:14px; padding:0;
+    background:var(--surface); color:var(--text);
+    width:min(760px, 96vw);
+  }
+  dialog::backdrop{ background: rgba(0,0,0,0.25); }
+  .dlg-head{padding:14px 16px; border-bottom:1px solid var(--border); font-weight:700;}
+  .dlg-body{padding:12px 16px; display:grid; gap:10px;}
+  .dlg-row{display:grid; grid-template-columns:160px 1fr; gap:12px; align-items:center;}
+  .dlg-foot{padding:12px 16px; border-top:1px solid var(--border); display:flex; justify-content:flex-end; gap:8px;}
+
+  /* Bigger Changelog dialog */
+  #logDialog{ width:min(1000px, 92vw); min-width:50vw; }
+  #logBody .log-card{ display:flex; align-items:flex-start; justify-content:space-between; gap:10px; }
+  #logBody .log-main{ flex:1; }
+
+  /* ===== Calendar ===== */
+  .cal-card{ margin-top:12px; }
+  .cal-head{ display:flex; align-items:center; justify-content:space-between; margin:2px 0 10px; }
+  .cal-title{ font-weight:700; }
+  .cal-grid{ display:grid; grid-template-columns:repeat(7, 1fr); gap:6px; }
+  .cal-wd{ text-align:center; color:var(--muted); font-weight:600; font-size:0.9em; }
+  .cal-day{
+    height:40px; border-radius:10px; border:1px solid var(--border);
+    display:flex; align-items:center; justify-content:center;
+    cursor:pointer; user-select:none; font-weight:700;
+    transition: transform .05s ease;
+    background-size: 16px 16px;
+    position: relative;
+  }
+  .cal-day:hover{ transform:scale(1.02); }
+  .cal-day.dim{ opacity:.45; }
+  .cal-day.blank{ visibility:hidden; }
+  .cal-day.today{ outline:2px solid var(--accent); }
+  .cal-day.selected{ box-shadow:0 0 0 2px var(--accent) inset; }
+
+  /* Excuse visuals */
+  .cal-day.excused{
+    background-image: repeating-linear-gradient(135deg, var(--stripe-dark) 0 8px, transparent 8px 16px);
+  }
+  .cal-day.exc-start{ border-top-right-radius:0; border-bottom-right-radius:0; }
+  .cal-day.exc-mid{ border-radius:0; }
+  .cal-day.exc-end{ border-top-left-radius:0; border-bottom-left-radius:0; }
+  .cal-day.exc-single{ }
+
+  /* Pending range start marker */
+  .cal-day.pending{ outline:2px dashed var(--accent); outline-offset:-2px; }
+
+  /* Theme Studio drawer tweaks */
+  #themeDialog{ width:min(1020px,96vw); }
+  .theme-grid{ display:grid; grid-template-columns: repeat(auto-fit, minmax(220px,1fr)); gap:12px; }
+  .theme-section{ padding:10px 12px; border-radius:12px; border:1px solid var(--border); }
+  .theme-section h3{ margin:0 0 6px; font-size:0.96em; }
+  .theme-row{
+    display:flex; align-items:center; justify-content:space-between;
+    padding:4px 0; gap:10px;
+  }
+  .theme-row .swatch{
+    width:28px; height:18px; border-radius:999px; border:1px solid var(--border);
+  }
+  .theme-meta{ font-size:0.85em; color:var(--muted); }
+
+  .badge{
+    display:inline-flex; align-items:center; gap:6px;
+    padding:4px 8px; border-radius:999px; font-size:0.8em;
+    background:var(--surface); border:1px solid var(--border);
+  }
+
+  .hot-pill{ font-weight:600; }
+
+  /* Snapshot canvas (hidden) */
+  #shareCanvas{ display:none; }
+</style>
+</head>
+<body>
+<div class="wrap">
+  <header class="topbar">
+    <div class="title" id="dateTitle" title="Ctrl/Cmd-click to toggle edit override on a locked day">Today</div>
+    <div class="score-pill" id="scoreHeader">0/0</div>
+    <div class="spacer"></div>
+    <div class="controls">
+      <div class="group">
+        <button class="btn icon" id="prevDay" title="Previous day">◀</button>
+        <button class="btn icon" id="nextDay" title="Next day">▶</button>
+        <button class="btn" id="todayBtn" title="Jump to today">Today</button>
+        <select id="categoryFilter" class="select" title="Filter by category"></select>
+      </div>
+      <div class="group">
+        <label class="muted small" for="fontRange">Font</label>
+        <input type="range" id="fontRange" class="range" min="-4" max="4" step="1" value="0" />
+        <span id="fontReadout" class="muted small">0</span>
+        <select id="fontFamilySelect" class="select" title="Font family">
+          <option value="system">System</option>
+          <option value="serif">Serif</option>
+          <option value="mono">Mono</option>
+          <option value="rounded">Rounded</option>
+        </select>
+      </div>
+      <div class="group">
+        <label class="switch">
+          <input type="checkbox" id="darkToggle" />
+          <span class="muted small">Dark</span>
+        </label>
+        <button class="btn" id="themeBtn" title="Open Theme & Color Studio">Theme Studio</button>
+        <div class="seg">
+          <button class="btn" id="undoBtn" title="Undo (Ctrl/Cmd+Z)">↶ Undo</button>
+          <button class="btn" id="redoBtn" title="Redo (Shift+Ctrl/Cmd+Z)">↷ Redo</button>
+        </div>
+      </div>
+    </div>
+  </header>
+
+  <!-- Manage / Import / Export / Changelog -->
+  <div class="toolbar">
+    <div class="group">
+      <button class="btn primary" id="addTaskBtn">Add Task</button>
+      <button class="btn" id="editTaskBtn">Edit Task</button>
+      <button class="btn" id="removeTaskBtn">Remove Task</button>
+      <button class="btn" id="changelogBtn">Changelog</button>
+    </div>
+    <div class="group">
+      <button class="btn" id="resetDayBtn">Reset Day</button>
+      <button class="btn" id="shareCardBtn" title="Generate shareable daily snapshot">Share Day Card</button>
+      <div class="seg">
+        <label class="btn file-btn">
+          Import Tasks CSV
+          <input type="file" id="importCsvInput" accept=".csv,text/csv" />
+        </label>
+        <label class="btn file-btn">
+          Import JSON
+          <input type="file" id="importJsonInput" accept=".json,application/json" />
+        </label>
+        <button class="btn" id="exportTasksBtn">Export Tasks CSV</button>
+        <button class="btn" id="exportJsonBtn">Export JSON</button>
+        <button class="btn" id="exportLogsBtn">Export Logs CSV</button>
+      </div>
+    </div>
+  </div>
+
+  <!-- Graph controls -->
+  <div class="toolbar">
+    <div class="group">
+      <button class="btn" id="graphOverallBtn" title="Overall completion over time">Graph Overall</button>
+      <button class="btn" id="graphSelectedBtn" title="Graph the selected category or task">Graph Selected</button>
+      <button class="btn" id="clearGraphBtn">Clear Graph</button>
+    </div>
+    <div class="muted small">Hover a line to highlight. Blue = % (left). Amber = cumulative (right).</div>
+  </div>
+
+  <!-- Graph -->
+  <div id="graphCard" class="card" style="display:none;">
+    <div class="group-head">
+      <div class="group-left">
+        <div class="group-title" id="graphTitle">Graph</div>
+        <div class="muted" id="graphSub"></div>
+      </div>
+      <div class="legend" id="graphLegend">
+        <span class="key"><span class="sw" style="background:var(--lineA)"></span><span class="muted">Percent</span></span>
+        <span class="key"><span class="sw" style="background:var(--lineB)"></span><span class="muted">Cumulative</span></span>
+      </div>
+    </div>
+    <div id="graphContainer"></div>
+  </div>
+
+  <!-- Task list -->
+  <div id="listRoot" class="grid"></div>
+
+  <!-- Notes -->
+  <div class="card" style="margin-top:16px;">
+    <div class="group-head">
+      <div class="group-left">
+        <div class="group-title">Notes</div>
+        <div class="muted small" id="notesHint"></div>
+      </div>
+      <div class="muted small" id="notesStatus"></div>
+    </div>
+    <textarea id="notesBox" class="notes-box" placeholder="Notes…"></textarea>
+    <div class="muted small" id="lockInfo"></div>
+  </div>
+
+  <!-- Calendar -->
+  <div class="card cal-card">
+    <div class="cal-head">
+      <div class="cal-title">Calendar</div>
+      <div class="muted small" id="calHint">Click a day to jump. Double-click to flag/excuse.</div>
+    </div>
+    <div class="cal-grid">
+      <div class="cal-wd">Sun</div>
+      <div class="cal-wd">Mon</div>
+      <div class="cal-wd">Tue</div>
+      <div class="cal-wd">Wed</div>
+      <div class="cal-wd">Thu</div>
+      <div class="cal-wd">Fri</div>
+      <div class="cal-wd">Sat</div>
+    </div>
+    <div id="calDays" class="cal-grid"></div>
+  </div>
+</div>
+
+<!-- Task dialog -->
+<dialog id="taskDialog">
+  <div class="dlg-head" id="taskDialogTitle">Add Task</div>
+  <div class="dlg-body">
+    <div class="dlg-row">
+      <label for="taskName">Task name</label>
+      <input id="taskName" class="input" type="text" placeholder="Task…" />
+    </div>
+    <div class="dlg-row">
+      <label for="taskCategory">Category</label>
+      <input id="taskCategory" class="input" type="text" placeholder="e.g. Morning, Work, Evening…" />
+    </div>
+    <div class="dlg-row">
+      <label for="taskMinutes">Minutes (optional)</label>
+      <input id="taskMinutes" class="input" type="number" min="0" step="1" placeholder="e.g. 30" />
+    </div>
+    <div class="dlg-row">
+      <label>Record note required?</label>
+      <div style="display:flex; flex-direction:column; gap:6px;">
+        <label><input type="checkbox" id="requireRecordChk" /> Require note before checking</label>
+        <div style="display:flex; gap:8px; align-items:center;">
+          <span class="muted small">Min chars</span>
+          <input id="recordMinInput" class="input" type="number" min="1" step="1" style="max-width:80px;" />
+          <span class="muted small">Placeholder</span>
+          <input id="recordPlaceholder" class="input" type="text" style="flex:1;" placeholder="What did you do / how did it go?" />
+        </div>
+      </div>
+    </div>
+  </div>
+  <div class="dlg-foot">
+    <button class="btn" id="cancelTaskBtn">Cancel</button>
+    <button class="btn primary" id="saveTaskBtn">Save</button>
+  </div>
+</dialog>
+
+<!-- Pick dialog -->
+<dialog id="pickDialog">
+  <div class="dlg-head">Choose Task</div>
+  <div class="dlg-body" id="pickBody"></div>
+  <div class="dlg-foot">
+    <button class="btn" id="cancelPickBtn">Cancel</button>
+  </div>
+</dialog>
+
+<!-- Changelog dialog -->
+<dialog id="logDialog">
+  <div class="dlg-head">Changelog (recent 1000 edits)</div>
+  <div class="dlg-body" id="logBody" style="max-height:60vh; overflow:auto;"></div>
+  <div class="dlg-foot">
+    <button class="btn" id="closeLogBtn">Close</button>
+  </div>
+</dialog>
+
+<!-- Flag dialog -->
+<dialog id="flagDialog">
+  <div class="dlg-head">Day Flag / Excuse</div>
+  <div class="dlg-body">
+    <div class="dlg-row">
+      <label>Date / Range</label>
+      <div id="flagDate"></div>
+    </div>
+    <div class="dlg-row">
+      <label for="flagRating">Rating (0–10)</label>
+      <input id="flagRating" class="input" type="number" min="0" max="10" step="1" />
+    </div>
+    <div class="dlg-row">
+      <label for="flagHappened">What happened?</label>
+      <textarea id="flagHappened" class="input" rows="3"></textarea>
+    </div>
+    <div class="dlg-row">
+      <label for="flagBlocker">What blocked tasks?</label>
+      <textarea id="flagBlocker" class="input" rows="3"></textarea>
+    </div>
+  </div>
+  <div class="dlg-foot">
+    <button class="btn" id="flagCancelBtn">Cancel</button>
+    <button class="btn primary" id="flagSaveBtn">Save / Excuse</button>
+  </div>
+</dialog>
+
+<!-- Theme Studio dialog -->
+<dialog id="themeDialog">
+  <div class="dlg-head">
+    Theme Studio · <span id="themeModeLabel">Light</span>
+  </div>
+  <div class="dlg-body">
+    <div class="theme-grid">
+      <div class="theme-section">
+        <h3>Global</h3>
+        <div id="themeGlobal"></div>
+      </div>
+      <div class="theme-section">
+        <h3>Graph</h3>
+        <div id="themeGraph"></div>
+      </div>
+      <div class="theme-section">
+        <h3>Calendar</h3>
+        <div id="themeCalendar"></div>
+      </div>
+      <div class="theme-section">
+        <h3>Stripes & Flags</h3>
+        <div id="themeStripes"></div>
+      </div>
+    </div>
+    <div class="theme-meta">
+      <div class="badge">Tip: you can set everything up, then export your theme JSON to reuse on other devices.</div>
+      <div style="margin-top:8px; display:flex; gap:8px; flex-wrap:wrap;">
+        <button class="btn" id="themeToggleModeBtn">Edit Light / Dark</button>
+        <button class="btn" id="themeResetBtn">Reset Theme</button>
+        <button class="btn" id="presetSaveBtn">Save Theme Preset</button>
+        <select id="presetSelect" class="select" style="min-width:160px;">
+          <option value="">Load preset…</option>
+        </select>
+        <button class="btn" id="presetDeleteBtn">Delete Preset</button>
+        <button class="btn" id="themeExportBtn">Export Theme JSON</button>
+        <label class="btn file-btn">
+          Import Theme JSON
+          <input type="file" id="themeImportInput" accept=".json,application/json" />
+        </label>
+      </div>
+    </div>
+  </div>
+  <div class="dlg-foot">
+    <button class="btn" id="themeCloseBtn">Close</button>
+  </div>
+</dialog>
+
+<!-- Hidden canvas for Instagram-style share card -->
+<canvas id="shareCanvas" width="1080" height="1080"></canvas>
+
+<script>
+/* ===================== Date helpers ===================== */
+function today(){ const d=new Date(); d.setHours(0,0,0,0); return d; }
+function startOfDay(d){ const x=new Date(d); x.setHours(0,0,0,0); return x; }
+function addDays(d, n){ const x=new Date(d); x.setDate(x.getDate()+n); return x; }
+function toISODate(d){
+  if(typeof d === "string") return d;
+  return d.toISOString().slice(0,10);
+}
+function fromISODate(s){
+  const [y,m,d]=s.split("-").map(Number);
+  const dt=new Date(y,m-1,d); dt.setHours(0,0,0,0); return dt;
+}
+function fmtMMDDYY(d){
+  const dt=(d instanceof Date)?d:fromISODate(d);
+  const m=String(dt.getMonth()+1).padStart(2,"0");
+  const dd=String(dt.getDate()).padStart(2,"0");
+  const yy=String(dt.getFullYear()).slice(-2);
+  return `${m}/${dd}/${yy}`;
+}
+function headerDateLabel(d){
+  const dt=(d instanceof Date)?d:fromISODate(d);
+  const t0=startOfDay(today());
+  const d0=startOfDay(dt);
+  const diff=Math.round((d0-t0)/86400000);
+  if(diff===0) return "Today";
+  if(diff===-1) return "Yesterday";
+  if(diff===1) return "Tomorrow";
+  const weekday=["Sun","Mon","Tue","Wed","Thu","Fri","Sat"][dt.getDay()];
+  return `${weekday} ${fmtMMDDYY(dt)}`;
+}
+function originallyLocked(d){
+  const t0=startOfDay(today());
+  const d0=startOfDay(d);
+  const diff=Math.round((t0-d0)/86400000);
+  return diff>2;
+}
+function isLockedDate(d){
+  const iso=toISODate(d);
+  if(state.editOverrides?.[iso]) return false;
+  return originallyLocked(d);
+}
+
+/* ===================== State & DOM refs ===================== */
+const STORAGE_KEY="daily-checklist-v3";
+
+const defaultState = {
+  tasks:[],
+  logs:{},        // logs[dateISO][taskId] = {completed, record, ts}
+  notes:{},       // notes[dateISO] = string
+  flags:{},       // flags[dateISO] = {rating, happened, blocker, batchId}
+  editOverrides:{},
+  orders:{ categoryOrder:[], taskOrder:{} },
+  changelog:[],
+  theme:{ light:{}, dark:{} },
+  themePresets:{},
+  prefs:{
+    fontStep:0,
+    darkMode:false,
+    fontFamily:"system"
+  }
+};
+
+function loadState(){
+  try{
+    const raw=localStorage.getItem(STORAGE_KEY);
+    if(!raw) return structuredClone(defaultState);
+    const s=JSON.parse(raw);
+    s.tasks ??=[];
+    s.logs ??={};
+    s.notes ??={};
+    s.flags ??={};
+    s.editOverrides ??={};
+    s.orders ??={categoryOrder:[],taskOrder:{}};
+    s.orders.categoryOrder ??=[];
+    s.orders.taskOrder ??={};
+    s.changelog ??=[];
+    s.theme ??={light:{},dark:{}};
+    s.themePresets ??={};
+    s.prefs ??={fontStep:0,darkMode:false,fontFamily:"system"};
+    if(typeof s.prefs.fontStep!=="number") s.prefs.fontStep=0;
+    if(typeof s.prefs.darkMode!=="boolean") s.prefs.darkMode=false;
+    if(!s.prefs.fontFamily) s.prefs.fontFamily="system";
+    return s;
+  }catch(e){
+    console.error("loadState failed",e);
+    return structuredClone(defaultState);
+  }
+}
+function saveState(){
+  try{
+    localStorage.setItem(STORAGE_KEY, JSON.stringify(state));
+  }catch(e){ console.error("saveState failed",e); }
+}
+
+let state = loadState();
+let curDate = today();
+
+let selectedCategory = null;
+let selectedTaskId = null;
+
+const $  = (sel, root=document)=>root.querySelector(sel);
+const $$ = (sel, root=document)=>Array.from(root.querySelectorAll(sel));
+
+const listRoot       = $("#listRoot");
+const dateTitle      = $("#dateTitle");
+const todayBtn       = $("#todayBtn");
+const categoryFilter = $("#categoryFilter");
+const scoreHeader    = $("#scoreHeader");
+const notesBox       = $("#notesBox");
+const notesHint      = $("#notesHint");
+const notesStatus    = $("#notesStatus");
+const lockInfo       = $("#lockInfo");
+
+const graphCard      = $("#graphCard");
+const graphTitle     = $("#graphTitle");
+const graphSub       = $("#graphSub");
+const graphContainer = $("#graphContainer");
+
+const calDays        = $("#calDays");
+
+/* ===================== Task Revisions (non-retroactive) ===================== */
+function getRevisionForDate(task, dateISO){
+  const revs = task.revisions || [];
+  let pick = revs[0] || null;
+  for(const r of revs){
+    if(r.effective <= dateISO && (!pick || r.effective >= pick.effective)) pick = r;
+  }
+  if(!pick){
+    return {
+      name:"(unnamed)",
+      category:null,
+      minutes:null,
+      effective:"0001-01-01",
+      requireRecord:false,
+      recordMin:0,
+      recordPlaceholder:"",
+      archived:false
+    };
+  }
+  if(pick.archived == null) pick.archived = false;
+  return pick;
+}
+function latestRevision(task){
+  const revs = task.revisions || [];
+  if(revs.length===0) return null;
+  const latest = revs.reduce((a,b)=> a.effective >= b.effective ? a : b);
+  if(latest.archived == null) latest.archived = false;
+  return latest;
+}
+function taskActiveOnDate(task, dateISO){
+  const rev = getRevisionForDate(task, dateISO);
+  return !rev.archived;
+}
+function categoriesForDate(dateISO){
+  const set = new Set();
+  for(const t of state.tasks){
+    const r = getRevisionForDate(t, dateISO);
+    if(r.archived) continue;
+    set.add(r.category ?? "-");
+  }
+  return Array.from(set).sort();
+}
+
+/* ===================== Logs & Scores ===================== */
+function getLogEntry(dateISO, taskId){
+  return state.logs?.[dateISO]?.[String(taskId)] || null;
+}
+function getStatus(dateISO, taskId){
+  return !!(getLogEntry(dateISO, taskId)?.completed);
+}
+function setStatus(dateISO, taskId, completed){
+  state.logs[dateISO] ??= {};
+  const prev = state.logs[dateISO][String(taskId)] || {};
+  state.logs[dateISO][String(taskId)] = { ...prev, completed: !!completed, ts:new Date().toISOString() };
+  saveState();
+}
+function setRecord(dateISO, taskId, text){
+  state.logs[dateISO] ??= {};
+  const prev = state.logs[dateISO][String(taskId)] || {};
+  state.logs[dateISO][String(taskId)] = { ...prev, record:text, ts:new Date().toISOString() };
+  saveState();
+}
+function scoreForDate(dateISO){
+  let total=0, done=0;
+  for(const t of state.tasks){
+    if(!taskActiveOnDate(t,dateISO)) continue;
+    total++;
+    if(getStatus(dateISO, t.id)) done++;
+  }
+  if(total===0) return {done:0,total:0,pct:0.5};
+  return {done,total,pct:done/total};
+}
+
+/* ===================== Ordering Helpers ===================== */
+function ensureOrdersFor(keys){
+  const ord = state.orders.categoryOrder || [];
+  const filtered = ord.filter(c=>keys.includes(c));
+  for(const k of keys){ if(!filtered.includes(k)) filtered.push(k); }
+  state.orders.categoryOrder = filtered;
+}
+function ensureTaskOrder(cat, ids){
+  const cur = state.orders.taskOrder[cat] || [];
+  const filtered = cur.filter(id=>ids.includes(id));
+  for(const id of ids){ if(!filtered.includes(id)) filtered.push(id); }
+  state.orders.taskOrder[cat] = filtered;
+}
+function sortByOrder(keys){
+  const ord = state.orders.categoryOrder || [];
+  return keys.slice().sort((a,b)=>{
+    const ia=ord.indexOf(a), ib=ord.indexOf(b);
+    if(ia===-1 && ib===-1) return a.localeCompare(b);
+    if(ia===-1) return 1;
+    if(ib===-1) return -1;
+    return ia-ib;
+  });
+}
+function sortTasksByOrder(cat, items){
+  const ids = items.map(x=>x.task.id);
+  ensureTaskOrder(cat, ids);
+  const order = state.orders.taskOrder[cat];
+  const pos = id => order.indexOf(id);
+  return items.slice().sort((a,b)=>{
+    const pa=pos(a.task.id), pb=pos(b.task.id);
+    if(pa===-1 && pb===-1) return a.rev.name.localeCompare(b.rev.name);
+    if(pa===-1) return 1;
+    if(pb===-1) return -1;
+    return pa-pb;
+  });
+}
+
+/* ===================== Log date helpers ===================== */
+function getAllLogDates(){
+  const s = new Set(Object.keys(state.logs||{}));
+  Object.keys(state.notes||{}).forEach(d=>s.add(d));
+  const arr = Array.from(s).filter(d=>/^\d{4}-\d{2}-\d{2}$/.test(d)).sort();
+  return arr;
+}
+
+/* ===================== Calendar coloring ===================== */
+function colorForPct(pct){
+  const p = Math.max(0,Math.min(1,pct));
+  const [r1,g1,b1] = evalColor(getCSSVar("--cal-red"));
+  const [r2,g2,b2] = evalColor(getCSSVar("--cal-mid"));
+  const [r3,g3,b3] = evalColor(getCSSVar("--cal-green"));
+  let r,g,b;
+  if(p<0.5){
+    const t=p/0.5;
+    r=Math.round(r1+(r2-r1)*t);
+    g=Math.round(g1+(g2-g1)*t);
+    b=Math.round(b1+(b2-b1)*t);
+  }else{
+    const t=(p-0.5)/0.5;
+    r=Math.round(r2+(r3-r2)*t);
+    g=Math.round(g2+(g3-g2)*t);
+    b=Math.round(b2+(b3-b2)*t);
+  }
+  return `rgb(${r},${g},${b})`;
+}
+function evalColor(value){
+  value=(value||"").trim();
+  if(value.startsWith("rgb")){
+    const nums=value.replace(/[^\d,]/g,"").split(",").map(Number);
+    return nums.slice(0,3);
+  }
+  if(value.startsWith("#")){
+    let hex=value.slice(1);
+    if(hex.length===3) hex=hex.split("").map(c=>c+c).join("");
+    const r=parseInt(hex.slice(0,2),16);
+    const g=parseInt(hex.slice(2,4),16);
+    const b=parseInt(hex.slice(4,6),16);
+    return [r,g,b];
+  }
+  return [200,200,200];
+}
+function textColorForBg(bg){
+  const [r,g,b] = evalColor(bg);
+  const L = 0.2126*(r/255)**2.2 + 0.7152*(g/255)**2.2 + 0.0722*(b/255)**2.2;
+  return L>0.5 ? "#111" : "#f9fafb";
+}
+
+/* ===================== Selection ===================== */
+function clearSelection(){
+  selectedCategory=null;
+  selectedTaskId=null;
+  $$(".group-card").forEach(c=>c.classList.remove("selected"));
+  $$(".row").forEach(r=>r.classList.remove("selected"));
+}
+function toggleSelectCategory(cat){
+  if(selectedCategory===cat && selectedTaskId==null){ clearSelection(); }
+  else{ selectedCategory=cat; selectedTaskId=null; }
+  render();
+}
+function toggleSelectTask(tid){
+  if(selectedTaskId===tid){ clearSelection(); }
+  else{ selectedTaskId=tid; selectedCategory=null; }
+  render();
+}
+
+/* ===================== Task CRUD + Changelog ===================== */
+const taskDialog = $("#taskDialog");
+const taskDialogTitle = $("#taskDialogTitle");
+const taskName = $("#taskName");
+const taskCategory = $("#taskCategory");
+const taskMinutes = $("#taskMinutes");
+const requireRecordChk = $("#requireRecordChk");
+const recordMinInput = $("#recordMinInput");
+const recordPlaceholder = $("#recordPlaceholder");
+
+$("#cancelTaskBtn").addEventListener("click", ()=> taskDialog.close());
+$("#saveTaskBtn").addEventListener("click", onSaveTask);
+
+let editingId = null;
+function addChangelog(entry){
+  state.changelog.unshift(entry);
+  if(state.changelog.length>1000) state.changelog.length=1000;
+  saveState();
+}
+
+function openAdd(){
+  editingId=null; taskDialogTitle.textContent="Add Task";
+  taskName.value=""; taskCategory.value=""; taskMinutes.value="";
+  requireRecordChk.checked=false; recordMinInput.value=""; recordPlaceholder.value="";
+  taskDialog.showModal(); setTimeout(()=>taskName.focus(),30);
+}
+function openAddInCategory(cat){
+  editingId=null; taskDialogTitle.textContent="Add Task";
+  taskName.value=""; taskCategory.value=(cat==="-"?"":cat); taskMinutes.value="";
+  requireRecordChk.checked=false; recordMinInput.value=""; recordPlaceholder.value="";
+  taskDialog.showModal(); setTimeout(()=>taskName.focus(),30);
+}
+function openEdit(id){
+  const t=state.tasks.find(x=>x.id===id); if(!t) return;
+  editingId=id; taskDialogTitle.textContent="Edit Task";
+  const cur=latestRevision(t) || {};
+  taskName.value=cur.name || "";
+  taskCategory.value=cur.category || "";
+  taskMinutes.value=(cur.minutes ?? "")==="" ? "" : String(cur.minutes);
+  requireRecordChk.checked=!!cur.requireRecord;
+  recordMinInput.value=cur.recordMin != null ? String(cur.recordMin) : "";
+  recordPlaceholder.value=cur.recordPlaceholder || "";
+  taskDialog.showModal(); setTimeout(()=>taskName.focus(),30);
+}
+function onSaveTask(){
+  const name=taskName.value.trim(); if(!name){ alert("Task name required."); return; }
+  const category=(taskCategory.value.trim() || null);
+  const minutesRaw=taskMinutes.value.trim();
+  let minutes=null;
+  if(minutesRaw!==""){
+    const n=Number(minutesRaw);
+    if(!Number.isInteger(n)||n<0){ alert("Minutes must be a non-negative integer."); return; }
+    minutes=n;
+  }
+
+  const reqRec=!!requireRecordChk.checked;
+  let recMin=0, recPh="";
+  if(reqRec){
+    const minRaw=recordMinInput.value.trim();
+    if(minRaw==="" || Number(minRaw)<1 || !Number.isInteger(Number(minRaw))){
+      alert("Min characters must be a positive integer."); return;
+    }
+    recMin=Number(minRaw);
+    recPh=recordPlaceholder.value.trim();
+  }
+
+  const eff=toISODate(today()); // proactive
+  const newFields={ name,category,minutes,requireRecord:reqRec,recordMin:recMin,recordPlaceholder:recPh, archived:false };
+
+  if(editingId==null){
+    const nextId=state.tasks.length ? Math.max(...state.tasks.map(t=>t.id))+1 : 1;
+    state.tasks.push({ id:nextId, revisions:[{effective:eff, ...newFields}] });
+    addChangelog({ ts:new Date().toISOString(), action:"add", taskId:nextId, before:null, after:newFields, effective:eff });
+  }else{
+    const t=state.tasks.find(x=>x.id===editingId); if(!t) return;
+    const before=latestRevision(t);
+    t.revisions.push({ effective:eff, ...newFields });
+    addChangelog({
+      ts:new Date().toISOString(),
+      action:"edit",
+      taskId:t.id,
+      effective:eff,
+      before:{
+        name:before?.name??null,
+        category:before?.category??null,
+        minutes:before?.minutes??null,
+        requireRecord:!!before?.requireRecord,
+        recordMin:before?.recordMin??0,
+        recordPlaceholder:before?.recordPlaceholder??"",
+        archived:!!before?.archived
+      },
+      after:newFields
+    });
+  }
+  refreshCategoryFilter(); render(); taskDialog.close();
+}
+
+/* Non-retroactive “remove” = archive from today forward */
+function removeTaskById(id){
+  const t = state.tasks.find(x=>x.id===id); if(!t) return;
+  const before = latestRevision(t);
+  const name = before?.name || "(unnamed)";
+  if(!confirm(`Remove “${name}” from future days? Past data will stay intact.`)) return;
+
+  const eff = toISODate(today());
+  const newFields = {
+    name:before?.name ?? null,
+    category:before?.category ?? null,
+    minutes:before?.minutes ?? null,
+    requireRecord:!!before?.requireRecord,
+    recordMin:before?.recordMin ?? 0,
+    recordPlaceholder:before?.recordPlaceholder ?? "",
+    archived:true
+  };
+  t.revisions.push({ effective:eff, ...newFields });
+
+  addChangelog({
+    ts:new Date().toISOString(),
+    action:"archive",
+    taskId:id,
+    effective:eff,
+    before:{
+      name:before?.name??null,
+      category:before?.category??null,
+      minutes:before?.minutes??null,
+      requireRecord:!!before?.requireRecord,
+      recordMin:before?.recordMin??0,
+      recordPlaceholder:before?.recordPlaceholder??"",
+      archived:!!before?.archived
+    },
+    after:newFields
+  });
+
+  refreshCategoryFilter();
+  render();
+}
+
+/* ===================== Pick Dialog ===================== */
+const pickDialog = $("#pickDialog");
+const pickBody = $("#pickBody");
+$("#cancelPickBtn").addEventListener("click", ()=> pickDialog.close());
+function openPick(onChoose){
+  pickBody.innerHTML="";
+  const filterSel = document.createElement("select");
+  filterSel.className="select";
+  filterSel.style.marginBottom="10px";
+  const cats = ["All", ...categoriesForDate(toISODate(curDate))];
+  for(const c of cats){
+    const opt=document.createElement("option");
+    opt.value=c; opt.textContent=c;
+    filterSel.appendChild(opt);
+  }
+  pickBody.appendChild(filterSel);
+  const list=document.createElement("div");
+  list.className="grid";
+  pickBody.appendChild(list);
+
+  function revFor(t){ return getRevisionForDate(t, toISODate(curDate)); }
+
+  function refreshList(){
+    list.innerHTML="";
+    const target=filterSel.value;
+    let ts=state.tasks.slice().map(t=>({t,r:revFor(t)}));
+    ts = ts.filter(x => !x.r.archived);
+    if(target!=="All") ts=ts.filter(x=>(x.r.category??"-")===target);
+    ts.sort((a,b)=>(a.r.category??"-").localeCompare(b.r.category??"-") || a.r.name.localeCompare(b.r.name));
+    for(const {t,r} of ts){
+      const btn=document.createElement("button");
+      btn.className="btn";
+      btn.style.justifyContent="space-between";
+      btn.style.display="flex";
+      btn.innerHTML=`<span>${r.name}</span><span class="muted small">${r.category??"-"}</span>`;
+      btn.addEventListener("click",()=>{
+        onChoose(t.id);
+        pickDialog.close();
+      });
+      list.appendChild(btn);
+    }
+  }
+  filterSel.addEventListener("change",refreshList);
+  refreshList();
+  pickDialog.showModal();
+}
+
+/* ===================== Render ===================== */
+function refreshCategoryFilter(){
+  const dateISO=toISODate(curDate);
+  const cats=["All", ...categoriesForDate(dateISO)];
+  categoryFilter.innerHTML=cats.map(c=>`<option value="${c}">${c}</option>`).join("");
+  if(!cats.includes(categoryFilter.value)) categoryFilter.value="All";
+}
+function computeScore(dateISO){
+  let doneAll=0, totalAll=0;
+  for(const t of state.tasks){
+    if(!taskActiveOnDate(t,dateISO)) continue;
+    totalAll++;
+    if(getStatus(dateISO, t.id)) doneAll++;
+  }
+  return {doneAll,totalAll};
+}
+function refreshTodayButton(){ todayBtn.textContent = fmtMMDDYY(today()); }
+
+/* drag state */
+let dragCat=null;
+let dragTask=null;
+
+function el(tag, props={}, ...children){
+  const n=document.createElement(tag);
+  if(props.class) n.className=props.class;
+  if(props.className) n.className=props.className;
+  if(props.dataset){
+    for(const [k,v] of Object.entries(props.dataset)) n.dataset[k]=v;
+  }
+  if(props.onclick) n.addEventListener("click",props.onclick);
+  if(props.title) n.title=props.title;
+  if(props.style) n.style.cssText=props.style;
+  if(props.type) n.type=props.type;
+  if(props.value!=null) n.value=props.value;
+  if(props.id) n.id=props.id;
+  for(const c of children){
+    if(c==null) continue;
+    if(typeof c==="string") n.appendChild(document.createTextNode(c));
+    else n.appendChild(c);
+  }
+  return n;
+}
+
+function render(){
+  const dateISO=toISODate(curDate);
+  const locked=isLockedDate(curDate);
+  const wasLocked=originallyLocked(curDate);
+  const overrideOn=!!state.editOverrides?.[dateISO];
+
+  dateTitle.textContent=headerDateLabel(curDate);
+  refreshTodayButton();
+  const {doneAll,totalAll}=computeScore(dateISO);
+  scoreHeader.textContent=`${doneAll}/${totalAll}`;
+
+  const filter=categoryFilter.value || "All";
+  const grouped={};
+  for(const t of state.tasks){
+    if(!taskActiveOnDate(t,dateISO)) continue;
+    const r=getRevisionForDate(t,dateISO);
+    const cat=r.category ?? "-";
+    if(filter!=="All" && cat!==filter) continue;
+    (grouped[cat] ||= []).push({task:t, rev:r});
+  }
+  const groupKeysAll=Object.keys(grouped);
+  ensureOrdersFor(groupKeysAll);
+  const groupKeys=sortByOrder(groupKeysAll);
+
+  listRoot.innerHTML="";
+  if(groupKeys.length===0){
+    listRoot.appendChild(el("div",{class:"card"}, el("div",{class:"muted"},"No tasks yet. Use “Add Task”.") ));
+  }else{
+    for(const cat of groupKeys){
+      grouped[cat]=sortTasksByOrder(cat, grouped[cat]);
+
+      const card=el("div",{class:"card group-card", dataset:{cat:cat}});
+      if(selectedCategory===cat && selectedTaskId==null) card.classList.add("selected");
+
+      /* Category drag handlers */
+      card.setAttribute("draggable","true");
+      card.addEventListener("dragstart",(e)=>{
+        dragCat=cat; card.classList.add("dragging");
+        e.dataTransfer.setData("text/plain","CAT:"+cat);
+      });
+      card.addEventListener("dragend",()=>{
+        dragCat=null; card.classList.remove("dragging");
+        $$(".drop-target").forEach(n=>n.classList.remove("drop-target"));
+      });
+      card.addEventListener("dragover",(e)=>{
+        if(dragCat && dragCat!==cat){ e.preventDefault(); card.classList.add("drop-target"); }
+      });
+      card.addEventListener("dragleave",()=> card.classList.remove("drop-target"));
+      card.addEventListener("drop",(e)=>{
+        if(!dragCat || dragCat===cat) return;
+        e.preventDefault(); card.classList.remove("drop-target");
+        const ord=state.orders.categoryOrder;
+        const from=ord.indexOf(dragCat), to=ord.indexOf(cat);
+        if(from>-1 && to>-1){ ord.splice(from,1); ord.splice(to,0,dragCat); saveState(); render(); }
+      });
+
+      const left=el("div",{class:"group-left"},
+        el("div",{class:"group-title", onclick:()=>toggleSelectCategory(cat), title:"Select category for graph / drag to reorder"}, cat),
+        el("div",{class:"muted"}, `${grouped[cat].length} tasks`)
+      );
+      const addBtn=el("button",{class:"btn", title:`Add task to ${cat}`, onclick:()=>openAddInCategory(cat)}, "＋ Add");
+      card.appendChild(el("div",{class:"group-head"}, left, addBtn));
+
+      for(const {task,rev} of grouped[cat]){
+        const checked=getStatus(dateISO, task.id);
+        const row=el("div",{class:"row", dataset:{tid:String(task.id)}});
+        if(selectedTaskId===task.id) row.classList.add("selected");
+
+        /* Task drag handlers */
+        row.setAttribute("draggable","true");
+        row.addEventListener("dragstart",(e)=>{
+          dragTask={id:task.id, cat:cat}; row.classList.add("dragging");
+          e.dataTransfer.setData("text/plain","TASK:"+task.id);
+        });
+        row.addEventListener("dragend",()=>{
+          dragTask=null; row.classList.remove("dragging");
+          $$(".drop-target").forEach(n=>n.classList.remove("drop-target"));
+        });
+        row.addEventListener("dragover",(e)=>{
+          if(dragTask && dragTask.cat===cat && dragTask.id!==task.id){
+            e.preventDefault(); row.classList.add("drop-target");
+          }
+        });
+        row.addEventListener("dragleave",()=> row.classList.remove("drop-target"));
+        row.addEventListener("drop",(e)=>{
+          if(!dragTask || dragTask.cat!==cat || dragTask.id===task.id) return;
+          e.preventDefault(); row.classList.remove("drop-target");
+          const list=state.orders.taskOrder[cat] || [];
+          const from=list.indexOf(dragTask.id);
+          const to=list.indexOf(task.id);
+          if(from>-1 && to>-1){
+            list.splice(from,1); list.splice(to,0,dragTask.id);
+            state.orders.taskOrder[cat]=list;
+            saveState(); render();
+          }
+        });
+
+        const chk=el("button",{
+          class:"chk",
+          dataset:{checked:String(checked)},
+          title: locked ? (wasLocked ? (overrideOn ? "Override ON" : "Locked (older than 2 days)") : "") : (checked?"Uncheck":"Check")
+        }, checked?"✓":"");
+        if(locked) chk.setAttribute("disabled","true");
+        chk.addEventListener("click",(ev)=>{
+          if(locked) return;
+          ev.stopPropagation();
+          const want=!(chk.dataset.checked==="true");
+          if(want && rev.requireRecord){
+            const rec=(getLogEntry(dateISO, task.id)?.record || "").trim();
+            const ok=rec.length >= Math.max(1, Number(rev.recordMin||0));
+            if(!ok){
+              const recTA=card.querySelector(`.record-input[data-for="${task.id}"]`);
+              if(recTA) recTA.focus();
+              alert(`Add a record note of at least ${rev.recordMin||1} characters before checking this task.`);
+              return;
+            }
+          }
+          setStatus(dateISO, task.id, want);
+          render(); renderCalendar();
+        });
+
+        const name=el("div",{class:"name", onclick:()=>toggleSelectTask(task.id), title:"Select for graph / drag to reorder"}, rev.name);
+        const metaBits=[];
+        if(rev.minutes != null && rev.minutes!=="") metaBits.push(`${rev.minutes}m`);
+        if(rev.requireRecord) metaBits.push(`req ${rev.recordMin||1}`);
+        const meta=el("div",{class:"meta"}, metaBits.join(" · "));
+        const actions=el("div",{class:"actions"},
+          el("button",{class:"btn icon", title:"Edit (proactive from today)", onclick:(ev)=>{ ev.stopPropagation(); openEdit(task.id); }}, "✏️"),
+          el("button",{class:"btn icon", title:"Remove (non-retroactive archive)", onclick:(ev)=>{ ev.stopPropagation(); removeTaskById(task.id); renderCalendar(); }}, "🗑️")
+        );
+        row.append(chk, el("div",{}, name, meta), actions);
+        card.appendChild(row);
+
+        if(rev.requireRecord){
+          const recEntry=getLogEntry(dateISO, task.id);
+          const recText=recEntry?.record || "";
+          const recWrap=el("div",{class:"record-wrap"},
+            el("textarea",{
+              class:"input record-input",
+              "data-for":String(task.id),
+              placeholder: rev.recordPlaceholder || `Record (min ${rev.recordMin||1} chars)…`,
+              disabled: locked ? "true" : null,
+              oninput:(e)=>{
+                const val=e.target.value;
+                setRecord(dateISO, task.id, val);
+                const len=val.trim().length, min=Math.max(1, Number(rev.recordMin||0));
+                counter.textContent=`${len}/${min}`;
+                counter.classList.toggle("bad", len<min);
+              }
+            }),
+            el("div",{class:"record-side"},
+              el("div",{class:"counter"}, "0/0"),
+              el("div",{class:"note-req"}, `min ${rev.recordMin||1}`)
+            )
+          );
+          const ta=recWrap.querySelector("textarea");
+          const counter=recWrap.querySelector(".counter");
+          ta.value=recText;
+          const len=recText.trim().length, min=Math.max(1, Number(rev.recordMin||0));
+          counter.textContent=`${len}/${min}`;
+          counter.classList.toggle("bad", len<min);
+          card.appendChild(recWrap);
+        }
+      }
+
+      listRoot.appendChild(card);
+    }
+  }
+
+  const label=headerDateLabel(curDate);
+  notesHint.textContent=`for ${label}`;
+  notesBox.placeholder=`Notes for ${label}.`;
+  notesBox.value=state.notes?.[dateISO] ?? "";
+  notesBox.disabled=locked && !state.editOverrides?.[dateISO];
+
+  if(locked){
+    lockInfo.textContent = state.editOverrides?.[dateISO]
+      ? "Override ON: editing an old locked day."
+      : "Locked: days older than 2 days are read-only. Ctrl/Cmd-click the date title to toggle override.";
+  }else{
+    lockInfo.textContent="";
+  }
+
+  renderCalendar();
+}
+
+/* ===================== Calendar ===================== */
+let pendingExcuseStartISO=null;
+
+function renderCalendar(){
+  const selectedISO=toISODate(curDate);
+  const dates=getAllLogDates();
+  const grid=calDays;
+  grid.innerHTML="";
+
+  const todayDate=today();
+  const firstLogDate=dates.length ? fromISODate(dates[0]) : todayDate;
+
+  const curMonthStart=new Date(curDate.getFullYear(), curDate.getMonth(), 1);
+  const startOffset=curMonthStart.getDay();
+  const firstCell=addDays(curMonthStart, -startOffset);
+
+  for(let i=0;i<42;i++){
+    const dt=addDays(firstCell, i);
+    const iso=toISODate(dt);
+    const inMonth=dt.getMonth()===curDate.getMonth();
+    if(i<7){
+      // header row already present; days below
+    }
+    const btn=document.createElement("button");
+    btn.className="cal-day";
+    const d=dt.getDate();
+    btn.textContent=String(d);
+
+    if(!inMonth) btn.classList.add("blank");
+
+    const inFuture=startOfDay(dt) > startOfDay(todayDate);
+    const beforeFirst = dates.length ? (startOfDay(dt) < startOfDay(firstLogDate)) : false;
+
+    btn.addEventListener("click",(e)=>{
+      if(!(inFuture || beforeFirst)){
+        curDate=dt; refreshCategoryFilter(); render();
+      }
+    });
+    btn.addEventListener("dblclick",(e)=>{
+      if(inFuture || beforeFirst) return;
+      openFlagDialog(iso); e.preventDefault(); e.stopPropagation();
+    });
+    btn.addEventListener("mousedown",(e)=>{
+      if(!(e.ctrlKey || e.metaKey)) return;
+      e.preventDefault(); e.stopPropagation();
+      if(inFuture || beforeFirst) return;
+      if(!pendingExcuseStartISO){
+        pendingExcuseStartISO=iso;
+        $("#calHint").textContent="Range start set. Ctrl/Cmd-click another eligible day to end the range, or Ctrl/Cmd-click the same day to excuse a single day.";
+        renderCalendar();
+      }else{
+        const [start,end]=(fromISODate(pendingExcuseStartISO) <= fromISODate(iso))
+          ? [pendingExcuseStartISO, iso] : [iso, pendingExcuseStartISO];
+        pendingExcuseStartISO=null;
+        openFlagDialog(null, {start,end});
+      }
+    });
+
+    if(inFuture || beforeFirst){
+      btn.classList.add("dim");
+      btn.style.backgroundColor="var(--border)";
+      btn.style.backgroundImage="none";
+      btn.style.color="var(--muted)";
+      btn.title = beforeFirst ? "No data yet" : "Future date";
+    }else{
+      const sc=scoreForDate(iso);
+      const bg=colorForPct(sc.pct);
+      btn.style.backgroundColor=bg;
+      btn.style.color=textColorForBg(bg);
+      if(pendingExcuseStartISO===iso) btn.classList.add("pending");
+
+      const f=state.flags[iso];
+      if(f){
+        btn.classList.add("excused");
+        const prevISO=toISODate(addDays(dt,-1));
+        const nextISO=toISODate(addDays(dt,+1));
+        const curBatch=f.batchId ?? `__single_${iso}`;
+        const prevMatch=state.flags[prevISO]?.batchId===curBatch;
+        const nextMatch=state.flags[nextISO]?.batchId===curBatch;
+
+        if(prevMatch && nextMatch) btn.classList.add("exc-mid");
+        else if(prevMatch && !nextMatch) btn.classList.add("exc-end");
+        else if(!prevMatch && nextMatch) btn.classList.add("exc-start");
+        else btn.classList.add("exc-single");
+
+        btn.title=`${iso}: ${Math.round(sc.pct*100)}% (${sc.done}/${sc.total}) · FLAG ${f.rating??""}/10 — ${f.happened?f.happened:"(no note)"}`;
+      }else{
+        btn.style.backgroundImage="none";
+        btn.title=`${iso}: ${Math.round(sc.pct*100)}% (${sc.done}/${sc.total})`;
+      }
+    }
+
+    if(toISODate(dt)===toISODate(todayDate)) btn.classList.add("today");
+    if(iso===selectedISO) btn.classList.add("selected");
+
+    grid.appendChild(btn);
+  }
+}
+
+/* ===================== Flag dialog logic ===================== */
+const flagDialog = $("#flagDialog");
+const flagDate = $("#flagDate");
+const flagRating = $("#flagRating");
+const flagHappened = $("#flagHappened");
+const flagBlocker = $("#flagBlocker");
+const flagSaveBtn = $("#flagSaveBtn");
+const flagCancelBtn = $("#flagCancelBtn");
+let flagRange=null;
+
+flagCancelBtn.addEventListener("click",()=>{ flagDialog.close(); flagRange=null; });
+
+function openFlagDialog(singleISO, range){
+  flagRange = range || null;
+  if(flagRange){
+    flagDate.textContent=`${flagRange.start} → ${flagRange.end}`;
+    const anyFlag=state.flags[flagRange.start] || null;
+    flagRating.value=anyFlag?.rating ?? "";
+    flagHappened.value=anyFlag?.happened ?? "";
+    flagBlocker.value=anyFlag?.blocker ?? "";
+  }else{
+    flagDate.textContent=singleISO;
+    const f=state.flags[singleISO];
+    flagRating.value=f?.rating ?? "";
+    flagHappened.value=f?.happened ?? "";
+    flagBlocker.value=f?.blocker ?? "";
+  }
+  flagDialog.showModal();
+}
+
+flagSaveBtn.addEventListener("click",()=>{
+  const ratingRaw=flagRating.value.trim();
+  const rating = ratingRaw==="" ? null : Number(ratingRaw);
+  const happened=flagHappened.value.trim();
+  const blocker=flagBlocker.value.trim();
+
+  const batchId = "_b_"+Date.now().toString(36);
+
+  function applyTo(iso, batch){
+    if(!state.flags[iso]) state.flags[iso]={};
+    state.flags[iso].rating = rating;
+    state.flags[iso].happened = happened;
+    state.flags[iso].blocker = blocker;
+    if(batch) state.flags[iso].batchId = batch;
+  }
+
+  if(flagRange){
+    const start=fromISODate(flagRange.start);
+    const end=fromISODate(flagRange.end);
+    let d=start;
+    while(d<=end){
+      applyTo(toISODate(d), batchId);
+      d=addDays(d,1);
+    }
+  }else{
+    const iso=flagDate.textContent;
+    applyTo(iso,null);
+  }
+  saveState();
+  flagDialog.close();
+  flagRange=null;
+  renderCalendar();
+});
+
+/* ===================== Graphs ===================== */
+function graphOverall(){
+  const dates=getAllLogDates();
+  if(dates.length===0){ graphContainer.innerHTML=""; graphCard.style.display="none"; return; }
+  const pct=dates.map(d=>{
+    let done=0,total=0;
+    for(const t of state.tasks){
+      if(!taskActiveOnDate(t,d)) continue;
+      total++;
+      if(getStatus(d,t.id)) done++;
+    }
+    return total ? (done/total)*100 : 0;
+  });
+  const dailyCount=dates.map(d=>{
+    let done=0;
+    for(const t of state.tasks){
+      if(taskActiveOnDate(t,d) && getStatus(d,t.id)) done++;
+    }
+    return done;
+  });
+  const cum=dailyCount.reduce((arr,v,i)=>{ arr.push((arr[i-1]||0)+v); return arr; },[]);
+  renderChartDual(dates,pct,cum,{title:"Overall completion", subtitle:`${dates[0]} → ${dates[dates.length-1]}`, rightLabel:"Cum. done"});
+}
+function graphSelected(){
+  const dates=getAllLogDates();
+  if(dates.length===0){ graphContainer.innerHTML=""; graphCard.style.display="none"; return; }
+  if(selectedTaskId!=null){
+    const t=state.tasks.find(x=>x.id===selectedTaskId); if(!t){ alert("Select a task again."); return; }
+    const pct=dates.map(d=> getStatus(d,t.id)?100:0);
+    const daily=dates.map(d=> getStatus(d,t.id)?1:0);
+    const cum=daily.reduce((a,v,i)=>{ a.push((a[i-1]||0)+v); return a; },[]);
+    const name=getRevisionForDate(t,toISODate(curDate)).name;
+    renderChartDual(dates,pct,cum,{title:`Task: ${name}`, subtitle:`${dates[0]} → ${dates[dates.length-1]}`, rightLabel:"Cum. checks"});
+    return;
+  }
+  if(selectedCategory!=null){
+    const cat=selectedCategory;
+    const pct=dates.map(d=>{
+      const tasks=state.tasks.filter(t=> taskActiveOnDate(t,d) && (getRevisionForDate(t,d).category??"-")===cat);
+      const total=tasks.length||1;
+      let done=0;
+      for(const t of tasks){ if(getStatus(d,t.id)) done++; }
+      return (done/total)*100;
+    });
+    const daily=dates.map(d=>{
+      let done=0;
+      for(const t of state.tasks){
+        if(taskActiveOnDate(t,d) && (getRevisionForDate(t,d).category??"-")===cat && getStatus(d,t.id)) done++;
+      }
+      return done;
+    });
+    const cum=daily.reduce((a,v,i)=>{ a.push((a[i-1]||0)+v); return a; },[]);
+    renderChartDual(dates,pct,cum,{title:`Category: ${cat}`, subtitle:`${dates[0]} → ${dates[dates.length-1]}`, rightLabel:"Cum. done in category"});
+    return;
+  }
+  graphOverall();
+}
+
+function renderChartDual(dates,pctValues,cumValues,opts={}){
+  graphCard.style.display="block";
+  graphTitle.textContent=opts.title || "Graph";
+  graphSub.textContent=opts.subtitle || "";
+
+  const W=940,H=320,padL=56,padR=56,padT=18,padB=38;
+  const innerW=W-padL-padR, innerH=H-padT-padB, n=dates.length;
+  const xFor=i=> padL + (n<=1 ? innerW/2 : (i*innerW)/(n-1));
+  const yPct=v=> padT + innerH - ((v-0)*innerH)/100;
+  const maxRight=Math.max(1, Math.max(...cumValues));
+  const yCum=v=> padT + innerH - ((v-0)*innerH)/maxRight;
+
+  function pathFrom(values,yFn){
+    let d=""; for(let i=0;i<n;i++){ const x=xFor(i), y=yFn(values[i]??0); d+=(i===0?`M${x},${y}`:` L${x},${y}`); }
+    return d;
+  }
+  const dPct=pathFrom(pctValues,yPct);
+  const dCum=pathFrom(cumValues,yCum);
+
+  const xTicks=[], xtCount=Math.min(6,n);
+  for(let t=0;t<xtCount;t++){ const idx=Math.round(t*(n-1)/(xtCount-1||1)); xTicks.push(idx); }
+  const yPctTicks=[]; for(let j=0;j<=5;j++){ yPctTicks.push(Math.round((j*100)/5)); }
+  function niceTicks(max){
+    const step=Math.max(1, Math.ceil(max/5));
+    const ticks=[0];
+    for(let v=step; v<=max; v+=step){ ticks.push(v); }
+    if(ticks[ticks.length-1]!==max) ticks.push(max);
+    return ticks;
+  }
+  const yCumTicks=niceTicks(maxRight);
+
+  const svg = `
+  <svg viewBox="0 0 ${W} ${H}" xmlns="http://www.w3.org/2000/svg" role="img">
+    <rect x="0" y="0" width="${W}" height="${H}" fill="transparent"/>
+    ${yPctTicks.map(v=>`<line x1="${padL}" y1="${yPct(v)}" x2="${W-padR}" y2="${yPct(v)}" stroke="var(--grid)" stroke-width="1"/>`).join("")}
+    ${yCumTicks.map(v=>`<line x1="${padL}" y1="${yCum(v)}" x2="${W-padR}" y2="${yCum(v)}" stroke="var(--grid)" stroke-width="1" stroke-dasharray="2,4"/>`).join("")}
+    ${xTicks.map(i=>`<line x1="${xFor(i)}" y1="${padT}" x2="${xFor(i)}" y2="${H-padB}" stroke="var(--grid)" stroke-width="1" stroke-dasharray="2,4"/>`).join("")}
+    <path d="${dPct}" class="series seriesA" fill="none" stroke-width="2" />
+    <path d="${dCum}" class="series seriesB" fill="none" stroke-width="2" />
+    ${dates.map((d,i)=>`<circle cx="${xFor(i)}" cy="${yPct(pctValues[i]??0)}" r="3.5" class="dot seriesA"/>`).join("")}
+    ${dates.map((d,i)=>`<circle cx="${xFor(i)}" cy="${yCum(cumValues[i]??0)}" r="3.5" class="dot seriesB"/>`).join("")}
+    ${xTicks.map(i=>`<text x="${xFor(i)}" y="${H-6}" text-anchor="middle" font-size="10" fill="var(--muted)">${dates[i].slice(5)}</text>`).join("")}
+    ${yPctTicks.map(v=>`<text x="${padL-4}" y="${yPct(v)+4}" text-anchor="end" font-size="10" fill="var(--muted)">${v}%</text>`).join("")}
+    ${yCumTicks.map(v=>`<text x="${W-padR+4}" y="${yCum(v)+4}" font-size="10" fill="var(--muted)">${v}</text>`).join("")}
+  </svg>`;
+  graphContainer.innerHTML=svg;
+}
+
+/* ===================== Notes ===================== */
+let saveTimer=null;
+notesBox.addEventListener("input",()=>{
+  if(isLockedDate(curDate) && !state.editOverrides?.[toISODate(curDate)]) return;
+  const d=toISODate(curDate);
+  state.notes[d]=notesBox.value;
+  notesStatus.textContent="Saving…";
+  clearTimeout(saveTimer);
+  saveTimer=setTimeout(()=>{
+    saveState();
+    notesStatus.textContent="Saved";
+    setTimeout(()=>{ if(notesStatus.textContent==="Saved") notesStatus.textContent=""; },800);
+  },250);
+});
+
+/* ===================== Font & Theme toggle ===================== */
+const fontRange = $("#fontRange");
+const fontReadout = $("#fontReadout");
+const darkToggle = $("#darkToggle");
+const fontFamilySelect = $("#fontFamilySelect");
+
+const FONT_FAMILIES = {
+  system: 'system-ui, -apple-system, "Segoe UI", Inter, Roboto, "Helvetica Neue", Arial, "Noto Sans", sans-serif',
+  serif: '"Georgia", "Times New Roman", "Palatino Linotype", "Book Antiqua", serif',
+  mono: '"JetBrains Mono", "Fira Code", "SF Mono", Menlo, Monaco, Consolas, "Liberation Mono", "Courier New", monospace',
+  rounded: '"Nunito", "Quicksand", system-ui, -apple-system, "Segoe UI", sans-serif'
+};
+
+function applyFontStep(step, commit=true){
+  step=Math.max(-4,Math.min(4, Number(step)||0));
+  document.documentElement.style.setProperty("--ui-step", String(step));
+  document.documentElement.style.setProperty("--ui-step-px", step+"px");
+  fontReadout.textContent = (step>0?`+${step}`:String(step));
+  if(commit){
+    state.prefs.fontStep=step;
+    saveState();
+  }
+}
+function applyFontFamily(key, commit=true){
+  const fam = FONT_FAMILIES[key] || FONT_FAMILIES.system;
+  document.documentElement.style.setProperty("--font-body", fam);
+  if(key==="system") document.documentElement.style.setProperty("--font-title", fam);
+  else document.documentElement.style.setProperty("--font-title", fam);
+  if(commit){
+    state.prefs.fontFamily = key;
+    saveState();
+  }
+}
+function applyThemeMode(dark){
+  document.documentElement.dataset.theme = dark ? "dark" : "light";
+  state.prefs.darkMode = dark;
+  darkToggle.checked = !!dark;
+  saveState();
+}
+function getCSSVar(name){
+  return getComputedStyle(document.documentElement).getPropertyValue(name).trim();
+}
+
+/* ===================== Theme Studio ===================== */
+const themeDialog = $("#themeDialog");
+const themeModeLabel = $("#themeModeLabel");
+const themeGlobal = $("#themeGlobal");
+const themeGraph = $("#themeGraph");
+const themeCalendar = $("#themeCalendar");
+const themeStripes = $("#themeStripes");
+const themeToggleModeBtn = $("#themeToggleModeBtn");
+const themeResetBtn = $("#themeResetBtn");
+const themeExportBtn = $("#themeExportBtn");
+const themeImportInput = $("#themeImportInput");
+const themeCloseBtn = $("#themeCloseBtn");
+const presetSaveBtn = $("#presetSaveBtn");
+const presetSelect = $("#presetSelect");
+const presetDeleteBtn = $("#presetDeleteBtn");
+
+let themeEditMode = state.prefs.darkMode ? "dark" : "light";
+
+const THEME_VARS_GLOBAL = [
+  ["--bg","Background"],
+  ["--surface","Cards"],
+  ["--text","Primary text"],
+  ["--muted","Muted text"],
+  ["--border","Borders"],
+  ["--accent","Accent"],
+  ["--accent-weak","Accent soft"],
+  ["--check","Checkmarks"]
+];
+const THEME_VARS_GRAPH = [
+  ["--lineA","Percent line"],
+  ["--lineB","Cumulative line"],
+  ["--grid","Graph grid"]
+];
+const THEME_VARS_CAL = [
+  ["--cal-red","Calendar low"],
+  ["--cal-mid","Calendar mid"],
+  ["--cal-green","Calendar high"]
+];
+const THEME_VARS_STRIPES = [
+  ["--stripe-dark","Stripe dark"],
+  ["--stripe-light","Stripe light"]
+];
+
+function applyThemeStyles(){
+  const styleId="theme-overrides-style";
+  let el=document.getElementById(styleId);
+  if(!el){ el=document.createElement("style"); el.id=styleId; document.head.appendChild(el); }
+  const light=state.theme.light||{};
+  const dark=state.theme.dark||{};
+  function makeBlock(mode, vars){
+    const entries=Object.entries(vars);
+    if(entries.length===0) return "";
+    const body = entries.map(([k,v])=>`${k}:${v};`).join("");
+    return `[data-theme="${mode}"]{${body}}`;
+  }
+  el.textContent = makeBlock("light", light) + makeBlock("dark", dark);
+}
+function toHexAlpha(value){
+  let r=0,g=0,b=0,a=1;
+  value=(value||"").trim();
+  if(value.startsWith("rgba")){
+    const nums=value.replace(/[^\d.,]/g,"").split(",").map(Number);
+    [r,g,b,a]=nums;
+    a = isNaN(a)?1:a;
+  }else if(value.startsWith("rgb")){
+    const nums=value.replace(/[^\d,]/g,"").split(",").map(Number);
+    [r,g,b]=nums;
+  }else if(value.startsWith("#")){
+    let hex=value.slice(1);
+    if(hex.length===3) hex=hex.split("").map(c=>c+c).join("");
+    r=parseInt(hex.slice(0,2),16);
+    g=parseInt(hex.slice(2,4),16);
+    b=parseInt(hex.slice(4,6),16);
+  }
+  const hex="#"+[r,g,b].map(x=>x.toString(16).padStart(2,"0")).join("");
+  return {hex, alpha:a};
+}
+function fromHexAlpha(hex, alpha=1){
+  const [r,g,b]=evalColor(hex);
+  if(alpha>=1) return `rgb(${r},${g},${b})`;
+  return `rgba(${r},${g},${b},${alpha})`;
+}
+function renderThemeEditors(){
+  function mkRow(varName,label,isStripe=false){
+    const wrap=document.createElement("div"); wrap.className="theme-row";
+    const left=document.createElement("div");
+    left.innerHTML=`<div style="font-weight:600">${label}</div><div class="muted small">${varName}</div>`;
+    const right=document.createElement("div");
+    right.style.display="flex"; right.style.gap="8px"; right.style.alignItems="center";
+
+    const current = state.theme[themeEditMode]?.[varName] || getCSSVar(varName);
+    const {hex, alpha} = toHexAlpha(current);
+    const color=document.createElement("input");
+    color.type="color"; color.value=hex; color.title="Pick color";
+
+    const alphaWrap=document.createElement("div");
+    if(isStripe || current.startsWith("rgba")){
+      const a=document.createElement("input");
+      a.type="range"; a.min="0"; a.max="1"; a.step="0.01"; a.value=String(alpha);
+      a.style.width="90px"; a.title="Opacity";
+      a.addEventListener("input",()=>{
+        const rgba=fromHexAlpha(color.value, parseFloat(a.value));
+        setThemeVar(varName, rgba, false);
+      });
+      alphaWrap.appendChild(a);
+    }
+
+    const sw=document.createElement("div");
+    sw.className="swatch";
+    sw.style.background=current;
+
+    color.addEventListener("input",()=>{
+      const val=(isStripe || current.startsWith("rgba")) ? fromHexAlpha(color.value, alpha) : color.value;
+      setThemeVar(varName, val, false);
+      sw.style.background=val;
+    });
+    color.addEventListener("change",()=>{
+      const val=(isStripe || current.startsWith("rgba")) ? fromHexAlpha(color.value, alpha) : color.value;
+      setThemeVar(varName, val, true);
+      sw.style.background=val;
+    });
+
+    right.appendChild(color);
+    if(alphaWrap.firstChild) right.appendChild(alphaWrap);
+    right.appendChild(sw);
+    wrap.append(left,right);
+    return wrap;
+  }
+
+  themeGlobal.innerHTML=""; themeGraph.innerHTML=""; themeCalendar.innerHTML=""; themeStripes.innerHTML="";
+  THEME_VARS_GLOBAL.forEach(([v,l])=> themeGlobal.appendChild(mkRow(v,l,false)));
+  THEME_VARS_GRAPH.forEach(([v,l])=> themeGraph.appendChild(mkRow(v,l,false)));
+  THEME_VARS_CAL.forEach(([v,l])=> themeCalendar.appendChild(mkRow(v,l,false)));
+  THEME_VARS_STRIPES.forEach(([v,l])=> themeStripes.appendChild(mkRow(v,l,true)));
+}
+function setThemeVar(name,value,commit){
+  state.theme[themeEditMode] ||= {};
+  state.theme[themeEditMode][name]=value;
+  applyThemeStyles();
+  if(commit) saveState();
+}
+function refreshPresetSelect(){
+  const presets=state.themePresets || {};
+  presetSelect.innerHTML='<option value="">Load preset…</option>';
+  Object.keys(presets).sort().forEach(name=>{
+    const opt=document.createElement("option");
+    opt.value=name; opt.textContent=name;
+    presetSelect.appendChild(opt);
+  });
+}
+function openThemeDialog(){
+  themeEditMode = state.prefs.darkMode ? "dark" : "light";
+  themeModeLabel.textContent = themeEditMode[0].toUpperCase()+themeEditMode.slice(1);
+  renderThemeEditors();
+  refreshPresetSelect();
+  themeDialog.showModal();
+}
+
+themeToggleModeBtn.addEventListener("click",()=>{
+  themeEditMode = themeEditMode==="light"?"dark":"light";
+  themeModeLabel.textContent = themeEditMode[0].toUpperCase()+themeEditMode.slice(1);
+  renderThemeEditors();
+});
+themeResetBtn.addEventListener("click",()=>{
+  if(!confirm("Reset theme overrides for both light and dark?")) return;
+  state.theme={light:{},dark:{}}; applyThemeStyles(); saveState(); renderThemeEditors();
+});
+themeExportBtn.addEventListener("click",()=>{
+  const blob=new Blob([JSON.stringify({theme:state.theme, presets:state.themePresets},null,2)],{type:"application/json"});
+  const a=document.createElement("a");
+  a.href=URL.createObjectURL(blob);
+  a.download="daily-checklist-theme.json";
+  document.body.appendChild(a);
+  a.click();
+  setTimeout(()=>{ URL.revokeObjectURL(a.href); a.remove(); },0);
+});
+themeImportInput.addEventListener("change",(e)=>{
+  const file=e.target.files[0]; if(!file) return;
+  const reader=new FileReader();
+  reader.onload = ev=>{
+    try{
+      const data=JSON.parse(ev.target.result);
+      if(data.theme) state.theme=data.theme;
+      if(data.presets) state.themePresets=data.presets;
+      applyThemeStyles(); saveState(); renderThemeEditors(); refreshPresetSelect();
+      alert("Theme imported.");
+    }catch(err){ alert("Invalid theme file."); }
+  };
+  reader.readAsText(file);
+});
+presetSaveBtn.addEventListener("click",()=>{
+  const name=prompt("Preset name?"); if(!name) return;
+  state.themePresets[name]={ light:state.theme.light, dark:state.theme.dark };
+  saveState(); refreshPresetSelect();
+});
+presetSelect.addEventListener("change",()=>{
+  const name=presetSelect.value;
+  if(!name) return;
+  const preset=state.themePresets[name]; if(!preset) return;
+  state.theme.light=preset.light || {};
+  state.theme.dark=preset.dark || {};
+  applyThemeStyles(); saveState(); renderThemeEditors();
+});
+presetDeleteBtn.addEventListener("click",()=>{
+  const name=presetSelect.value;
+  if(!name) return;
+  if(!confirm(`Delete preset “${name}”?`)) return;
+  delete state.themePresets[name];
+  saveState(); refreshPresetSelect();
+});
+themeCloseBtn.addEventListener("click",()=>themeDialog.close());
+
+/* ===================== Undo / Redo (simple snapshot) ===================== */
+let historyStack=[JSON.stringify(state)];
+let historyIndex=0;
+function pushHistory(){
+  const snap=JSON.stringify(state);
+  if(historyStack[historyIndex]===snap) return;
+  historyStack=historyStack.slice(0,historyIndex+1);
+  historyStack.push(snap);
+  historyIndex=historyStack.length-1;
+}
+function applyHistory(idx){
+  if(idx<0 || idx>=historyStack.length) return;
+  historyIndex=idx;
+  state=JSON.parse(historyStack[historyIndex]);
+  applyThemeStyles();
+  applyFontStep(state.prefs.fontStep||0,false);
+  applyFontFamily(state.prefs.fontFamily||"system",false);
+  applyThemeMode(state.prefs.darkMode||false);
+  refreshCategoryFilter();
+  render();
+}
+$("#undoBtn").addEventListener("click",()=> applyHistory(historyIndex-1));
+$("#redoBtn").addEventListener("click",()=> applyHistory(historyIndex+1));
+
+/* ===================== Import / Export ===================== */
+const importCsvInput=$("#importCsvInput");
+const importJsonInput=$("#importJsonInput");
+const exportTasksBtn=$("#exportTasksBtn");
+const exportJsonBtn=$("#exportJsonBtn");
+const exportLogsBtn=$("#exportLogsBtn");
+
+importCsvInput.addEventListener("change",(e)=>{
+  const file=e.target.files[0]; if(!file) return;
+  const reader=new FileReader();
+  reader.onload=ev=>{
+    const text=ev.target.result;
+    const lines=text.split(/\r?\n/).filter(x=>x.trim().length);
+    if(lines.length<=1){ alert("CSV appears empty."); return; }
+    const [, ...rows]=lines;
+    const eff=toISODate(today());
+    for(const row of rows){
+      const cells=row.split(",").map(x=>x.replace(/^"|"$/g,"").replace(/""/g,'"'));
+      const [name,cat,minStr, ,reqStr,recMinStr,ph]=cells;
+      if(!name) continue;
+      const minutes=minStr?Number(minStr):null;
+      const req=reqStr==="1";
+      const recMin=recMinStr?Number(recMinStr):0;
+      const recPh=ph||"";
+      const nextId=state.tasks.length ? Math.max(...state.tasks.map(t=>t.id))+1 : 1;
+      state.tasks.push({ id:nextId, revisions:[{effective:eff, name,category:cat||null,minutes,requireRecord:req,recordMin:recMin,recordPlaceholder:recPh, archived:false}] });
+      addChangelog({ts:new Date().toISOString(),action:"add",taskId:nextId,before:null,after:{name,category:cat||null,minutes,requireRecord:req,recordMin:recMin,recordPlaceholder:recPh,archived:false},effective:eff});
+    }
+    saveState(); refreshCategoryFilter(); render();
+  };
+  reader.readAsText(file);
+});
+importJsonInput.addEventListener("change",(e)=>{
+  const file=e.target.files[0]; if(!file) return;
+  const reader=new FileReader();
+  reader.onload=ev=>{
+    try{
+      const data=JSON.parse(ev.target.result);
+      if(!Array.isArray(data.tasks)){ alert("JSON missing tasks."); return; }
+      state.tasks=data.tasks;
+      state.logs=data.logs||{};
+      state.notes=data.notes||{};
+      state.flags=data.flags||{};
+      state.orders=data.orders||{categoryOrder:[],taskOrder:{}};
+      state.changelog=data.changelog||[];
+      saveState(); refreshCategoryFilter(); render();
+    }catch(err){ alert("Invalid JSON."); }
+  };
+  reader.readAsText(file);
+});
+exportTasksBtn.addEventListener("click",()=>{
+  const eff=toISODate(today());
+  const lines=[["name","category","minutes","id","requireRecord","recordMin","recordPlaceholder"]];
+  for(const t of state.tasks){
+    const r=getRevisionForDate(t,eff);
+    if(r.archived) continue;
+    lines.push([r.name, r.category??"", r.minutes??"", t.id, r.requireRecord?1:0, r.recordMin??0, r.recordPlaceholder??""]);
+  }
+  downloadCSV("tasks_current.csv",lines);
+});
+exportJsonBtn.addEventListener("click",()=>{
+  downloadJSON("daily_checklist_export.json", state);
+});
+exportLogsBtn.addEventListener("click",()=>{
+  const rows=[["date","taskId","taskName","category","completed","record","ts"]];
+  const dates=getAllLogDates();
+  for(const d of dates){
+    for(const t of state.tasks){
+      const rev=getRevisionForDate(t,d);
+      const entry=getLogEntry(d,t.id);
+      if(!entry) continue;
+      rows.push([d, t.id, rev.name, rev.category??"", entry.completed?1:0, entry.record??"", entry.ts??""]);
+    }
+  }
+  downloadCSV("logs.csv",rows);
+});
+function downloadCSV(filename, rows){
+  const csv = rows.map(r=>r.map(cell=>{
+    const s=String(cell ?? "");
+    if(s.includes(",")||s.includes("\n")||s.includes('"')) return `"${s.replace(/"/g,'""')}"`;
+    return s;
+  }).join(",")).join("\n");
+  const blob=new Blob([csv],{type:"text/csv;charset=utf-8"});
+  const a=document.createElement("a");
+  a.href=URL.createObjectURL(blob);
+  a.download=filename;
+  document.body.appendChild(a);
+  a.click();
+  setTimeout(()=>{ URL.revokeObjectURL(a.href); a.remove(); },0);
+}
+function downloadJSON(filename,obj){
+  const blob=new Blob([JSON.stringify(obj,null,2)],{type:"application/json"});
+  const a=document.createElement("a");
+  a.href=URL.createObjectURL(blob);
+  a.download=filename;
+  document.body.appendChild(a);
+  a.click();
+  setTimeout(()=>{ URL.revokeObjectURL(a.href); a.remove(); },0);
+}
+
+/* ===================== Controls ===================== */
+$("#prevDay").addEventListener("click",()=>{ curDate=addDays(curDate,-1); refreshCategoryFilter(); render(); });
+$("#nextDay").addEventListener("click",()=>{ curDate=addDays(curDate,+1); refreshCategoryFilter(); render(); });
+todayBtn.addEventListener("click",()=>{ curDate=today(); refreshCategoryFilter(); render(); });
+
+dateTitle.addEventListener("click",(e)=>{
+  if(e.ctrlKey || e.metaKey){
+    const iso=toISODate(curDate);
+    state.editOverrides[iso]=!state.editOverrides[iso];
+    saveState();
+    render();
+    alert(state.editOverrides[iso]
+      ? `Edit override ON for ${iso}.`
+      : `Edit override OFF for ${iso}.`);
+    e.preventDefault(); e.stopPropagation();
+  }
+});
+
+categoryFilter.addEventListener("change",render);
+
+$("#addTaskBtn").addEventListener("click",openAdd);
+$("#editTaskBtn").addEventListener("click",()=>openPick(id=>openEdit(id)));
+$("#removeTaskBtn").addEventListener("click",()=>openPick(id=>removeTaskById(id)));
+
+$("#resetDayBtn").addEventListener("click",()=>{
+  const d=toISODate(curDate);
+  if(isLockedDate(curDate)){ alert("This day is locked. Toggle override (Ctrl/Cmd-click the date title) to edit."); return; }
+  if(state.logs[d] && confirm(`Clear all checkmarks for ${d}?`)){
+    delete state.logs[d]; saveState(); render();
+  }
+});
+
+fontRange.addEventListener("input",e=>applyFontStep(e.target.value,false));
+fontRange.addEventListener("change",e=>applyFontStep(e.target.value,true));
+fontFamilySelect.addEventListener("change",()=>applyFontFamily(fontFamilySelect.value,true));
+darkToggle.addEventListener("change",()=>applyThemeMode(darkToggle.checked));
+
+$("#themeBtn").addEventListener("click",openThemeDialog);
+
+/* Graph buttons */
+$("#graphOverallBtn").addEventListener("click",graphOverall);
+$("#graphSelectedBtn").addEventListener("click",graphSelected);
+$("#clearGraphBtn").addEventListener("click",()=>{ graphContainer.innerHTML=""; graphCard.style.display="none"; });
+
+/* Changelog dialog */
+const logDialog=$("#logDialog");
+const logBody=$("#logBody");
+$("#changelogBtn").addEventListener("click",()=>{
+  logBody.innerHTML="";
+  if(state.changelog.length===0){
+    logBody.textContent="No changes logged yet.";
+  }else{
+    for(const entry of state.changelog){
+      const main=document.createElement("div");
+      main.className="log-card";
+      const left=document.createElement("div");
+      left.className="log-main";
+      const right=document.createElement("div");
+      right.className="muted small";
+
+      left.innerHTML=`<div><strong>${entry.action.toUpperCase()}</strong> task ${entry.taskId ?? ""}</div>` +
+        `<div class="small">${entry.effective ?? ""}</div>`;
+      right.textContent=new Date(entry.ts).toLocaleString();
+      main.append(left,right);
+      logBody.appendChild(main);
+    }
+  }
+  logDialog.showModal();
+});
+$("#closeLogBtn").addEventListener("click",()=>logDialog.close());
+
+/* ===================== Daily Share Card (Instagram 1080×1080) ===================== */
+const shareCardBtn = $("#shareCardBtn");
+const shareCanvas = $("#shareCanvas");
+
+function currentStreakForTask(taskId, dateISO){
+  let streak=0;
+  let d = fromISODate(dateISO);
+  for(let i=0;i<365;i++){
+    const iso=toISODate(d);
+    if(!getStatus(iso, taskId)) break;
+    streak++;
+    d=addDays(d,-1);
+  }
+  return streak;
+}
+function lastCompletionBefore(taskId, dateISO){
+  let d=addDays(fromISODate(dateISO), -1);
+  for(let i=0;i<365;i++){
+    const iso=toISODate(d);
+    if(getStatus(iso, taskId)) return d;
+    d=addDays(d,-1);
+  }
+  return null;
+}
+
+function generateShareCard(){
+  const ctx=shareCanvas.getContext("2d");
+  const W=shareCanvas.width, H=shareCanvas.height;
+
+  const iso=toISODate(curDate);
+  const label=headerDateLabel(curDate);
+  const {done,total,pct}=scoreForDate(iso);
+
+  const activeTasks=state.tasks.filter(t=>taskActiveOnDate(t,iso));
+  if(activeTasks.length===0){
+    alert("No active tasks for this day yet.");
+    return;
+  }
+
+  // Hot streak: max currentStreakForTask among tasks
+  let bestStreak=0, bestStreakTask=null;
+  for(const t of activeTasks){
+    const s=currentStreakForTask(t.id, iso);
+    if(s>bestStreak){
+      bestStreak=s;
+      bestStreakTask=t;
+    }
+  }
+
+  // Comeback: done today, longest gap since last completion
+  let bestGap=-1, bestGapTask=null;
+  for(const t of activeTasks){
+    if(!getStatus(iso,t.id)) continue;
+    const lastPrev=lastCompletionBefore(t.id, iso);
+    if(!lastPrev) continue;
+    const gapDays = Math.round((startOfDay(curDate) - startOfDay(lastPrev))/86400000);
+    if(gapDays>bestGap){
+      bestGap=gapDays;
+      bestGapTask=t;
+    }
+  }
+
+  const bg = getCSSVar("--bg") || "#0f172a";
+  const surface = getCSSVar("--surface") || "#111827";
+  const accent = getCSSVar("--accent") || "#3b82f6";
+  const text = getCSSVar("--text") || "#e5e7eb";
+  const muted = getCSSVar("--muted") || "#9ca3af";
+
+  // Background
+  ctx.clearRect(0,0,W,H);
+  const grad=ctx.createLinearGradient(0,0,W,H);
+  grad.addColorStop(0, surface);
+  grad.addColorStop(1, bg);
+  ctx.fillStyle=grad;
+  ctx.fillRect(0,0,W,H);
+
+  // Main card
+  const cardX=80, cardY=120, cardW=W-160, cardH=H-240;
+  const radius=40;
+  ctx.fillStyle="rgba(0,0,0,0.15)";
+  ctx.beginPath();
+  ctx.moveTo(cardX+radius,cardY);
+  ctx.lineTo(cardX+cardW-radius,cardY);
+  ctx.quadraticCurveTo(cardX+cardW,cardY,cardX+cardW,cardY+radius);
+  ctx.lineTo(cardX+cardW,cardY+cardH-radius);
+  ctx.quadraticCurveTo(cardX+cardW,cardY+cardH,cardX+cardW-radius,cardY+cardH);
+  ctx.lineTo(cardX+radius,cardY+cardH);
+  ctx.quadraticCurveTo(cardX,cardY+cardH,cardX,cardY+cardH-radius);
+  ctx.lineTo(cardX,cardY+radius);
+  ctx.quadraticCurveTo(cardX,cardY,cardX+radius,cardY);
+  ctx.closePath();
+  ctx.fill();
+
+  ctx.fillStyle=surface;
+  ctx.beginPath();
+  ctx.moveTo(cardX+radius,cardY);
+  ctx.lineTo(cardX+cardW-radius,cardY);
+  ctx.quadraticCurveTo(cardX+cardW,cardY,cardX+cardW,cardY+radius);
+  ctx.lineTo(cardX+cardW,cardY+cardH-radius);
+  ctx.quadraticCurveTo(cardX+cardW,cardY+cardH,cardX+cardW-radius,cardY+cardH);
+  ctx.lineTo(cardX+radius,cardY+cardH);
+  ctx.quadraticCurveTo(cardX,cardY+cardH,cardX,cardY+cardH-radius);
+  ctx.lineTo(cardX,cardY+radius);
+  ctx.quadraticCurveTo(cardX,cardY,cardX+radius,cardY);
+  ctx.closePath();
+  ctx.fill();
+
+  // Title: "Daily Snapshot"
+  ctx.fillStyle=text;
+  ctx.font="bold 64px " + (getCSSVar("--font-title") || "system-ui");
+  ctx.textAlign="center";
+  ctx.fillText("Daily Snapshot", W/2, cardY+110);
+
+  // Date label
+  ctx.fillStyle=muted;
+  ctx.font="28px " + (getCSSVar("--font-body") || "system-ui");
+  ctx.fillText(label + " · "+ iso, W/2, cardY+160);
+
+  // Hit Rate
+  const pctStr = total ? Math.round(pct*100)+"%" : "—";
+  const statY1 = cardY+250;
+  ctx.textAlign="left";
+  ctx.fillStyle=muted;
+  ctx.font="22px " + (getCSSVar("--font-body") || "system-ui");
+  ctx.fillText("Hit Rate", cardX+60, statY1);
+
+  ctx.fillStyle=accent;
+  ctx.font="bold 54px " + (getCSSVar("--font-title") || "system-ui");
+  ctx.fillText(`${done}/${total} (${pctStr})`, cardX+60, statY1+60);
+
+  // Hot Streak
+  const statY2 = statY1+150;
+  const hotName = bestStreakTask ? getRevisionForDate(bestStreakTask, iso).name : "No streak yet";
+  ctx.fillStyle=muted;
+  ctx.font="22px " + (getCSSVar("--font-body") || "system-ui");
+  ctx.fillText("Hot Streak", cardX+60, statY2);
+  ctx.fillStyle=text;
+  ctx.font="bold 36px " + (getCSSVar("--font-body") || "system-ui");
+  const streakLabel = bestStreak>1 ? `${hotName} — ${bestStreak} days 🔥` : hotName;
+  ctx.fillText(streakLabel, cardX+60, statY2+50);
+
+  // Comeback Task
+  const statY3 = statY2+130;
+  ctx.fillStyle=muted;
+  ctx.font="22px " + (getCSSVar("--font-body") || "system-ui");
+  ctx.fillText("Comeback Task", cardX+60, statY3);
+  ctx.fillStyle=text;
+  ctx.font="bold 32px " + (getCSSVar("--font-body") || "system-ui");
+  let comebackText="No big comeback today";
+  if(bestGapTask && bestGap>=2){
+    const rev=getRevisionForDate(bestGapTask, iso);
+    comebackText = `${rev.name} — back after ${bestGap} days ✨`;
+  }else if(bestGapTask){
+    const rev=getRevisionForDate(bestGapTask, iso);
+    comebackText = `${rev.name} — keeping the rhythm`;
+  }
+  ctx.fillText(comebackText, cardX+60, statY3+48);
+
+  // Footer
+  ctx.textAlign="center";
+  ctx.fillStyle=muted;
+  ctx.font="20px " + (getCSSVar("--font-body") || "system-ui");
+  ctx.fillText("Made with Daily Checklist · “Hit Rate · Hot Streak · Comeback Task”", W/2, cardY+cardH-40);
+
+  const url=shareCanvas.toDataURL("image/png");
+  const w=window.open();
+  if(w){
+    w.document.write(`<title>Daily Snapshot</title><img src="${url}" style="max-width:100%;height:auto;display:block;margin:0 auto;background:#000;" />`);
+  }else{
+    alert("Popup blocked. Allow popups to see the image, or open this page in a normal tab.");
+  }
+}
+
+shareCardBtn.addEventListener("click", generateShareCard);
+
+/* ===================== Init ===================== */
+function init(){
+  applyThemeStyles();
+  applyThemeMode(state.prefs.darkMode||false);
+  applyFontStep(state.prefs.fontStep||0,false);
+  fontRange.value = String(state.prefs.fontStep||0);
+  fontFamilySelect.value = state.prefs.fontFamily || "system";
+  applyFontFamily(state.prefs.fontFamily || "system", false);
+
+  refreshCategoryFilter();
+  render();
+  pushHistory();
+}
+
+init();
+</script>
+</body>
+</html>

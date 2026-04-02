@@ -1,0 +1,15 @@
+<!DOCTYPE html>
+<html>
+<head>
+  <link rel="stylesheet" href="/static/style.css">
+</head>
+<body>
+  <div class="card">
+    {% if img %}
+      <img src="{{ img }}" />
+    {% endif %}
+    <h1>{{ title }}</h1>
+    <p>{{ body }}</p>
+  </div>
+</body>
+</html>

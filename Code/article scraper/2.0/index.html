@@ -1,0 +1,332 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <title>URL Snapshot Tool</title>
+  <meta name="viewport" content="width=device-width, initial-scale=1" />
+  <style>
+    body {
+      font-family: system-ui, -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif;
+      background: #111827;
+      color: #e5e7eb;
+      margin: 0;
+      padding: 0;
+      display: flex;
+      flex-direction: column;
+      min-height: 100vh;
+    }
+
+    header {
+      padding: 1rem 1.5rem;
+      background: #020617;
+      box-shadow: 0 1px 3px rgba(0,0,0,0.6);
+    }
+
+    h1 {
+      margin: 0;
+      font-size: 1.4rem;
+    }
+
+    main {
+      flex: 1;
+      padding: 1.5rem;
+      max-width: 1200px;
+      width: 100%;
+      margin: 0 auto;
+      display: grid;
+      grid-template-columns: 1fr;
+      gap: 1rem;
+    }
+
+    .card {
+      background: #020617;
+      border-radius: 0.75rem;
+      padding: 1rem 1.25rem;
+      box-shadow: 0 10px 25px rgba(0,0,0,0.6);
+      border: 1px solid #1f2937;
+    }
+
+    label {
+      font-size: 0.9rem;
+      color: #9ca3af;
+    }
+
+    textarea {
+      width: 100%;
+      min-height: 160px;
+      margin-top: 0.5rem;
+      padding: 0.75rem;
+      border-radius: 0.5rem;
+      border: 1px solid #374151;
+      background: #020617;
+      color: #e5e7eb;
+      font-size: 0.95rem;
+      resize: vertical;
+      line-height: 1.35;
+    }
+
+    textarea:focus {
+      outline: none;
+      border-color: #3b82f6;
+      box-shadow: 0 0 0 1px #3b82f6;
+    }
+
+    .row {
+      display: flex;
+      gap: 0.75rem;
+      align-items: center;
+      flex-wrap: wrap;
+      margin-top: 0.75rem;
+    }
+
+    select {
+      padding: 0.55rem 0.75rem;
+      border-radius: 0.5rem;
+      border: 1px solid #374151;
+      background: #020617;
+      color: #e5e7eb;
+      font-size: 0.9rem;
+    }
+
+    button {
+      padding: 0.65rem 1.1rem;
+      border-radius: 0.5rem;
+      border: none;
+      font-size: 0.95rem;
+      font-weight: 600;
+      cursor: pointer;
+      background: #3b82f6;
+      color: white;
+      white-space: nowrap;
+    }
+
+    button.secondary {
+      background: #334155;
+    }
+
+    button:disabled {
+      opacity: 0.6;
+      cursor: default;
+    }
+
+    .status {
+      margin-top: 0.75rem;
+      font-size: 0.9rem;
+      min-height: 1.2em;
+    }
+
+    .status.error { color: #f97373; }
+    .status.ok { color: #6ee7b7; }
+
+    .grid {
+      margin-top: 1rem;
+      display: grid;
+      grid-template-columns: repeat(auto-fill, minmax(260px, 1fr));
+      gap: 0.75rem;
+    }
+
+    .thumb {
+      background: #0b1120;
+      border: 1px solid #1f2937;
+      border-radius: 0.75rem;
+      overflow: hidden;
+      padding: 0.5rem;
+      display: flex;
+      flex-direction: column;
+      gap: 0.5rem;
+    }
+
+    .thumb img {
+      width: 100%;
+      height: auto;
+      border-radius: 0.5rem;
+      display: block;
+    }
+
+    .thumb .meta {
+      font-size: 0.8rem;
+      color: #9ca3af;
+      word-break: break-word;
+    }
+
+    footer {
+      padding: 0.75rem 1.5rem;
+      font-size: 0.8rem;
+      color: #9ca3af;
+      text-align: center;
+      border-top: 1px solid #111827;
+      background: #020617;
+    }
+  </style>
+</head>
+<body>
+  <header>
+    <h1>URL → Instagram Snapshots</h1>
+  </header>
+
+  <main>
+    <section class="card">
+      <label for="urlsInput">Links (one per line)</label>
+      <textarea id="urlsInput" placeholder="https://example.com/article1&#10;https://example.com/article2"></textarea>
+
+      <div class="row">
+        <div style="display:flex; flex-direction:column; gap:0.25rem;">
+          <label for="formatSelect">Format</label>
+          <select id="formatSelect">
+            <option value="instagram">Instagram Portrait (1080×1350)</option>
+            <option value="full">Full Page</option>
+          </select>
+        </div>
+
+        <button id="previewBtn">Preview First</button>
+        <button id="downloadZipBtn" class="secondary">Download All (.zip)</button>
+      </div>
+
+      <div id="status" class="status"></div>
+
+      <div id="thumbGrid" class="grid"></div>
+    </section>
+  </main>
+
+  <footer>
+    Tip: “Download All” returns a ZIP of PNGs ready to post.
+  </footer>
+
+  <script>
+    const urlsInput = document.getElementById("urlsInput");
+    const formatSelect = document.getElementById("formatSelect");
+    const previewBtn = document.getElementById("previewBtn");
+    const downloadZipBtn = document.getElementById("downloadZipBtn");
+    const statusEl = document.getElementById("status");
+    const thumbGrid = document.getElementById("thumbGrid");
+
+    function parseUrls() {
+      return urlsInput.value
+        .split(/\r?\n/)
+        .map(s => s.trim())
+        .filter(Boolean);
+    }
+
+    function setStatus(text, kind) {
+      statusEl.className = "status";
+      statusEl.textContent = text || "";
+      if (kind) statusEl.classList.add(kind);
+    }
+
+    async function previewFirst() {
+      const urls = parseUrls();
+      const mode = formatSelect.value;
+
+      thumbGrid.innerHTML = "";
+
+      if (!urls.length) {
+        setStatus("Paste one or more URLs (one per line).", "error");
+        return;
+      }
+
+      previewBtn.disabled = true;
+      downloadZipBtn.disabled = true;
+      setStatus("Capturing preview…", "");
+
+      try {
+        const url = urls[0];
+        const response = await fetch("/snapshot", {
+          method: "POST",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify({ url, mode }),
+        });
+
+        if (!response.ok) {
+          const data = await response.json().catch(() => ({}));
+          throw new Error(data.error || `HTTP ${response.status}`);
+        }
+
+        const blob = await response.blob();
+        const objectUrl = URL.createObjectURL(blob);
+
+        const card = document.createElement("div");
+        card.className = "thumb";
+        card.innerHTML = `
+          <img src="${objectUrl}" alt="preview" />
+          <div class="meta">${escapeHtml(url)}</div>
+        `;
+        thumbGrid.appendChild(card);
+
+        setStatus("Preview captured (first URL only).", "ok");
+      } catch (e) {
+        setStatus("Error: " + e.message, "error");
+      } finally {
+        previewBtn.disabled = false;
+        downloadZipBtn.disabled = false;
+      }
+    }
+
+    async function downloadAllZip() {
+      const urls = parseUrls();
+      const mode = formatSelect.value;
+
+      if (!urls.length) {
+        setStatus("Paste one or more URLs (one per line).", "error");
+        return;
+      }
+
+      previewBtn.disabled = true;
+      downloadZipBtn.disabled = true;
+      setStatus(`Capturing ${urls.length} snapshot(s) and building ZIP…`, "");
+
+      try {
+        const response = await fetch("/snapshots_zip", {
+          method: "POST",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify({ urls, mode }),
+        });
+
+        if (!response.ok) {
+          const data = await response.json().catch(() => ({}));
+          throw new Error(data.error || `HTTP ${response.status}`);
+        }
+
+        const blob = await response.blob();
+
+        // Try to use filename from server header; fall back otherwise
+        const dispo = response.headers.get("Content-Disposition") || "";
+        const match = dispo.match(/filename="?([^"]+)"?/i);
+        const filename = match ? match[1] : "snapshots.zip";
+
+        const a = document.createElement("a");
+        const urlObj = URL.createObjectURL(blob);
+        a.href = urlObj;
+        a.download = filename;
+        document.body.appendChild(a);
+        a.click();
+        a.remove();
+        URL.revokeObjectURL(urlObj);
+
+        setStatus("ZIP downloaded.", "ok");
+      } catch (e) {
+        setStatus("Error: " + e.message, "error");
+      } finally {
+        previewBtn.disabled = false;
+        downloadZipBtn.disabled = false;
+      }
+    }
+
+    function escapeHtml(str) {
+      return str
+        .replaceAll("&", "&amp;")
+        .replaceAll("<", "&lt;")
+        .replaceAll(">", "&gt;")
+        .replaceAll('"', "&quot;")
+        .replaceAll("'", "&#039;");
+    }
+
+    previewBtn.addEventListener("click", previewFirst);
+    downloadZipBtn.addEventListener("click", downloadAllZip);
+
+    // Optional: example starting value
+    urlsInput.value =
+`https://www.france24.com/fr/france/20251209-en-direct-fran%C3%A7ois-hollande-appelle-les-socialistes-%C3%A0-voter-pour-le-budget-de-la-s%C3%A9curit%C3%A9-sociale
+https://www.ansa.it/`;
+  </script>
+</body>
+</html>

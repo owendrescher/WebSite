@@ -1,0 +1,176 @@
+:root {
+  --bg: #f0f0f0;
+  --fg: #000;
+  --btn-bg: #ddd;
+  --btn-hover: #ccc;
+  --correct: #53FD7D;
+  --incorrect: #FF9999;
+}
+
+body.dark {
+  --bg: #222;
+  --fg: #fff;
+  --btn-bg: #444;
+  --btn-hover: #666;
+  --correct: #379f6e;
+  --incorrect: #b35a5a;
+}
+
+body {
+  margin: 0;
+  background-color: var(--bg);
+  color: var(--fg);
+  font-family: Arial, sans-serif;
+}
+
+h1, h3 {
+  text-align: center;
+}
+
+.section {
+  margin: 20px;
+  text-align: center;
+}
+
+#wordset-buttons, #interval-buttons, #display-buttons, #language-buttons {
+  display: flex;
+  flex-wrap: wrap;
+  justify-content: center;
+  gap: 10px;
+}
+
+button {
+  padding: 10px 20px;
+  font-size: 1em;
+  background-color: var(--btn-bg);
+  color: var(--fg);
+  border: 1px solid #888;
+  cursor: pointer;
+}
+
+button:hover {
+  background-color: var(--btn-hover);
+}
+
+button.active {
+  outline: 2px solid yellow;
+  background-color: var(--btn-hover);
+}
+
+#stats {
+  display: flex;
+  justify-content: space-around;
+  font-weight: bold;
+  padding: 10px;
+}
+
+#game-area {
+  display: flex;
+  justify-content: center;
+  align-items: flex-start;
+  gap: 40px;
+  padding: 20px;
+  flex-wrap: wrap; /* allow side-by-side on wide screens, stacked on narrow */
+}
+
+
+.word-column {
+  display: grid;
+  grid-template-columns: repeat(5, 1fr); /* force 5 columns */
+  gap: 10px;
+  width: 100%;
+  max-width: 800px;
+}
+
+
+.word-button {
+  width: 100%;
+  box-sizing: border-box;
+  padding: 10px;
+  font-size: 1em;
+  background-color: var(--btn-bg);
+  color: var(--fg);
+  border: 2px solid #999;
+  text-align: center;
+  cursor: pointer;
+  transition: background-color 0.2s ease;
+}
+
+.word-button.selected {
+  outline: 3px solid orange;
+}
+
+.word-button:hover {
+  background-color: var(--btn-hover);
+}
+
+#divider {
+  width: 2px;
+  background-color: black;
+  height: 100%;
+}
+
+footer {
+  display: flex;
+  flex-wrap: wrap;
+  justify-content: center;
+  gap: 10px;
+  padding: 20px;
+}
+
+#scoreboard-container {
+  text-align: center;
+  margin-top: 10px;
+}
+
+#scoreboard {
+  font-family: 'Courier New', monospace;
+  font-size: 1.2em;
+  color: lime;
+  background-color: black;
+  border: 3px inset #555;
+  padding: 8px 16px;
+  display: inline-block;
+  white-space: pre-line;
+}
+
+/* Flag backgrounds — 3-band pastel */
+
+body.lang-de {
+  background: linear-gradient(to bottom,
+    #aaaaaa 0%, 
+    #aaaaaa 33.33%,
+    #e2a2a2 33.33%, 
+    #e2a2a2 66.66%,
+    #f5f5a3 66.66%, 
+    #f5f5a3 100%);
+  background-repeat: no-repeat;
+  background-size: 100% 100vh;
+}
+
+
+body.lang-es {
+  background: linear-gradient(to bottom,
+    #f5b1b1 0%,
+    #f5b1b1 33.33%,
+    #fce797 33.33%,
+    #fce797 66.66%,
+    #f5b1b1 66.66%,
+    #f5b1b1 100%);
+}
+
+body.lang-it {
+  background: linear-gradient(to right, #a8d5a8 0%, #a8d5a8 33.33%, #ffffff 33.33%, #ffffff 66.66%, #f2a8a8 66.66%, #f2a8a8 100%);
+}
+
+body.lang-fr {
+  background: linear-gradient(to right, #add8e6 0%, #add8e6 33.33%, #ffffff 33.33%, #ffffff 66.66%, #f08080 66.66%, #f08080 100%);
+}
+
+body.lang-cn {
+  background-color: #f4aaaa;
+}
+
+body[class^="lang-"] * {
+  color: black !important;
+}

@@ -1,0 +1,52 @@
+<!DOCTYPE html>
+<html lang="en">
+  <head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <title>Placeholder Site Three</title>
+    <style>
+      :root { --base: #1b1c27; --warm: #f2ab27; --paper: #fef8ea; }
+      * { box-sizing: border-box; }
+      body {
+        margin: 0;
+        min-height: 100vh;
+        font-family: "Gill Sans", "Gill Sans MT", Calibri, sans-serif;
+        background: var(--paper);
+        color: var(--base);
+        display: grid;
+        place-items: center;
+        padding: 1rem;
+      }
+      .stack {
+        width: min(780px, 100%);
+        display: grid;
+        gap: 1rem;
+      }
+      .banner {
+        background: linear-gradient(90deg, #f9d37d, var(--warm));
+        border-radius: 18px;
+        padding: 1.3rem;
+        font-size: clamp(1.8rem, 4vw, 2.8rem);
+        font-weight: 700;
+      }
+      .block {
+        border: 2px solid #1b1c27;
+        border-radius: 16px;
+        padding: 1rem;
+        background: #fff;
+      }
+      p { line-height: 1.65; margin: 0; }
+    </style>
+  </head>
+  <body>
+    <div class="stack">
+      <div class="banner">Placeholder Site Three</div>
+      <div class="block">
+        <p>
+          Third preview slot. Replace with your own production UI, project microsite, or frontend
+          case study when you are ready.
+        </p>
+      </div>
+    </div>
+  </body>
+</html>

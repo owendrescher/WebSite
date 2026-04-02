@@ -1,0 +1,2066 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8" />
+<meta name="viewport" content="width=device-width,initial-scale=1" />
+<title>Daily Checklist</title>
+<style>
+  :root{
+    /* Header fixed sizes (does NOT scale with slider) */
+    --base-font-size:16px;
+    --fixed-title-size: calc(var(--base-font-size) + 2px);
+
+    /* Body font slider variables (body ONLY) */
+    --ui-step:0;
+    --ui-step-px:0px;
+    --font-size: calc(var(--base-font-size) + var(--ui-step-px));
+
+    /* Light palette (defaults; Theme Studio can override via injected styles) */
+    --bg:#f6f7f9;
+    --surface:#ffffff;
+    --text:#111316;
+    --muted:#646a73;
+    --border:#e3e6eb;
+    --accent:#316aff;
+    --accent-weak:#e8efff;
+    --check:#316aff;
+    --lineA:#316aff;   /* % line (blue) */
+    --lineB:#f59e0b;   /* cumulative line (amber) */
+    --grid:#e1e4ea;
+    --warn:#b45309;
+    --err:#dc2626;
+
+    /* Calendar gradient (RGB strings) */
+    --cal-red: rgb(220,38,38);
+    --cal-mid: rgb(255,255,255);
+    --cal-green: rgb(22,163,74);
+
+    /* Stripe overlays for flags/excuses */
+    --stripe-dark: rgba(0,0,0,0.18);
+    --stripe-light: rgba(255,255,255,0.18);
+  }
+  [data-theme="dark"]{
+    --bg:#191b1f;
+    --surface:#22252a;
+    --text:#e9edf3;
+    --muted:#b5bdc9;
+    --border:#343944;
+    --accent:#6aa0ff;
+    --accent-weak:#223153;
+    --check:#6aa0ff;
+    --lineA:#8fbbff;
+    --lineB:#fbbf24;
+    --grid:#394050;
+    --warn:#fbbf24;
+    --err:#ef4444;
+
+    --cal-red: rgb(185,28,28);
+    --cal-mid: rgb(34,39,46);
+    --cal-green: rgb(22,163,74);
+
+    --stripe-dark: rgba(255,255,255,0.22);
+    --stripe-light: rgba(0,0,0,0.22);
+  }
+
+  html,body{height:100%;}
+  body{
+    margin:0; background:var(--bg); color:var(--text);
+    font: 400 var(--font-size)/1.45 system-ui, -apple-system, "Segoe UI", Inter, Roboto, "Helvetica Neue", Arial, "Noto Sans", sans-serif;
+  }
+
+  .wrap{max-width:980px; margin:0 auto; padding:16px;}
+
+  /* ===== HEADER (fixed size) ===== */
+  .topbar{
+    display:flex; align-items:center; gap:10px; flex-wrap:wrap;
+    position:sticky; top:0; background:var(--bg); padding:10px 0; z-index:6;
+    font-size: var(--base-font-size);
+  }
+  .title{font-size: var(--fixed-title-size); font-weight:700; letter-spacing:.2px; cursor:pointer;}
+  .spacer{flex:1;}
+  .controls, .controls .group{display:flex; align-items:center; gap:10px; flex-wrap:wrap;}
+  .score-pill{font-weight:700;}
+
+  button, select, input[type="text"], input[type="number"], textarea { font: inherit; color:var(--text); }
+  .btn{
+    border:1px solid var(--border); background:var(--surface); color:var(--text);
+    padding:8px 12px; border-radius:10px; cursor:pointer; transition: border-color .12s ease, background .12s ease, transform .04s ease;
+  }
+  .btn:hover{ border-color:var(--accent); background:color-mix(in srgb, var(--surface) 90%, var(--accent-weak) 10%); }
+  .btn:active{ transform: translateY(1px); }
+  .btn.primary{ background:var(--accent); color:#fff; border-color:transparent; }
+  .btn.primary:hover{ filter:brightness(1.05); }
+  .btn.icon{ padding:6px 9px; line-height:1; display:inline-flex; align-items:center; justify-content:center; }
+  .seg{ display:inline-flex; border:1px solid var(--border); border-radius:10px; overflow:hidden; }
+  .seg button{ border:0; background:var(--surface); padding:8px 10px; }
+  .seg button+button{ border-left:1px solid var(--border); }
+  .seg button:hover{ background:var(--accent-weak); }
+  select, .select, .input, textarea{
+    border:1px solid var(--border); background:var(--surface); color:var(--text);
+    padding:8px 10px; border-radius:10px; outline:none;
+  }
+  .input::placeholder, textarea::placeholder{ color:var(--muted); }
+  .input:focus, select:focus, textarea:focus{ outline:2px solid var(--accent); outline-offset:0; }
+
+  .switch{display:inline-flex; align-items:center; gap:6px;}
+  .switch input{appearance:none; width:42px; height:24px; border-radius:999px; position:relative; background:var(--border); border:1px solid var(--border); cursor:pointer; transition:all .15s ease;}
+  .switch input:checked{ background:var(--accent); border-color:var(--accent); }
+  .switch input::after{ content:""; position:absolute; top:3px; left:3px; width:18px; height:18px; border-radius:50%; background:#fff; transition:transform .15s ease; }
+  .switch input:checked::after{ transform:translateX(18px); }
+
+  .card{ background:var(--surface); border:1px solid var(--border); border-radius:16px; padding:12px 14px; box-shadow: 0 1px 0 rgba(0,0,0,.04); }
+  .toolbar{display:flex; align-items:center; gap:8px; justify-content:space-between; margin:8px 0 14px; flex-wrap:wrap;}
+  .grid{display:grid; gap:12px;}
+  .group-card{padding:8px 10px;}
+  .group-head{ display:flex; align-items:center; justify-content:space-between; padding:6px 2px 8px; border-bottom:1px dashed var(--border); margin-bottom:8px; }
+  .group-left{display:flex; align-items:center; gap:8px;}
+  .group-title{font-weight:700; cursor:pointer;}
+  .muted{color:var(--muted); font-size:0.95em;}
+
+  .row{ display:grid; grid-template-columns:auto 1fr auto; align-items:center; gap:10px; padding:8px 6px; border-radius:10px; }
+  .row:hover{ background:var(--accent-weak); }
+  .row .name{font-weight:600; cursor:pointer;}
+  .row .meta{color:var(--muted); font-size:0.95em;}
+  .row .actions{display:flex; gap:6px;}
+
+  .chk{ width:22px; height:22px; border-radius:6px; border:2px solid var(--border); display:inline-flex; align-items:center; justify-content:center; cursor:pointer; background:transparent; transition:all .15s ease; }
+  .chk[data-checked="true"]{ background:var(--check); border-color:var(--check); color:#fff; }
+  .chk[disabled]{ opacity:.5; cursor:not-allowed; }
+
+  /* record note */
+  .record-wrap{
+    margin:6px 2px 12px 34px; padding:10px 10px;
+    border:1px solid var(--border); border-left:3px solid var(--accent); border-radius:12px;
+    background: color-mix(in srgb, var(--surface) 88%, var(--accent-weak) 12%);
+    display:flex; align-items:flex-start; gap:10px;
+  }
+  .record-input{ flex:1; min-height:60px; resize:vertical; }
+  .record-side{ display:flex; flex-direction:column; gap:4px; align-items:flex-end; white-space:nowrap; }
+  .counter{ font-size:0.9em; color:var(--muted); }
+  .counter.bad{ color: var(--err); font-weight:600; }
+  .note-req{ font-size:0.88em; color:var(--muted); }
+
+  .group-card.selected{ border-color:var(--accent); box-shadow: 0 0 0 2px var(--accent-weak) inset; }
+  .row.selected{ outline:2px solid var(--accent); background:var(--accent-weak); }
+
+  .range{ accent-color: var(--accent); }
+  .pill{padding:6px 10px; border:1px solid var(--border); border-radius:999px; background:var(--surface);}
+
+  input[type="file"]{ display:none; }
+  .file-btn{ cursor:pointer; }
+
+  .notes-box{ width:100%; min-height:110px; resize:vertical; }
+  .notes-box[disabled]{ opacity:.7; background:var(--bg); }
+
+  /* Graph */
+  #graphContainer svg{ width:100%; height:auto; display:block; }
+  .legend{ display:flex; gap:14px; align-items:center; }
+  .legend .key{ display:inline-flex; align-items:center; gap:6px; }
+  .legend .sw{ width:14px; height:6px; border-radius:999px; display:inline-block; }
+  .series{ transition: opacity .12s ease, stroke-width .12s ease; pointer-events: stroke; }
+  .seriesA{ stroke: var(--lineA); }
+  .seriesB{ stroke: var(--lineB); }
+  .dot{ transition: transform .08s ease; }
+  .dot:hover{ transform: scale(1.2); }
+  .dimmed{ opacity:.45; }
+  .hi{ stroke-width:3.5 !important; opacity:1 !important; }
+
+  .warn{ color:var(--warn); font-weight:600; }
+  .small{ font-size:0.9em; }
+
+  /* Dialogs */
+  dialog{
+    border:1px solid var(--border); border-radius:14px; padding:0; background:var(--surface); color:var(--text);
+    width:min(760px, 96vw);
+  }
+  dialog::backdrop{ background: rgba(0,0,0,.25); }
+  .dlg-head{padding:14px 16px; border-bottom:1px solid var(--border); font-weight:700;}
+  .dlg-body{padding:12px 16px; display:grid; gap:10px;}
+  .dlg-row{display:grid; grid-template-columns:160px 1fr; gap:12px; align-items:center;}
+  .dlg-foot{padding:12px 16px; border-top:1px solid var(--border); display:flex; justify-content:flex-end; gap:8px;}
+
+  /* Bigger Changelog dialog */
+  #logDialog{ width:min(1000px, 92vw); min-width:50vw; }
+  #logBody .log-card{ display:flex; align-items:flex-start; justify-content:space-between; gap:10px; }
+  #logBody .log-main{ flex:1; }
+
+  /* ===== Calendar ===== */
+  .cal-card{ margin-top:12px; }
+  .cal-head{ display:flex; align-items:center; justify-content:space-between; margin:2px 0 10px; }
+  .cal-title{ font-weight:700; }
+  .cal-grid{ display:grid; grid-template-columns:repeat(7, 1fr); gap:6px; }
+  .cal-wd{ text-align:center; color:var(--muted); font-weight:600; font-size:0.9em; }
+  .cal-day{
+    height:40px; border-radius:10px; border:1px solid var(--border);
+    display:flex; align-items:center; justify-content:center;
+    cursor:pointer; user-select:none; font-weight:700;
+    transition: transform .05s ease;
+    background-size: 16px 16px;
+    position: relative;
+  }
+  .cal-day:hover{ transform:scale(1.02); }
+  .cal-day.dim{ opacity:.45; }
+  .cal-day.blank{ visibility:hidden; }
+  .cal-day.today{ outline:2px solid var(--accent); }
+  .cal-day.selected{ box-shadow:0 0 0 2px var(--accent) inset; }
+
+  /* Excuse visuals */
+  .cal-day.excused{
+    background-image: repeating-linear-gradient(135deg, var(--stripe-dark) 0 8px, transparent 8px 16px);
+  }
+  .cal-day.exc-start{ border-top-right-radius:0; border-bottom-right-radius:0; }
+  .cal-day.exc-mid{ border-radius:0; }
+  .cal-day.exc-end{ border-top-left-radius:0; border-bottom-left-radius:0; }
+  .cal-day.exc-single{ }
+
+  /* Pending range start marker */
+  .cal-day.pending{ outline:2px dashed var(--accent); outline-offset:-2px; }
+
+  /* Theme Studio drawer tweaks */
+  #themeDialog{ width:min(1020px,96vw); }
+  .theme-grid{ display:grid; grid-template-columns: repeat(auto-fit, minmax(220px,1fr)); gap:10px; }
+  .theme-card{ display:grid; gap:8px; border:1px dashed var(--border); padding:10px; border-radius:12px; background:var(--surface); }
+  .theme-row{ display:grid; grid-template-columns: 1fr auto; gap:8px; align-items:center; }
+  .swatch{ width:28px; height:28px; border-radius:8px; border:1px solid var(--border); }
+
+  /* Drag hints */
+  .dragging{ opacity:.5; }
+  .drop-target{ outline:2px dashed var(--accent); }
+
+  /* Sticky bottom toolbar inside Theme Studio */
+  .dlg-foot.sticky{ position:sticky; bottom:0; background:var(--surface); }
+</style>
+</head>
+<body>
+  <div class="wrap">
+    <div class="topbar">
+      <div class="seg">
+        <button class="btn icon" id="prevDay" title="Previous day">◀</button>
+        <button class="btn" id="todayBtn" title="Jump to today">--/--/--</button>
+        <button class="btn icon" id="nextDay" title="Next day">▶</button>
+      </div>
+
+      <div class="title" id="dateTitle" title="Ctrl/Cmd-click to toggle edit override for this day">Today</div>
+
+      <div class="spacer"></div>
+
+      <div class="controls">
+        <span class="pill score-pill" id="scoreHeader">0/0</span>
+
+        <div class="group">
+          <label class="muted">Category</label>
+          <select id="categoryFilter" class="select"></select>
+        </div>
+
+        <div class="group">
+          <label class="muted" for="fontRange">Font</label>
+          <input id="fontRange" type="range" class="range" min="-2" max="2" step="1" />
+          <span class="pill" id="fontReadout">16 pt</span>
+        </div>
+
+        <label class="switch" title="Dark mode">
+          <input type="checkbox" id="darkToggle" />
+          <span class="muted">Dark</span>
+        </label>
+
+        <button class="btn" id="themeBtn" title="Open Theme Studio">Theme</button>
+        <div class="seg">
+          <button class="btn" id="undoBtn" title="Undo (Ctrl/Cmd+Z)">↶ Undo</button>
+          <button class="btn" id="redoBtn" title="Redo (Shift+Ctrl/Cmd+Z)">↷ Redo</button>
+        </div>
+      </div>
+    </div>
+
+    <!-- Manage / Import / Export / Changelog -->
+    <div class="toolbar">
+      <div class="group">
+        <button class="btn primary" id="addTaskBtn">Add Task</button>
+        <button class="btn" id="editTaskBtn">Edit Task</button>
+        <button class="btn" id="removeTaskBtn">Remove Task</button>
+        <button class="btn" id="changelogBtn">Changelog</button>
+        <button class="btn" id="snapshotBtn" title="Generate an Instagram-sized daily summary card">Daily Snapshot</button>
+      </div>
+      <div class="group">
+        <button class="btn" id="resetDayBtn">Reset Day</button>
+        <div class="seg">
+          <label class="btn file-btn">
+            Import Tasks CSV
+            <input type="file" id="importCsvInput" accept=".csv,text/csv" />
+          </label>
+          <label class="btn file-btn">
+            Import JSON
+            <input type="file" id="importJsonInput" accept=".json,application/json" />
+          </label>
+          <button class="btn" id="exportTasksBtn">Export Tasks CSV</button>
+          <button class="btn" id="exportJsonBtn">Export JSON</button>
+          <button class="btn" id="exportLogsBtn">Export Logs CSV</button>
+        </div>
+      </div>
+    </div>
+
+    <!-- Graph controls -->
+    <div class="toolbar">
+      <div class="group">
+        <button class="btn" id="graphOverallBtn" title="Overall completion over time">Graph Overall</button>
+        <button class="btn" id="graphSelectedBtn" title="Graph the selected category or task">Graph Selected</button>
+        <button class="btn" id="clearGraphBtn">Clear Graph</button>
+      </div>
+      <div class="muted small">Hover a line to highlight. Blue = % (left). Amber = cumulative (right).</div>
+    </div>
+
+    <!-- Graph -->
+    <div id="graphCard" class="card" style="display:none;">
+      <div class="group-head">
+        <div class="group-left">
+          <div class="group-title" id="graphTitle">Graph</div>
+          <div class="muted" id="graphSub"></div>
+        </div>
+        <div class="legend" id="graphLegend">
+          <span class="key"><span class="sw" style="background:var(--lineA)"></span><span class="muted">Percent</span></span>
+          <span class="key"><span class="sw" style="background:var(--lineB)"></span><span class="muted">Cumulative</span></span>
+        </div>
+      </div>
+      <div id="graphContainer"></div>
+    </div>
+
+    <canvas id="shareCanvas" width="1080" height="1080" style="display:none;"></canvas>
+    
+    <!-- Task groups -->
+    <div id="listRoot" class="grid"></div>
+
+    <!-- Notes -->
+    <div class="card" id="notesCard">
+      <div class="group-head">
+        <div class="group-left">
+          <div class="group-title">Notes</div>
+          <div class="muted" id="notesHint"></div>
+        </div>
+        <div class="muted" id="notesStatus"></div>
+      </div>
+      <textarea id="notesBox" class="input notes-box" placeholder="Notes for today..."></textarea>
+      <div class="muted small" id="lockInfo" style="margin-top:6px;"></div>
+    </div>
+
+    <!-- Calendar -->
+    <div id="calendarCard" class="card cal-card">
+      <div class="cal-head">
+        <button class="btn icon" id="calPrev">◀</button>
+        <div class="cal-title" id="calTitle">Month YYYY</div>
+        <button class="btn icon" id="calNext">▶</button>
+      </div>
+      <div class="cal-grid" id="calGrid"></div>
+      <div class="muted small" id="calHint" style="margin-top:6px;">
+        Color: red (0%) → mid (50%) → green (100%).  
+        Double-click a day to **flag** it. Ctrl/Cmd-click a day to **start a range**, Ctrl/Cmd-click another to **end** and apply one excuse to all. Ranges show **connected stripes**.
+      </div>
+    </div>
+  </div>
+
+  <!-- Task dialog -->
+  <dialog id="taskDialog">
+    <div class="dlg-head" id="taskDialogTitle">Add Task</div>
+    <div class="dlg-body">
+      <div class="dlg-row">
+        <label for="taskName">Name</label>
+        <input id="taskName" class="input" type="text" placeholder="e.g., Journal" />
+      </div>
+      <div class="dlg-row">
+        <label for="taskCategory">Category</label>
+        <input list="catList" id="taskCategory" class="input" placeholder="e.g., Mindset" />
+        <datalist id="catList"></datalist>
+      </div>
+      <div class="dlg-row">
+        <label for="taskMinutes">Minutes (optional)</label>
+        <input id="taskMinutes" class="input" type="number" min="0" step="1" placeholder="10" />
+      </div>
+
+      <div class="card" style="padding:10px;">
+        <div style="font-weight:600; margin-bottom:6px;">Record note requirement (optional)</div>
+        <div class="dlg-row">
+          <label for="requireRecordChk">Require record to complete</label>
+          <input id="requireRecordChk" type="checkbox" />
+        </div>
+        <div class="dlg-row">
+          <label for="recordMinInput">Min characters</label>
+          <input id="recordMinInput" class="input" type="number" min="1" step="1" placeholder="e.g., 40" />
+        </div>
+        <div class="dlg-row">
+          <label for="recordPlaceholder">Textbox hint</label>
+          <input id="recordPlaceholder" class="input" type="text" placeholder="e.g., Who/what did you research?" />
+        </div>
+        <div class="muted small">If enabled, the checkbox can only be marked when the note meets the minimum length.</div>
+      </div>
+
+      <div class="muted small">Edits are <span class="warn">proactive</span>: they apply from <b>today</b> forward. Past days remain unchanged.</div>
+    </div>
+    <div class="dlg-foot">
+      <button class="btn" id="cancelTaskBtn">Cancel</button>
+      <button class="btn primary" id="saveTaskBtn">Save</button>
+    </div>
+  </dialog>
+
+  <!-- Pick Task dialog -->
+  <dialog id="pickDialog">
+    <div class="dlg-head" id="pickDialogTitle">Select Task</div>
+    <div class="dlg-body" id="pickBody"></div>
+    <div class="dlg-foot">
+      <button class="btn" id="cancelPickBtn">Cancel</button>
+    </div>
+  </dialog>
+
+  <!-- Changelog dialog -->
+  <dialog id="logDialog">
+    <div class="dlg-head">Changelog</div>
+    <div class="dlg-body" id="logBody" style="max-height:65vh; overflow:auto;"></div>
+    <div class="dlg-foot">
+      <button class="btn" id="clearLogBtn" title="Remove all entries">Clear All</button>
+      <button class="btn primary" id="closeLogBtn">Close</button>
+    </div>
+  </dialog>
+
+  <!-- Day Flag dialog (single day or range) -->
+  <dialog id="flagDialog">
+    <div class="dlg-head">Excuse / Flag Day(s)</div>
+    <div class="dlg-body">
+      <div class="dlg-row">
+        <label for="flagDate">Date(s)</label>
+        <input id="flagDate" class="input" type="text" disabled />
+      </div>
+      <div class="dlg-row">
+        <label for="flagRating">Rating (1–10)</label>
+        <input id="flagRating" class="input" type="range" min="1" max="10" step="1" />
+      </div>
+      <div class="dlg-row">
+        <label for="flagHappened">What happened?</label>
+        <textarea id="flagHappened" class="input" rows="3" placeholder="Brief recap of the day(s)…"></textarea>
+      </div>
+      <div class="dlg-row">
+        <label for="flagBlocker">What prevented tasks?</label>
+        <textarea id="flagBlocker" class="input" rows="3" placeholder="Specific blockers / reasons…"></textarea>
+      </div>
+      <div class="muted small">This doesn’t change completion color; it adds a **striped overlay**. Ranges will appear as **connected** stripes across days.</div>
+    </div>
+    <div class="dlg-foot">
+      <button class="btn" id="flagClearBtn" title="Remove flag(s)">Clear</button>
+      <button class="btn" id="flagCancelBtn">Cancel</button>
+      <button class="btn primary" id="flagSaveBtn">Save</button>
+    </div>
+  </dialog>
+
+  <!-- THEME STUDIO -->
+  <dialog id="themeDialog">
+    <div class="dlg-head">Theme Studio</div>
+    <div class="dlg-body">
+      <div class="toolbar" style="margin-top:0;">
+        <div class="group">
+          <div class="seg">
+            <button class="btn" id="themeModeLight">Light</button>
+            <button class="btn" id="themeModeDark">Dark</button>
+          </div>
+          <span class="muted">Editing mode:</span>
+          <span class="pill" id="themeModeLabel">Light</span>
+        </div>
+        <div class="group">
+          <input id="themePresetName" class="input" type="text" placeholder="Preset name" style="min-width:180px;">
+          <button class="btn" id="themeSavePreset">Save Preset</button>
+          <select id="themePresetSelect" class="select" style="min-width:180px;"></select>
+          <button class="btn" id="themeLoadPreset">Load</button>
+        </div>
+      </div>
+
+      <div class="theme-grid">
+        <div class="theme-card">
+          <div class="group-head"><div class="group-title">Global Palette</div></div>
+          <div id="themeGlobal"></div>
+        </div>
+
+        <div class="theme-card">
+          <div class="group-head"><div class="group-title">Graph & Status</div></div>
+          <div id="themeGraph"></div>
+        </div>
+
+        <div class="theme-card">
+          <div class="group-head"><div class="group-title">Calendar Gradient</div></div>
+          <div id="themeCalendar"></div>
+        </div>
+
+        <div class="theme-card">
+          <div class="group-head"><div class="group-title">Stripe Overlays</div></div>
+          <div id="themeStripes"></div>
+        </div>
+      </div>
+    </div>
+    <div class="dlg-foot sticky">
+      <div class="spacer"></div>
+      <button class="btn" id="themeCopyToOther">Copy to Other Mode</button>
+      <button class="btn" id="themeResetMode">Reset Mode</button>
+      <button class="btn" id="themeExport">Export Theme JSON</button>
+      <label class="btn file-btn">
+        Import Theme JSON
+        <input type="file" id="themeImportInput" accept=".json,application/json" />
+      </label>
+      <button class="btn primary" id="themeClose">Close</button>
+    </div>
+  </dialog>
+
+<script>
+/* ===================== Global History (Undo/Redo) ===================== */
+const STORAGE_KEY = "daily_checklist_state_v5"; // bumped version for theme/presets/undo
+
+let historyState = { stack: [], idx: -1, lock: false, ready: false };
+function pushHistory(){
+  if(historyState.lock || !historyState.ready) return;
+  const snap = JSON.stringify(state);
+  if(historyState.idx >= 0 && historyState.stack[historyState.idx] === snap) return;
+  // cap size to avoid runaway
+  const MAX = 200;
+  historyState.stack = historyState.stack.slice(0, historyState.idx+1);
+  historyState.stack.push(snap);
+  if(historyState.stack.length > MAX){ historyState.stack.shift(); }
+  historyState.idx = historyState.stack.length - 1;
+  updateUndoRedoButtons();
+}
+function restoreFromHistory(newIdx){
+  if(newIdx < 0 || newIdx >= historyState.stack.length) return;
+  historyState.lock = true;
+  const snap = historyState.stack[newIdx];
+  state = JSON.parse(snap);
+  localStorage.setItem(STORAGE_KEY, snap);
+  historyState.idx = newIdx;
+  historyState.lock = false;
+  refreshCategoryFilter();
+  render();
+  updateUndoRedoButtons();
+}
+function undo(){ if(historyState.idx > 0) restoreFromHistory(historyState.idx - 1); }
+function redo(){ if(historyState.idx < historyState.stack.length - 1) restoreFromHistory(historyState.idx + 1); }
+function updateUndoRedoButtons(){
+  const u=$("#undoBtn"), r=$("#redoBtn");
+  u.disabled = !(historyState.idx > 0);
+  r.disabled = !(historyState.idx < historyState.stack.length - 1);
+}
+
+/* ===================== State / Persistence ===================== */
+function defaultState(){
+  return {
+    tasks: [],
+    logs: {},
+    notes: {},
+    changelog: [],
+    prefs: { fontStep: 0, darkMode: false },
+    flags: {},
+    editOverrides: {},
+    orders: { categoryOrder: [], taskOrder: {} },
+    theme: { light:{}, dark:{} },     // CSS var map for Theme Studio
+    themePresets: {}                  // name -> {light:{}, dark:{}}
+  };
+}
+function loadState(){
+  try{
+    const raw = localStorage.getItem(STORAGE_KEY);
+    if(raw){
+      const s = JSON.parse(raw);
+      // shape guards
+      s.tasks ??= []; s.logs ??= {}; s.notes ??= {}; s.changelog ??= [];
+      s.prefs ??= {fontStep:0, darkMode:false};
+      s.flags ??= {}; s.editOverrides ??= {};
+      s.orders ??= {categoryOrder:[], taskOrder:{}};
+      s.orders.categoryOrder ??= []; s.orders.taskOrder ??= {};
+      s.theme ??= {light:{}, dark:{}}; s.themePresets ??= {};
+      return s;
+    }
+    return defaultState();
+  }catch(e){ return defaultState(); }
+}
+function saveState(){
+  if(!historyState.ready) return; // before init complete
+  localStorage.setItem(STORAGE_KEY, JSON.stringify(state));
+  pushHistory();
+}
+
+/* ===================== Dates / Labels ===================== */
+function today(){ return new Date(); }
+function toISODate(d){
+  const y = d.getFullYear(), m = String(d.getMonth()+1).padStart(2,'0'), dd = String(d.getDate()).padStart(2,'0');
+  return `${y}-${m}-${dd}`;
+}
+function fromISODate(iso){ const [y,m,d]=iso.split("-").map(Number); return new Date(y, m-1, d); }
+function addDays(d, n){ const x=new Date(d); x.setDate(x.getDate()+n); return x; }
+function startOfDay(d){ const x=new Date(d); x.setHours(0,0,0,0); return x; }
+function fmtMMDDYY(d){
+  const mm = String(d.getMonth()+1).padStart(2,'0'), dd = String(d.getDate()).padStart(2,'0'), yy = String(d.getFullYear()).slice(-2);
+  return `${mm}/${dd}/${yy}`;
+}
+function headerDateLabel(d){
+  const t0 = startOfDay(today());
+  const d0 = startOfDay(d);
+  const diff = Math.round((d0 - t0)/86400000);
+  if(diff === 0) return "Today";
+  if(diff === -1) return "Yesterday";
+  if(diff === 1) return "Tomorrow";
+  return fmtMMDDYY(d);
+}
+function originallyLocked(d){
+  const t0 = startOfDay(today());
+  const d0 = startOfDay(d);
+  const diff = Math.round((t0 - d0)/86400000);
+  return diff > 2;
+}
+function isLockedDate(d){
+  const iso = toISODate(d);
+  if(state.editOverrides?.[iso]) return false;
+  return originallyLocked(d);
+}
+
+/* ===================== App State & DOM refs ===================== */
+let state = loadState();
+let curDate = today();
+
+let selectedCategory = null;
+let selectedTaskId = null;
+
+const $  = (sel, root=document) => root.querySelector(sel);
+const $$ = (sel, root=document) => Array.from(root.querySelectorAll(sel));
+
+const listRoot       = $("#listRoot");
+const dateTitle      = $("#dateTitle");
+const todayBtn       = $("#todayBtn");
+const categoryFilter = $("#categoryFilter");
+const scoreHeader    = $("#scoreHeader");
+const notesBox       = $("#notesBox");
+const notesHint      = $("#notesHint");
+const notesStatus    = $("#notesStatus");
+const lockInfo       = $("#lockInfo");
+const snapshotBtn   = $("#snapshotBtn");
+const shareCanvas   = document.getElementById("shareCanvas");
+
+
+/* ===================== Task Revisions ===================== */
+function getRevisionForDate(task, dateISO){
+  const revs = task.revisions || [];
+  let pick = revs[0] || null;
+  for(const r of revs){
+    if(r.effective <= dateISO && (!pick || r.effective >= pick.effective)) pick = r;
+  }
+  return pick || {name:"(unnamed)", category:null, minutes:null, effective:"0001-01-01", requireRecord:false, recordMin:0, recordPlaceholder:""};
+}
+function latestRevision(task){
+  const revs = task.revisions || [];
+  if(revs.length === 0) return null;
+  return revs.reduce((a,b)=> a.effective >= b.effective ? a : b);
+}
+function categoriesForDate(dateISO){
+  const set = new Set();
+  for(const t of state.tasks){
+    const r = getRevisionForDate(t, dateISO);
+    set.add(r.category ?? "-");
+  }
+  return Array.from(set).sort();
+}
+
+/* ===================== Logs & Scores ===================== */
+function getLogEntry(dateISO, taskId){
+  return state.logs?.[dateISO]?.[String(taskId)] || null;
+}
+function getStatus(dateISO, taskId){
+  return !!(getLogEntry(dateISO, taskId)?.completed);
+}
+function setStatus(dateISO, taskId, completed){
+  state.logs[dateISO] ??= {};
+  const prev = state.logs[dateISO][String(taskId)] || {};
+  state.logs[dateISO][String(taskId)] = { ...prev, completed: !!completed, ts: new Date().toISOString() };
+  saveState();
+}
+function setRecord(dateISO, taskId, text){
+  state.logs[dateISO] ??= {};
+  const prev = state.logs[dateISO][String(taskId)] || {};
+  state.logs[dateISO][String(taskId)] = { ...prev, record: text, ts: new Date().toISOString() };
+  saveState();
+}
+function scoreForDate(dateISO){
+  let total = 0, done = 0;
+  for(const t of state.tasks){
+    const rev = getRevisionForDate(t, dateISO);
+    if(rev){ total++; if(getStatus(dateISO, t.id)) done++; }
+  }
+  if(total === 0) return {done:0,total:0,pct:0.5};
+  return {done,total,pct: done/total};
+}
+
+/* ===================== Ordering Helpers ===================== */
+function ensureOrdersFor(keys){
+  const ord = state.orders.categoryOrder || [];
+  const filtered = ord.filter(c => keys.includes(c));
+  for(const k of keys){ if(!filtered.includes(k)) filtered.push(k); }
+  state.orders.categoryOrder = filtered;
+}
+function ensureTaskOrder(cat, ids){
+  const cur = state.orders.taskOrder[cat] || [];
+  const filtered = cur.filter(id => ids.includes(id));
+  for(const id of ids){ if(!filtered.includes(id)) filtered.push(id); }
+  state.orders.taskOrder[cat] = filtered;
+}
+function sortByOrder(keys){
+  const ord = state.orders.categoryOrder || [];
+  return keys.slice().sort((a,b)=>{
+    const ia = ord.indexOf(a), ib = ord.indexOf(b);
+    if(ia === -1 && ib === -1) return a.localeCompare(b);
+    if(ia === -1) return 1;
+    if(ib === -1) return -1;
+    return ia - ib;
+  });
+}
+function sortTasksByOrder(cat, items){
+  const ids = items.map(x=>x.task.id);
+  ensureTaskOrder(cat, ids);
+  const order = state.orders.taskOrder[cat];
+  const pos = id => order.indexOf(id);
+  return items.slice().sort((a,b)=>{
+    const pa = pos(a.task.id), pb = pos(b.task.id);
+    if(pa === -1 && pb === -1) return a.rev.name.localeCompare(b.rev.name);
+    if(pa === -1) return 1;
+    if(pb === -1) return -1;
+    return pa - pb;
+  });
+}
+
+/* ===================== UI Rendering ===================== */
+function refreshCategoryFilter(){
+  const dateISO = toISODate(curDate);
+  const cats = ["All", ...categoriesForDate(dateISO)];
+  categoryFilter.innerHTML = cats.map(c => `<option value="${c}">${c}</option>`).join("");
+  if(!cats.includes(categoryFilter.value)) categoryFilter.value = "All";
+}
+function computeScore(dateISO){
+  let doneAll = 0;
+  for(const t of state.tasks){ if(getStatus(dateISO, t.id)) doneAll++; }
+  return { doneAll, totalAll: state.tasks.length };
+}
+function refreshTodayButton(){ todayBtn.textContent = fmtMMDDYY(today()); }
+
+/* --- drag state --- */
+let dragCat = null;
+let dragTask = null;
+
+function render(){
+  const dateISO = toISODate(curDate);
+  const locked = isLockedDate(curDate);
+  const wasLocked = originallyLocked(curDate);
+  const overrideOn = !!state.editOverrides?.[dateISO];
+
+  // header
+  dateTitle.textContent = headerDateLabel(curDate);
+  refreshTodayButton();
+  const {doneAll, totalAll} = computeScore(dateISO);
+  scoreHeader.textContent = `${doneAll}/${totalAll}`;
+
+  // group by category AS-OF date
+  const filter = categoryFilter.value || "All";
+  const grouped = {};
+  for(const t of state.tasks){
+    const r = getRevisionForDate(t, dateISO);
+    const cat = r.category ?? "-";
+    if(filter !== "All" && cat !== filter) continue;
+    (grouped[cat] ||= []).push({task:t, rev:r});
+  }
+  const groupKeysAll = Object.keys(grouped);
+  ensureOrdersFor(groupKeysAll);
+  const groupKeys = sortByOrder(groupKeysAll);
+
+  // render groups
+  listRoot.innerHTML = "";
+  if(groupKeys.length === 0){
+    listRoot.appendChild(el("div",{class:"card"}, el("div",{class:"muted"},"No tasks yet. Use “Add Task”.") ));
+  }else{
+    for(const cat of groupKeys){
+      grouped[cat] = sortTasksByOrder(cat, grouped[cat]);
+
+      const card = el("div",{class:"card group-card", dataset:{cat:cat}});
+      if(selectedCategory === cat && selectedTaskId == null) card.classList.add("selected");
+
+      /* Category drag handlers */
+      card.setAttribute("draggable","true");
+      card.addEventListener("dragstart",(e)=>{
+        dragCat = cat; card.classList.add("dragging");
+        e.dataTransfer.setData("text/plain", "CAT:"+cat);
+      });
+      card.addEventListener("dragend",()=>{ dragCat=null; card.classList.remove("dragging"); $$(".drop-target").forEach(n=>n.classList.remove("drop-target")); });
+      card.addEventListener("dragover",(e)=>{ if(dragCat && dragCat!==cat){ e.preventDefault(); card.classList.add("drop-target"); } });
+      card.addEventListener("dragleave",()=> card.classList.remove("drop-target"));
+      card.addEventListener("drop",(e)=>{
+        if(!dragCat || dragCat===cat) return;
+        e.preventDefault(); card.classList.remove("drop-target");
+        const ord = state.orders.categoryOrder;
+        const from = ord.indexOf(dragCat), to = ord.indexOf(cat);
+        if(from>-1 && to>-1){ ord.splice(from,1); ord.splice(to,0,dragCat); saveState(); render(); }
+      });
+
+      const left = el("div",{class:"group-left"},
+        el("div",{class:"group-title", onclick:()=>toggleSelectCategory(cat), title:"Select category for graph / drag to reorder"}, cat),
+        el("div",{class:"muted"}, `${grouped[cat].length} tasks`)
+      );
+      const addBtn = el("button",{class:"btn", title:`Add task to ${cat}`, onclick:()=>openAddInCategory(cat)}, "＋ Add");
+      card.appendChild(el("div",{class:"group-head"}, left, addBtn));
+
+      for(const {task, rev} of grouped[cat]){
+        const checked = getStatus(dateISO, task.id);
+        const row = el("div",{class:"row", dataset:{tid:String(task.id)}});
+        if(selectedTaskId === task.id) row.classList.add("selected");
+
+        /* Task drag handlers (within same category) */
+        row.setAttribute("draggable","true");
+        row.addEventListener("dragstart",(e)=>{
+          dragTask = {id:task.id, cat:cat}; row.classList.add("dragging");
+          e.dataTransfer.setData("text/plain", "TASK:"+task.id);
+        });
+        row.addEventListener("dragend",()=>{
+          dragTask=null; row.classList.remove("dragging"); $$(".drop-target").forEach(n=>n.classList.remove("drop-target"));
+        });
+        row.addEventListener("dragover",(e)=>{
+          if(dragTask && dragTask.cat===cat && dragTask.id!==task.id){ e.preventDefault(); row.classList.add("drop-target"); }
+        });
+        row.addEventListener("dragleave",()=> row.classList.remove("drop-target"));
+        row.addEventListener("drop",(e)=>{
+          if(!dragTask || dragTask.cat!==cat || dragTask.id===task.id) return;
+          e.preventDefault(); row.classList.remove("drop-target");
+          const list = state.orders.taskOrder[cat] || [];
+          const from = list.indexOf(dragTask.id);
+          const to = list.indexOf(task.id);
+          if(from>-1 && to>-1){ list.splice(from,1); list.splice(to,0,dragTask.id); state.orders.taskOrder[cat]=list; saveState(); render(); }
+        });
+
+        const chk = el("button",{class:"chk", dataset:{checked:String(checked)}, title: locked ? (wasLocked ? (overrideOn ? "Override ON" : "Locked (older than 2 days)") : "") : (checked?"Uncheck":"Check")}, checked ? "✓" : "");
+        if(locked) chk.setAttribute("disabled","true");
+        chk.addEventListener("click", (ev) => {
+          if(locked) return;
+          ev.stopPropagation();
+          const want = !(chk.dataset.checked === "true");
+          if(want && rev.requireRecord){
+            const rec = (getLogEntry(dateISO, task.id)?.record || "").trim();
+            const ok = rec.length >= Math.max(1, Number(rev.recordMin||0));
+            if(!ok){
+              const recTA = card.querySelector(`.record-input[data-for="${task.id}"]`);
+              if(recTA){ recTA.focus(); }
+              alert(`Add a record note of at least ${rev.recordMin||1} characters before checking this task.`);
+              return;
+            }
+          }
+          setStatus(dateISO, task.id, want);
+          render(); renderCalendar();
+        });
+
+        const name = el("div",{class:"name", onclick:()=>toggleSelectTask(task.id), title:"Select for graph / drag to reorder"}, rev.name);
+        const metaBits = [];
+        if(rev.minutes != null && rev.minutes !== "") metaBits.push(`${rev.minutes}m`);
+        if(rev.requireRecord) metaBits.push(`req ${rev.recordMin||1}`);
+        const meta = el("div",{class:"meta"}, metaBits.join(" · "));
+
+        const actions = el("div",{class:"actions"},
+          el("button",{class:"btn icon", title:"Edit (proactive from today)", onclick:(ev)=>{ ev.stopPropagation(); openEdit(task.id); }}, "✏️"),
+          el("button",{class:"btn icon", title:"Remove", onclick:(ev)=>{ ev.stopPropagation(); removeTaskById(task.id); renderCalendar(); }}, "🗑️"),
+        );
+
+        row.append(chk, el("div",{}, name, meta), actions);
+        card.appendChild(row);
+
+        // record note UI if required
+        if(rev.requireRecord){
+          const recEntry = getLogEntry(dateISO, task.id);
+          const recText = recEntry?.record || "";
+          const recWrap = el("div",{class:"record-wrap"},
+            el("textarea",{
+              class:"input record-input",
+              "data-for": String(task.id),
+              placeholder: rev.recordPlaceholder || `Record (min ${rev.recordMin||1} chars)…`,
+              disabled: locked ? "true" : null,
+              oninput:(e)=>{
+                const val = e.target.value;
+                setRecord(dateISO, task.id, val);
+                const len = val.trim().length, min = Math.max(1, Number(rev.recordMin||0));
+                counter.textContent = `${len}/${min}`;
+                counter.classList.toggle("bad", len<min);
+              }
+            }),
+            el("div",{class:"record-side"},
+              el("div",{class:"counter"}, "0/0"),
+              el("div",{class:"note-req"}, `min ${rev.recordMin||1}`)
+            )
+          );
+          const ta = recWrap.querySelector("textarea");
+          const counter = recWrap.querySelector(".counter");
+          ta.value = recText;
+          const len = recText.trim().length, min = Math.max(1, Number(rev.recordMin||0));
+          counter.textContent = `${len}/${min}`;
+          counter.classList.toggle("bad", len<min);
+          card.appendChild(recWrap);
+        }
+      }
+      listRoot.appendChild(card);
+    }
+  }
+
+  // notes
+  const label = headerDateLabel(curDate);
+  notesHint.textContent = `for ${label}`;
+  notesBox.placeholder = `Notes for ${label}...`;
+  notesBox.value = state.notes?.[dateISO] ?? "";
+  notesBox.disabled = locked;
+  if(wasLocked && !overrideOn){
+    lockInfo.textContent = "This day is read-only (more than 2 days ago). Ctrl/Cmd-click the date title to override.";
+  }else if(wasLocked && overrideOn){
+    lockInfo.textContent = "Override active — this previously locked day is editable. Ctrl/Cmd-click the date title again to turn off.";
+  }else{
+    lockInfo.textContent = "";
+  }
+
+  // datalist for categories in dialog
+  const dl = $("#catList");
+  dl.innerHTML = categoriesForDate(dateISO).filter(c=>c!=="-").map(c=>`<option value="${c}">`).join("");
+
+  // calendar
+  renderCalendar();
+}
+
+/* ===================== Helpers ===================== */
+function el(tag, attrs={}, ...children){
+  const e = document.createElement(tag);
+  for(const [k,v] of Object.entries(attrs)){
+    if(k === "class") e.className = v;
+    else if(k === "dataset"){ for(const [dk,dv] of Object.entries(v)) e.dataset[dk] = dv; }
+    else if(k.startsWith("on") && typeof v === "function"){ e.addEventListener(k.substring(2), v); }
+    else if(k === "html") e.innerHTML = v;
+    else if(v != null) e.setAttribute(k,v);
+  }
+  for(const c of children){ if(c != null) e.appendChild(typeof c === "string" ? document.createTextNode(c) : c); }
+  return e;
+}
+function clearSelection(){
+  selectedCategory = null; selectedTaskId = null;
+  $$(".group-card").forEach(c => c.classList.remove("selected"));
+  $$(".row").forEach(r => r.classList.remove("selected"));
+}
+function toggleSelectCategory(cat){ if(selectedCategory === cat && selectedTaskId == null){ clearSelection(); } else { selectedCategory = cat; selectedTaskId = null; } render(); }
+function toggleSelectTask(tid){ if(selectedTaskId === tid){ clearSelection(); } else { selectedTaskId = tid; selectedCategory = null; } render(); }
+
+/* ===================== Task CRUD + Changelog ===================== */
+const taskDialog = $("#taskDialog");
+const taskDialogTitle = $("#taskDialogTitle");
+const taskName = $("#taskName");
+const taskCategory = $("#taskCategory");
+const taskMinutes = $("#taskMinutes");
+const requireRecordChk = $("#requireRecordChk");
+const recordMinInput = $("#recordMinInput");
+const recordPlaceholder = $("#recordPlaceholder");
+
+$("#cancelTaskBtn").addEventListener("click", ()=> taskDialog.close());
+$("#saveTaskBtn").addEventListener("click", onSaveTask);
+
+let editingId = null;
+function addChangelog(entry){ state.changelog.unshift(entry); if(state.changelog.length>1000) state.changelog.length=1000; saveState(); }
+
+function openAdd(){
+  editingId=null; taskDialogTitle.textContent="Add Task";
+  taskName.value=""; taskCategory.value=""; taskMinutes.value="";
+  requireRecordChk.checked=false; recordMinInput.value=""; recordPlaceholder.value="";
+  taskDialog.showModal(); setTimeout(()=>taskName.focus(), 30);
+}
+function openAddInCategory(cat){
+  editingId=null; taskDialogTitle.textContent="Add Task";
+  taskName.value=""; taskCategory.value=(cat==="-"?"":cat); taskMinutes.value="";
+  requireRecordChk.checked=false; recordMinInput.value=""; recordPlaceholder.value="";
+  taskDialog.showModal(); setTimeout(()=>taskName.focus(), 30);
+}
+function openEdit(id){
+  const t = state.tasks.find(x=>x.id===id); if(!t) return;
+  editingId=id; taskDialogTitle.textContent="Edit Task";
+  const cur = latestRevision(t) || {};
+  taskName.value = cur.name || ""; taskCategory.value = cur.category || ""; taskMinutes.value = (cur.minutes ?? "") === "" ? "" : String(cur.minutes);
+  requireRecordChk.checked = !!cur.requireRecord;
+  recordMinInput.value = cur.recordMin != null ? String(cur.recordMin) : "";
+  recordPlaceholder.value = cur.recordPlaceholder || "";
+  taskDialog.showModal(); setTimeout(()=>taskName.focus(), 30);
+}
+function onSaveTask(){
+  const name = taskName.value.trim(); if(!name){ alert("Task name required."); return; }
+  const category = (taskCategory.value.trim() || null);
+  const minutesRaw = taskMinutes.value.trim();
+  let minutes = null;
+  if(minutesRaw !== ""){ const n=Number(minutesRaw); if(!Number.isInteger(n)||n<0){ alert("Minutes must be a non-negative integer."); return; } minutes=n; }
+
+  const reqRec = !!requireRecordChk.checked;
+  let recMin = 0, recPh = "";
+  if(reqRec){
+    const minRaw = recordMinInput.value.trim();
+    if(minRaw === "" || Number(minRaw) < 1 || !Number.isInteger(Number(minRaw))){ alert("Min characters must be a positive integer."); return; }
+    recMin = Number(minRaw);
+    recPh = recordPlaceholder.value.trim();
+  }
+
+  const eff = toISODate(today()); // proactive
+  const newFields = { name, category, minutes, requireRecord:reqRec, recordMin:recMin, recordPlaceholder:recPh };
+
+  if(editingId == null){
+    const nextId = state.tasks.length ? Math.max(...state.tasks.map(t=>t.id))+1 : 1;
+    state.tasks.push({ id:nextId, revisions:[{effective:eff, ...newFields}] });
+    addChangelog({ ts:new Date().toISOString(), action:"add", taskId:nextId, before:null, after:newFields, effective:eff });
+  }else{
+    const t = state.tasks.find(x=>x.id===editingId); if(!t) return;
+    const before = latestRevision(t);
+    t.revisions.push({ effective:eff, ...newFields });
+    addChangelog({ ts:new Date().toISOString(), action:"edit", taskId:t.id, effective:eff,
+      before:{ name:before?.name??null, category:before?.category??null, minutes:before?.minutes??null, requireRecord:!!before?.requireRecord, recordMin:before?.recordMin??0, recordPlaceholder:before?.recordPlaceholder??"" },
+      after:newFields
+    });
+  }
+  refreshCategoryFilter(); render(); taskDialog.close();
+}
+function removeTaskById(id){
+  const t = state.tasks.find(x=>x.id===id); if(!t) return;
+  if(!confirm(`Delete “${(latestRevision(t)?.name)||"(unnamed)"}”? Past checkmarks remain in logs.`)) return;
+  const before = latestRevision(t);
+  state.tasks = state.tasks.filter(x=>x.id!==id);
+  addChangelog({ ts:new Date().toISOString(), action:"delete", taskId:id, effective:toISODate(today()),
+    before:{ name:before?.name??null, category:before?.category??null, minutes:before?.minutes??null, requireRecord:!!before?.requireRecord, recordMin:before?.recordMin??0, recordPlaceholder:before?.recordPlaceholder??"" }, after:null });
+  refreshCategoryFilter(); render();
+}
+
+/* ===================== Pick Dialog ===================== */
+const pickDialog = $("#pickDialog");
+const pickBody = $("#pickBody");
+$("#cancelPickBtn").addEventListener("click", ()=> pickDialog.close());
+function openPick(onChoose){
+  pickBody.innerHTML = "";
+  const filterSel = el("select",{class:"select", style:"margin-bottom:10px;"});
+  const cats = ["All", ...categoriesForDate(toISODate(curDate))]; for(const c of cats){ filterSel.appendChild(el("option",{value:c},c)); }
+  pickBody.appendChild(filterSel);
+  const list = el("div",{class:"grid"}); pickBody.appendChild(list);
+  function revFor(t){ return getRevisionForDate(t, toISODate(curDate)); }
+  function refreshList(){
+    list.innerHTML=""; const target=filterSel.value;
+    let ts=state.tasks.slice().map(t=>({t,r:revFor(t)}));
+    if(target!=="All") ts=ts.filter(x=>(x.r.category??"-")===target);
+    ts.sort((a,b)=>(a.r.category??"-").localeCompare(b.r.category??"-")||a.r.name.localeCompare(b.r.name));
+    for(const x of ts){
+      const t=x.t, r=x.r;
+      list.appendChild(el("div",{class:"card", style:"display:flex;align-items:center;justify-content:space-between;gap:10px;"},
+        el("div",{}, el("div",{style:"font-weight:600;"}, r.name),
+          el("div",{class:"muted"}, `${r.category ?? "-"} ${r.minutes!=null&&r.minutes!==""?`· ${r.minutes}m`:""} ${r.requireRecord?`· req ${r.recordMin}`:""}`)),
+        el("div",{}, el("button",{class:"btn", onclick:()=>{ pickDialog.close(); onChoose(t.id); }}, "Choose"))
+      ));
+    }
+  }
+  filterSel.addEventListener("change", refreshList);
+  refreshList(); pickDialog.showModal();
+}
+
+/* ===================== Import/Export ===================== */
+const importCsvInput=$("#importCsvInput"), importJsonInput=$("#importJsonInput"),
+      exportJsonBtn=$("#exportJsonBtn"), exportLogsBtn=$("#exportLogsBtn"), exportTasksBtn=$("#exportTasksBtn");
+
+importCsvInput.addEventListener("change", async (e)=>{
+  const file=e.target.files?.[0]; if(!file) return;
+  const text=await file.text(); const rows=text.split(/\r?\n/).map(l=>l.trim()).filter(Boolean);
+  let added=0; const eff=toISODate(today());
+  for(const line of rows){
+    if(line.startsWith("#")) continue;
+    const [nameRaw, categoryRaw, minutesRaw] = line.split(",").map(s=>(s??"").trim());
+    const name=nameRaw; if(!name) continue; const category=categoryRaw||null;
+    let minutes=null; if(minutesRaw && /^\d+$/.test(minutesRaw)) minutes=Number(minutesRaw);
+    const nextId = state.tasks.length ? Math.max(...state.tasks.map(t=>t.id))+1 : 1;
+    state.tasks.push({id:nextId, revisions:[{effective:eff,name,category,minutes, requireRecord:false, recordMin:0, recordPlaceholder:""}]});
+    addChangelog({ ts:new Date().toISOString(), action:"add", taskId:nextId, before:null, after:{name,category,minutes, requireRecord:false, recordMin:0, recordPlaceholder:""}, effective:eff });
+    added++;
+  }
+  render(); alert(`Imported ${added} tasks.`); e.target.value="";
+});
+importJsonInput.addEventListener("change", async (e)=>{
+  const file=e.target.files?.[0]; if(!file) return;
+  try{
+    const text=await file.text(); const incoming=JSON.parse(text);
+    // basic guards
+    incoming.orders ||= {categoryOrder:[], taskOrder:{}};
+    incoming.flags ||= {};
+    incoming.editOverrides ||= {};
+    incoming.theme ||= {light:{}, dark:{}};
+    incoming.themePresets ||= {};
+    state=incoming; localStorage.setItem(STORAGE_KEY, JSON.stringify(state));
+    pushHistory(); // snapshot after import
+    refreshCategoryFilter(); render(); alert("JSON imported.");
+  }catch(err){ alert("Failed to import JSON."); }
+  e.target.value="";
+});
+exportJsonBtn.addEventListener("click", ()=> downloadJSON("daily_checklist_state.json", state));
+exportLogsBtn.addEventListener("click", ()=>{
+  const lines=[["date","task_id","task_name_at_date","category_at_date","completed","timestamp","record_text"]];
+  const dates=Object.keys(state.logs).sort();
+  for(const d of dates){
+    const row=state.logs[d];
+    for(const tidStr of Object.keys(row)){
+      const info=row[tidStr]; const task=state.tasks.find(t=>String(t.id)===tidStr); const rev=task?getRevisionForDate(task,d):null;
+      lines.push([ d, tidStr, rev?rev.name:"(deleted)", rev?(rev.category??"-"):"-", info && info.completed ? 1 : 0, info?.ts ?? "", info?.record ?? "" ]);
+    }
+  }
+  downloadCSV("daily_logs.csv", lines);
+});
+exportTasksBtn.addEventListener("click", ()=>{
+  const eff = toISODate(today());
+  const lines = [["name","category","minutes","id","require_record","record_min","record_placeholder"]];
+  for(const t of state.tasks){
+    const r = getRevisionForDate(t, eff);
+    lines.push([ r.name, r.category ?? "", (r.minutes ?? ""), t.id, r.requireRecord?1:0, r.recordMin??0, r.recordPlaceholder??"" ]);
+  }
+  downloadCSV("tasks_current.csv", lines);
+});
+function downloadCSV(filename, rows){
+  const csv=rows.map(r=>r.map(cell=>{ const s=String(cell ?? ""); if(s.includes(",")||s.includes("\n")||s.includes('"')) return `"${s.replace(/"/g,'""')}"`; return s; }).join(",")).join("\n");
+  const blob=new Blob([csv],{type:"text/csv;charset=utf-8"}); const a=document.createElement("a");
+  a.href=URL.createObjectURL(blob); a.download=filename; document.body.appendChild(a); a.click(); setTimeout(()=>{ URL.revokeObjectURL(a.href); a.remove(); },0);
+}
+function downloadJSON(filename,obj){
+  const blob=new Blob([JSON.stringify(obj,null,2)],{type:"application/json"}); const a=document.createElement("a");
+  a.href=URL.createObjectURL(blob); a.download=filename; document.body.appendChild(a); a.click(); setTimeout(()=>{ URL.revokeObjectURL(a.href); a.remove(); },0);
+}
+
+/* ===================== Controls ===================== */
+$("#prevDay").addEventListener("click", ()=>{ curDate=new Date(curDate.getTime()-86400000); refreshCategoryFilter(); render(); });
+$("#nextDay").addEventListener("click", ()=>{ curDate=new Date(curDate.getTime()+86400000); refreshCategoryFilter(); render(); });
+$("#todayBtn").addEventListener("click", ()=>{ curDate=today(); refreshCategoryFilter(); render(); });
+
+// Date title edit-override toggle
+dateTitle.addEventListener("click", (e)=>{
+  if(e.ctrlKey || e.metaKey){
+    const iso = toISODate(curDate);
+    state.editOverrides[iso] = !state.editOverrides[iso];
+    saveState();
+    render();
+    alert(state.editOverrides[iso] ? `Edit override ON for ${iso}.` : `Edit override OFF for ${iso}.`);
+    e.preventDefault(); e.stopPropagation();
+  }
+});
+
+categoryFilter.addEventListener("change", render);
+
+$("#addTaskBtn").addEventListener("click", openAdd);
+$("#editTaskBtn").addEventListener("click", ()=> openPick(id=> openEdit(id)));
+$("#removeTaskBtn").addEventListener("click", ()=> openPick(id=> removeTaskById(id)));
+
+$("#resetDayBtn").addEventListener("click", ()=>{
+  const d=toISODate(curDate);
+  if(isLockedDate(curDate)){ alert("This day is locked. Toggle override (Ctrl/Cmd-click the date title) to edit."); return; }
+  if(state.logs[d] && confirm(`Clear all checkmarks for ${d}?`)){ delete state.logs[d]; saveState(); render(); }
+});
+
+/* ===================== Notes ===================== */
+let saveTimer=null;
+notesBox.addEventListener("input", ()=>{
+  if(isLockedDate(curDate)) return;
+  const d=toISODate(curDate); state.notes[d]=notesBox.value; notesStatus.textContent="Saving…";
+  clearTimeout(saveTimer);
+  saveTimer=setTimeout(()=>{ saveState(); notesStatus.textContent="Saved"; setTimeout(()=>{ if(notesStatus.textContent==="Saved") notesStatus.textContent=""; },800); },250);
+});
+
+/* ===================== Font & Theme toggle ===================== */
+const fontRange=$("#fontRange"), fontReadout=$("#fontReadout"), darkToggle=$("#darkToggle");
+function applyFontStep(step){
+  step=Math.max(-2, Math.min(2, step|0)); state.prefs.fontStep=step; saveState();
+  const basePx=16, px=basePx+step*2;
+  document.documentElement.style.setProperty("--ui-step", String(step));
+  document.documentElement.style.setProperty("--ui-step-px", `${step*2}px`);
+  document.documentElement.style.setProperty("--font-size", `${px}px`);
+  fontReadout.textContent=`${Math.round(px*0.75)} pt`;
+}
+function applyDarkMode(on){ state.prefs.darkMode=!!on; saveState(); document.documentElement.setAttribute("data-theme", on?"dark":"light"); darkToggle.checked=!!on; applyThemeStyles(); }
+
+/* ===================== Graphing (DUAL AXIS) ===================== */
+const graphCard=$("#graphCard"), graphTitle=$("#graphTitle"), graphSub=$("#graphSub"), graphContainer=$("#graphContainer");
+$("#graphOverallBtn").addEventListener("click", ()=> graphOverall());
+$("#graphSelectedBtn").addEventListener("click", ()=> graphSelected());
+$("#clearGraphBtn").addEventListener("click", ()=> { graphContainer.innerHTML=""; graphCard.style.display="none"; });
+
+function getAllLogDates(){
+  const keys=Object.keys(state.logs).sort();
+  if(keys.length===0){ return [toISODate(today())]; }
+  const min=keys[0], max=keys[keys.length-1];
+  const dates=[]; let d=new Date(min); const end=new Date(max);
+  d.setHours(0,0,0,0); end.setHours(0,0,0,0);
+  while(d<=end){ dates.push(toISODate(d)); d=new Date(d.getTime()+86400000); }
+  return dates;
+}
+
+function graphOverall(){
+  const dates=getAllLogDates(); const total=state.tasks.length||1;
+  const pct=dates.map(d=>{ let done=0; for(const t of state.tasks){ if(getStatus(d,t.id)) done++; } return total? (done/total)*100 : 0; });
+  const dailyCount = dates.map(d=>{ let done=0; for(const t of state.tasks){ if(getStatus(d,t.id)) done++; } return done; });
+  const cum = dailyCount.reduce((arr,v,i)=>{ arr.push((arr[i-1]||0)+v); return arr; },[]);
+  renderChartDual(dates, pct, cum, { title:"Overall completion", subtitle:`${dates[0]} → ${dates[dates.length-1]}`, rightLabel:"Cum. done" });
+}
+
+function graphSelected(){
+  if(selectedTaskId!=null){
+    const t=state.tasks.find(x=>x.id===selectedTaskId); if(!t){ alert("Select a task again."); return; }
+    const dates=getAllLogDates();
+    const pct=dates.map(d=> getStatus(d,t.id)?100:0);
+    const daily=dates.map(d=> getStatus(d,t.id)?1:0);
+    const cum=daily.reduce((a,v,i)=>{ a.push((a[i-1]||0)+v); return a; },[]);
+    const name = getRevisionForDate(t, toISODate(curDate)).name;
+    renderChartDual(dates, pct, cum, { yRightMaxAuto:true, title:`Task: ${name}`, subtitle:`${dates[0]} → ${dates[dates.length-1]}`, rightLabel:"Cum. checks" });
+    return;
+  }
+  if(selectedCategory!=null){
+    const cat=selectedCategory; const dates=getAllLogDates();
+    const pct=dates.map(d=>{ const tasks=state.tasks.filter(t=>(getRevisionForDate(t,d).category??"-")===cat);
+      const total=tasks.length||1; let done=0; for(const t of tasks){ if(getStatus(d,t.id)) done++; } return (done/total)*100; });
+    const daily=dates.map(d=>{ let done=0; for(const t of state.tasks){ if((getRevisionForDate(t,d).category??"-")===cat && getStatus(d,t.id)) done++; } return done; });
+    const cum=daily.reduce((a,v,i)=>{ a.push((a[i-1]||0)+v); return a; },[]);
+    renderChartDual(dates, pct, cum, { title:`Category: ${cat}`, subtitle:`${dates[0]} → ${dates[dates.length-1]}`, rightLabel:"Cum. done in category" });
+    return;
+  }
+  graphOverall();
+}
+
+function renderChartDual(dates, pctValues, cumValues, opts={}){
+  graphCard.style.display="block";
+  graphTitle.textContent = opts.title || "Graph";
+  graphSub.textContent = opts.subtitle || "";
+
+  const W=940,H=320,padL=56,padR=56,padT=18,padB=38;
+  const innerW=W-padL-padR, innerH=H-padT-padB, n=dates.length;
+
+  const xFor=(i)=> padL + (n<=1 ? innerW/2 : (i*innerW)/(n-1));
+  const yPct=(v)=> padT + innerH - ((v-0)*innerH)/(100);
+  const maxRight = Math.max(1, Math.max(...cumValues));
+  const yCum=(v)=> padT + innerH - ((v-0)*innerH)/(maxRight);
+
+  function pathFrom(values, yFn){
+    let d=""; for(let i=0;i<n;i++){ const x=xFor(i), y=yFn(values[i]??0); d+=(i===0?`M${x},${y}`:` L${x},${y}`); }
+    return d;
+  }
+  const dPct = pathFrom(pctValues, yPct);
+  const dCum = pathFrom(cumValues, yCum);
+
+  const xTicks=[], xtCount=Math.min(6,n);
+  for(let t=0;t<xtCount;t++){ const idx=Math.round(t*(n-1)/(xtCount-1||1)); xTicks.push(idx); }
+  const yPctTicks=[]; for(let j=0;j<=5;j++){ yPctTicks.push(Math.round((j*100)/5)); }
+  function niceTicks(max){
+    const step = Math.max(1, Math.ceil(max/5));
+    const ticks=[0];
+    for(let v=step; v<=max; v+=step){ ticks.push(v); }
+    if(ticks[ticks.length-1] !== max) ticks.push(max);
+    return ticks;
+  }
+  const yCumTicks = niceTicks(maxRight);
+
+  const svg = `
+  <svg viewBox="0 0 ${W} ${H}" xmlns="http://www.w3.org/2000/svg" role="img" aria-label="dual axis chart">
+    <rect x="0" y="0" width="${W}" height="${H}" fill="transparent"/>
+    ${yPctTicks.map(v=>{ const y=yPct(v); return `<line x1="${padL}" y1="${y}" x2="${W-padR}" y2="${y}" stroke="var(--grid)" stroke-width="1"/>`; }).join("")}
+    <line x1="${padL}" y1="${padT}" x2="${padL}" y2="${H-padB}" stroke="var(--grid)" stroke-width="1.5"/>
+    ${yPctTicks.map(v=>{ const y=yPct(v); return `<text x="${padL-10}" y="${y+4}" text-anchor="end" font-size="11" fill="var(--lineA)">${v}%</text>`; }).join("")}
+    <line x1="${W-padR}" y1="${padT}" x2="${W-padR}" y2="${H-padB}" stroke="var(--grid)" stroke-width="1.5"/>
+    ${yCumTicks.map(v=>{ const y=yCum(v); return `<text x="${W-padR+10}" y="${y+4}" text-anchor="start" font-size="11" fill="var(--lineB)">${v}</text>`; }).join("")}
+    <line x1="${padL}" y1="${H-padB}" x2="${W-padR}" y2="${H-padB}" stroke="var(--grid)" stroke-width="1.5"/>
+    ${xTicks.map(i=>{ const x=xFor(i), lbl=dates[i]; return `<text x="${x}" y="${H-12}" text-anchor="middle" font-size="11" fill="var(--muted)">${lbl}</text>`; }).join("")}
+    <path class="series seriesA" id="seriesA" d="${dPct}" fill="none" stroke-width="2.5"/>
+    <path class="series seriesB" id="seriesB" d="${dCum}" fill="none" stroke-width="2.5"/>
+    ${dates.map((dt,i)=>{ const x=xFor(i), y=yPct(pctValues[i] ?? 0), label=Math.round(pctValues[i]??0)+'%'; return `<circle class="dot dotA" cx="${x}" cy="${y}" r="2.8" fill="var(--lineA)"><title>${dt}: ${label}</title></circle>`; }).join("")}
+    ${dates.map((dt,i)=>{ const x=xFor(i), y=yCum(cumValues[i] ?? 0), label=(cumValues[i]??0); return `<circle class="dot dotB" cx="${x}" cy="${y}" r="2.8" fill="var(--lineB)"><title>${dt}: ${label}</title></circle>`; }).join("")}
+  </svg>`;
+  graphContainer.innerHTML = svg;
+
+  const a = graphContainer.querySelector("#seriesA");
+  const b = graphContainer.querySelector("#seriesB");
+  const dotsA = graphContainer.querySelectorAll(".dotA");
+  const dotsB = graphContainer.querySelectorAll(".dotB");
+  function setHi(which){
+    if(which==="A"){ a.classList.add("hi"); b.classList.add("dimmed"); }
+    else if(which==="B"){ b.classList.add("hi"); a.classList.add("dimmed"); }
+  }
+  function clearHi(){ a.classList.remove("hi","dimmed"); b.classList.remove("hi","dimmed"); }
+  a.addEventListener("mouseenter", ()=> setHi("A"));
+  b.addEventListener("mouseenter", ()=> setHi("B"));
+  a.addEventListener("mouseleave", clearHi);
+  b.addEventListener("mouseleave", clearHi);
+  dotsA.forEach(d=>{ d.addEventListener("mouseenter", ()=> setHi("A")); d.addEventListener("mouseleave", clearHi); });
+  dotsB.forEach(d=>{ d.addEventListener("mouseenter", ()=> setHi("B")); d.addEventListener("mouseleave", clearHi); });
+}
+
+/* ===================== Changelog ===================== */
+const logDialog=$("#logDialog"), logBody=$("#logBody");
+$("#changelogBtn").addEventListener("click", ()=> openChangelog());
+$("#closeLogBtn").addEventListener("click", ()=> logDialog.close());
+$("#clearLogBtn").addEventListener("click", ()=>{ if(!state.changelog.length) return logDialog.close(); if(confirm("Clear all changelog entries?")){ state.changelog=[]; saveState(); openChangelog(); }});
+function openChangelog(){
+  if(!state.changelog.length){ logBody.innerHTML=`<div class="muted">No changes yet.</div>`; }
+  else{
+    logBody.innerHTML=state.changelog.map((entry,idx)=>{
+      const ts=new Date(entry.ts).toLocaleString(), eff=entry.effective||"";
+      const before=entry.before?fmtEntry(entry.before):"(none)", after=entry.after?fmtEntry(entry.after):"(none)";
+      return `<div class="card log-card" data-idx="${idx}" style="margin-bottom:8px;">
+        <div class="log-main">
+          <div><b>${entry.action.toUpperCase()}</b> · Task #${entry.taskId} · <span class="muted">${ts}</span></div>
+          ${eff?`<div class="small muted">Effective from: ${eff}</div>`:""}
+          <div class="small" style="margin-top:6px;">
+            <div><b>Before:</b> ${before}</div>
+            <div><b>After:</b> ${after}</div>
+          </div>
+        </div>
+        <div><button class="btn icon" title="Delete entry" onclick="removeLogEntry(${idx})">🗑️</button></div>
+      </div>`;
+    }).join("");
+  }
+  logDialog.showModal();
+}
+function removeLogEntry(idx){ if(idx<0||idx>=state.changelog.length) return; if(!confirm("Remove this changelog entry?")) return; state.changelog.splice(idx,1); saveState(); openChangelog(); }
+function fmtEntry(obj){ const name=obj.name??"", cat=obj.category??"-"; const mins=(obj.minutes!=null&&obj.minutes!=="")?`${obj.minutes}m`:""; const req=obj.requireRecord?` · req ${obj.recordMin}`:""; return `"${name}" · ${cat}${mins?` · ${mins}`:""}${req}`; }
+
+/* ===================== Calendar (with batch excuses) ===================== */
+const calTitle=$("#calTitle"), calGrid=$("#calGrid");
+const calPrev=$("#calPrev"), calNext=$("#calNext");
+let calMonth = new Date(today().getFullYear(), today().getMonth(), 1);
+let pendingExcuseStartISO = null;
+
+calPrev.addEventListener("click", ()=>{ calMonth = new Date(calMonth.getFullYear(), calMonth.getMonth()-1, 1); renderCalendar(); });
+calNext.addEventListener("click", ()=>{ calMonth = new Date(calMonth.getFullYear(), calMonth.getMonth()+1, 1); renderCalendar(); });
+
+function firstLogISO(){
+  const keys=Object.keys(state.logs).sort();
+  return keys.length? keys[0] : null;
+}
+function lerp(a,b,t){ return Math.round(a + (b-a)*t); }
+function parseRGB(str){
+  // supports "rgb(r,g,b)" or "#rrggbb"
+  if(!str) return [0,0,0];
+  if(str.startsWith("#")){
+    const n = str.slice(1);
+    const r = parseInt(n.substring(0,2),16);
+    const g = parseInt(n.substring(2,4),16);
+    const b = parseInt(n.substring(4,6),16);
+    return [r,g,b];
+  }
+  const m = str.match(/rgb\((\d+),\s*(\d+),\s*(\d+)\)/i);
+  if(m) return [+m[1], +m[2], +m[3]];
+  return [0,0,0];
+}
+function getCSSVar(name){
+  return getComputedStyle(document.documentElement).getPropertyValue(name).trim();
+}
+function colorForPct(p){
+  p = Math.max(0, Math.min(1, p));
+  const red = parseRGB(getCSSVar('--cal-red'));
+  const mid = parseRGB(getCSSVar('--cal-mid'));
+  const green = parseRGB(getCSSVar('--cal-green'));
+  let r,g,b;
+  if(p<=0.5){ const t=p/0.5; r=lerp(red[0],mid[0],t); g=lerp(red[1],mid[1],t); b=lerp(red[2],mid[2],t); }
+  else{ const t=(p-0.5)/0.5; r=lerp(mid[0],green[0],t); g=lerp(mid[1],green[1],t); b=lerp(mid[2],green[2],t); }
+  return `rgb(${r},${g},${b})`;
+}
+function textColorForBg(rgbStr){
+  const m = rgbStr.match(/rgb\((\d+),(\d+),(\d+)\)/); if(!m) return "#111316";
+  const r=+m[1], g=+m[2], b=+m[3];
+  const Y = (0.2126*r + 0.7152*g + 0.0722*b)/255;
+  return Y < 0.6 ? "#fff" : "#111316";
+}
+function daysInMonth(d){ return new Date(d.getFullYear(), d.getMonth()+1, 0).getDate(); }
+function weekday0Sun(d){ return new Date(d.getFullYear(), d.getMonth(), 1).getDay(); }
+function monthYearLabel(d){ return d.toLocaleString(undefined, {month:"long", year:"numeric"}); }
+
+function renderCalendar(){
+  calTitle.textContent = monthYearLabel(calMonth);
+
+  calGrid.innerHTML = "";
+  const wds=["Sun","Mon","Tue","Wed","Thu","Fri","Sat"];
+  for(const wd of wds){ calGrid.appendChild(el("div",{class:"cal-wd"}, wd)); }
+
+  const blanks = weekday0Sun(calMonth);
+  for(let i=0;i<blanks;i++) calGrid.appendChild(el("div",{class:"cal-day blank"}));
+
+  const nDays = daysInMonth(calMonth);
+  const firstLog = firstLogISO();
+  const firstLogDate = firstLog ? new Date(firstLog) : null;
+  const t0 = startOfDay(today());
+  const selectedISO = toISODate(curDate);
+
+  for(let d=1; d<=nDays; d++){
+    const dt = new Date(calMonth.getFullYear(), calMonth.getMonth(), d);
+    const iso = toISODate(dt);
+    const inFuture = startOfDay(dt) > t0;
+    const beforeFirst = firstLogDate ? (startOfDay(dt) < startOfDay(firstLogDate)) : false;
+
+    const btn = el("button",{class:"cal-day"});
+    btn.textContent = String(d);
+
+    btn.addEventListener("click",(e)=>{
+      if(!(inFuture || beforeFirst)){ curDate = dt; refreshCategoryFilter(); render(); }
+    });
+    btn.addEventListener("dblclick",(e)=>{
+      if(inFuture || beforeFirst) return;
+      openFlagDialog(iso); e.preventDefault(); e.stopPropagation();
+    });
+    btn.addEventListener("mousedown",(e)=>{
+      if(!(e.ctrlKey || e.metaKey)) return;
+      e.preventDefault(); e.stopPropagation();
+      if(inFuture || beforeFirst) return;
+
+      if(!pendingExcuseStartISO){
+        pendingExcuseStartISO = iso;
+        const h = $("#calHint");
+        h.textContent = "Range start set. Ctrl/Cmd-click another eligible day to end the range, or Ctrl/Cmd-click the same day to excuse a single day.";
+        renderCalendar();
+      }else{
+        const [start,end] = (fromISODate(pendingExcuseStartISO) <= fromISODate(iso)) ? [pendingExcuseStartISO, iso] : [iso, pendingExcuseStartISO];
+        pendingExcuseStartISO = null;
+        openFlagDialog(null, {start, end});
+      }
+    });
+
+    if(inFuture || beforeFirst){
+      btn.classList.add("dim");
+      btn.style.backgroundColor = "var(--border)";
+      btn.style.backgroundImage = "none";
+      btn.style.color = "var(--muted)";
+      btn.title = beforeFirst ? "No data yet" : "Future date";
+    }else{
+      const sc = scoreForDate(iso);
+      const bg = colorForPct(sc.pct);
+      btn.style.backgroundColor = bg;
+      btn.style.color = textColorForBg(bg);
+      if(pendingExcuseStartISO === iso){ btn.classList.add("pending"); }
+
+      const f = state.flags[iso];
+      if(f){
+        btn.classList.add("excused");
+        const prevISO = toISODate(addDays(dt, -1));
+        const nextISO = toISODate(addDays(dt, +1));
+        const curBatch = f.batchId ?? `__single_${iso}`;
+        const prevMatch = state.flags[prevISO]?.batchId === curBatch;
+        const nextMatch = state.flags[nextISO]?.batchId === curBatch;
+
+        if(prevMatch && nextMatch) btn.classList.add("exc-mid");
+        else if(prevMatch && !nextMatch) btn.classList.add("exc-end");
+        else if(!prevMatch && nextMatch) btn.classList.add("exc-start");
+        else btn.classList.add("exc-single");
+
+        btn.title = `${iso}: ${Math.round(sc.pct*100)}% (${sc.done}/${sc.total}) · FLAG ${f.rating??""}/10 — ${f.happened?f.happened:"(no note)"}`;
+      }else{
+        btn.style.backgroundImage = "none";
+        btn.title = `${iso}: ${Math.round(sc.pct*100)}% (${sc.done}/${sc.total})`;
+      }
+    }
+
+    if(toISODate(dt) === toISODate(today())) btn.classList.add("today");
+    if(iso === selectedISO) btn.classList.add("selected");
+
+    calGrid.appendChild(btn);
+  }
+}
+
+/* ===================== Flag dialog logic (single or range) ===================== */
+const flagDialog = $("#flagDialog");
+const flagDate = $("#flagDate");
+const flagRating = $("#flagRating");
+const flagHappened = $("#flagHappened");
+const flagBlocker = $("#flagBlocker");
+const flagSaveBtn = $("#flagSaveBtn");
+const flagCancelBtn = $("#flagCancelBtn");
+const flagClearBtn = $("#flagClearBtn");
+
+let flagISO = null;
+let flagRangeStartISO = null;
+let flagRangeEndISO = null;
+
+function isoSequenceBetween(aISO, bISO){
+  const a = fromISODate(aISO), b=fromISODate(bISO);
+  const [s,e] = a<=b ? [a,b] : [b,a];
+  const out=[];
+  let d=new Date(s); d.setHours(0,0,0,0);
+  const end = new Date(e); end.setHours(0,0,0,0);
+  while(d<=end){ out.push(toISODate(d)); d=new Date(d.getTime()+86400000); }
+  return out;
+}
+
+function openFlagDialog(iso, range){
+  flagISO = null; flagRangeStartISO = null; flagRangeEndISO = null;
+
+  if(range && range.start && range.end){
+    flagRangeStartISO = range.start;
+    flagRangeEndISO = range.end;
+    const list = isoSequenceBetween(flagRangeStartISO, flagRangeEndISO);
+    flagDate.value = `${flagRangeStartISO} → ${flagRangeEndISO} (${list.length} day${list.length>1?"s":""})`;
+  }else{
+    flagISO = iso;
+    flagDate.value = iso;
+    const f = state.flags[iso];
+    if(f){
+      flagRating.value = String(f.rating ?? 5);
+      flagHappened.value = f.happened ?? "";
+      flagBlocker.value = f.blocker ?? "";
+    }else{
+      flagRating.value = "5";
+      flagHappened.value = "";
+      flagBlocker.value = "";
+    }
+  }
+  if(!flagRating.value) flagRating.value = "5";
+  flagDialog.showModal();
+}
+flagCancelBtn.addEventListener("click", ()=> flagDialog.close());
+flagSaveBtn.addEventListener("click", ()=>{
+  const rating = Math.max(1, Math.min(10, Number(flagRating.value||5)));
+  const happened = flagHappened.value.trim();
+  const blocker = flagBlocker.value.trim();
+  const ts = new Date().toISOString();
+
+  if(flagRangeStartISO && flagRangeEndISO){
+    const days = isoSequenceBetween(flagRangeStartISO, flagRangeEndISO);
+    const t0 = startOfDay(today());
+    const firstLog = firstLogISO(); const firstLogDate = firstLog ? new Date(firstLog) : null;
+    const batchId = `b${Date.now().toString(36)}${Math.random().toString(36).slice(2,7)}`;
+
+    for(const iso of days){
+      const d = fromISODate(iso);
+      const inFuture = startOfDay(d) > t0;
+      const beforeFirst = firstLogDate ? (startOfDay(d) < startOfDay(firstLogDate)) : false;
+      if(inFuture || beforeFirst) continue;
+      state.flags[iso] = { rating, happened, blocker, ts, batchId };
+    }
+    saveState(); flagDialog.close(); renderCalendar();
+  }else if(flagISO){
+    state.flags[flagISO] = { rating, happened, blocker, ts, batchId: `b${flagISO}` };
+    saveState(); flagDialog.close(); renderCalendar();
+  }
+});
+flagClearBtn.addEventListener("click", ()=>{
+  if(flagRangeStartISO && flagRangeEndISO){
+    if(!confirm("Clear flags for the entire selected range?")) return;
+    const days = isoSequenceBetween(flagRangeStartISO, flagRangeEndISO);
+    for(const iso of days){ if(state.flags[iso]) delete state.flags[iso]; }
+    saveState(); flagDialog.close(); renderCalendar();
+  }else if(flagISO){
+    if(!confirm(`Clear flag for ${flagISO}?`)) return;
+    delete state.flags[flagISO];
+    saveState(); flagDialog.close(); renderCalendar();
+  }
+});
+
+/* ===================== Theme Studio ===================== */
+const THEME_VARS_GLOBAL = [
+  ["--bg","Background"],["--surface","Surface"],["--text","Text"],["--muted","Muted Text"],
+  ["--border","Border"],["--accent","Accent"],["--accent-weak","Accent (Weak)"],["--check","Check Fill"]
+];
+const THEME_VARS_GRAPH = [
+  ["--lineA","Graph Percent"],["--lineB","Graph Cumulative"],["--grid","Graph Grid"],
+  ["--warn","Warning"],["--err","Error"]
+];
+const THEME_VARS_CAL = [
+  ["--cal-red","Calendar Low (0%)"],["--cal-mid","Calendar Mid (50%)"],["--cal-green","Calendar High (100%)"]
+];
+const THEME_VARS_STRIPES = [
+  ["--stripe-dark","Stripe (Dark)"],["--stripe-light","Stripe (Light)"]
+];
+
+const themeDialog = $("#themeDialog");
+const themeModeLight = $("#themeModeLight");
+const themeModeDark = $("#themeModeDark");
+const themeModeLabel = $("#themeModeLabel");
+const themeGlobal = $("#themeGlobal");
+const themeGraph = $("#themeGraph");
+const themeCalendar = $("#themeCalendar");
+const themeStripes = $("#themeStripes");
+const themeBtn = $("#themeBtn");
+const themePresetName = $("#themePresetName");
+const themePresetSelect = $("#themePresetSelect");
+const themeSavePreset = $("#themeSavePreset");
+const themeLoadPreset = $("#themeLoadPreset");
+const themeCopyToOther = $("#themeCopyToOther");
+const themeResetMode = $("#themeResetMode");
+const themeExport = $("#themeExport");
+const themeImportInput = $("#themeImportInput");
+const themeClose = $("#themeClose");
+
+let themeEditMode = "light"; // "light" | "dark"
+let styleLightEl = null;
+let styleDarkEl = null;
+
+function ensureThemeSnapshots(){
+  // If empty, capture computed values as baseline
+  if(!Object.keys(state.theme.light||{}).length){
+    state.theme.light = snapshotComputedVars("light");
+  }
+  if(!Object.keys(state.theme.dark||{}).length){
+    state.theme.dark = snapshotComputedVars("dark");
+  }
+  saveState(); // also push to history initially once ready
+}
+function snapshotComputedVars(mode){
+  const was = document.documentElement.getAttribute("data-theme");
+  document.documentElement.setAttribute("data-theme", mode==="dark"?"dark":"light");
+  const all = [...THEME_VARS_GLOBAL, ...THEME_VARS_GRAPH, ...THEME_VARS_CAL, ...THEME_VARS_STRIPES].map(v=>v[0]);
+  const out={};
+  const cs = getComputedStyle(document.documentElement);
+  for(const name of all){
+    out[name] = cs.getPropertyValue(name).trim();
+  }
+  // restore
+  document.documentElement.setAttribute("data-theme", was || (state.prefs.darkMode?"dark":"light"));
+  return out;
+}
+function applyThemeStyles(){
+  // inject/update two style blocks so both modes reflect custom values
+  if(!styleLightEl){ styleLightEl = document.createElement("style"); styleLightEl.id="themeLightVars"; document.head.appendChild(styleLightEl); }
+  if(!styleDarkEl){ styleDarkEl = document.createElement("style"); styleDarkEl.id="themeDarkVars"; document.head.appendChild(styleDarkEl); }
+  const light = state.theme.light || {};
+  const dark = state.theme.dark || {};
+  styleLightEl.textContent = `:root{${Object.entries(light).map(([k,v])=>`${k}:${v};`).join("")}}`;
+  styleDarkEl.textContent = `[data-theme="dark"]{${Object.entries(dark).map(([k,v])=>`${k}:${v};`).join("")}}`;
+}
+function openThemeDialog(){
+  themeEditMode = state.prefs.darkMode ? "dark" : "light";
+  themeModeLabel.textContent = themeEditMode[0].toUpperCase()+themeEditMode.slice(1);
+  renderThemeEditors();
+  refreshPresetSelect();
+  themeDialog.showModal();
+}
+function renderThemeEditors(){
+  // helpers render groups
+  function mkRow(varName,label,isStripe=false){
+    const wrap = document.createElement("div"); wrap.className="theme-row";
+    const left = document.createElement("div"); left.innerHTML = `<div style="font-weight:600">${label}</div><div class="muted small">${varName}</div>`;
+    const right = document.createElement("div"); right.style.display="flex"; right.style.gap="8px"; right.style.alignItems="center";
+
+    const current = state.theme[themeEditMode]?.[varName] || getCSSVar(varName);
+    const {hex, alpha} = toHexAlpha(current);
+
+    const color = document.createElement("input");
+    color.type="color"; color.value = hex; color.title="Pick color";
+
+    const alphaWrap = document.createElement("div");
+    if(isStripe || current.startsWith("rgba")){
+      const a = document.createElement("input"); a.type="range"; a.min="0"; a.max="1"; a.step="0.01"; a.value = String(alpha);
+      a.style.width="90px"; a.title="Opacity";
+      a.addEventListener("input", ()=>{
+        const rgba = fromHexAlpha(color.value, parseFloat(a.value));
+        setThemeVar(varName, rgba, false); // live, no history yet
+      });
+      alphaWrap.appendChild(a);
+    }
+
+    const sw = document.createElement("div"); sw.className="swatch"; sw.style.background = current;
+
+    color.addEventListener("input", ()=>{
+      const val = (isStripe || current.startsWith("rgba")) ? fromHexAlpha(color.value, alpha) : color.value;
+      setThemeVar(varName, val, false);
+      sw.style.background = val;
+    });
+    color.addEventListener("change", ()=>{
+      const val = (isStripe || current.startsWith("rgba")) ? fromHexAlpha(color.value, alpha) : color.value;
+      setThemeVar(varName, val, true); // commit to history on change
+      sw.style.background = val;
+    });
+
+    right.appendChild(color);
+    if(alphaWrap.firstChild) right.appendChild(alphaWrap);
+    right.appendChild(sw);
+    wrap.appendChild(left); wrap.appendChild(right);
+    return wrap;
+  }
+
+  themeGlobal.innerHTML=""; themeGraph.innerHTML=""; themeCalendar.innerHTML=""; themeStripes.innerHTML="";
+  THEME_VARS_GLOBAL.forEach(([v,l]) => themeGlobal.appendChild(mkRow(v,l,false)));
+  THEME_VARS_GRAPH.forEach(([v,l]) => themeGraph.appendChild(mkRow(v,l,false)));
+  THEME_VARS_CAL.forEach(([v,l]) => themeCalendar.appendChild(mkRow(v,l,false)));
+  THEME_VARS_STRIPES.forEach(([v,l]) => themeStripes.appendChild(mkRow(v,l,true)));
+}
+function setThemeVar(name, value, commit){
+  state.theme[themeEditMode] ||= {};
+  state.theme[themeEditMode][name] = value;
+  applyThemeStyles();
+  if(commit) saveState(); // push history snapshot
+}
+function toHexAlpha(value){
+  // value can be '#rrggbb' or 'rgb(...)' or 'rgba(...)'
+  let r=0,g=0,b=0,a=1;
+  if(value.startsWith("#")){
+    const n=value.slice(1);
+    r=parseInt(n.substring(0,2),16); g=parseInt(n.substring(2,4),16); b=parseInt(n.substring(4,6),16);
+  }else{
+    const m=value.match(/rgba?\((\d+),\s*(\d+),\s*(\d+)(?:,\s*([0-9.]+))?\)/i);
+    if(m){ r=+m[1]; g=+m[2]; b=+m[3]; a=m[4]!=null?parseFloat(m[4]):1; }
+  }
+  const hex = "#"+[r,g,b].map(x=>x.toString(16).padStart(2,"0")).join("");
+  return {hex, alpha:a};
+}
+function fromHexAlpha(hex, alpha=1){
+  // return rgba if alpha<1 else hex
+  const r=parseInt(hex.slice(1,3),16), g=parseInt(hex.slice(3,5),16), b=parseInt(hex.slice(5,7),16);
+  if(alpha>=1) return hex;
+  return `rgba(${r},${g},${b},${alpha})`;
+}
+function refreshPresetSelect(){
+  const names = Object.keys(state.themePresets||{}).sort();
+  themePresetSelect.innerHTML = names.length? names.map(n=>`<option value="${n}">${n}</option>`).join("") : `<option disabled>(no presets)</option>`;
+}
+function copyTheme(from,to){
+  state.theme[to] = JSON.parse(JSON.stringify(state.theme[from]||{}));
+  applyThemeStyles(); saveState(); renderThemeEditors();
+}
+
+/* Theme Studio bindings */
+themeBtn.addEventListener("click", openThemeDialog);
+themeModeLight.addEventListener("click", ()=>{ themeEditMode="light"; themeModeLabel.textContent="Light"; renderThemeEditors(); });
+themeModeDark.addEventListener("click", ()=>{ themeEditMode="dark"; themeModeLabel.textContent="Dark"; renderThemeEditors(); });
+themeSavePreset.addEventListener("click", ()=>{
+  const name = themePresetName.value.trim();
+  if(!name){ alert("Enter a preset name."); return; }
+  state.themePresets[name] = JSON.parse(JSON.stringify(state.theme));
+  saveState(); refreshPresetSelect(); alert(`Saved preset "${name}".`);
+});
+themeLoadPreset.addEventListener("click", ()=>{
+  const name = themePresetSelect.value;
+  if(!name || !state.themePresets[name]){ alert("Pick a preset to load."); return; }
+  state.theme = JSON.parse(JSON.stringify(state.themePresets[name]));
+  applyThemeStyles(); saveState(); renderThemeEditors();
+});
+themeCopyToOther.addEventListener("click", ()=>{
+  copyTheme(themeEditMode, themeEditMode==="light" ? "dark" : "light");
+});
+themeResetMode.addEventListener("click", ()=>{
+  if(!confirm(`Reset ${themeEditMode} colors to current computed defaults?`)) return;
+  state.theme[themeEditMode] = snapshotComputedVars(themeEditMode);
+  applyThemeStyles(); saveState(); renderThemeEditors();
+});
+themeExport.addEventListener("click", ()=>{
+  downloadJSON("theme.json", state.theme);
+});
+themeImportInput.addEventListener("change", async (e)=>{
+  const file=e.target.files?.[0]; if(!file) return;
+  try{
+    const text=await file.text(); const incoming=JSON.parse(text);
+    if(!incoming.light || !incoming.dark) throw new Error("Invalid theme file.");
+    state.theme = incoming;
+    applyThemeStyles(); saveState(); renderThemeEditors();
+  }catch(err){ alert("Failed to import theme."); }
+  e.target.value="";
+});
+themeClose.addEventListener("click", ()=> themeDialog.close());
+
+/* ===================== Daily Snapshot (1080x1080 share card) ===================== */
+
+function computeTaskStreak(taskId, dateISO){
+  // consecutive days ending at dateISO where task is completed
+  let streak = 0;
+  let d = fromISODate(dateISO);
+  const firstLog = firstLogISO();
+  while(true){
+    const iso = toISODate(d);
+    if(firstLog && startOfDay(d) < startOfDay(new Date(firstLog))) break;
+    if(getStatus(iso, taskId)){
+      streak++;
+      d = addDays(d, -1);
+    }else{
+      break;
+    }
+  }
+  return streak;
+}
+
+function lastDoneBefore(taskId, dateISO){
+  // most recent date before dateISO where task was completed
+  const firstLog = firstLogISO();
+  let d = addDays(fromISODate(dateISO), -1);
+  for(let i=0;i<365;i++){
+    if(firstLog && startOfDay(d) < startOfDay(new Date(firstLog))) break;
+    const iso = toISODate(d);
+    if(getStatus(iso, taskId)) return d;
+    d = addDays(d, -1);
+  }
+  return null;
+}
+
+function drawRoundedRect(ctx, x, y, w, h, r){
+  ctx.beginPath();
+  ctx.moveTo(x+r, y);
+  ctx.lineTo(x+w-r, y);
+  ctx.quadraticCurveTo(x+w, y, x+w, y+r);
+  ctx.lineTo(x+w, y+h-r);
+  ctx.quadraticCurveTo(x+w, y+h, x+w-r, y+h);
+  ctx.lineTo(x+r, y+h);
+  ctx.quadraticCurveTo(x, y+h, x, y+h-r);
+  ctx.lineTo(x, y+r);
+  ctx.quadraticCurveTo(x, y, x+r, y);
+  ctx.closePath();
+}
+
+function fitText(ctx, text, maxWidth){
+  if(!text) return "";
+  let t = text;
+  while(t.length > 0 && ctx.measureText(t).width > maxWidth){
+    t = t.slice(0, -1);
+  }
+  if(t.length < text.length){
+    if(t.length > 1) t = t.slice(0, -1) + "…";
+  }
+  return t;
+}
+
+function generateDailySnapshot(){
+  if(!shareCanvas){
+    alert("Snapshot canvas not found.");
+    return;
+  }
+  const iso = toISODate(curDate);
+  const { doneAll, totalAll } = computeScore(iso);
+  if(totalAll === 0){
+    alert("No tasks defined yet — add some tasks first.");
+    return;
+  }
+
+  const ctx = shareCanvas.getContext("2d");
+  const W = shareCanvas.width  = 1080;
+  const H = shareCanvas.height = 1080;
+
+  // theme colors
+  const bg      = getCSSVar("--bg")        || "#050811";
+  const surface = getCSSVar("--card")      || "#0f172a";
+  const accentA = getCSSVar("--accent")    || "#38bdf8";
+  const accentB = getCSSVar("--lineB")     || "#22c55e";
+  const textCol = getCSSVar("--fg")        || "#e5e7eb";
+  const muted   = getCSSVar("--muted")     || "#9ca3af";
+
+  // background gradient
+  const g = ctx.createLinearGradient(0, 0, W, H);
+  g.addColorStop(0, bg);
+  g.addColorStop(0.4, fromHexAlpha(accentA.startsWith("#")?accentA:"#38bdf8", 0.25));
+  g.addColorStop(1, bg);
+  ctx.fillStyle = g;
+  ctx.fillRect(0, 0, W, H);
+
+  // main card
+  const pad = 80;
+  const cardX = pad;
+  const cardY = pad + 20;
+  const cardW = W - pad*2;
+  const cardH = H - pad*2 - 20;
+  ctx.fillStyle = fromHexAlpha(surface.startsWith("#")?surface:"#0f172a", 0.96);
+  drawRoundedRect(ctx, cardX, cardY, cardW, cardH, 40);
+  ctx.fill();
+
+  // header text
+  const label = headerDateLabel(curDate);
+  const dateLine = `${label} · ${fmtMMDDYY(curDate)}`;
+  ctx.textAlign = "left";
+
+  ctx.fillStyle = muted;
+  ctx.font = "600 34px system-ui, -apple-system, BlinkMacSystemFont, 'Segoe UI', sans-serif";
+  ctx.fillText(fitText(ctx, dateLine, cardW - 200), cardX + 48, cardY + 70);
+
+  ctx.fillStyle = textCol;
+  ctx.font = "700 72px system-ui, -apple-system, BlinkMacSystemFont, 'Segoe UI', sans-serif";
+  ctx.fillText("Daily Snapshot", cardX + 48, cardY + 140);
+
+  // completion circle on the right
+  const pct = totalAll ? Math.round((doneAll / totalAll) * 100) : 0;
+  const cx = cardX + cardW - 230;
+  const cy = cardY + 180;
+  const rOuter = 120;
+  const rInner = 88;
+
+  ctx.lineCap = "round";
+  // background ring
+  ctx.lineWidth = 20;
+  ctx.strokeStyle = fromHexAlpha("#000000", 0.25);
+  ctx.beginPath();
+  ctx.arc(cx, cy, rOuter, 0, Math.PI*2);
+  ctx.stroke();
+
+  // progress ring
+  const startAngle = -Math.PI / 2;
+  const endAngle   = startAngle + (Math.PI*2) * (pct/100);
+  const progGrad = ctx.createLinearGradient(cx - rOuter, cy - rOuter, cx + rOuter, cy + rOuter);
+  progGrad.addColorStop(0, accentA);
+  progGrad.addColorStop(1, accentB);
+  ctx.strokeStyle = progGrad;
+  ctx.beginPath();
+  ctx.arc(cx, cy, rOuter, startAngle, endAngle, false);
+  ctx.stroke();
+
+  // inner circle
+  ctx.fillStyle = surface;
+  drawRoundedRect(ctx, cx - rInner, cy - rInner, rInner*2, rInner*2, rInner);
+  ctx.fill();
+
+  // percentage text inside circle
+  ctx.fillStyle = textCol;
+  ctx.textAlign = "center";
+  ctx.font = "800 64px system-ui, -apple-system, BlinkMacSystemFont, 'Segoe UI', sans-serif";
+  ctx.fillText(`${pct}%`, cx, cy + 18);
+  ctx.font = "500 26px system-ui, -apple-system, BlinkMacSystemFont, 'Segoe UI', sans-serif";
+  ctx.fillStyle = muted;
+  ctx.fillText(`${doneAll}/${totalAll} tasks`, cx, cy + 56);
+
+  // highlight metrics on left
+  const leftX = cardX + 48;
+  let baseY = cardY + 210;
+  const lineGap = 52;
+  const maxLineWidth = cardW - 320; // leave room on the right
+
+  ctx.textAlign = "left";
+
+  ctx.fillStyle = muted;
+  ctx.font = "600 30px system-ui, -apple-system, BlinkMacSystemFont, 'Segoe UI', sans-serif";
+  ctx.fillText("Highlights", leftX, baseY);
+  baseY += 20;
+
+  // computing streaks & comeback & category stats
+  const todayTasks = state.tasks.slice();
+  const firstLog = firstLogISO();
+
+  let bestStreak = { task: null, streak: 0 };
+  let bestComeback = { task: null, gap: 0 };
+  let catStats = {}; // cat -> {done,total}
+
+  for(const t of todayTasks){
+    const id = t.id;
+    const rev = getRevisionForDate(t, iso);
+    const name = rev?.name || "(unnamed)";
+    const cat  = rev?.category || "Uncategorized";
+
+    if(!catStats[cat]) catStats[cat] = {done:0,total:0};
+    catStats[cat].total++;
+    if(getStatus(iso, id)) catStats[cat].done++;
+
+    if(firstLog){
+      const s = computeTaskStreak(id, iso);
+      if(s > bestStreak.streak){
+        bestStreak = {task: name, streak: s};
+      }
+    }
+
+    if(getStatus(iso, id)){
+      const prev = lastDoneBefore(id, iso);
+      if(prev){
+        const gapDays = Math.round((startOfDay(fromISODate(iso)) - startOfDay(prev))/86400000);
+        if(gapDays > bestComeback.gap){
+          bestComeback = {task: name, gap: gapDays};
+        }
+      }
+    }
+  }
+
+  // Hit rate line
+  baseY += 26;
+  ctx.fillStyle = textCol;
+  ctx.font = "600 32px system-ui, -apple-system, BlinkMacSystemFont, 'Segoe UI', sans-serif";
+  ctx.fillText(fitText(ctx, `Hit rate: ${pct}% (${doneAll}/${totalAll})`, maxLineWidth), leftX, baseY);
+  baseY += lineGap;
+
+  // Hot streak
+  ctx.font = "500 28px system-ui, -apple-system, BlinkMacSystemFont, 'Segoe UI', sans-serif";
+  if(bestStreak.streak > 1 && bestStreak.task){
+    const line = `Hot streak: ${bestStreak.task} — ${bestStreak.streak} days in a row`;
+    ctx.fillStyle = textCol;
+    ctx.fillText(fitText(ctx, line, maxLineWidth), leftX, baseY);
+    baseY += lineGap;
+  }else{
+    const line = "Hot streak: build one today 🔥";
+    ctx.fillStyle = textCol;
+    ctx.fillText(fitText(ctx, line, maxLineWidth), leftX, baseY);
+    baseY += lineGap;
+  }
+
+  // Comeback task: not done in a while but done today
+  if(bestComeback.task && bestComeback.gap >= 3){
+    const line = `Comeback: ${bestComeback.task} — first time in ${bestComeback.gap} days`;
+    ctx.fillStyle = textCol;
+    ctx.fillText(fitText(ctx, line, maxLineWidth), leftX, baseY);
+    baseY += lineGap;
+  }
+
+  // Category spotlight
+  let bestCat = null;
+  for(const [cat, s] of Object.entries(catStats)){
+    if(s.total === 0) continue;
+    const pctCat = (s.done / s.total) * 100;
+    if(!bestCat || pctCat > bestCat.pct){
+      bestCat = {cat, pct: Math.round(pctCat), done: s.done, total: s.total};
+    }
+  }
+  if(bestCat){
+    const line = `Category spotlight: ${bestCat.cat} — ${bestCat.pct}% today (${bestCat.done}/${bestCat.total})`;
+    ctx.fillStyle = textCol;
+    ctx.fillText(fitText(ctx, line, maxLineWidth), leftX, baseY);
+    baseY += lineGap;
+  }
+
+  // Footer tagline
+  ctx.fillStyle = muted;
+  ctx.font = "400 24px system-ui, -apple-system, BlinkMacSystemFont, 'Segoe UI', sans-serif";
+  const footer = "Tap and hold to share · Designed for 1080×1080 posts";
+  ctx.fillText(fitText(ctx, footer, cardW - 96), cardX + 48, cardY + cardH - 40);
+
+  // open PNG in a new tab so it can be saved/shared
+  const png = shareCanvas.toDataURL("image/png");
+  const w = window.open();
+  if(w){
+    w.document.write(`<img src="${png}" alt="Daily snapshot" style="max-width:100%;height:auto;display:block;margin:0 auto;background:#000"/>`);
+    w.document.title = `Snapshot-${iso}.png`;
+  }else{
+    // fallback: trigger download
+    const a = document.createElement("a");
+    a.href = png;
+    a.download = `snapshot-${iso}.png`;
+    document.body.appendChild(a);
+    a.click();
+    setTimeout(()=>a.remove(), 0);
+  }
+}
+
+// bind button
+snapshotBtn.addEventListener("click", generateDailySnapshot);
+
+
+/* ===================== Init ===================== */
+function init(){
+  // Theme init
+  applyDarkMode(state.prefs.darkMode);
+  ensureThemeSnapshots();
+  applyThemeStyles();
+
+  // font
+  fontRange.value = state.prefs.fontStep; applyFontStep(state.prefs.fontStep);
+  todayBtn.textContent = fmtMMDDYY(today());
+  refreshCategoryFilter();
+  render();
+
+  // history prime
+  historyState.ready = true;
+  pushHistory();
+
+  // undo/redo buttons + hotkeys
+  $("#undoBtn").addEventListener("click", undo);
+  $("#redoBtn").addEventListener("click", redo);
+  document.addEventListener("keydown", (e)=>{
+    const isMac = navigator.platform.toUpperCase().indexOf('MAC')>=0;
+    const mod = isMac ? e.metaKey : e.ctrlKey;
+    if(mod && e.key.toLowerCase()==="z"){
+      if(e.shiftKey){ redo(); } else { undo(); }
+      e.preventDefault();
+    }
+  });
+}
+init();
+
+/* ===================== Pref hooks & keyboard ===================== */
+fontRange.addEventListener("input", (e)=> applyFontStep(Number(e.target.value)));
+darkToggle.addEventListener("change", (e)=> applyDarkMode(e.target.checked));
+document.addEventListener("keydown", (e)=>{
+  if(e.key==="Escape"){
+    if(taskDialog.open) taskDialog.close();
+    if(pickDialog.open) pickDialog.close();
+    if(flagDialog.open) flagDialog.close();
+    if(logDialog.open) logDialog.close();
+    if(themeDialog.open) themeDialog.close();
+  }
+});
+</script>
+</body>
+</html>

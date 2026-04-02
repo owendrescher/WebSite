@@ -1,0 +1,735 @@
+<!doctype html>
+<html lang="en">
+  <head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <title>Cubic Creature + Solar Orrery</title>
+    <style>
+      :root {
+        color-scheme: dark;
+        font-family: Arial, Helvetica, sans-serif;
+      }
+
+      body {
+        margin: 0;
+        overflow: hidden;
+        background: #04060c;
+      }
+
+      #overlay {
+        position: fixed;
+        inset: 0;
+        display: grid;
+        place-items: center;
+        background: rgba(0, 0, 0, 0.65);
+        color: #f5f8ff;
+        text-align: center;
+        z-index: 10;
+        cursor: pointer;
+      }
+
+      #overlay.hidden {
+        display: none;
+      }
+
+      .panel {
+        max-width: 760px;
+        padding: 1.1rem 1.4rem;
+        background: rgba(16, 20, 34, 0.9);
+        border: 1px solid rgba(162, 186, 255, 0.35);
+        border-radius: 0.75rem;
+      }
+
+      #reticle {
+        position: fixed;
+        left: 50%;
+        top: 50%;
+        width: 10px;
+        height: 10px;
+        transform: translate(-50%, -50%);
+        border: 1px solid rgba(235, 245, 255, 0.85);
+        border-radius: 50%;
+        z-index: 5;
+        pointer-events: none;
+      }
+
+      #hud {
+        position: fixed;
+        left: 1rem;
+        bottom: 1rem;
+        color: #d6e2ff;
+        background: rgba(10, 14, 26, 0.75);
+        border: 1px solid rgba(155, 184, 255, 0.3);
+        border-radius: 0.55rem;
+        padding: 0.7rem 0.85rem;
+        z-index: 6;
+        font-size: 0.92rem;
+      }
+    </style>
+  </head>
+  <body>
+    <div id="overlay">
+      <div class="panel">
+        <h1>Cubic Creature: Physical Solar Controls</h1>
+        <p>Move with <strong>WASD</strong>, look with mouse. Double-tap <strong>Space</strong> (two separate tap-and-release presses) to toggle no-gravity fly mode. In fly mode: hold <strong>Space</strong> up, <strong>Shift</strong> down. Hold <strong>Ctrl</strong> to move 3× faster.</p>
+        <p>
+          The <strong>yz wall</strong> has real 3D controls: clickable time-rate buttons, a clickable/draggable
+          ceiling-light slider, and an orbit-angle mode toggle.
+        </p>
+        <p>
+          Pluto orbit scale is tuned so its farthest point (aphelion) reaches the side walls.
+        </p>
+        <p><strong>Click to begin.</strong></p>
+      </div>
+    </div>
+
+    <div id="reticle" aria-hidden="true"></div>
+    <div id="hud">Initializing...</div>
+
+    <script type="module">
+      import * as THREE from 'https://unpkg.com/three@0.161.0/build/three.module.js';
+
+      const CREATURE_HEIGHT = 1.8;
+      const BOX_SIZE = CREATURE_HEIGHT * 3 * 22.5;
+      const HALF_BOX = BOX_SIZE / 2;
+
+      const MOVE_SPEED = 3.1;
+      const JUMP_SPEED = 4.3;
+      const GRAVITY = 12.5;
+
+      const BASE_SIM_DAYS_PER_SECOND = 365.25 / 60; // 1 Earth year / minute
+      let timeMultiplier = 1;
+      let simDays = 0;
+      let orbitMode = 'accurate'; // 'topological' | 'accurate'
+
+      const scene = new THREE.Scene();
+      scene.background = new THREE.Color(0x070911);
+      scene.fog = new THREE.Fog(0x070911, BOX_SIZE * 0.55, BOX_SIZE * 1.5);
+
+      const camera = new THREE.PerspectiveCamera(72, window.innerWidth / window.innerHeight, 0.05, 250);
+      const renderer = new THREE.WebGLRenderer({ antialias: true });
+      renderer.setPixelRatio(Math.min(window.devicePixelRatio, 2));
+      renderer.setSize(window.innerWidth, window.innerHeight);
+      renderer.shadowMap.enabled = true;
+      document.body.appendChild(renderer.domElement);
+
+      const ambient = new THREE.AmbientLight(0x4e5f89, 0.18);
+      scene.add(ambient);
+
+      const ceilingLight = new THREE.PointLight(0xf7e4b5, 4.2, BOX_SIZE * 2.3, 2);
+      ceilingLight.position.set(0, HALF_BOX - 0.12, 0);
+      ceilingLight.castShadow = true;
+      scene.add(ceilingLight);
+
+      const bulb = new THREE.Mesh(
+        new THREE.SphereGeometry(0.2, 20, 20),
+        new THREE.MeshStandardMaterial({ color: 0xffefc4, emissive: 0xf8cc72, emissiveIntensity: 1.1 })
+      );
+      bulb.position.copy(ceilingLight.position);
+      scene.add(bulb);
+
+      const room = new THREE.Mesh(
+        new THREE.BoxGeometry(BOX_SIZE, BOX_SIZE, BOX_SIZE),
+        new THREE.MeshPhysicalMaterial({ color: 0x9eb8ff, roughness: 0.1, metalness: 0.05, transmission: 0.86, transparent: true, opacity: 0.2, reflectivity: 0.55, clearcoat: 0.6, clearcoatRoughness: 0.2, side: THREE.BackSide })
+      );
+      room.receiveShadow = true;
+      scene.add(room);
+
+      const roomEdges = new THREE.LineSegments(
+        new THREE.EdgesGeometry(new THREE.BoxGeometry(BOX_SIZE, BOX_SIZE, BOX_SIZE)),
+        new THREE.LineBasicMaterial({ color: 0xbfd3ff, transparent: true, opacity: 0.65 })
+      );
+      scene.add(roomEdges);
+
+      const floorGrid = new THREE.GridHelper(BOX_SIZE, 40, 0x9fb8f6, 0x6679aa);
+      floorGrid.position.y = -HALF_BOX + 0.02;
+      floorGrid.material.opacity = 0.35;
+      floorGrid.material.transparent = true;
+      scene.add(floorGrid);
+
+      const overlay = document.getElementById('overlay');
+      const hud = document.getElementById('hud');
+
+      // Player
+      const cameraPosition = new THREE.Vector3(0, -HALF_BOX + CREATURE_HEIGHT, 0);
+      const velocity = new THREE.Vector3();
+      const moveInput = { forward: false, back: false, left: false, right: false, boost: false };
+      let isGrounded = true;
+      let yaw = 0;
+      let pitch = 0;
+      let noGravityMode = false;
+      let lastSpaceTapMs = 0;
+      let awaitingSecondTap = false;
+      let firstTapReleased = false;
+      const verticalInput = { up: false, down: false };
+      camera.position.copy(cameraPosition);
+
+      const onKey = (event, isDown) => {
+        switch (event.code) {
+          case 'KeyW': moveInput.forward = isDown; break;
+          case 'KeyS': moveInput.back = isDown; break;
+          case 'KeyA': moveInput.left = isDown; break;
+          case 'KeyD': moveInput.right = isDown; break;
+          case 'Space':
+            if (isDown && event.repeat) break;
+
+            if (!isDown) {
+              if (awaitingSecondTap) firstTapReleased = true;
+              if (noGravityMode) verticalInput.up = false;
+              break;
+            }
+
+            const now = performance.now();
+            if (!awaitingSecondTap || now - lastSpaceTapMs > 320) {
+              awaitingSecondTap = true;
+              firstTapReleased = false;
+              lastSpaceTapMs = now;
+            } else if (firstTapReleased && now - lastSpaceTapMs <= 320) {
+              noGravityMode = !noGravityMode;
+              awaitingSecondTap = false;
+              firstTapReleased = false;
+              velocity.y = 0;
+              verticalInput.up = false;
+              verticalInput.down = false;
+            }
+
+            if (noGravityMode) {
+              verticalInput.up = true;
+              break;
+            }
+            if (isGrounded) {
+              velocity.y = JUMP_SPEED;
+              isGrounded = false;
+            }
+            break;
+          case 'ShiftLeft':
+          case 'ShiftRight':
+            if (noGravityMode) verticalInput.down = isDown;
+            break;
+          case 'ControlLeft':
+          case 'ControlRight':
+            moveInput.boost = isDown;
+            break;
+          default: break;
+        }
+      };
+      window.addEventListener('keydown', (event) => onKey(event, true));
+      window.addEventListener('keyup', (event) => onKey(event, false));
+
+
+      window.addEventListener('keydown', (event) => {
+        if (!event.ctrlKey && !event.metaKey) return;
+        const blocked = new Set(['KeyW', 'KeyR', 'KeyT', 'KeyN', 'KeyP', 'KeyL', 'F4']);
+        if (blocked.has(event.code)) {
+          event.preventDefault();
+          event.stopPropagation();
+        }
+      }, true);
+
+      overlay.addEventListener('click', () => renderer.domElement.requestPointerLock());
+      document.addEventListener('pointerlockchange', () => {
+        const locked = document.pointerLockElement === renderer.domElement;
+        overlay.classList.toggle('hidden', locked);
+      });
+
+      document.addEventListener('mousemove', (event) => {
+        if (document.pointerLockElement !== renderer.domElement) return;
+        const sensitivity = 0.0021;
+        yaw -= event.movementX * sensitivity;
+        pitch -= event.movementY * sensitivity;
+        pitch = Math.max(-Math.PI / 2 + 0.01, Math.min(Math.PI / 2 - 0.01, pitch));
+      });
+
+      // Solar system root at comfortable viewing height
+      const solarRoot = new THREE.Group();
+      solarRoot.position.set(0, 0, 0);
+      scene.add(solarRoot);
+
+      // Orbital/physical data (approximate J2000 elements for visual accuracy)
+      const bodies = [
+        { name: 'Sun', radiusKm: 696340, color: 0xffcc4d, parent: null, aAU: 0, e: 0, iDeg: 0, OmegaDeg: 0, wDeg: 0, periodDays: 1, phaseDeg: 0 },
+        { name: 'Mercury', radiusKm: 2440, color: 0xa2988f, parent: 'Sun', aAU: 0.3871, e: 0.2056, iDeg: 7.00, OmegaDeg: 48.33, wDeg: 29.12, periodDays: 87.97, phaseDeg: 75 },
+        { name: 'Venus', radiusKm: 6052, color: 0xdfb47f, parent: 'Sun', aAU: 0.7233, e: 0.0068, iDeg: 3.39, OmegaDeg: 76.68, wDeg: 54.88, periodDays: 224.70, phaseDeg: 10 },
+        { name: 'Earth', radiusKm: 6371, color: 0x4d8cff, parent: 'Sun', aAU: 1.0000, e: 0.0167, iDeg: 0.0, OmegaDeg: -11.26, wDeg: 102.95, periodDays: 365.25, phaseDeg: 100 },
+        { name: 'Moon', radiusKm: 1737, color: 0xd7d9de, parent: 'Earth', aAU: 0.00257, e: 0.0549, iDeg: 5.14, OmegaDeg: 125.08, wDeg: 318.15, periodDays: 27.32, phaseDeg: 30 },
+        { name: 'Mars', radiusKm: 3390, color: 0xc66d4f, parent: 'Sun', aAU: 1.5237, e: 0.0934, iDeg: 1.85, OmegaDeg: 49.56, wDeg: 286.50, periodDays: 686.98, phaseDeg: 140 },
+        { name: 'Ceres', radiusKm: 473, color: 0x9fa2aa, parent: 'Sun', aAU: 2.767, e: 0.0758, iDeg: 10.59, OmegaDeg: 80.30, wDeg: 73.60, periodDays: 1680, phaseDeg: 200 },
+        { name: 'Jupiter', radiusKm: 69911, color: 0xcfb08a, parent: 'Sun', aAU: 5.203, e: 0.0489, iDeg: 1.30, OmegaDeg: 100.46, wDeg: 273.87, periodDays: 4332.59, phaseDeg: 260 },
+        { name: 'Saturn', radiusKm: 58232, color: 0xe3c281, parent: 'Sun', aAU: 9.537, e: 0.0565, iDeg: 2.49, OmegaDeg: 113.67, wDeg: 339.39, periodDays: 10759.22, phaseDeg: 330 },
+        { name: 'Uranus', radiusKm: 25362, color: 0x8bd7df, parent: 'Sun', aAU: 19.191, e: 0.0472, iDeg: 0.77, OmegaDeg: 74.01, wDeg: 96.99, periodDays: 30688.5, phaseDeg: 20 },
+        { name: 'Neptune', radiusKm: 24622, color: 0x4a6bd9, parent: 'Sun', aAU: 30.07, e: 0.0086, iDeg: 1.77, OmegaDeg: 131.79, wDeg: 273.19, periodDays: 60182, phaseDeg: 60 },
+        { name: 'Pluto', radiusKm: 1188, color: 0xa9a099, parent: 'Sun', aAU: 39.48, e: 0.2488, iDeg: 17.16, OmegaDeg: 110.30, wDeg: 113.76, periodDays: 90560, phaseDeg: 310 },
+      ];
+
+      const plutoAphelionAU = bodies.find((b) => b.name === 'Pluto').aAU * (1 + bodies.find((b) => b.name === 'Pluto').e);
+      const DISTANCE_SCALE = (HALF_BOX - 0.2) / plutoAphelionAU;
+      const SIZE_SCALE = 0.00000023;
+      const MIN_VISIBLE_RADIUS = 0.025;
+
+      function makeTextTexture(text, width = 512, height = 128) {
+        const canvas = document.createElement('canvas');
+        const ctx = canvas.getContext('2d');
+        canvas.width = width;
+        canvas.height = height;
+        ctx.font = 'bold 52px Arial';
+        ctx.shadowColor = 'rgba(255, 244, 190, 0.95)';
+        ctx.shadowBlur = 18;
+        ctx.fillStyle = '#fff7ca';
+        ctx.textAlign = 'center';
+        ctx.textBaseline = 'middle';
+        ctx.fillText(text, width / 2, height / 2 + 2);
+        const texture = new THREE.CanvasTexture(canvas);
+        texture.needsUpdate = true;
+        return texture;
+      }
+
+      function makeSpriteLabel(text) {
+        const sprite = new THREE.Sprite(new THREE.SpriteMaterial({ map: makeTextTexture(text), transparent: true }));
+        sprite.scale.set(0.8, 0.2, 1);
+        return sprite;
+      }
+
+      const bodyObjects = new Map();
+      const orbitVisuals = [];
+
+      for (const body of bodies) {
+        const renderRadius = Math.max(body.radiusKm * SIZE_SCALE, body.name === 'Sun' ? 0.28 : MIN_VISIBLE_RADIUS);
+        const mesh = new THREE.Mesh(
+          new THREE.SphereGeometry(renderRadius, 20, 20),
+          new THREE.MeshStandardMaterial({
+            color: body.color,
+            emissive: body.name === 'Sun' ? 0xff9626 : 0x000000,
+            emissiveIntensity: body.name === 'Sun' ? 0.9 : 0,
+            roughness: 0.82,
+            metalness: 0.08,
+          })
+        );
+
+        const pivot = new THREE.Object3D();
+        const parentNode = body.parent ? bodyObjects.get(body.parent).mesh : solarRoot;
+        parentNode.add(pivot);
+        pivot.add(mesh);
+
+        const label = makeSpriteLabel(body.name);
+        label.position.set(0, renderRadius + 0.13, 0);
+        mesh.add(label);
+
+        if (body.name === 'Saturn') {
+          const ring = new THREE.Mesh(
+            new THREE.RingGeometry(renderRadius * 1.35, renderRadius * 2.1, 48),
+            new THREE.MeshBasicMaterial({ color: 0xd1ba82, side: THREE.DoubleSide, transparent: true, opacity: 0.65 })
+          );
+          ring.rotation.x = Math.PI / 2.35;
+          mesh.add(ring);
+        }
+
+        if (body.parent === 'Sun') {
+          const points = [];
+          for (let k = 0; k <= 256; k++) {
+            const nu = (k / 256) * Math.PI * 2;
+            const r = body.aAU * (1 - body.e * body.e) / (1 + body.e * Math.cos(nu));
+            const x = r * Math.cos(nu) * DISTANCE_SCALE;
+            const z = r * Math.sin(nu) * DISTANCE_SCALE;
+            points.push(new THREE.Vector3(x, 0, z));
+          }
+          const geom = new THREE.BufferGeometry().setFromPoints(points);
+          const line = new THREE.LineLoop(
+            geom,
+            new THREE.LineBasicMaterial({ color: 0x5e77b2, transparent: true, opacity: 0.33 })
+          );
+          solarRoot.add(line);
+          orbitVisuals.push({ body, line });
+        }
+
+        bodyObjects.set(body.name, { body, pivot, mesh, label, renderRadius });
+      }
+
+      function solveKeplerE(M, e) {
+        let E = M;
+        for (let i = 0; i < 6; i++) {
+          E = E - (E - e * Math.sin(E) - M) / (1 - e * Math.cos(E));
+        }
+        return E;
+      }
+
+      function orbitPosition(body, elapsedDays) {
+        if (body.name === 'Sun') return new THREE.Vector3(0, 0, 0);
+
+        const meanMotion = (Math.PI * 2) / body.periodDays;
+        const M = THREE.MathUtils.degToRad(body.phaseDeg) + elapsedDays * meanMotion;
+
+        if (orbitMode === 'topological') {
+          const r = body.aAU * DISTANCE_SCALE;
+          return new THREE.Vector3(Math.cos(M) * r, 0, Math.sin(M) * r);
+        }
+
+        const E = solveKeplerE(M, body.e);
+        const cosE = Math.cos(E);
+        const sinE = Math.sin(E);
+
+        const xOrb = body.aAU * (cosE - body.e);
+        const yOrb = body.aAU * Math.sqrt(1 - body.e * body.e) * sinE;
+
+        // Rotate by argument of periapsis + longitude ascending node inside xz,
+        // then apply inclination to produce physically meaningful orbital angle offsets.
+        const omega = THREE.MathUtils.degToRad(body.wDeg);
+        const Omega = THREE.MathUtils.degToRad(body.OmegaDeg);
+        const inc = THREE.MathUtils.degToRad(body.iDeg);
+
+        const cosO = Math.cos(Omega), sinO = Math.sin(Omega);
+        const cosW = Math.cos(omega), sinW = Math.sin(omega);
+        const cosI = Math.cos(inc), sinI = Math.sin(inc);
+
+        const x1 = xOrb * cosW - yOrb * sinW;
+        const y1 = xOrb * sinW + yOrb * cosW;
+
+        const x2 = x1;
+        const y2 = y1 * cosI;
+        const z2 = y1 * sinI;
+
+        const x = x2 * cosO - y2 * sinO;
+        const z = x2 * sinO + y2 * cosO;
+
+        return new THREE.Vector3(x * DISTANCE_SCALE, z2 * DISTANCE_SCALE, z * DISTANCE_SCALE);
+      }
+
+      function updateOrbitVisuals() {
+        for (const { body, line } of orbitVisuals) {
+          const pts = [];
+          for (let k = 0; k <= 256; k++) {
+            const M = (k / 256) * Math.PI * 2;
+            if (orbitMode === 'topological') {
+              const r = body.aAU * DISTANCE_SCALE;
+              pts.push(new THREE.Vector3(Math.cos(M) * r, 0, Math.sin(M) * r));
+              continue;
+            }
+            const E = solveKeplerE(M, body.e);
+            const xOrb = body.aAU * (Math.cos(E) - body.e);
+            const yOrb = body.aAU * Math.sqrt(1 - body.e * body.e) * Math.sin(E);
+            const omega = THREE.MathUtils.degToRad(body.wDeg);
+            const Omega = THREE.MathUtils.degToRad(body.OmegaDeg);
+            const inc = THREE.MathUtils.degToRad(body.iDeg);
+
+            const x1 = xOrb * Math.cos(omega) - yOrb * Math.sin(omega);
+            const y1 = xOrb * Math.sin(omega) + yOrb * Math.cos(omega);
+            const y2 = y1 * Math.cos(inc);
+            const z2 = y1 * Math.sin(inc);
+            const x = x1 * Math.cos(Omega) - y2 * Math.sin(Omega);
+            const z = x1 * Math.sin(Omega) + y2 * Math.cos(Omega);
+            pts.push(new THREE.Vector3(x * DISTANCE_SCALE, z2 * DISTANCE_SCALE, z * DISTANCE_SCALE));
+          }
+          line.geometry.setFromPoints(pts);
+          line.geometry.computeBoundingSphere();
+        }
+      }
+
+      function updateSolarSystem() {
+        for (const { body, mesh } of bodyObjects.values()) {
+          mesh.position.copy(orbitPosition(body, simDays));
+        }
+      }
+
+      // Tangible wall controls (3D objects on +X yz wall)
+      const interactive = [];
+      const controlState = {
+        lightLevel: 0.65,
+        dragged: null,
+      };
+
+      const wallX = HALF_BOX - 0.04;
+      const controlGroup = new THREE.Group();
+      controlGroup.position.set(wallX, 0, 0);
+      scene.add(controlGroup);
+
+      const controlBack = new THREE.Mesh(
+        new THREE.PlaneGeometry(0.03, 8.2, 7.2),
+        new THREE.MeshStandardMaterial({ color: 0x1f2a48, metalness: 0.2, roughness: 0.7 })
+      );
+      controlBack.rotation.y = -Math.PI / 2;
+      controlGroup.add(controlBack);
+
+      function makeWallButton(label, y, z, action) {
+        const btn = new THREE.Mesh(
+          new THREE.CylinderGeometry(0.14, 0.14, 0.1, 40),
+          new THREE.MeshStandardMaterial({ color: 0x5a5070, emissive: 0xffefad, emissiveIntensity: 0.42, roughness: 0.42, metalness: 0.22 })
+        );
+        btn.position.set(-0.08, y, z);
+        btn.rotation.z = Math.PI / 2;
+        controlGroup.add(btn);
+
+        const plate = new THREE.Mesh(
+          new THREE.PlaneGeometry(0.72, 0.24),
+          new THREE.MeshBasicMaterial({ map: makeTextTexture(label, 512, 256), transparent: true, depthWrite: false })
+        );
+        plate.position.set(1.0, 0, 0);
+        plate.lookAt(new THREE.Vector3(0, y, z));
+        controlGroup.add(plate);
+
+        btn.userData.action = action;
+        btn.userData.restX = -0.08;
+        btn.userData.pushX = -0.15;
+        interactive.push(btn);
+        return btn;
+      }
+
+      function addControlLabel(text, y, z, width = 0.9, height = 0.22) {
+        const label = new THREE.Mesh(
+          new THREE.PlaneGeometry(width, height),
+          new THREE.MeshBasicMaterial({ map: makeTextTexture(text, 700, 180), transparent: true, depthWrite: false })
+        );
+        label.position.set(1.0, y, z);
+        label.lookAt(new THREE.Vector3(0, y, z));
+        controlGroup.add(label);
+      }
+
+      addControlLabel('TIME RATE', 3.25, 2.2, 1.15, 0.26);
+      addControlLabel('ORBIT MODE', -0.95, 2.2, 1.15, 0.26);
+      addControlLabel('CEILING LIGHT', 0.05, -1.5, 1.35, 0.26);
+
+      const timeButtons = [
+        { label: '0.25x', mul: 0.25, y: 2.6 },
+        { label: '1x', mul: 1, y: 2.0 },
+        { label: '2x', mul: 2, y: 1.4 },
+        { label: '5x', mul: 5, y: 0.8 },
+        { label: '10x', mul: 10, y: 0.2 },
+        { label: '20x', mul: 20, y: -0.4 },
+      ];
+
+      const timeButtonMeshes = [];
+      for (const tb of timeButtons) {
+        const m = makeWallButton(tb.label, tb.y, 2.2, () => {
+          timeMultiplier = tb.mul;
+          updateButtonHighlights();
+        });
+        m.userData.kind = 'time';
+        m.userData.value = tb.mul;
+        timeButtonMeshes.push(m);
+      }
+
+      const modeTopo = makeWallButton('TOPO', -1.45, 2.2, () => {
+        if (orbitMode !== 'topological') {
+          orbitMode = 'topological';
+          updateOrbitVisuals();
+          updateButtonHighlights();
+        }
+      });
+      modeTopo.userData.kind = 'mode';
+      modeTopo.userData.value = 'topological';
+
+      const modeAcc = makeWallButton('ANGLE', -2.05, 2.2, () => {
+        if (orbitMode !== 'accurate') {
+          orbitMode = 'accurate';
+          updateOrbitVisuals();
+          updateButtonHighlights();
+        }
+      });
+      modeAcc.userData.kind = 'mode';
+      modeAcc.userData.value = 'accurate';
+
+      // Light slider track + knob
+      const sliderY = -0.7;
+      const sliderZMin = -2.7;
+      const sliderZMax = -0.3;
+
+      const sliderTrack = new THREE.Mesh(
+        new THREE.BoxGeometry(0.08, 0.09, sliderZMax - sliderZMin + 0.1),
+        new THREE.MeshStandardMaterial({ color: 0x2e3c61, roughness: 0.55, metalness: 0.2 })
+      );
+      sliderTrack.position.set(-0.08, sliderY, (sliderZMin + sliderZMax) / 2);
+      controlGroup.add(sliderTrack);
+
+      const sliderKnob = new THREE.Mesh(
+        new THREE.BoxGeometry(0.2, 0.24, 0.22),
+        new THREE.MeshStandardMaterial({ color: 0x7a6e8e, emissive: 0xffefad, emissiveIntensity: 0.5, roughness: 0.38, metalness: 0.25 })
+      );
+      controlGroup.add(sliderKnob);
+      sliderKnob.userData.kind = 'slider';
+      sliderKnob.userData.action = () => {
+        controlState.dragged = sliderKnob;
+      };
+      interactive.push(sliderKnob);
+
+      const sliderLabel = new THREE.Mesh(
+        new THREE.PlaneGeometry(0.001, 0.9, 0.26),
+        new THREE.MeshBasicMaterial({ map: makeTextTexture('LIGHT', 512, 196), transparent: true })
+      );
+      sliderLabel.rotation.y = Math.PI / 2;
+      sliderLabel.position.set(0.09, sliderY + 0.32, (sliderZMin + sliderZMax) / 2);
+      controlGroup.add(sliderLabel);
+
+      function applyCeilingLight(level) {
+        const clamped = THREE.MathUtils.clamp(level, 0, 1);
+        controlState.lightLevel = clamped;
+        const intensity = clamped <= 0 ? 0 : 0.08 + Math.pow(clamped, 2.2) * 12;
+        const ambientLevel = 0.05 + clamped * 0.18;
+        ceilingLight.intensity = intensity;
+        ambient.intensity = ambientLevel;
+        bulb.material.emissiveIntensity = 0.15 + clamped * 1.8;
+        const z = THREE.MathUtils.lerp(sliderZMin, sliderZMax, clamped);
+        sliderKnob.position.set(-0.08, sliderY, z);
+      }
+
+      function updateButtonHighlights() {
+        for (const btn of interactive) {
+          if (!btn.userData.kind) continue;
+          const mat = btn.material;
+          if (btn.userData.kind === 'time') {
+            const active = btn.userData.value === timeMultiplier;
+            mat.color.setHex(active ? 0xfff5bf : 0x5a5070);
+            mat.emissive.setHex(0xffefad);
+            mat.emissiveIntensity = active ? 0.8 : 0.42;
+            btn.position.x = active ? btn.userData.pushX : btn.userData.restX;
+          } else if (btn.userData.kind === 'mode') {
+            const active = btn.userData.value === orbitMode;
+            mat.color.setHex(active ? 0xfff5bf : 0x5a5070);
+            mat.emissive.setHex(0xffefad);
+            mat.emissiveIntensity = active ? 0.8 : 0.42;
+            btn.position.x = active ? btn.userData.pushX : btn.userData.restX;
+          }
+        }
+      }
+
+      applyCeilingLight(controlState.lightLevel);
+      updateButtonHighlights();
+      updateOrbitVisuals();
+
+      const raycaster = new THREE.Raycaster();
+      raycaster.far = Number.POSITIVE_INFINITY;
+      const mouseNdc = new THREE.Vector2();
+      let lastInteractionMs = 0;
+      const INTERACTION_COOLDOWN_MS = 80;
+
+      function ndcFromEvent(event) {
+        mouseNdc.x = (event.clientX / window.innerWidth) * 2 - 1;
+        mouseNdc.y = -(event.clientY / window.innerHeight) * 2 + 1;
+      }
+
+      function setSliderFromRay(event) {
+        ndcFromEvent(event);
+        raycaster.setFromCamera(mouseNdc, camera);
+        const plane = new THREE.Plane(new THREE.Vector3(1, 0, 0), -wallX);
+        const hit = new THREE.Vector3();
+        if (!raycaster.ray.intersectPlane(plane, hit)) return;
+        const local = controlGroup.worldToLocal(hit.clone());
+        const raw = (local.z - sliderZMin) / (sliderZMax - sliderZMin);
+        if (!Number.isFinite(raw)) return;
+        const t = THREE.MathUtils.clamp(raw, 0, 1);
+        applyCeilingLight(t);
+      }
+
+      window.addEventListener('mousedown', (event) => {
+        const now = performance.now();
+        if (now - lastInteractionMs < INTERACTION_COOLDOWN_MS) return;
+        lastInteractionMs = now;
+
+        ndcFromEvent(event);
+        raycaster.setFromCamera(mouseNdc, camera);
+        const intersects = raycaster.intersectObjects(interactive, false);
+        if (intersects.length === 0) return;
+        const picked = intersects[0].object;
+        if (picked.userData.kind === 'slider') {
+          controlState.dragged = picked;
+          setSliderFromRay(event);
+          return;
+        }
+        picked.userData.action?.();
+      });
+
+      window.addEventListener('mousemove', (event) => {
+        if (!controlState.dragged) return;
+        setSliderFromRay(event);
+      });
+
+      window.addEventListener('mouseup', () => {
+        controlState.dragged = null;
+      });
+
+      function updatePlayer(dt) {
+        const move = new THREE.Vector3(
+          Number(moveInput.right) - Number(moveInput.left),
+          0,
+          Number(moveInput.back) - Number(moveInput.forward)
+        );
+
+        if (move.lengthSq() > 0) {
+          move.normalize();
+          const dir = new THREE.Vector3();
+          camera.getWorldDirection(dir);
+          dir.y = 0;
+          dir.normalize();
+          const right = new THREE.Vector3().crossVectors(dir, new THREE.Vector3(0, 1, 0)).normalize();
+
+          const desired = new THREE.Vector3();
+          desired.addScaledVector(dir, -move.z);
+          desired.addScaledVector(right, move.x);
+          desired.normalize();
+
+          const speedMult = moveInput.boost ? 3 : 1;
+          velocity.x = desired.x * MOVE_SPEED * speedMult;
+          velocity.z = desired.z * MOVE_SPEED * speedMult;
+        } else {
+          velocity.x = THREE.MathUtils.damp(velocity.x, 0, 9, dt);
+          velocity.z = THREE.MathUtils.damp(velocity.z, 0, 9, dt);
+        }
+
+        const clearance = 0.1;
+
+        if (noGravityMode) {
+          const vertical = Number(verticalInput.up) - Number(verticalInput.down);
+          const speedMult = moveInput.boost ? 3 : 1;
+          velocity.y = vertical * MOVE_SPEED * speedMult;
+        } else {
+          velocity.y -= GRAVITY * dt;
+        }
+
+        cameraPosition.addScaledVector(velocity, dt);
+
+        const floorY = -HALF_BOX + CREATURE_HEIGHT;
+        const ceilingY = HALF_BOX - 0.08;
+
+        if (cameraPosition.y < floorY) {
+          cameraPosition.y = floorY;
+          velocity.y = 0;
+          isGrounded = true;
+        }
+        if (cameraPosition.y > ceilingY) {
+          cameraPosition.y = ceilingY;
+          velocity.y = Math.min(0, velocity.y);
+        }
+
+        cameraPosition.x = THREE.MathUtils.clamp(cameraPosition.x, -HALF_BOX + clearance, HALF_BOX - clearance);
+        cameraPosition.z = THREE.MathUtils.clamp(cameraPosition.z, -HALF_BOX + clearance, HALF_BOX - clearance);
+
+        // No collision checks against solar objects; observer can move through them.
+        camera.position.copy(cameraPosition);
+        camera.rotation.set(pitch, yaw, 0, 'YXZ');
+      }
+
+      const clock = new THREE.Clock();
+
+      function animate() {
+        requestAnimationFrame(animate);
+        const dt = Math.min(clock.getDelta(), 0.05);
+
+        updatePlayer(dt);
+        simDays += dt * BASE_SIM_DAYS_PER_SECOND * timeMultiplier;
+        updateSolarSystem();
+
+        for (const { label } of bodyObjects.values()) {
+          label.quaternion.copy(camera.quaternion);
+        }
+
+        hud.textContent = `Room: ${BOX_SIZE.toFixed(1)}u | Pluto aphelion scale touches walls | Time: ${timeMultiplier}x | Orbit mode: ${orbitMode} | Light: ${controlState.lightLevel.toFixed(2)} | Grav: ${noGravityMode ? 'off' : 'on'}`;
+        renderer.render(scene, camera);
+      }
+
+      animate();
+
+      window.addEventListener('resize', () => {
+        camera.aspect = window.innerWidth / window.innerHeight;
+        camera.updateProjectionMatrix();
+        renderer.setSize(window.innerWidth, window.innerHeight);
+      });
+    </script>
+  </body>
+</html>

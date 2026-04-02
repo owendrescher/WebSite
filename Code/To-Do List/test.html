@@ -1,0 +1,682 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1" />
+  <title>Notepad To-Do</title>
+
+  <!-- Handwriting font (falls back to cursive if offline) -->
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+  <link href="https://fonts.googleapis.com/css2?family=Patrick+Hand&display=swap" rel="stylesheet">
+
+  <style>
+    :root{
+      --paper: #fff7d6;
+      --paperEdge: #f1e2aa;
+      --line: rgba(70, 130, 180, 0.22);
+      --margin: rgba(220, 50, 50, 0.22);
+
+      --ink: #1f2a37;
+
+      /* Requested default */
+      --taskFontSize: 200px;
+
+      /* Scales checkbox with the font size */
+      --boxSize: 120px;
+
+      --shadow: 0 24px 60px rgba(0,0,0,.22);
+      --radius: 18px;
+    }
+
+    * { box-sizing: border-box; }
+    html, body { height: 100%; }
+    body{
+      margin:0;
+      display:flex;
+      align-items:center;
+      justify-content:center;
+      background:
+        radial-gradient(1200px 700px at 30% 20%, rgba(255,255,255,.35), rgba(255,255,255,0)),
+        radial-gradient(900px 600px at 80% 80%, rgba(0,0,0,.10), rgba(0,0,0,0)),
+        #2b2a2f;
+      color: var(--ink);
+      overflow:hidden;
+      user-select:none;
+    }
+
+    /* Book container */
+    #book{
+      width: min(1200px, calc(100vw - 36px));
+      height: min(740px, calc(100vh - 36px));
+      position: relative;
+      perspective: 1400px;
+    }
+
+    /* Outer notebook frame */
+    #frame{
+      position:absolute;
+      inset: 0;
+      border-radius: calc(var(--radius) + 10px);
+      background: linear-gradient(180deg, #1f1f26, #14141a);
+      box-shadow: var(--shadow);
+      padding: 18px;
+    }
+
+    /* Paper stack */
+    #stack{
+      position:absolute;
+      inset: 18px;
+      border-radius: var(--radius);
+      overflow: hidden;
+      background: linear-gradient(90deg, rgba(0,0,0,.16), rgba(0,0,0,0) 12px);
+    }
+
+    /* Two sheets for flip animation */
+    .sheet{
+      position:absolute;
+      inset: 0;
+      border-radius: var(--radius);
+      background: var(--paper);
+      box-shadow: inset 0 0 0 2px rgba(0,0,0,.08);
+      transform-style: preserve-3d;
+      backface-visibility: hidden;
+      overflow:hidden;
+    }
+
+    /* Paper lines + margin */
+    .sheet::before{
+      content:"";
+      position:absolute;
+      inset: 0;
+      background:
+        /* margin line */
+        linear-gradient(90deg, transparent 0 68px, var(--margin) 68px 71px, transparent 71px 100%),
+        /* horizontal rules */
+        repeating-linear-gradient(
+          to bottom,
+          transparent 0 32px,
+          var(--line) 32px 33px,
+          transparent 33px 66px
+        );
+      pointer-events:none;
+      mix-blend-mode:multiply;
+      opacity:.9;
+    }
+
+    /* Subtle paper texture */
+    .sheet::after{
+      content:"";
+      position:absolute;
+      inset:0;
+      background:
+        radial-gradient(1px 1px at 10% 20%, rgba(0,0,0,.08), rgba(0,0,0,0)),
+        radial-gradient(1px 1px at 40% 60%, rgba(0,0,0,.06), rgba(0,0,0,0)),
+        radial-gradient(1px 1px at 70% 30%, rgba(0,0,0,.07), rgba(0,0,0,0)),
+        radial-gradient(1px 1px at 90% 80%, rgba(0,0,0,.05), rgba(0,0,0,0));
+      opacity:.25;
+      pointer-events:none;
+    }
+
+    #backSheet{ z-index: 1; }
+    #frontSheet{ z-index: 2; }
+
+    /* Flip animations (handled by class toggles) */
+    #frontSheet.turn-left{
+      transform-origin: left center;
+      transition: transform 680ms cubic-bezier(.2,.7,.1,1);
+      transform: rotateY(-180deg);
+    }
+    #frontSheet.turn-right{
+      transform-origin: right center;
+      transition: transform 680ms cubic-bezier(.2,.7,.1,1);
+      transform: rotateY(180deg);
+    }
+
+    /* Top bar (small, unobtrusive) */
+    #topBar{
+      position:absolute;
+      top: 16px;
+      left: 16px;
+      right: 16px;
+      display:flex;
+      align-items:center;
+      justify-content:space-between;
+      pointer-events:none;
+      z-index: 5;
+      font-family: system-ui, -apple-system, Segoe UI, Roboto, Arial, sans-serif;
+      color: rgba(0,0,0,.55);
+    }
+    #hint{
+      background: rgba(255,255,255,.55);
+      border: 1px solid rgba(0,0,0,.08);
+      border-radius: 999px;
+      padding: 8px 12px;
+      backdrop-filter: blur(4px);
+      font-size: 13px;
+      pointer-events:none;
+    }
+    #pageLabel{
+      background: rgba(255,255,255,.55);
+      border: 1px solid rgba(0,0,0,.08);
+      border-radius: 999px;
+      padding: 8px 12px;
+      backdrop-filter: blur(4px);
+      font-size: 13px;
+      pointer-events:none;
+    }
+
+    /* Navigation arrows */
+    .nav{
+      position:absolute;
+      bottom: 18px;
+      width: 66px;
+      height: 66px;
+      border-radius: 999px;
+      border: 1px solid rgba(255,255,255,.14);
+      background: rgba(0,0,0,.35);
+      backdrop-filter: blur(6px);
+      display:grid;
+      place-items:center;
+      cursor:pointer;
+      z-index: 10;
+      transition: transform .12s ease, background .12s ease, opacity .12s ease;
+    }
+    .nav:hover{ transform: translateY(-2px); background: rgba(0,0,0,.45); }
+    .nav:active{ transform: translateY(0px) scale(.98); }
+    .nav[disabled]{ opacity:.35; cursor:not-allowed; }
+    .nav svg{ width: 30px; height: 30px; fill: rgba(255,255,255,.92); }
+
+    #navLeft{ left: 18px; }
+    #navRight{ right: 18px; }
+
+    /* Todo item */
+    .todo-item{
+      position:absolute;
+      display:flex;
+      align-items:flex-start;
+      gap: 14px;
+      padding: 10px 12px;
+      border-radius: 14px;
+      background: rgba(255,255,255,.22);
+      border: 1px solid rgba(0,0,0,.08);
+      backdrop-filter: blur(1px);
+      box-shadow: 0 8px 22px rgba(0,0,0,.10);
+      max-width: calc(100% - 28px);
+      user-select:none;
+    }
+
+    /* Big checkbox */
+    .check{
+      width: var(--boxSize);
+      height: var(--boxSize);
+      border-radius: 16px;
+      border: 3px solid rgba(0,0,0,.25);
+      background: rgba(255,255,255,.55);
+      box-shadow: inset 0 0 0 2px rgba(255,255,255,.35);
+      cursor:pointer;
+      appearance:none;
+      -webkit-appearance:none;
+      outline:none;
+      position: relative;
+      flex: 0 0 auto;
+      margin-top: 10px;
+    }
+    .check:checked{
+      background: rgba(210, 255, 210, .65);
+      border-color: rgba(0,0,0,.28);
+    }
+    .check:checked::after{
+      content:"";
+      position:absolute;
+      left: 30%;
+      top: 18%;
+      width: 28%;
+      height: 52%;
+      border-right: 10px solid rgba(0,0,0,.55);
+      border-bottom: 10px solid rgba(0,0,0,.55);
+      transform: rotate(38deg);
+    }
+
+    /* Editor */
+    .editor{
+      min-width: 220px;
+      max-width: min(1000px, calc(100% - 160px));
+      outline:none;
+      user-select:text;
+      font-family: "Patrick Hand", "Comic Sans MS", cursive;
+      font-size: var(--taskFontSize);
+      line-height: 1.05;
+      color: var(--ink);
+      white-space: pre-wrap;
+      word-break: break-word;
+      caret-color: rgba(0,0,0,.55);
+      cursor:text;
+      padding-right: 8px;
+    }
+    .todo-item.checked .editor{
+      opacity: .55;
+      text-decoration: line-through;
+      text-decoration-thickness: 10px;
+      text-decoration-color: rgba(0,0,0,.35);
+    }
+
+    /* Character fade-in */
+    .char{
+      opacity: 0;
+      display:inline-block;
+      transform: translateY(6px);
+      filter: blur(.35px);
+      transition:
+        opacity 160ms ease,
+        transform 180ms ease,
+        filter 180ms ease;
+      will-change: opacity, transform, filter;
+    }
+    .char.show{
+      opacity: 1;
+      transform: translateY(0px);
+      filter: blur(0px);
+    }
+
+    /* A little “drag handle” vibe without actual dragging */
+    .todo-item::marker{ content:""; }
+    .todo-item:focus-within{
+      border-color: rgba(0,0,0,.18);
+      box-shadow: 0 10px 26px rgba(0,0,0,.14);
+    }
+
+    /* Small screens: keep it usable (still defaults to 200px, but scales the page visually) */
+    @media (max-width: 720px), (max-height: 520px){
+      #book{ transform: scale(.82); transform-origin: center; }
+    }
+    @media (max-width: 520px), (max-height: 420px){
+      #book{ transform: scale(.70); }
+      .nav{ width: 58px; height: 58px; }
+    }
+  </style>
+</head>
+<body>
+  <div id="book">
+    <div id="frame"></div>
+    <div id="stack">
+      <div id="topBar">
+        <div id="hint">MB1 anywhere on the paper to place a new checkbox + textbox</div>
+        <div id="pageLabel">Page <span id="pageNum">1</span></div>
+      </div>
+
+      <div class="sheet" id="backSheet" aria-hidden="true"></div>
+      <div class="sheet" id="frontSheet"></div>
+    </div>
+
+    <button class="nav" id="navLeft" title="Previous page" aria-label="Previous page">
+      <svg viewBox="0 0 24 24" aria-hidden="true"><path d="M15.5 4.5 7 12l8.5 7.5 1.5-1.7L10.7 12 17 6.2z"/></svg>
+    </button>
+    <button class="nav" id="navRight" title="Next page" aria-label="Next page">
+      <svg viewBox="0 0 24 24" aria-hidden="true"><path d="M8.5 19.5 17 12 8.5 4.5 7 6.2 13.3 12 7 17.8z"/></svg>
+    </button>
+  </div>
+
+  <script>
+    (function(){
+      const STORAGE_KEY = "notepad_todo_pages_v1";
+
+      const frontSheet = document.getElementById("frontSheet");
+      const backSheet  = document.getElementById("backSheet");
+
+      const navLeft  = document.getElementById("navLeft");
+      const navRight = document.getElementById("navRight");
+      const pageNumEl = document.getElementById("pageNum");
+
+      let turning = false;
+
+      /** Data model:
+       * pages = [
+       *   { items: [ {id, x, y, checked, text} ] }
+       * ]
+       */
+      let pages = loadPages();
+      let pageIndex = clampInt(loadPageIndex(), 0, pages.length - 1);
+
+      renderPage(pageIndex, frontSheet);
+      updateNavUI();
+
+      // --- Click to create item (MB1) ---
+      frontSheet.addEventListener("mousedown", (e) => {
+        if (e.button !== 0) return; // MB1 only
+        // Don't create if clicking existing item/editor/checkbox
+        if (e.target.closest(".todo-item")) return;
+
+        const rect = frontSheet.getBoundingClientRect();
+        const x = e.clientX - rect.left;
+        const y = e.clientY - rect.top;
+
+        createItemAt(x, y);
+      });
+
+      // --- Page nav ---
+      navRight.addEventListener("click", () => goTo(pageIndex + 1, "right"));
+      navLeft.addEventListener("click",  () => goTo(pageIndex - 1, "left"));
+
+      // --- Core functions ---
+      function createItemAt(x, y){
+        const item = {
+          id: cryptoId(),
+          x: clamp(x, 14, frontSheet.clientWidth - 14),
+          y: clamp(y, 14, frontSheet.clientHeight - 14),
+          checked: false,
+          text: ""
+        };
+
+        pages[pageIndex].items.push(item);
+        saveAll();
+
+        // Render just this item
+        const el = buildItemElement(item);
+        frontSheet.appendChild(el);
+
+        // Focus editor
+        const editor = el.querySelector(".editor");
+        placeCaretAtEnd(editor);
+        editor.focus({ preventScroll: true });
+      }
+
+      function buildItemElement(item){
+        const wrap = document.createElement("div");
+        wrap.className = "todo-item";
+        wrap.dataset.id = item.id;
+        wrap.style.left = `${item.x}px`;
+        wrap.style.top  = `${item.y}px`;
+
+        const cb = document.createElement("input");
+        cb.type = "checkbox";
+        cb.className = "check";
+        cb.checked = !!item.checked;
+
+        const editor = document.createElement("div");
+        editor.className = "editor";
+        editor.contentEditable = "true";
+        editor.spellcheck = false;
+        editor.setAttribute("aria-label", "Task text");
+        editor.dataset.id = item.id;
+
+        // Populate text -> spans (no animation on load)
+        editor.innerHTML = "";
+        injectTextAsSpans(editor, item.text, /*animate*/ false);
+
+        // Checkbox behavior
+        cb.addEventListener("change", () => {
+          item.checked = cb.checked;
+          wrap.classList.toggle("checked", item.checked);
+          saveAll();
+        });
+        wrap.classList.toggle("checked", item.checked);
+
+        // Typing behavior (animated letters)
+        editor.addEventListener("keydown", (e) => {
+          // Allow standard shortcuts
+          if (e.ctrlKey || e.metaKey) return;
+
+          // Basic navigation keys: let user click/drag to select if they want,
+          // but we keep insertion/deletion simple and reliable.
+          const k = e.key;
+
+          // Backspace
+          if (k === "Backspace") {
+            e.preventDefault();
+            if (!item.text.length) return;
+
+            // Remove last char from model
+            item.text = item.text.slice(0, -1);
+
+            // Remove last rendered node
+            removeLastRenderedChar(editor);
+            saveAll();
+            return;
+          }
+
+          // Enter => newline
+          if (k === "Enter") {
+            e.preventDefault();
+            item.text += "\n";
+            addNewline(editor);
+            saveAll();
+            return;
+          }
+
+          // Printable character
+          if (k.length === 1) {
+            e.preventDefault();
+
+            // Normalize tabs to spaces
+            const ch = (k === "\t") ? " " : k;
+
+            item.text += ch;
+            addCharAnimated(editor, ch);
+            saveAll();
+            return;
+          }
+        });
+
+        // Paste: turn into animated chars (but quick)
+        editor.addEventListener("paste", (e) => {
+          e.preventDefault();
+          const text = (e.clipboardData || window.clipboardData).getData("text") || "";
+          if (!text) return;
+
+          // Append to model
+          item.text += text;
+
+          // Render
+          for (let i = 0; i < text.length; i++){
+            const ch = text[i];
+            if (ch === "\n") addNewline(editor);
+            else addCharAnimated(editor, ch, /*baseDelay*/ i * 8);
+          }
+          saveAll();
+        });
+
+        wrap.appendChild(cb);
+        wrap.appendChild(editor);
+        return wrap;
+      }
+
+      function renderPage(idx, targetSheet){
+        targetSheet.innerHTML = ""; // keep pseudo-lines intact via ::before/::after
+        // (pseudo elements remain; this only clears children)
+
+        const page = pages[idx];
+        for (const item of page.items){
+          const el = buildItemElement(item);
+          targetSheet.appendChild(el);
+        }
+
+        pageNumEl.textContent = String(idx + 1);
+      }
+
+      function goTo(nextIdx, direction){
+        if (turning) return;
+        if (nextIdx < 0) return;
+
+        // Create pages lazily
+        while (nextIdx >= pages.length) pages.push({ items: [] });
+
+        turning = true;
+        navLeft.disabled = true;
+        navRight.disabled = true;
+
+        renderPage(nextIdx, backSheet);
+
+        // Trigger flip on frontSheet
+        frontSheet.classList.remove("turn-left", "turn-right");
+        // force reflow so transition always fires
+        void frontSheet.offsetWidth;
+
+        if (direction === "right") frontSheet.classList.add("turn-left");
+        else frontSheet.classList.add("turn-right");
+
+        const onDone = () => {
+          frontSheet.removeEventListener("transitionend", onDone);
+
+          pageIndex = nextIdx;
+          persistPageIndex(pageIndex);
+
+          // Reset animation state and render current page into front
+          frontSheet.classList.remove("turn-left", "turn-right");
+          backSheet.innerHTML = "";
+
+          renderPage(pageIndex, frontSheet);
+          updateNavUI();
+
+          turning = false;
+        };
+
+        frontSheet.addEventListener("transitionend", onDone, { once: true });
+      }
+
+      function updateNavUI(){
+        navLeft.disabled = pageIndex <= 0 || turning;
+        navRight.disabled = turning; // always allow creating new pages
+        pageNumEl.textContent = String(pageIndex + 1);
+      }
+
+      // --- Rendering helpers ---
+      function randDelaySeconds(){
+        // Random in [0.05, 0.1]
+        return (0.05 + Math.random() * 0.05);
+      }
+
+      function addCharAnimated(editor, ch, baseDelayMs = 0){
+        const span = document.createElement("span");
+        span.className = "char";
+        span.textContent = (ch === " ") ? "\u00A0" : ch;
+
+        // Random delay per key press
+        const d = randDelaySeconds();
+        span.style.transitionDelay = `${d}s`;
+
+        editor.appendChild(span);
+
+        // Make it appear slightly “after” the key press
+        const ms = baseDelayMs + Math.floor(d * 1000);
+        setTimeout(() => span.classList.add("show"), ms);
+
+        placeCaretAtEnd(editor);
+      }
+
+      function addNewline(editor){
+        const br = document.createElement("br");
+        editor.appendChild(br);
+        placeCaretAtEnd(editor);
+      }
+
+      function removeLastRenderedChar(editor){
+        // Remove trailing empty text nodes
+        while (editor.lastChild && editor.lastChild.nodeType === Node.TEXT_NODE && editor.lastChild.textContent.trim() === ""){
+          editor.removeChild(editor.lastChild);
+        }
+        if (!editor.lastChild) return;
+
+        // If last node is <br>, remove it. Else remove last span.
+        const last = editor.lastChild;
+        editor.removeChild(last);
+        placeCaretAtEnd(editor);
+      }
+
+      function injectTextAsSpans(editor, text, animate){
+        for (let i = 0; i < text.length; i++){
+          const ch = text[i];
+          if (ch === "\n") {
+            const br = document.createElement("br");
+            editor.appendChild(br);
+            continue;
+          }
+          const span = document.createElement("span");
+          span.className = "char" + (animate ? "" : " show");
+          span.textContent = (ch === " ") ? "\u00A0" : ch;
+          if (animate){
+            const d = randDelaySeconds();
+            span.style.transitionDelay = `${d}s`;
+            requestAnimationFrame(() => span.classList.add("show"));
+          }
+          editor.appendChild(span);
+        }
+      }
+
+      function placeCaretAtEnd(el){
+        // Contenteditable caret control (best-effort)
+        el.focus({ preventScroll: true });
+        const selection = window.getSelection();
+        if (!selection) return;
+        const range = document.createRange();
+        range.selectNodeContents(el);
+        range.collapse(false);
+        selection.removeAllRanges();
+        selection.addRange(range);
+      }
+
+      // --- Persistence ---
+      let saveTimer = null;
+      function saveAll(){
+        // Small debounce to avoid constant writes
+        if (saveTimer) clearTimeout(saveTimer);
+        saveTimer = setTimeout(() => {
+          localStorage.setItem(STORAGE_KEY, JSON.stringify(pages));
+        }, 60);
+      }
+
+      function loadPages(){
+        try{
+          const raw = localStorage.getItem(STORAGE_KEY);
+          if (!raw) return [{ items: [] }];
+          const parsed = JSON.parse(raw);
+          if (!Array.isArray(parsed) || !parsed.length) return [{ items: [] }];
+
+          // Basic sanitize
+          for (const p of parsed){
+            if (!p.items || !Array.isArray(p.items)) p.items = [];
+            for (const it of p.items){
+              it.id = String(it.id || cryptoId());
+              it.x = Number(it.x || 80);
+              it.y = Number(it.y || 120);
+              it.checked = !!it.checked;
+              it.text = String(it.text || "");
+            }
+          }
+          return parsed;
+        }catch{
+          return [{ items: [] }];
+        }
+      }
+
+      function persistPageIndex(idx){
+        try{ localStorage.setItem(STORAGE_KEY + "_pageIndex", String(idx)); }catch{}
+      }
+      function loadPageIndex(){
+        try{
+          const v = localStorage.getItem(STORAGE_KEY + "_pageIndex");
+          const n = parseInt(v, 10);
+          return Number.isFinite(n) ? n : 0;
+        }catch{ return 0; }
+      }
+
+      // --- Utils ---
+      function clamp(n, a, b){ return Math.max(a, Math.min(b, n)); }
+      function clampInt(n, a, b){
+        n = Math.floor(Number(n));
+        if (!Number.isFinite(n)) n = a;
+        return clamp(n, a, b);
+      }
+      function cryptoId(){
+        // Short unique id
+        return (crypto && crypto.randomUUID) ? crypto.randomUUID() : ("id_" + Math.random().toString(16).slice(2) + Date.now().toString(16));
+      }
+
+      // Disable context menu on the paper for a more “notepad app” feel
+      document.addEventListener("contextmenu", (e) => {
+        if (e.target.closest("#stack")) e.preventDefault();
+      });
+    })();
+  </script>
+</body>
+</html>

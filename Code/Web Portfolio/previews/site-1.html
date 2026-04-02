@@ -1,0 +1,52 @@
+<!DOCTYPE html>
+<html lang="en">
+  <head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <title>Placeholder Site One</title>
+    <style>
+      :root { --ink: #0f1020; --hot: #ff4e00; --soft: #ffcd73; }
+      * { box-sizing: border-box; }
+      body {
+        margin: 0;
+        min-height: 100vh;
+        font-family: "Trebuchet MS", sans-serif;
+        color: #f7f7f7;
+        background:
+          radial-gradient(circle at 78% 14%, rgba(255, 205, 115, 0.3), transparent 32%),
+          linear-gradient(145deg, #101328, #1a1f38 40%, #111526);
+        display: grid;
+        place-items: center;
+        padding: 1rem;
+      }
+      .panel {
+        width: min(800px, 100%);
+        border: 1px solid rgba(255, 255, 255, 0.2);
+        border-radius: 24px;
+        padding: 2rem;
+        background: rgba(5, 8, 18, 0.55);
+      }
+      h1 { margin: 0; font-size: clamp(2rem, 5vw, 3.3rem); }
+      p { color: #d8d8df; line-height: 1.65; }
+      .chip {
+        display: inline-block;
+        margin-top: 1rem;
+        background: linear-gradient(90deg, var(--hot), var(--soft));
+        color: var(--ink);
+        padding: 0.55rem 0.9rem;
+        border-radius: 999px;
+        font-weight: 700;
+      }
+    </style>
+  </head>
+  <body>
+    <section class="panel">
+      <h1>Placeholder Site One</h1>
+      <p>
+        This is a temporary preview document. Replace it with one of your real project pages
+        once you are ready to populate the portfolio.
+      </p>
+      <span class="chip">Preview Skeleton</span>
+    </section>
+  </body>
+</html>

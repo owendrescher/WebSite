@@ -1,0 +1,3810 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8" />
+<meta name="viewport" content="width=device-width,initial-scale=1" />
+<title>Courtside Tasks</title>
+<style>
+  :root{
+    --base-font-size:16px;
+    --fixed-title-size: calc(var(--base-font-size) + 2px);
+    --peoplebar-h:58px;
+
+    /* Theme vars (Light defaults) */
+    --bg:#f6f7f9;
+    --surface:#ffffff;
+    --text:#111316;
+    --muted:#646a73;
+    --border:#e3e6eb;
+    --accent:#316aff;
+    --accent-weak:#e8efff;
+    --check:#316aff;
+  }
+  [data-theme="dark"]{
+    --bg:#191b1f;
+    --surface:#22252a;
+    --text:#e9edf3;
+    --muted:#b5bdc9;
+    --border:#343944;
+    --accent:#6aa0ff;
+    --accent-weak:#223153;
+    --check:#6aa0ff;
+  }
+
+  html,body{height:100%;}
+  body{
+    margin:0;
+    background:var(--bg);
+    color:var(--text);
+    padding-top: var(--peoplebar-h);
+    font: 400 var(--base-font-size)/1.45 system-ui, -apple-system, "Segoe UI", Inter, Roboto, "Helvetica Neue", Arial, "Noto Sans", sans-serif;
+  }
+
+  .wrap{max-width:980px; margin:0 auto; padding:16px;}
+
+  /* ===== HEADER ===== */
+  .topbar{
+    display:flex; align-items:center; gap:10px; flex-wrap:wrap;
+    position:sticky; top: var(--peoplebar-h); background:var(--bg); padding:10px 0; z-index:6;
+    font-size: var(--base-font-size);
+  }
+  .seg{ display:inline-flex; border:1px solid var(--border); border-radius:10px; overflow:hidden; }
+  .seg button{ border:0; background:var(--surface); padding:8px 10px; }
+  .seg button+button{ border-left:1px solid var(--border); }
+  .seg button:hover{ background:var(--accent-weak); }
+
+  .title{font-size: var(--fixed-title-size); font-weight:700; letter-spacing:.2px;}
+
+#peopleBar{
+
+    position:fixed;
+    top:0;
+    left:0;
+    right:0;
+    height: var(--peoplebar-h);
+    z-index:9999;
+    display:flex;
+    align-items:center;
+    gap:8px;
+    padding:10px 12px;
+    border-bottom:1px solid var(--border);
+    background:var(--surface);
+    box-shadow: 0 6px 18px rgba(0,0,0,.10);
+    box-sizing:border-box;
+  }
+  #peopleLabel{ font-weight:600; white-space:nowrap; }
+  #peopleInputs{
+    display:flex;
+    align-items:center;
+    gap:8px;
+    flex:1;
+    overflow-x:auto;
+    overflow-y:hidden;
+    white-space:nowrap;
+    scrollbar-width:thin;
+  }
+
+  .peopleRow{
+    display:flex;
+    align-items:center;
+    gap:8px;
+    flex:1;
+    min-width:0;
+  }
+  .shiftControls{
+    display:inline-flex;
+    align-items:center;
+    gap:6px;
+    flex:0 0 auto;
+    white-space:nowrap;
+  }
+  .shiftControls .btn{
+    padding:8px 10px;
+  }
+  .shiftControls .btn.active{
+    background:var(--accent);
+    color:#fff;
+    border-color:transparent;
+  }
+  #peopleInputs::-webkit-scrollbar{ height:8px; }
+  #peopleInputs::-webkit-scrollbar-thumb{ background: color-mix(in srgb, var(--border) 65%, transparent 35%); border-radius:999px; }
+  .personRow{ display:inline-flex; align-items:center; gap:6px; }
+  .personInput{ width: 170px; }
+  .personRemove{ padding:6px 8px; }
+  .spacer{flex:1;}
+
+  button, select, input[type="text"] { font: inherit; color:var(--text); }
+  .btn{
+    border:1px solid var(--border); background:var(--surface); color:var(--text);
+    padding:8px 12px; border-radius:10px; cursor:pointer;
+    transition: border-color .12s ease, background .12s ease, transform .04s ease;
+  }
+  .btn:hover{ border-color:var(--accent); background:color-mix(in srgb, var(--surface) 90%, var(--accent-weak) 10%); }
+  .btn:active{ transform: translateY(1px); }
+  .btn.primary{ background:var(--accent); color:#fff; border-color:transparent; }
+  .btn.primary:hover{ filter:brightness(1.05); }
+  .btn.icon{ padding:6px 9px; line-height:1; display:inline-flex; align-items:center; justify-content:center; }
+
+  select, .input{
+    border:1px solid var(--border); background:var(--surface); color:var(--text);
+    padding:8px 10px; border-radius:10px; outline:none;
+  }
+  .input::placeholder{ color:var(--muted); }
+  .input:focus, select:focus{ outline:2px solid var(--accent); outline-offset:0; }
+
+  .switch{display:inline-flex; align-items:center; gap:6px;}
+  .switch input{
+    appearance:none; width:42px; height:24px; border-radius:999px;
+    position:relative; background:var(--border); border:1px solid var(--border);
+    cursor:pointer; transition:all .15s ease;
+  }
+  .switch input:checked{ background:var(--accent); border-color:var(--accent); }
+  .switch input::after{
+    content:""; position:absolute; top:3px; left:3px; width:18px; height:18px;
+    border-radius:50%; background:#fff; transition:transform .15s ease;
+  }
+  .switch input:checked::after{ transform:translateX(18px); }
+
+  .pill{padding:6px 10px; border:1px solid var(--border); border-radius:999px; background:var(--surface); font-weight:700;}
+  .muted{color:var(--muted); font-size:0.95em;}
+
+  .toolbar{
+    display:flex; align-items:center; gap:8px; justify-content:space-between;
+    margin:8px 0 14px; flex-wrap:wrap;
+  }
+
+  .card{
+    background:var(--surface); border:1px solid var(--border); border-radius:16px;
+    padding:12px 14px; box-shadow: 0 1px 0 rgba(0,0,0,.04);
+  }
+
+  .group-head{
+    display:flex; align-items:center; justify-content:space-between;
+    padding:6px 2px 8px; border-bottom:1px dashed var(--border); margin-bottom:8px;
+  }
+  .group-left{display:flex; align-items:center; gap:8px;}
+  .group-title{font-weight:700;}
+
+  .grid{display:grid; gap:12px;}
+
+  .row{
+    display:grid; grid-template-columns:auto 1fr auto; align-items:center;
+    gap:10px; padding:8px 6px; border-radius:10px;
+  }
+  .row:hover{ background:var(--accent-weak); }
+  .row .name{font-weight:600;}
+  .row .actions{display:flex; gap:6px;}
+
+  .chk{
+    width:22px; height:22px; border-radius:6px; border:2px solid var(--border);
+    display:inline-flex; align-items:center; justify-content:center; cursor:pointer;
+    background:transparent; transition:all .15s ease;
+  }
+  .chk[data-checked="true"]{ background:var(--check); border-color:var(--check); color:#fff; }
+
+  /* Dialogs */
+  dialog{
+    border:1px solid var(--border); border-radius:14px; padding:0;
+    background:var(--surface); color:var(--text);
+    width:min(760px, 96vw);
+  }
+  dialog::backdrop{ background: rgba(0,0,0,.25); }
+  .dlg-head{padding:14px 16px; border-bottom:1px solid var(--border); font-weight:700;}
+
+  .dlg-head-closable{display:flex; align-items:center; justify-content:space-between; gap:10px;}
+  .dlg-close{padding:6px 9px;}
+  .dlg-body{padding:12px 16px; display:grid; gap:10px;}
+  .dlg-row{display:grid; grid-template-columns:160px 1fr; gap:12px; align-items:center;}
+  .dlg-foot{padding:12px 16px; border-top:1px solid var(--border); display:flex; justify-content:flex-end; gap:8px;}
+
+  /* Theme Studio */
+  #themeDialog{ width:min(900px,96vw); }
+  .theme-grid{ display:grid; grid-template-columns: repeat(auto-fit, minmax(240px,1fr)); gap:10px; }
+  .theme-card{ display:grid; gap:8px; border:1px dashed var(--border); padding:10px; border-radius:12px; background:var(--surface); }
+  .theme-row{ display:grid; grid-template-columns: 1fr auto; gap:8px; align-items:center; }
+  .swatch{ width:28px; height:28px; border-radius:8px; border:1px solid var(--border); }
+  /* Admin lock */
+  .admin-locked{
+    opacity:0.55;
+    filter: grayscale(0.15);
+  }
+
+  /* Admin-only visibility */
+  body[data-admin="0"] .admin-only{ display:none !important; }
+
+  /* Lock icon (always visible) */
+  #adminLockIcon{
+    position: fixed;
+    right: 14px;
+    bottom: 14px;
+    z-index: 9999;
+    width: 36px;
+    height: 36px;
+    border-radius: 999px;
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    box-shadow: 0 6px 18px rgba(0,0,0,.18);
+    opacity: .78;
+  }
+  #adminLockIcon:hover{ opacity: .95; }
+  #adminLockIcon:active{ transform: translateY(1px); }
+
+
+  /* Color Picker */
+  #colorPickerDialog{ width:min(360px, 94vw); }
+  .cp-wrap{ display:grid; gap:10px; }
+  .cp-row{ display:flex; gap:10px; align-items:center; justify-content:space-between; flex-wrap:wrap; }
+  #cpSV{ touch-action:none; border:1px solid var(--border); border-radius:10px; }
+  #cpHue{ touch-action:none; border:1px solid var(--border); border-radius:10px; }
+  .cp-canvases{ display:grid; grid-template-columns: 1fr 26px; gap:10px; align-items:stretch; }
+  .cp-preview{ width:32px; height:32px; border-radius:10px; border:1px solid var(--border); }
+
+
+  /* Shift checklists gating */
+  #gateOverlay{
+    position:fixed; inset:0; z-index:50;
+    display:none;
+    background: rgba(0,0,0,.45);
+    backdrop-filter: blur(2px);
+    align-items:center; justify-content:center;
+    padding:16px;
+  }
+  #gateOverlay .gateCard{
+    width:min(560px, 96vw);
+    background:var(--surface);
+    border:1px solid var(--border);
+    border-radius:16px;
+    padding:16px;
+    box-shadow: 0 10px 30px rgba(0,0,0,.25);
+    display:grid; gap:10px;
+  }
+  #finishShiftBtn{
+    position:fixed;
+    right:16px;
+    bottom:16px;
+    z-index:20;
+    display:none;
+    border-radius:999px;
+    padding:10px 14px;
+    box-shadow: 0 10px 22px rgba(0,0,0,.20);
+  }
+
+  #completionBar{
+    margin-top: 12px;
+    display:none;
+  }
+  .completion-card{
+    background:var(--surface);
+    border:1px solid var(--border);
+    border-radius:16px;
+    padding:12px 14px;
+    box-shadow: 0 1px 0 rgba(0,0,0,.04);
+  }
+  .completion-actions{
+    display:flex;
+    gap:10px;
+    flex-wrap:wrap;
+  }
+  .completion-actions .btn{
+    flex:1;
+    min-width: 180px;
+    padding:12px 14px;
+    border-radius:14px;
+    font-weight:800;
+  }
+  .btn.gold-shimmer{
+    position:relative;
+    overflow:hidden;
+    background: linear-gradient(135deg, #d4af37, #ffe58a, #d4af37);
+    color:#1b1400;
+    border-color: color-mix(in srgb, #d4af37 70%, var(--border) 30%);
+  }
+  .btn.gold-shimmer::before{
+    content:"";
+    position:absolute;
+    inset:0;
+    background: repeating-linear-gradient(
+      120deg,
+      rgba(255,255,255,0) 0%,
+      rgba(255,255,255,0) 35%,
+      rgba(255,255,255,.55) 50%,
+      rgba(255,255,255,0) 65%,
+      rgba(255,255,255,0) 100%
+    );
+    background-size: 200% 100%;
+    animation: shimmerSweep 2.2s linear infinite;
+    pointer-events:none;
+    will-change: background-position;
+  }
+  @keyframes shimmerSweep{
+    0%{ background-position: 0% 0; }
+    100%{ background-position: 200% 0; }
+  }
+100%{ transform: translate3d(35%, 0, 0); }
+  }
+  #boredDialog .wheelBox{
+    position:relative;
+    border:1px solid var(--border);
+    border-radius:16px;
+    padding:16px 14px;
+    background: color-mix(in srgb, var(--surface) 92%, var(--accent-weak) 8%);
+    overflow:hidden;
+  }
+  #boredSpinText{
+    font-weight:900;
+    font-size: 20px;
+    letter-spacing:.2px;
+    text-align:center;
+    min-height: 28px;
+  }
+  #boredSpinner{
+    display:inline-block;
+    margin: 10px auto 0;
+    font-size: 22px;
+    transform-origin: 50% 50%;
+    animation: boredSpin 0.85s linear infinite;
+  }
+  @keyframes boredSpin{
+    from{ transform: rotate(0deg); }
+    to{ transform: rotate(360deg); }
+  }
+  #confettiCanvas{
+    position:fixed;
+    inset:0;
+    z-index: 60;
+    pointer-events:none;
+    display:none;
+  }
+  #shiftFinalBadge{
+    display:none;
+    position:fixed;
+    left:16px;
+    bottom:16px;
+    z-index:20;
+    padding:8px 12px;
+    border-radius:999px;
+    background:var(--surface);
+    border:1px solid var(--border);
+    box-shadow: 0 8px 18px rgba(0,0,0,.18);
+    font-weight:700;
+  }
+
+
+  /* Signature pads */
+  .sigCard{background:var(--surface); border:1px solid var(--border); border-radius:16px; padding:12px 14px; box-shadow:0 1px 0 rgba(0,0,0,.04);}
+  .sigHead{display:flex; align-items:center; justify-content:space-between; gap:10px; margin-bottom:10px;}
+  .sigTitle{font-weight:700;}
+  .sigGrid{display:flex; flex-direction:column; gap:12px;}
+  .sigPad{display:grid; gap:8px;}
+  .sigLabel{display:flex; align-items:center; justify-content:space-between; gap:10px;}
+  .sigName{font-weight:600;}
+  canvas.sigCanvas{width:100%; height:140px; border:1px solid var(--border); border-radius:12px; background:rgba(0,0,0,.02); touch-action:none;}
+  [data-theme="dark"] canvas.sigCanvas{ background:rgba(255,255,255,.04); }
+
+
+    .feedbackCard{ margin-bottom:12px; }
+  .feedbackRow{ display:flex; flex-wrap:wrap; gap:10px 12px; align-items:center; }
+  .fbOpt{ display:inline-flex; align-items:center; cursor:pointer; user-select:none; }
+  .fbOpt input{
+    position:absolute;
+    opacity:0;
+    pointer-events:none;
+  }
+  .fbOpt span{
+    display:inline-flex;
+    align-items:center;
+    justify-content:center;
+    padding:9px 12px;
+    border:1px solid var(--border);
+    border-radius:999px;
+    background:var(--surface);
+    box-shadow: 0 1px 0 rgba(0,0,0,.04);
+    font-weight:700;
+    transition: background .12s ease, border-color .12s ease, transform .04s ease, filter .12s ease;
+  }
+  .fbOpt:hover span{
+    border-color:var(--accent);
+    filter:brightness(1.02);
+  }
+  .fbOpt:active span{ transform: translateY(1px); }
+  .fbOpt input:focus-visible + span{
+    outline:2px solid var(--accent);
+    outline-offset:2px;
+  }
+  .fbOpt input:checked + span{
+    background:var(--accent);
+    border-color:transparent;
+    color:#fff;
+    box-shadow: 0 2px 0 rgba(0,0,0,.10);
+  }
+
+</style>
+</head>
+
+<body>
+
+  <button class="btn icon" id="adminLockIcon" type="button" title="Admin (Ctrl+Enter)">🔒</button>
+  <div id="peopleBar" aria-label="People">
+    <div class="muted" id="peopleLabel">Write your first name (s) here - </div>
+    <div class="peopleRow">
+      <div id="peopleInputs"></div>
+      <div id="shiftControls" class="shiftControls" aria-label="Shift">
+        <button class="btn" id="shiftOpen" type="button" title="Opening shift">Opening</button>
+        <button class="btn" id="shiftClose" type="button" title="Closing shift">Closing</button>
+      </div>
+    </div>
+  </div>
+
+
+  <div id="gateOverlay" aria-hidden="true">
+    <div class="gateCard">
+      <div style="font-weight:800; font-size:1.05em;">Opening checklist required</div>
+      <div class="muted">Enter your name above, then complete the opening checklist to unlock today’s tasks.</div>
+      <button class="btn primary" id="openGateBtn" type="button">Open Opening Checklist</button>
+    </div>
+  </div>
+
+  <button class="btn primary" id="finishShiftBtn" type="button" title="Finish shift (Closing checklist)">Finish Shift</button>
+  <div id="shiftFinalBadge">Shift finalized</div>
+
+  <dialog id="openingChecklistDialog">
+    <div class="dlg-head dlg-head-closable"><span>Opening Checklist</span><button class="btn icon dlg-close" id="openingChecklistClose" type="button" title="Close">✕</button></div>
+    <div class="dlg-body" id="openingChecklistBody"></div>
+    <div class="dlg-foot">
+      <button class="btn primary" id="openingChecklistSave">Unlock Tasks</button>
+    </div>
+  </dialog>
+
+  <dialog id="closingChecklistDialog">
+    <div class="dlg-head dlg-head-closable"><span>Closing Checklist</span><button class="btn icon dlg-close" id="closingChecklistClose" type="button" title="Close">✕</button></div>
+    <div class="dlg-body" id="closingChecklistBody"></div>
+    <div class="dlg-foot">
+      <button class="btn" id="closingChecklistCancel">Not yet</button>
+      <button class="btn primary" id="closingChecklistSave">Finalize Shift</button>
+    </div>
+  </dialog>
+
+  <dialog id="boredDialog">
+    <div class="dlg-head">Bored?</div>
+    <div class="dlg-body">
+      <div class="wheelBox">
+        <div class="muted" style="text-align:center;">Here's a random task from another day.</div>
+        <div id="boredSpinText">—</div>
+        <div style="text-align:center;"><span id="boredSpinner">⟳</span></div>
+      </div>
+    </div>
+    <div class="dlg-foot">
+      <button class="btn" id="boredCloseBtn">Close</button>
+      <button class="btn primary" id="boredAgainBtn">Spin again</button>
+    </div>
+  </dialog>
+
+  <canvas id="confettiCanvas"></canvas>
+
+  <!-- CHECKLIST TEMPLATE EDITOR (ADMIN ONLY) -->
+  <dialog id="checklistEditorDialog">
+    <div class="dlg-head" id="checklistEditorTitle">Checklist Editor</div>
+    <div class="dlg-body">
+      <div class="muted">Edits apply to future shifts. Existing shift history keeps its original checklist text.</div>
+      <div id="checklistEditorBody"></div>
+      <div style="display:flex; gap:8px; justify-content:flex-end; flex-wrap:wrap; padding-top:6px;">
+        <button class="btn" id="checklistEditorAdd" type="button">Add Item</button>
+      </div>
+    </div>
+    <div class="dlg-foot">
+      <button class="btn primary" id="checklistEditorClose" type="button">Close</button>
+    </div>
+  </dialog>
+
+
+
+
+  <div class="wrap">
+    <div class="topbar">
+      <div class="seg admin-only" id="dateNavSeg">
+        <button class="btn icon admin-only" id="prevDay" title="Previous day">◀</button>
+        <button class="btn admin-only" id="todayBtn" title="Jump to today">--/--/--</button>
+        <button class="btn icon admin-only" id="nextDay" title="Next day">▶</button>
+        <span class="pill" id="datePill" style="border-radius:10px; padding:8px 10px;">--/--/--</span>
+      </div>
+      
+
+
+<div class="title" id="dateTitle">Today</div>
+
+      <div class="spacer"></div>
+
+      <span class="pill" id="scoreHeader">0/0</span>
+
+      <div style="display:flex; align-items:center; gap:10px; flex-wrap:wrap;">
+        <div style="display:flex; align-items:center; gap:8px;">
+          <label class="muted">Category</label>
+          <select id="categoryFilter" class="select"></select>
+        </div>
+
+        <label class="switch" title="Dark mode">
+          <input type="checkbox" id="darkToggle" />
+          <span class="muted">Dark</span>
+        </label>
+
+        <button class="btn admin-only" id="themeBtn" title="Open Theme Studio">Theme</button>
+      </div>
+    </div>
+
+    <div class="toolbar">
+      <div style="display:flex; gap:8px; flex-wrap:wrap;">
+        <button class="btn primary admin-only" id="addTaskBtn">Add Task</button>
+        <button class="btn admin-only" id="editOpeningBtn" title="Edit Opening Checklist">Opening Checklist</button>
+        <button class="btn admin-only" id="editClosingBtn" title="Edit Closing Checklist">Closing Checklist</button>
+        <button class="btn admin-only" id="archiveBtn" title="Archived Tasks">Archived</button>
+        <button class="btn admin-only" id="resetDayBtn" title="Admin: Reset this shift (testing)">Reset Shift</button>
+      </div>
+      <div class="muted">Yes/No completion per day.</div>
+    </div>
+    <div id="feedbackCard" class="card feedbackCard">
+      <div class="group-head" style="padding-top:0; margin-top:0;">
+        <div class="group-left">
+          <div class="group-title">How did you receive Courtside?</div>
+        </div>
+      </div>
+      <div class="feedbackRow" role="radiogroup" aria-label="Courtside rating">
+        <label class="fbOpt"><input type="radio" name="cs_rating" value="Unacceptable"> <span>Unacceptable</span></label>
+        <label class="fbOpt"><input type="radio" name="cs_rating" value="Needs improvement"> <span>Needs improvement</span></label>
+        <label class="fbOpt"><input type="radio" name="cs_rating" value="No complaints"> <span>No complaints</span></label>
+        <label class="fbOpt"><input type="radio" name="cs_rating" value="Really Solid"> <span>Really Solid</span></label>
+        <label class="fbOpt"><input type="radio" name="cs_rating" value="Excellent"> <span>Excellent</span></label>
+      </div>
+      <textarea id="feedbackComment" class="input" rows="3" placeholder="Comment (optional)..." style="width:100%; margin-top:10px; resize:vertical;"></textarea>
+    </div>
+
+    <div id="listRoot" class="grid"></div>
+
+    <div id="completionBar"></div>
+
+    <div id="signatureRoot" class="grid" style="margin-top:12px;"></div>
+
+  <!-- Archived Tasks (admin) -->
+  <dialog id="archiveDialog">
+    <div class="dlg-head">Archived Tasks</div>
+    <div class="dlg-body" id="archiveBody"></div>
+    <div class="dlg-foot">
+      <button class="btn primary" id="archiveClose">Close</button>
+    </div>
+  </dialog>
+
+  </div>
+
+  <!-- Task dialog -->
+  <dialog id="taskDialog">
+    <div class="dlg-head" id="taskDialogTitle">Add Task</div>
+    <div class="dlg-body">
+      <div class="dlg-row">
+        <label for="taskName">Name</label>
+        <input id="taskName" class="input" type="text" placeholder="e.g., Film study" />
+      </div>
+      <div class="dlg-row">
+        <label for="taskCategory">Category</label>
+        <input list="catList" id="taskCategory" class="input" placeholder="e.g., Offense" />
+        <datalist id="catList"></datalist>
+      </div>
+      <div class="muted">Edits apply from <b>today</b> forward (past days keep their old task labels).</div>
+    </div>
+    <div class="dlg-foot">
+      <button class="btn" id="cancelTaskBtn">Cancel</button>
+      <button class="btn primary" id="saveTaskBtn">Save</button>
+    </div>
+  </dialog>
+
+  <!-- Pick Task dialog -->
+  <dialog id="pickDialog">
+    <div class="dlg-head" id="pickDialogTitle">Select Task</div>
+    <div class="dlg-body" id="pickBody"></div>
+    <div class="dlg-foot">
+      <button class="btn" id="cancelPickBtn">Cancel</button>
+    </div>
+  </dialog>
+
+  <!-- THEME STUDIO -->
+  <dialog id="themeDialog">
+    <div class="dlg-head">Theme Studio</div>
+    <div class="dlg-body">
+      <div class="toolbar" style="margin-top:0;">
+        <div style="display:flex; gap:10px; align-items:center; flex-wrap:wrap;">
+          <div class="seg">
+            <button class="btn" id="themeModeLight">Light</button>
+            <button class="btn" id="themeModeDark">Dark</button>
+          </div>
+          <span class="muted">Editing mode:</span>
+          <span class="pill" id="themeModeLabel">Light</span>
+        </div>
+
+        <div style="display:flex; gap:8px; align-items:center; flex-wrap:wrap;">
+          <input id="themePresetName" class="input" type="text" placeholder="Preset name" style="min-width:180px;">
+          <button class="btn" id="themeSavePreset">Save Preset</button>
+          <select id="themePresetSelect" class="select" style="min-width:180px;"></select>
+          <button class="btn" id="themeLoadPreset">Load</button>
+        </div>
+      </div>
+
+      <div class="theme-grid">
+        <div class="theme-card">
+          <div class="group-head"><div class="group-title">Palette</div></div>
+          <div id="themeGlobal"></div>
+        </div>
+
+        <div class="theme-card">
+          <div class="group-head"><div class="group-title">Quick Actions</div></div>
+          <div class="muted">These apply instantly (stored in localStorage).</div>
+          <div style="display:flex; gap:8px; flex-wrap:wrap;">
+            <button class="btn" id="themeCopyToOther">Copy to Other Mode</button>
+            <button class="btn" id="themeResetMode">Reset Mode</button>
+          </div>
+        </div>
+      </div>
+    </div>
+    <div class="dlg-foot">
+      <button class="btn primary" id="themeClose">Close</button>
+    </div>
+  </dialog>
+
+
+  <!-- ADMIN PIN -->
+  <dialog id="adminDialog">
+    <div class="dlg-head">Admin Controls</div>
+    <div class="dlg-body">
+      <div class="muted">Enter 4-digit PIN to unlock admin controls.</div>
+      <div class="dlg-row">
+        <label for="adminPin">PIN</label>
+        <input id="adminPin" class="input" type="password" inputmode="numeric" pattern="\d{4}" maxlength="4" placeholder="••••" autocomplete="off" />
+      </div>
+      <div class="muted" id="adminPinHint" style="display:none;">Incorrect PIN.</div>
+    </div>
+    <div class="dlg-foot">
+      <button class="btn" id="adminCancel">Cancel</button>
+      <button class="btn primary" id="adminUnlock">Unlock</button>
+    </div>
+  </dialog>
+
+
+  <!-- COLOR PICKER -->
+  <dialog id="colorPickerDialog">
+    <div class="dlg-head">Pick a color</div>
+    <div class="dlg-body">
+      <div class="cp-wrap">
+        <div class="cp-canvases">
+          <canvas id="cpSV" width="260" height="180" aria-label="Saturation and brightness picker"></canvas>
+          <canvas id="cpHue" width="26" height="180" aria-label="Hue picker"></canvas>
+        </div>
+        <div class="cp-row">
+          <div style="display:flex; align-items:center; gap:10px;">
+            <div class="cp-preview" id="cpPreview"></div>
+            <div class="muted" id="cpVarLabel">--</div>
+          </div>
+          <input id="cpHex" class="input" type="text" placeholder="#RRGGBB" style="width:120px;">
+        </div>
+        <div class="muted">Drag in the large square for saturation/brightness. Drag the thin bar for hue.</div>
+      </div>
+    </div>
+    <div class="dlg-foot">
+      <button class="btn" id="cpCancel">Cancel</button>
+      <button class="btn primary" id="cpApply">Apply</button>
+    </div>
+  </dialog>
+
+<script>
+/* ===================== Storage ===================== */
+const STORAGE_KEY = "courtside_tasks_state_v1";
+
+function defaultState(){
+  return {
+    peopleByKey: {},
+    checklistsByKey: {},
+    finalizedByKey: {},
+    signaturesByKey: {},
+    tasks: [],          // [{id, weekdays:[0-6], shifts:[opening|closing], revisions:[{effective,name,category}]}]
+    logs: {},           // logs[dateISO|shift][taskId] = {completed:boolean, ts:string}
+    prefs: { darkMode:false },
+    theme: { light:{}, dark:{} },     // CSS var map
+    themePresets: {} ,                 // name -> {light:{}, dark:{}}
+  };
+}
+function loadState(){
+  try{
+    const raw = localStorage.getItem(STORAGE_KEY);
+    if(!raw) return defaultState();
+    const s = JSON.parse(raw);
+    s.tasks ??= [];
+    s.peopleByDate ??= {};
+    // Migration: if old global people list exists, store it on today's date
+    if(Array.isArray(s.people)){
+      const todayISO = new Date().toISOString().slice(0,10);
+      const cleaned = s.people.map(x=>String(x||"").trim());
+      if(cleaned.some(x=>x)) s.peopleByDate[todayISO] = cleaned;
+    }
+    delete s.people;
+    if(typeof s.peopleByDate !== "object" || s.peopleByDate === null) s.peopleByDate = {};
+    // Migration: older saves had tasks without weekdays; treat them as 'every day'
+    for(const t of s.tasks){
+      if(!Array.isArray(t.weekdays) || !t.weekdays.length){
+        t.weekdays = [0,1,2,3,4,5,6];
+      }
+      // normalize
+      t.weekdays = Array.from(new Set(t.weekdays.map(n=>Number(n)).filter(n=>Number.isFinite(n) && n>=0 && n<=6))).sort((a,b)=>a-b);
+      if(!Array.isArray(t.shifts) || !t.shifts.length){
+        t.shifts = ["opening"];
+      }
+      t.shifts = Array.from(new Set(t.shifts.map(s=>String(s).toLowerCase()).filter(s=>s==="opening"||s==="closing"))).sort();
+      if(typeof t.order !== "number" || !Number.isFinite(t.order)){
+        t.order = null;
+      }
+    }
+// Assign missing task.order values deterministically (stable across loads)
+let __ord = 1;
+const __sorted = [...s.tasks].sort((a,b)=>{
+  const an = (((a.revisions||[]).slice(-1)[0]||{}).name||"").toLowerCase();
+  const bn = (((b.revisions||[]).slice(-1)[0]||{}).name||"").toLowerCase();
+  return an.localeCompare(bn) || (a.id-b.id);
+});
+for(const t of __sorted){
+  if(t.order == null){
+    t.order = __ord++;
+  }else{
+    __ord = Math.max(__ord, Math.floor(t.order)+1);
+  }
+}
+    s.logs ??= {};
+    s.feedback ??= {};
+    s.prefs ??= {darkMode:false};
+    if(!s.prefs.shift) s.prefs.shift = "opening";
+    s.theme ??= {light:{}, dark:{}};
+    s.themePresets ??= {};
+    s.archivedTasks ??= [];
+    // People: migrate old per-date names into opening shift if needed
+    s.peopleByKey ??= {};
+    s.checklistsByKey ??= {};
+    s.finalizedByKey ??= {};
+    s.signaturesByKey ??= {};
+    if(s.peopleByDate && typeof s.peopleByDate === "object"){
+      for(const [d, arr] of Object.entries(s.peopleByDate)){
+        const k = `${d}|opening`;
+        if(!Array.isArray(s.peopleByKey[k]) || !s.peopleByKey[k].length){
+          s.peopleByKey[k] = Array.isArray(arr) ? arr : [""];
+        }
+      }
+      delete s.peopleByDate;
+    }
+    return s;
+  }catch(_e){
+    return defaultState();
+  }
+}
+let state = loadState();
+function saveState(){
+  localStorage.setItem(STORAGE_KEY, JSON.stringify(state));
+}
+
+/* ===================== Dates ===================== */
+function today(){ return new Date(); }
+function startOfDay(d){ const x=new Date(d); x.setHours(0,0,0,0); return x; }
+function addDays(d,n){ const x=new Date(d); x.setDate(x.getDate()+n); return x; }
+function toISODate(d){
+  const y=d.getFullYear(), m=String(d.getMonth()+1).padStart(2,"0"), dd=String(d.getDate()).padStart(2,"0");
+  return `${y}-${m}-${dd}`;
+}
+
+function weekdayIndexFromISO(dateISO){
+  // dateISO: YYYY-MM-DD
+  return new Date(dateISO + "T00:00:00").getDay();
+}
+function fmtMMDDYY(d){
+  const mm=String(d.getMonth()+1).padStart(2,"0"), dd=String(d.getDate()).padStart(2,"0"), yy=String(d.getFullYear()).slice(-2);
+  return `${mm}/${dd}/${yy}`;
+}
+function headerDateLabel(d){
+  const t0 = startOfDay(today());
+  const d0 = startOfDay(d);
+  const diff = Math.round((d0 - t0) / 86400000);
+
+  let base;
+  if (diff === 0) base = "Today";
+  else if (diff === -1) base = "Yesterday";
+  else if (diff === 1) base = "Tomorrow";
+  else base = fmtMMDDYY(d);
+
+  const weekdays = ["Sunday","Monday","Tuesday","Wednesday","Thursday","Friday","Saturday"];
+  const wd = weekdays[d0.getDay()] || "";
+  const shiftLabel = (curShift === "closing") ? "Closing" : "Opening";
+
+  return `${base}, ${wd}, ${shiftLabel}`;
+}
+
+/* ===================== DOM ===================== */
+const $  = (sel, root=document) => root.querySelector(sel);
+const $$ = (sel, root=document) => Array.from(root.querySelectorAll(sel));
+const listRoot       = $("#listRoot");
+const dateTitle      = $("#dateTitle");
+const todayBtn       = $("#todayBtn");
+const categoryFilter = $("#categoryFilter");
+const scoreHeader    = $("#scoreHeader");
+
+const feedbackCard   = $("#feedbackCard");
+const feedbackComment= $("#feedbackComment");
+const feedbackRadios = Array.from(document.querySelectorAll('input[name="cs_rating"]'));
+
+function getFeedback(){
+  const key = dayKey(toISODate(curDate));
+  return state.feedback?.[key] || { rating:"", comment:"" };
+}
+function setFeedback(next){
+  const key = dayKey(toISODate(curDate));
+  state.feedback[key] = { rating: next.rating || "", comment: next.comment || "", ts: new Date().toISOString() };
+  saveState();
+}
+function refreshFeedbackUI(){
+  if(!feedbackCard) return;
+  const fb = getFeedback();
+  for(const r of feedbackRadios){
+    r.checked = (r.value === (fb.rating || ""));
+  }
+  if(feedbackComment){
+    feedbackComment.value = fb.comment || "";
+  }
+}
+
+function wireFeedbackUI(){
+  if(!feedbackCard) return;
+  for(const r of feedbackRadios){
+    r.addEventListener("change", ()=>{
+      const fb = getFeedback();
+      setFeedback({ rating: r.value, comment: fb.comment || "" });
+    });
+  }
+  if(feedbackComment){
+    feedbackComment.addEventListener("input", ()=>{
+      const fb = getFeedback();
+      setFeedback({ rating: fb.rating || "", comment: feedbackComment.value });
+    });
+  }
+}
+const darkToggle     = $("#darkToggle");
+const shiftOpen     = $("#shiftOpen");
+const shiftClose    = $("#shiftClose");
+
+function applyShiftUI(){
+  if(shiftOpen) shiftOpen.classList.toggle("active", curShift==="opening");
+  if(shiftClose) shiftClose.classList.toggle("active", curShift==="closing");
+}
+function setShift(next){
+  next = String(next||"").toLowerCase();
+  if(next!=="opening" && next!=="closing") return;
+  curShift = next;
+  state.prefs.shift = next;
+  saveState();
+  applyShiftUI();
+  refreshCategoryFilter();
+  renderPeopleInputs();
+  render();
+  renderSignaturePads();
+}
+function suggestedShiftFromClock(){
+  const h = new Date().getHours();
+  return (h >= 16) ? "closing" : "opening";
+}
+
+
+
+/* ===================== Admin Lock ===================== */
+const ADMIN_PIN = "3434";
+let adminUnlocked = false;
+
+const ADMIN_CONTROL_IDS = [
+  "prevDay","nextDay","todayBtn",
+  "addTaskBtn",
+  "themeBtn","editOpeningBtn","editClosingBtn","archiveBtn","resetDayBtn"
+];
+
+function setAdminLockedUI(){
+  document.body.setAttribute("data-admin", adminUnlocked ? "1" : "0");
+
+  // Toggle legacy styling (kept for safety)
+  for(const id of ADMIN_CONTROL_IDS){
+    const el = document.getElementById(id);
+    if(!el) continue;
+    if(adminUnlocked) el.classList.remove("admin-locked");
+    else el.classList.add("admin-locked");
+  }
+
+  const lockBtn = document.getElementById("adminLockIcon");
+  if(lockBtn){
+    lockBtn.textContent = adminUnlocked ? "🔓" : "🔒";
+    lockBtn.title = adminUnlocked ? "Admin unlocked (Ctrl+Enter)" : "Admin locked (Ctrl+Enter)";
+  }
+
+  // date pill when locked
+  const dp = document.getElementById("datePill");
+  if(dp){
+    dp.style.display = adminUnlocked ? "none" : "inline-flex";
+  }
+}
+
+const adminDialog = $("#adminDialog");
+const adminPin = $("#adminPin");
+const adminPinHint = $("#adminPinHint");
+const adminCancel = $("#adminCancel");
+const adminUnlock = $("#adminUnlock");
+
+function openAdminDialog(){
+  if(!adminDialog) return;
+  adminPinHint.style.display = "none";
+  adminPin.value = "";
+  adminDialog.showModal();
+  setTimeout(()=> adminPin.focus(), 30);
+}
+
+function tryUnlockAdmin(){
+  const val = (adminPin.value || "").trim();
+  if(val === ADMIN_PIN){
+    adminUnlocked = true;
+    setAdminLockedUI();
+    // Ensure UI updates immediately when unlocking
+    applyShiftUI();
+    refreshCategoryFilter();
+    renderPeopleInputs();
+    render();
+    adminDialog.close();
+    return true;
+  }
+  adminPinHint.style.display = "block";
+  adminPin.select();
+  return false;
+}
+
+adminCancel?.addEventListener("click", ()=> adminDialog.close());
+adminUnlock?.addEventListener("click", ()=> tryUnlockAdmin());
+
+document.getElementById("adminLockIcon")?.addEventListener("click", ()=>{
+  if(adminUnlocked){ adminUnlocked = false; setAdminLockedUI(); syncGatesAndLocks(); curDate = today(); refreshCategoryFilter(); renderPeopleInputs(); render(); return; }
+  openAdminDialog();
+});
+adminPin?.addEventListener("keydown", (e)=>{
+  if(e.key === "Enter"){
+    e.preventDefault();
+    tryUnlockAdmin();
+  }
+});
+
+document.addEventListener("keydown", (e)=>{
+  if(e.ctrlKey && (e.key === "Enter" || e.code === "Enter")){
+    e.preventDefault();
+    if(adminUnlocked){ adminUnlocked = false; setAdminLockedUI(); syncGatesAndLocks(); curDate = today(); refreshCategoryFilter(); renderPeopleInputs(); render(); return; }
+    openAdminDialog();
+  }
+});
+
+
+
+/* ===================== People ===================== */
+function ensurePeopleForKey(key){
+  state.peopleByKey ??= {};
+  if(typeof state.peopleByKey !== "object" || state.peopleByKey === null) state.peopleByKey = {};
+  if(!Array.isArray(state.peopleByKey[key]) || !state.peopleByKey[key].length){
+    state.peopleByKey[key] = [""];
+  }
+}
+function getPeopleForDate(dateISO){
+  const key = dayKey(dateISO);
+  ensurePeopleForKey(key);
+  return state.peopleByKey[key];
+}
+function renderPeopleInputs(){
+  const dateISO = toISODate(curDate);
+  const k = dayKey(dateISO);
+  const locked = false; // names are always editable
+  const people = getPeopleForDate(dateISO);
+
+  const wrap = $("#peopleInputs");
+  if(!wrap) return;
+  wrap.innerHTML = "";
+
+  people.forEach((val, idx)=>{
+    const row = document.createElement("div");
+    row.className = "personRow";
+
+    const inp = document.createElement("input");
+    inp.type = "text";
+    inp.className = "input personInput";
+    inp.placeholder = "Name";
+    inp.disabled = !!locked;
+    inp.value = val || "";
+
+    inp.addEventListener("input", ()=>{
+      if(locked) return;
+      people[idx] = inp.value;
+      saveState();
+      // If the Opening checklist dialog is open, keep its inline name field synced (first slot only)
+      if(idx === 0){
+        const inline = document.getElementById("openingNameInline");
+        if(inline && inline !== document.activeElement){
+          inline.value = inp.value;
+        }
+      }
+    });
+
+    inp.addEventListener("keydown", (e)=>{
+      if(locked) return;
+      if(e.key !== "Enter") return;
+      e.preventDefault();
+
+      const inputs = Array.from(document.querySelectorAll("#peopleInputs input"));
+      if(idx < inputs.length - 1){
+        inputs[idx + 1].focus();
+        return;
+      }
+      // Last input: create a new one
+      people.push("");
+      saveState();
+      renderPeopleInputs();
+      const nextInputs = Array.from(document.querySelectorAll("#peopleInputs input"));
+      if(nextInputs.length) nextInputs[nextInputs.length - 1].focus();
+    });
+
+    row.appendChild(inp);
+
+    if(idx > 0){
+      const rm = document.createElement("button");
+      rm.className = "btn icon personRemove";
+      rm.type = "button";
+      rm.title = "Remove";
+      rm.textContent = "×";
+      rm.style.display = (locked ? "none" : "");
+      rm.addEventListener("click", ()=>{
+        people.splice(idx, 1);
+        if(!people.length) people.push("");
+        saveState();
+        renderPeopleInputs();
+      });
+      row.appendChild(rm);
+    }
+
+    wrap.appendChild(row);
+  });
+
+  // Add button inline next to inputs
+  const add = document.createElement("button");
+  add.className = "btn icon";
+  add.type = "button";
+  add.id = "addPersonBtn";
+  add.title = "Add person";
+  add.textContent = "＋";
+  add.addEventListener("click", ()=>{
+    people.push("");
+    saveState();
+    renderPeopleInputs();
+    const ins = document.querySelectorAll("#peopleInputs input");
+    if(ins.length) ins[ins.length-1].focus();
+  });
+  add.style.display = "";
+  wrap.appendChild(add);
+  
+  renderSignaturePads();
+}
+
+
+/* ===================== Signatures ===================== */
+function ensureSignaturesForKey(key){
+  state.signaturesByKey ??= {};
+  if(typeof state.signaturesByKey !== "object" || state.signaturesByKey === null) state.signaturesByKey = {};
+  if(!Array.isArray(state.signaturesByKey[key])) state.signaturesByKey[key] = [];
+}
+function getSignaturesForDate(dateISO){
+  const key = dayKey(dateISO);
+  ensureSignaturesForKey(key);
+  return state.signaturesByKey[key];
+}
+function resizeSignatureCanvas(canvas){
+  const dpr = window.devicePixelRatio || 1;
+  const rect = canvas.getBoundingClientRect();
+  const w = Math.max(1, Math.floor(rect.width * dpr));
+  const h = Math.max(1, Math.floor(rect.height * dpr));
+  if(canvas.width !== w || canvas.height !== h){
+    const ctx = canvas.getContext("2d");
+    // preserve existing drawing
+    const prev = document.createElement("canvas");
+    prev.width = canvas.width; prev.height = canvas.height;
+    prev.getContext("2d").drawImage(canvas,0,0);
+    canvas.width = w; canvas.height = h;
+    ctx.scale(dpr, dpr);
+    // redraw previous at CSS pixels
+    ctx.setTransform(dpr,0,0,dpr,0,0);
+    if(prev.width && prev.height) ctx.drawImage(prev, 0, 0, prev.width/dpr, prev.height/dpr);
+  }else{
+    const ctx = canvas.getContext("2d");
+    ctx.setTransform(dpr,0,0,dpr,0,0);
+  }
+}
+function loadSignatureToCanvas(canvas, dataURL){
+  if(!dataURL) return;
+  const img = new Image();
+  img.onload = ()=> {
+    const dpr = window.devicePixelRatio || 1;
+    const ctx = canvas.getContext("2d");
+    ctx.setTransform(dpr,0,0,dpr,0,0);
+    ctx.clearRect(0,0,canvas.width/dpr,canvas.height/dpr);
+    ctx.drawImage(img, 0, 0, canvas.width/dpr, canvas.height/dpr);
+  };
+  img.src = dataURL;
+}
+function attachSignatureDrawing(canvas, onChange, disabled){
+  const ctx = canvas.getContext("2d");
+  ctx.lineWidth = 2.2;
+  ctx.lineCap = "round";
+  ctx.lineJoin = "round";
+  ctx.strokeStyle = getComputedStyle(document.documentElement).getPropertyValue("--text").trim() || "#111";
+
+  let drawing = false;
+  let last = null;
+
+  function ptFromEvent(e){
+    const rect = canvas.getBoundingClientRect();
+    return { x: e.clientX - rect.left, y: e.clientY - rect.top };
+  }
+
+  function start(e){
+    if(disabled) return;
+    drawing = true;
+    last = ptFromEvent(e);
+    try{ canvas.setPointerCapture(e.pointerId); }catch(_){}
+  }
+  function move(e){
+    if(!drawing || disabled) return;
+    const p = ptFromEvent(e);
+    ctx.beginPath();
+    ctx.moveTo(last.x, last.y);
+    ctx.lineTo(p.x, p.y);
+    ctx.stroke();
+    last = p;
+    onChange();
+  }
+  function end(e){
+    if(!drawing) return;
+    drawing = false;
+    last = null;
+    try{ canvas.releasePointerCapture(e.pointerId); }catch(_){}
+    onChange(true);
+  }
+
+  canvas.onpointerdown = start;
+  canvas.onpointermove = move;
+  canvas.onpointerup = end;
+  canvas.onpointercancel = end;
+  canvas.onpointerleave = (e)=>{ if(drawing) end(e); };
+}
+
+function renderSignaturePads(){
+  const dateISO = toISODate(curDate);
+  const locked = false; // signatures are always editable
+  const people = getPeopleForDate(dateISO);
+  const sigs = getSignaturesForDate(dateISO);
+
+  // Keep signatures array aligned with people length (but never reorder existing)
+  while(sigs.length < people.length) sigs.push({ name:"", dataURL:"" });
+  if(sigs.length > people.length) sigs.length = people.length;
+  for(let i=0;i<people.length;i++){
+    sigs[i].name = people[i] || "";
+  }
+  saveState();
+
+  const root = document.getElementById("signatureRoot");
+  if(!root) return;
+
+  // Create the container once; avoid rebuilding existing canvases (prevents wiping signatures)
+  let card = root.querySelector(".sigCard");
+  if(!card){
+    card = document.createElement("div");
+    card.className = "sigCard";
+
+    const head = document.createElement("div");
+    head.className = "sigHead";
+    head.appendChild(Object.assign(document.createElement("div"), { className:"sigTitle", textContent:"Signatures" }));
+    head.appendChild(Object.assign(document.createElement("div"), { className:"muted", textContent: locked ? "Locked" : "Draw with mouse or touch" }));
+    card.appendChild(head);
+
+    const grid = document.createElement("div");
+    grid.className = "sigGrid";
+    grid.id = "sigGrid";
+    card.appendChild(grid);
+
+    root.appendChild(card);
+  }else{
+    // Update hint text
+    const hint = card.querySelector(".sigHead .muted");
+    if(hint) hint.textContent = locked ? "Locked" : "Draw with mouse or touch";
+  }
+
+  const grid = card.querySelector("#sigGrid") || card.querySelector(".sigGrid");
+  if(!grid) return;
+
+  // Helper: build one pad
+  function buildPad(idx){
+    const pad = document.createElement("div");
+    pad.className = "sigPad";
+    pad.dataset.sigIdx = String(idx);
+
+    const label = document.createElement("div");
+    label.className = "sigLabel";
+
+    const nameEl = document.createElement("div");
+    nameEl.className = "sigName";
+    nameEl.textContent = (String(people[idx]||"").trim() ? String(people[idx]).trim() : `Signature ${idx+1}`);
+
+    const actions = document.createElement("div");
+    actions.style.display = "flex";
+    actions.style.gap = "8px";
+    actions.style.alignItems = "center";
+
+    const clearBtn = document.createElement("button");
+    clearBtn.className = "btn";
+    clearBtn.type = "button";
+    clearBtn.textContent = "Clear";
+    clearBtn.style.padding = "6px 10px";
+    clearBtn.style.display = locked ? "none" : "";
+    clearBtn.addEventListener("click", ()=>{
+      const canvas = pad.querySelector("canvas");
+      if(!canvas) return;
+      const dpr = window.devicePixelRatio || 1;
+      const ctx = canvas.getContext("2d");
+      ctx.setTransform(dpr,0,0,dpr,0,0);
+      ctx.clearRect(0,0,canvas.width/dpr,canvas.height/dpr);
+      sigs[idx].dataURL = "";
+      saveState();
+    });
+
+    actions.appendChild(clearBtn);
+    label.appendChild(nameEl);
+    label.appendChild(actions);
+
+    const canvas = document.createElement("canvas");
+    canvas.className = "sigCanvas";
+    canvas.width = 600; canvas.height = 280; // will be resized
+
+    pad.appendChild(label);
+    pad.appendChild(canvas);
+
+    // Persist drawing: save at end and also periodically (so adding a name never wipes an "unsaved" sig)
+    let saveTimer = null;
+    const persist = (final=false)=>{
+      if(final){
+        if(saveTimer){ clearTimeout(saveTimer); saveTimer = null; }
+        try{
+          sigs[idx].dataURL = canvas.toDataURL("image/png");
+          saveState();
+        }catch(_){}
+        return;
+      }
+      if(saveTimer) return;
+      saveTimer = setTimeout(()=>{
+        saveTimer = null;
+        try{
+          sigs[idx].dataURL = canvas.toDataURL("image/png");
+          saveState();
+        }catch(_){}
+      }, 350);
+    };
+
+    requestAnimationFrame(()=>{
+      resizeSignatureCanvas(canvas);
+      const existing = sigs[idx]?.dataURL;
+      if(existing) loadSignatureToCanvas(canvas, existing);
+      attachSignatureDrawing(canvas, (final)=>persist(!!final), locked);
+    });
+
+    return pad;
+  }
+
+  // Update/create pads without touching existing canvases
+  const existingPads = Array.from(grid.querySelectorAll(".sigPad"));
+  const padByIdx = new Map(existingPads.map(p=>[Number(p.dataset.sigIdx), p]));
+
+  // Ensure pads 0..people.length-1 exist (append new pads at bottom)
+  for(let i=0;i<people.length;i++){
+    let pad = padByIdx.get(i);
+    if(!pad){
+      pad = buildPad(i);
+      grid.appendChild(pad);
+      padByIdx.set(i, pad);
+    }else{
+      // Update label name & clear button visibility
+      const nameEl = pad.querySelector(".sigName");
+      if(nameEl){
+        nameEl.textContent = (String(people[i]||"").trim() ? String(people[i]).trim() : `Signature ${i+1}`);
+      }
+      const clearBtn = pad.querySelector("button");
+      if(clearBtn) clearBtn.style.display = locked ? "none" : "";
+      // Keep existing canvas content; if it was never loaded but we have dataURL, load it once
+      const canvas = pad.querySelector("canvas");
+      if(canvas && sigs[i]?.dataURL && !canvas.dataset.sigLoaded){
+        canvas.dataset.sigLoaded = "1";
+        requestAnimationFrame(()=>{ resizeSignatureCanvas(canvas); loadSignatureToCanvas(canvas, sigs[i].dataURL); });
+      }
+    }
+  }
+
+  // Remove extra pads if people count shrank (from the bottom only)
+  for(const pad of existingPads){
+    const idx = Number(pad.dataset.sigIdx);
+    if(idx >= people.length){
+      pad.remove();
+    }
+  }
+}
+
+
+/* ===================== Revisions ===================== */
+function getRevisionForDate(task, dateISO){
+  const revs = task.revisions || [];
+  let pick = revs[0] || null;
+  for(const r of revs){
+    if(r.effective <= dateISO && (!pick || r.effective >= pick.effective)) pick = r;
+  }
+  return pick || { name:"(unnamed)", category:"-", effective:"0001-01-01" };
+}
+function latestRevision(task){
+  const revs = task.revisions || [];
+  if(!revs.length) return null;
+  return revs.reduce((a,b)=> a.effective >= b.effective ? a : b);
+}
+function taskAppliesOnISO(task, dateISO){
+  const wd = weekdayIndexFromISO(dateISO);
+  const okDay = Array.isArray(task.weekdays) && task.weekdays.includes(wd);
+  const shifts = Array.isArray(task.shifts) ? task.shifts : ["opening"];
+  const okShift = shifts.includes(curShift);
+  return okDay && okShift;
+}
+function categoriesForDate(dateISO){
+  const set = new Set();
+  for(const t of state.tasks){
+    if(!taskAppliesOnISO(t, dateISO)) continue;
+    const r = getRevisionForDate(t, dateISO);
+    set.add((r.category || "-").trim() || "-");
+  }
+  return Array.from(set).sort((a,b)=>a.localeCompare(b));
+}
+
+/* ===================== Logs ===================== */
+function getStatus(dateISO, taskId){
+  const k = dayKey(dateISO);
+  return !!(state.logs?.[k]?.[String(taskId)]?.completed);
+}
+function setStatus(dateISO, taskId, completed){
+  const k = dayKey(dateISO);
+  if(isShiftFinalized(k) && !adminUnlocked) return;
+  if(curShift === "opening" && !checklistCompleteFor(k, "opening") && !adminUnlocked) return;
+  state.logs[k] ??= {};
+  const prev = state.logs[k][String(taskId)] || {};
+  state.logs[k][String(taskId)] = { ...prev, completed: !!completed, ts: new Date().toISOString() };
+  saveState();
+}
+
+
+// Reorder tasks within the current view (same category, same day+shift)
+function moveTask(taskId, dir){
+  if(!adminUnlocked) return;
+  const dateISO = toISODate(curDate);
+  const t = state.tasks.find(x=>x.id===taskId);
+  if(!t) return;
+
+  // Determine this task's category for this date
+  const thisRev = getRevisionForDate(t, dateISO);
+  const cat = ((thisRev.category||"-").trim()||"-");
+
+  // Build ordered list of tasks in same category that are visible on this date
+  const items = state.tasks
+    .filter(x=>taskAppliesOnISO(x, dateISO))
+    .map(x=>({task:x, rev:getRevisionForDate(x, dateISO)}))
+    .filter(x=>(((x.rev.category||"-").trim()||"-")===cat))
+    .sort((a,b)=>{
+      const ao = (typeof a.task.order==="number" && Number.isFinite(a.task.order)) ? a.task.order : 0;
+      const bo = (typeof b.task.order==="number" && Number.isFinite(b.task.order)) ? b.task.order : 0;
+      return (ao-bo) || a.rev.name.localeCompare(b.rev.name) || (a.task.id-b.task.id);
+    });
+
+  const idx = items.findIndex(x=>x.task.id===taskId);
+  if(idx<0) return;
+  const j = idx + (dir<0 ? -1 : 1);
+  if(j<0 || j>=items.length) return;
+
+  const a = items[idx].task;
+  const b = items[j].task;
+
+  const ao = (typeof a.order==="number" && Number.isFinite(a.order)) ? a.order : idx+1;
+  const bo = (typeof b.order==="number" && Number.isFinite(b.order)) ? b.order : j+1;
+
+  a.order = bo;
+  b.order = ao;
+
+  saveState();
+  render();
+}
+/* ===================== UI ===================== */
+let curDate = today();
+let curShift = (state.prefs && state.prefs.shift) ? state.prefs.shift : "opening";
+
+function dayKey(dateISO){
+  return `${dateISO}|${curShift}`;
+}
+
+
+const OPENING_CHECKLIST = [
+  "Rinse dishwasher filter and turn on dishwasher",
+  "Brew regular coffee, decaf if needed",
+  "Turn on computer and log into CA",
+  "Restock: Refreshers and puree’s",
+  "Restock: BOTH ice bin’s",
+  "Restock: Grab n’ go",
+  "Restock: Cups, lids, straws, almond milk",
+  "Restock: Alcohol fridges",
+  "Unlock bar fridges, turn on light (Unlock taps at 11)",
+  "Put on puree sprouts and wash covers",
+  "Put out scoops, PB/AB scoops",
+  "Wipe down and put out menu cards",
+  "Organize grab n’ go and remove cover",
+  "Turn on tv’s and menu display screens"
+];
+
+const CLOSING_CHECKLIST = [
+  "Stock up halfway or more: Powders, Fruit, Puree’s, Grab n’ go",
+  "Lock taps, wine, and fridges",
+  "Put metal beer grate in the dishwasher, spray and wipe down drainage tray underneath",
+  "Turn off tv’s",
+  "Cover puree’s, rinse and run spouts through the dishwasher",
+  "Wash scoops, blenders, lids",
+  "Scrub sinks down, no shake should be in them",
+  "Wipe down underneath all powders and supplements; all surfaces and blenders spotless",
+  "Soak soda gun in soda water",
+  "Turn off blenders",
+  "Dump and rinse coffee’s",
+  "Drain ice, close and lock ice bin",
+  "Take menus off the counter’s",
+  "Take out trash, put a new bag in",
+  "Put all tips in envelopes with name, date, and location in the front desk safe",
+  "Turn off computers and put grab n’ go cover on"
+];
+
+function ensureChecklistTemplates(){
+  state.checklistTemplates ??= {};
+  if(!Array.isArray(state.checklistTemplates.opening) || !state.checklistTemplates.opening.length){
+    state.checklistTemplates.opening = [...OPENING_CHECKLIST];
+  }
+  if(!Array.isArray(state.checklistTemplates.closing) || !state.checklistTemplates.closing.length){
+    state.checklistTemplates.closing = [...CLOSING_CHECKLIST];
+  }
+  saveState();
+}
+function templateList(which){
+  ensureChecklistTemplates();
+  return (which==="closing") ? state.checklistTemplates.closing : state.checklistTemplates.opening;
+}
+
+
+
+function ensureChecklistEntry(key){
+  state.checklistsByKey ??= {};
+  state.checklistsByKey[key] ??= {
+    opening: {},
+    closing: {},
+    openingItems: null,   // snapshot of checklist text for this shift-day
+    closingItems: null,
+    openingDoneAt: null,
+    closingDoneAt: null
+  };
+  const entry = state.checklistsByKey[key];
+  // If this entry predates snapshots, initialize them (preserves audit text for future renders).
+  if(!Array.isArray(entry.openingItems)) entry.openingItems = [...templateList("opening")];
+  if(!Array.isArray(entry.closingItems)) entry.closingItems = [...templateList("closing")];
+  return entry;
+}
+function checklistCompleteFor(key, which){
+  const entry = ensureChecklistEntry(key);
+  const list = (which==="closing") ? entry.closingItems : entry.openingItems;
+  const map = (which==="closing") ? entry.closing : entry.opening;
+  return list.every((_, i)=> !!map[i]);
+}
+function isShiftFinalized(key){
+  state.finalizedByKey ??= {};
+  return !!state.finalizedByKey[key];
+}
+function setShiftFinalized(key){
+  state.finalizedByKey ??= {};
+  state.finalizedByKey[key] = { finalizedAt: new Date().toISOString() };
+}
+
+
+function refreshTodayButton(){
+  const t = fmtMMDDYY(today());
+  todayBtn.textContent = t;
+  const dp = document.getElementById("datePill");
+  if(dp) dp.textContent = fmtMMDDYY(curDate);
+}
+function refreshCategoryFilter(){
+  const dateISO = toISODate(curDate);
+  const cats = ["All", ...categoriesForDate(dateISO)];
+  categoryFilter.innerHTML = cats.map(c => `<option value="${escapeHtml(c)}">${escapeHtml(c)}</option>`).join("");
+  if(!cats.includes(categoryFilter.value)) categoryFilter.value = "All";
+}
+function computeScore(dateISO){
+  let total=0, done=0;
+  for(const t of state.tasks){
+    if(!taskAppliesOnISO(t, dateISO)) continue;
+    total++;
+    if(getStatus(dateISO, t.id)) done++;
+  }
+  return {done,total};
+}
+function render(){
+  const dateISO = toISODate(curDate);
+
+  refreshFeedbackUI();
+  const k = dayKey(dateISO);
+  renderPeopleInputs();
+
+  dateTitle.textContent = headerDateLabel(curDate);
+  refreshTodayButton();
+
+    const dp = document.getElementById("datePill");
+  if(dp) dp.textContent = fmtMMDDYY(curDate);
+const {done,total} = computeScore(dateISO);
+  scoreHeader.textContent = `${done}/${total}`;
+
+  // datalist for categories in dialog
+  $("#catList").innerHTML = categoriesForDate(dateISO)
+    .filter(c=>c!=="-")
+    .map(c=>`<option value="${escapeHtml(c)}">`)
+    .join("");
+
+  const filter = categoryFilter.value || "All";
+
+  // group by category for this date
+  const grouped = {};
+  for(const t of state.tasks){
+    if(!taskAppliesOnISO(t, dateISO)) continue;
+    const r = getRevisionForDate(t, dateISO);
+    const cat = (r.category || "-").trim() || "-";
+    if(filter !== "All" && cat !== filter) continue;
+    (grouped[cat] ||= []).push({task:t, rev:r});
+  }
+
+  const cats = Object.keys(grouped).sort((a,b)=>a.localeCompare(b));
+  listRoot.innerHTML = "";
+
+  // Shift checklist start buttons
+  if(curShift === "opening"){
+    const openCard = el("div",{class:"card", style:"padding:10px 12px;"});
+    const openDone = checklistCompleteFor(k,"opening");
+    const openBtn = el("button",{class: openDone ? "btn gold-shimmer" : "btn primary", style:"width:100%; padding:12px 14px; border-radius:14px; font-weight:800;", type:"button"},
+      "Start Opening Checklist"
+    );
+    openBtn.addEventListener("click", openOpeningChecklist);
+    openCard.appendChild(openBtn);
+    listRoot.appendChild(openCard);
+  }
+
+
+  if(!cats.length){
+    listRoot.appendChild(el("div",{class:"card"}, el("div",{class:"muted"},"No tasks yet. Use “Add Task”.") ));
+    return;
+  }
+
+  for(const cat of cats){
+    const card = el("div",{class:"card"});
+    const headLeft = el("div",{class:"group-left"},
+      el("div",{class:"group-title"}, cat),
+      el("div",{class:"muted"}, `${grouped[cat].length} tasks`)
+    );
+    let headRight = el("div",{});
+    if(adminUnlocked){
+      headRight = el("button",{class:"btn", onclick:()=>openAddInCategory(cat)}, "＋ Add");
+    }
+    card.appendChild(el("div",{class:"group-head"}, headLeft, headRight));
+
+    grouped[cat].sort((a,b)=>{
+      const ao = (typeof a.task.order==="number" && Number.isFinite(a.task.order)) ? a.task.order : 0;
+      const bo = (typeof b.task.order==="number" && Number.isFinite(b.task.order)) ? b.task.order : 0;
+      return (ao-bo) || a.rev.name.localeCompare(b.rev.name) || (a.task.id-b.task.id);
+    });
+
+    for(const {task, rev} of grouped[cat]){
+      const checked = getStatus(dateISO, task.id);
+
+      const chk = el("button",{class:"chk", dataset:{checked:String(checked)}, title: checked ? "Uncheck" : "Check"}, checked ? "✓" : "");
+      if(isGateActiveNow()) chk.disabled = true;
+      chk.addEventListener("click", (ev)=>{
+        ev.stopPropagation();
+        if(isGateActiveNow()) { openOpeningChecklist(); return; }
+        const want = !(chk.dataset.checked === "true");
+        setStatus(dateISO, task.id, want);
+        chk.dataset.checked = String(want);
+        chk.textContent = want ? "✓" : "";
+        const sc = computeScore(dateISO);
+        scoreHeader.textContent = `${sc.done}/${sc.total}`;
+        renderCompletionBar();
+      });
+
+      const name = el("div",{class:"name"}, rev.name);
+      let actions = el("div",{class:"actions"});
+      if(adminUnlocked){
+        actions = el("div",{class:"actions"},
+          el("button",{class:"btn icon", title:"Move up", onclick:(ev)=>{ ev.stopPropagation(); moveTask(task.id, -1); }}, "⬆️"),
+          el("button",{class:"btn icon", title:"Move down", onclick:(ev)=>{ ev.stopPropagation(); moveTask(task.id, 1); }}, "⬇️"),
+          el("button",{class:"btn icon", title:"Edit (from today)", onclick:(ev)=>{ ev.stopPropagation(); openEdit(task.id); }}, "✏️"),
+          el("button",{class:"btn icon", title:"Archive", onclick:(ev)=>{ ev.stopPropagation(); removeTaskById(task.id); }}, "🗄️"),
+        );
+      }
+const row = el("div",{class:"row"});
+      row.append(chk, el("div",{}, name), actions);
+      card.appendChild(row);
+    }
+
+    listRoot.appendChild(card);
+  }
+
+  if(curShift === "closing"){
+    const closeCard = el("div",{class:"card", style:"padding:10px 12px; margin-top:12px;"});
+    const closeDone = checklistCompleteFor(k,"closing");
+    const closeBtn = el("button",{class: closeDone ? "btn gold-shimmer" : "btn primary", style:"width:100%; padding:12px 14px; border-radius:14px; font-weight:800;", type:"button"},
+      "Start Closing Checklist"
+    );
+    closeBtn.addEventListener("click", openClosingChecklist);
+    closeCard.appendChild(closeBtn);
+    listRoot.appendChild(closeCard);
+  }
+
+  renderCompletionBar();
+  syncGatesAndLocks();
+  renderSignaturePads();
+
+}
+
+
+/* ===================== Elements ===================== */
+function el(tag, attrs={}, ...children){
+  const e = document.createElement(tag);
+  for(const [k,v] of Object.entries(attrs)){
+    if(k==="class") e.className=v;
+    else if(k==="dataset"){ for(const [dk,dv] of Object.entries(v)) e.dataset[dk]=dv; }
+    else if(k.startsWith("on") && typeof v==="function"){ e.addEventListener(k.substring(2), v); }
+    else if(v!=null) e.setAttribute(k,v);
+  }
+  for(const c of children){
+    if(c==null) continue;
+    e.appendChild(typeof c==="string" ? document.createTextNode(c) : c);
+  }
+  return e;
+}
+function escapeHtml(s){
+  return String(s).replaceAll("&","&amp;").replaceAll("<","&lt;").replaceAll(">","&gt;").replaceAll('"',"&quot;");
+}
+
+/* ===================== Task CRUD ===================== */
+function currentWeekdayIndex(){
+  return startOfDay(curDate).getDay();
+}
+function normalizeWeekdays(arr){
+  const out = Array.from(new Set((arr||[]).map(n=>Number(n)).filter(n=>Number.isFinite(n) && n>=0 && n<=6))).sort((a,b)=>a-b);
+  return out.length ? out : [0,1,2,3,4,5,6];
+}
+
+function normalizeShifts(arr){
+  const out = Array.from(new Set((arr||[]).map(s=>String(s).toLowerCase()).filter(s=>s==="opening"||s==="closing"))).sort();
+  return out.length ? out : ["opening"];
+}
+
+function migrateSplitDualShiftTasks(){
+  // Ensure opening/closing have fully separate task sets.
+  // If any legacy task is tagged for BOTH shifts, split it into two tasks
+  // and move closing logs to the new task id.
+  state.prefs ??= {};
+  if(state.prefs._shiftSplitDone) return;
+
+  let maxId = 0;
+  for(const t of state.tasks){
+    const idNum = Number(t.id);
+    if(Number.isFinite(idNum)) maxId = Math.max(maxId, idNum);
+  }
+
+  const idMap = new Map(); // oldId -> newId (for closing clone)
+  const snapshot = Array.from(state.tasks);
+
+  for(const t of snapshot){
+    const sh = normalizeShifts(t.shifts);
+    if(sh.length === 2){
+      // Keep original as opening
+      t.shifts = ["opening"];
+
+      // Clone for closing
+      const newId = ++maxId;
+      const clone = {
+        id: newId,
+        weekdays: Array.isArray(t.weekdays) ? Array.from(t.weekdays) : [0,1,2,3,4,5,6],
+        shifts: ["closing"],
+        revisions: JSON.parse(JSON.stringify(t.revisions || [])),
+      };
+      state.tasks.push(clone);
+      idMap.set(String(t.id), String(newId));
+    }else{
+      t.shifts = sh;
+    }
+  }
+
+  if(idMap.size){
+    for(const [k, dayObj] of Object.entries(state.logs || {})){
+      if(!k.endsWith("|closing")) continue;
+      if(!dayObj || typeof dayObj !== "object") continue;
+
+      for(const [oldId, newId] of idMap.entries()){
+        if(Object.prototype.hasOwnProperty.call(dayObj, oldId)){
+          dayObj[newId] = dayObj[oldId];
+          delete dayObj[oldId];
+        }
+      }
+    }
+  }
+
+  state.prefs._shiftSplitDone = true;
+  saveState();
+}
+
+
+function splitTaskForWeekday(task, wd){
+  // If a task applies to multiple weekdays, split out the current weekday into its own task.
+  task.weekdays = normalizeWeekdays(task.weekdays);
+  if(task.weekdays.length === 1 && task.weekdays[0] === wd) return task;
+
+  if(!task.weekdays.includes(wd)) return task; // shouldn't happen for visible tasks
+
+  // Remove weekday from original
+  task.weekdays = task.weekdays.filter(x=>x!==wd);
+
+  // Clone into new task with only this weekday
+  const nextId = state.tasks.length ? Math.max(...state.tasks.map(t=>t.id))+1 : 1;
+  const clone = {
+    id: nextId,
+    weekdays: [wd],
+    shifts: JSON.parse(JSON.stringify(task.shifts || ["opening","closing"])),
+    revisions: JSON.parse(JSON.stringify(task.revisions || []))
+  };
+  state.tasks.push(clone);
+  saveState();
+  return clone;
+}
+
+function splitTaskForShift(task, shift){
+  task.shifts = normalizeShifts(task.shifts);
+  if(task.shifts.length === 1 && task.shifts[0] === shift) return task;
+
+  if(!task.shifts.includes(shift)) return task;
+
+  task.shifts = task.shifts.filter(s=>s!==shift);
+
+  const nextId = state.tasks.length ? Math.max(...state.tasks.map(t=>t.id))+1 : 1;
+  const clone = {
+    id: nextId,
+    weekdays: JSON.parse(JSON.stringify(task.weekdays || [0,1,2,3,4,5,6])),
+    shifts: [shift],
+    revisions: JSON.parse(JSON.stringify(task.revisions || []))
+  };
+  state.tasks.push(clone);
+  saveState();
+  return clone;
+}
+function splitTaskForContext(task, wd, shift){
+  let t = splitTaskForWeekday(task, wd);
+  t = splitTaskForShift(t, shift);
+  return t;
+}
+const taskDialog = $("#taskDialog");
+const taskDialogTitle = $("#taskDialogTitle");
+const taskName = $("#taskName");
+const taskCategory = $("#taskCategory");
+let editingId = null;
+
+$("#cancelTaskBtn").addEventListener("click", ()=> taskDialog.close());
+$("#saveTaskBtn").addEventListener("click", onSaveTask);
+
+function openAdd(){
+  editingId=null;
+  taskDialogTitle.textContent="Add Task";
+  taskName.value="";
+  taskCategory.value="";
+  taskDialog.showModal();
+  setTimeout(()=>taskName.focus(), 30);
+}
+function openAddInCategory(cat){
+  editingId=null;
+  taskDialogTitle.textContent="Add Task";
+  taskName.value="";
+  taskCategory.value=(cat==="-"?"":cat);
+  taskDialog.showModal();
+  setTimeout(()=>taskName.focus(), 30);
+}
+function openEdit(id){
+  const t0 = state.tasks.find(x=>x.id===id);
+  if(!t0) return;
+  const t = splitTaskForContext(t0, currentWeekdayIndex(), curShift);
+  editingId=t.id;
+  taskDialogTitle.textContent="Edit Task";
+  const cur = latestRevision(t) || {};
+  taskName.value = cur.name || "";
+  taskCategory.value = (cur.category && cur.category !== "-") ? cur.category : "";
+  taskDialog.showModal();
+  setTimeout(()=>taskName.focus(), 30);
+}
+function onSaveTask(){
+  const name = taskName.value.trim();
+  if(!name){ alert("Task name required."); return; }
+  const category = (taskCategory.value.trim() || "-");
+  const eff = toISODate(today()); // proactive edit
+
+  if(editingId == null){
+    const nextId = state.tasks.length ? Math.max(...state.tasks.map(t=>t.id))+1 : 1;
+    const wd = currentWeekdayIndex();
+    const maxOrd = Math.max(0, ...state.tasks.filter(t=>Array.isArray(t.weekdays)&&t.weekdays.includes(wd) && (Array.isArray(t.shifts)?t.shifts:["opening"]).includes(curShift)).map(t=> (typeof t.order==="number" && Number.isFinite(t.order)) ? t.order : 0));
+    state.tasks.push({ id: nextId, weekdays:[wd], shifts:[curShift], order: maxOrd+1, revisions:[{effective:eff, name, category}] });
+  }else{
+    const t0 = state.tasks.find(x=>x.id===editingId);
+    if(!t0) return;
+    const t = splitTaskForContext(t0, currentWeekdayIndex(), curShift);
+    editingId = t.id;
+    t.revisions.push({effective:eff, name, category});
+  }
+
+  saveState();
+  refreshCategoryFilter();
+  render();
+  taskDialog.close();
+}
+
+/* ===================== Pick Dialog ===================== */
+const pickDialog = $("#pickDialog");
+const pickBody = $("#pickBody");
+$("#cancelPickBtn").addEventListener("click", ()=> pickDialog.close());
+
+function openPick(onChoose){
+  const dateISO = toISODate(curDate);
+  pickBody.innerHTML = "";
+
+  const filterSel = el("select",{class:"select", style:"margin-bottom:10px;"});
+  const cats = ["All", ...categoriesForDate(dateISO)];
+  for(const c of cats) filterSel.appendChild(el("option",{value:c}, c));
+  pickBody.appendChild(filterSel);
+
+  const list = el("div",{class:"grid"});
+  pickBody.appendChild(list);
+
+  function refreshList(){
+    list.innerHTML="";
+    const target = filterSel.value;
+
+    let ts = state.tasks.filter(t=>taskAppliesOnISO(t, dateISO)).map(t=>({t, r:getRevisionForDate(t, dateISO)}));
+    if(target !== "All"){
+      ts = ts.filter(x=>((x.r.category||"-").trim()||"-") === target);
+    }
+    ts.sort((a,b)=> (a.r.category||"-").localeCompare(b.r.category||"-") || a.r.name.localeCompare(b.r.name));
+
+    for(const x of ts){
+      const label = `${x.r.name} · ${(x.r.category||"-").trim()||"-"}`;
+      list.appendChild(
+        el("div",{class:"card", style:"display:flex;align-items:center;justify-content:space-between;gap:10px;"},
+          el("div",{}, el("div",{style:"font-weight:600;"}, x.r.name), el("div",{class:"muted"}, (x.r.category||"-"))),
+          el("button",{class:"btn", onclick:()=>{ pickDialog.close(); onChoose(x.t.id); }}, "Choose")
+        )
+      );
+    }
+
+    if(!ts.length){
+      list.appendChild(el("div",{class:"card"}, el("div",{class:"muted"},"No tasks in this filter.")));
+    }
+  }
+
+  filterSel.addEventListener("change", refreshList);
+  refreshList();
+  pickDialog.showModal();
+}
+
+function removeTaskById(id){
+  const t0 = state.tasks.find(x=>x.id===id);
+  if(!t0) return;
+  const nm = (latestRevision(t0)?.name) || "(unnamed)";
+  const wd = currentWeekdayIndex();
+
+  const t = splitTaskForContext(t0, wd, curShift);
+
+    // Archive the exact per-weekday + per-shift task so it can be restored later
+  state.archivedTasks ??= [];
+  const archived = JSON.parse(JSON.stringify(t));
+  archived.archivedAt = new Date().toISOString();
+  state.archivedTasks.push(archived);
+
+  state.tasks = state.tasks.filter(x=>x.id!==t.id);
+  saveState();
+  refreshCategoryFilter();
+  render();
+}
+
+/* ===================== Controls ===================== */
+$("#prevDay").addEventListener("click", (e)=>{ if(!adminUnlocked){ e.preventDefault(); openAdminDialog(); return; } curDate=addDays(curDate,-1); refreshCategoryFilter(); render(); });
+$("#nextDay").addEventListener("click", (e)=>{ if(!adminUnlocked){ e.preventDefault(); openAdminDialog(); return; } curDate=addDays(curDate, 1); refreshCategoryFilter(); render(); });
+$("#todayBtn").addEventListener("click", (e)=>{ if(!adminUnlocked){ e.preventDefault(); openAdminDialog(); return; } curDate=today(); refreshCategoryFilter(); render(); });
+
+categoryFilter.addEventListener("change", render);
+
+if(shiftOpen) shiftOpen.addEventListener("click", ()=> setShift("opening"));
+if(shiftClose) shiftClose.addEventListener("click", ()=> setShift("closing"));
+
+$("#addTaskBtn").addEventListener("click", (e)=>{ if(!adminUnlocked){ e.preventDefault(); openAdminDialog(); return; } openAdd(); });
+/* ===================== Dark Mode + Theme Studio ===================== */
+function applyDarkMode(on){
+  state.prefs.darkMode = !!on;
+  saveState();
+  document.documentElement.setAttribute("data-theme", on ? "dark" : "light");
+  darkToggle.checked = !!on;
+  applyThemeStyles();
+  wireFeedbackUI();
+}
+darkToggle.addEventListener("change", ()=> applyDarkMode(darkToggle.checked));
+
+renderPeopleInputs();
+
+/* ===== Theme Studio core ===== */
+const THEME_VARS_GLOBAL = [
+  ["--bg","Background"],
+  ["--surface","Surface"],
+  ["--text","Text"],
+  ["--muted","Muted"],
+  ["--border","Border"],
+  ["--accent","Accent"],
+  ["--accent-weak","Accent Weak"],
+  ["--check","Check Fill"]
+];
+
+const themeDialog = $("#themeDialog");
+const themeModeLight = $("#themeModeLight");
+const themeModeDark = $("#themeModeDark");
+const themeModeLabel = $("#themeModeLabel");
+const themeGlobal = $("#themeGlobal");
+const themeBtn = $("#themeBtn");
+const themePresetName = $("#themePresetName");
+const themePresetSelect = $("#themePresetSelect");
+const themeSavePreset = $("#themeSavePreset");
+const themeLoadPreset = $("#themeLoadPreset");
+const themeCopyToOther = $("#themeCopyToOther");
+const themeResetMode = $("#themeResetMode");
+const themeClose = $("#themeClose");
+
+let themeEditMode = "light"; // "light" | "dark"
+let styleLightEl = null;
+let styleDarkEl = null;
+
+function snapshotComputedVars(mode){
+  const was = document.documentElement.getAttribute("data-theme");
+  document.documentElement.setAttribute("data-theme", mode==="dark" ? "dark" : "light");
+  const cs = getComputedStyle(document.documentElement);
+  const out = {};
+  for(const [name] of THEME_VARS_GLOBAL){
+    out[name] = cs.getPropertyValue(name).trim();
+  }
+  document.documentElement.setAttribute("data-theme", was || (state.prefs.darkMode ? "dark" : "light"));
+  return out;
+}
+function ensureThemeSnapshots(){
+  if(!Object.keys(state.theme.light||{}).length) state.theme.light = snapshotComputedVars("light");
+  if(!Object.keys(state.theme.dark||{}).length) state.theme.dark = snapshotComputedVars("dark");
+  saveState();
+}
+function applyThemeStyles(){
+  if(!styleLightEl){ styleLightEl = document.createElement("style"); styleLightEl.id="themeLightVars"; document.head.appendChild(styleLightEl); }
+  if(!styleDarkEl){ styleDarkEl = document.createElement("style"); styleDarkEl.id="themeDarkVars"; document.head.appendChild(styleDarkEl); }
+  const light = state.theme.light || {};
+  const dark = state.theme.dark || {};
+  styleLightEl.textContent = `:root{${Object.entries(light).map(([k,v])=>`${k}:${v};`).join("")}}`;
+  styleDarkEl.textContent = `[data-theme="dark"]{${Object.entries(dark).map(([k,v])=>`${k}:${v};`).join("")}}`;
+}
+function buildThemeRows(container, vars){
+  container.innerHTML = "";
+  const current = (themeEditMode==="dark") ? (state.theme.dark||{}) : (state.theme.light||{});
+  for(const [cssVar, label] of vars){
+    const row = el("div",{class:"theme-row"});
+    const left = el("div",{}, el("div",{style:"font-weight:600;"}, label), el("div",{class:"muted"}, cssVar));
+    const inp = el("input",{class:"input", type:"text", value: current[cssVar] || "", placeholder:"e.g. #316aff or rgb(49,106,255)"});
+    const sw = el("div",{class:"swatch", title:"Pick color"});
+    sw.style.background = (current[cssVar] || getComputedStyle(document.documentElement).getPropertyValue(cssVar).trim() || "transparent");
+    sw.style.cursor = "pointer";
+    sw.addEventListener("click", ()=> openColorPicker(cssVar, inp, sw));
+
+    inp.addEventListener("input", ()=>{
+      const target = (themeEditMode==="dark") ? state.theme.dark : state.theme.light;
+      target[cssVar] = inp.value.trim();
+      saveState();
+      applyThemeStyles();
+      sw.style.background = target[cssVar] || "transparent";
+    });
+
+    row.append(left, el("div",{style:"display:flex; gap:8px; align-items:center; justify-content:flex-end;"}, inp, sw));
+    container.appendChild(row);
+  }
+}
+function refreshPresetSelect(){
+  const names = Object.keys(state.themePresets || {}).sort((a,b)=>a.localeCompare(b));
+  themePresetSelect.innerHTML = names.length
+    ? names.map(n=>`<option value="${escapeHtml(n)}">${escapeHtml(n)}</option>`).join("")
+    : `<option value="" disabled selected>No presets</option>`;
+}
+function openThemeDialog(){
+  ensureThemeSnapshots();
+  themeEditMode = state.prefs.darkMode ? "dark" : "light";
+  themeModeLabel.textContent = themeEditMode==="dark" ? "Dark" : "Light";
+  buildThemeRows(themeGlobal, THEME_VARS_GLOBAL);
+  refreshPresetSelect();
+  themeDialog.showModal();
+}
+
+themeBtn.addEventListener("click", (e)=>{ if(!adminUnlocked){ e.preventDefault(); openAdminDialog(); return; } openThemeDialog(); });
+
+themeModeLight.addEventListener("click", ()=>{
+  themeEditMode="light";
+  themeModeLabel.textContent="Light";
+  buildThemeRows(themeGlobal, THEME_VARS_GLOBAL);
+});
+themeModeDark.addEventListener("click", ()=>{
+  themeEditMode="dark";
+  themeModeLabel.textContent="Dark";
+  buildThemeRows(themeGlobal, THEME_VARS_GLOBAL);
+});
+
+themeCopyToOther.addEventListener("click", ()=>{
+  ensureThemeSnapshots();
+  const src = themeEditMode==="dark" ? state.theme.dark : state.theme.light;
+  const dst = themeEditMode==="dark" ? state.theme.light : state.theme.dark;
+  for(const [k,v] of Object.entries(src||{})) dst[k]=v;
+  saveState();
+  applyThemeStyles();
+  alert("Copied.");
+});
+
+themeResetMode.addEventListener("click", ()=>{
+  const baseline = snapshotComputedVars(themeEditMode);
+  if(themeEditMode==="dark") state.theme.dark = baseline;
+  else state.theme.light = baseline;
+  saveState();
+  applyThemeStyles();
+  buildThemeRows(themeGlobal, THEME_VARS_GLOBAL);
+});
+
+themeSavePreset.addEventListener("click", ()=>{
+  const name = themePresetName.value.trim();
+  if(!name){ alert("Preset name required."); return; }
+  state.themePresets[name] = {
+    light: {...(state.theme.light||{})},
+    dark:  {...(state.theme.dark||{})}
+  };
+  saveState();
+  refreshPresetSelect();
+  themePresetName.value="";
+});
+
+themeLoadPreset.addEventListener("click", ()=>{
+  const key = themePresetSelect.value;
+  if(!key || !state.themePresets?.[key]) return;
+  const p = state.themePresets[key];
+  state.theme.light = {...(p.light||{})};
+  state.theme.dark  = {...(p.dark||{})};
+  saveState();
+  applyThemeStyles();
+  buildThemeRows(themeGlobal, THEME_VARS_GLOBAL);
+});
+
+themeClose.addEventListener("click", ()=> themeDialog.close());
+
+
+/* ===================== Color Picker ===================== */
+const colorPickerDialog = $("#colorPickerDialog");
+const cpSV = $("#cpSV");
+const cpHue = $("#cpHue");
+const cpPreview = $("#cpPreview");
+const cpHex = $("#cpHex");
+const cpVarLabel = $("#cpVarLabel");
+const cpCancel = $("#cpCancel");
+const cpApply = $("#cpApply");
+
+let cpTargetVar = null;
+let cpTargetInput = null;
+let cpTargetSwatch = null;
+
+let cpH = 0;   // 0..360
+let cpS = 1;   // 0..1
+let cpV = 1;   // 0..1
+
+function clamp01(x){ return Math.max(0, Math.min(1, x)); }
+
+function rgbToHex(r,g,b){
+  const hh = (n)=> String(n.toString(16)).padStart(2,"0");
+  return `#${hh(r)}${hh(g)}${hh(b)}`.toUpperCase();
+}
+function hexToRgb(hex){
+  let h = String(hex||"").trim();
+  if(!h) return null;
+  if(h[0] !== "#") h = "#"+h;
+  if(h.length === 4){
+    const r = parseInt(h[1]+h[1],16), g = parseInt(h[2]+h[2],16), b = parseInt(h[3]+h[3],16);
+    if([r,g,b].some(n=>Number.isNaN(n))) return null;
+    return {r,g,b};
+  }
+  if(h.length !== 7) return null;
+  const r = parseInt(h.slice(1,3),16), g = parseInt(h.slice(3,5),16), b = parseInt(h.slice(5,7),16);
+  if([r,g,b].some(n=>Number.isNaN(n))) return null;
+  return {r,g,b};
+}
+function hsvToRgb(h,s,v){
+  const C = v*s;
+  const Hp = (h%360)/60;
+  const X = C*(1 - Math.abs((Hp%2) - 1));
+  let r1=0,g1=0,b1=0;
+  if(0<=Hp && Hp<1){ r1=C; g1=X; b1=0; }
+  else if(1<=Hp && Hp<2){ r1=X; g1=C; b1=0; }
+  else if(2<=Hp && Hp<3){ r1=0; g1=C; b1=X; }
+  else if(3<=Hp && Hp<4){ r1=0; g1=X; b1=C; }
+  else if(4<=Hp && Hp<5){ r1=X; g1=0; b1=C; }
+  else { r1=C; g1=0; b1=X; }
+  const m = v - C;
+  return {
+    r: Math.round((r1+m)*255),
+    g: Math.round((g1+m)*255),
+    b: Math.round((b1+m)*255)
+  };
+}
+function rgbToHsv(r,g,b){
+  const R=r/255, G=g/255, B=b/255;
+  const cmax = Math.max(R,G,B), cmin = Math.min(R,G,B);
+  const d = cmax - cmin;
+  let h = 0;
+  if(d === 0) h = 0;
+  else if(cmax === R) h = 60*(((G-B)/d)%6);
+  else if(cmax === G) h = 60*(((B-R)/d)+2);
+  else h = 60*(((R-G)/d)+4);
+  if(h < 0) h += 360;
+  const s = (cmax === 0) ? 0 : (d / cmax);
+  const v = cmax;
+  return {h, s, v};
+}
+
+function drawHue(){
+  const ctx = cpHue.getContext("2d");
+  const w = cpHue.width, h = cpHue.height;
+  const grad = ctx.createLinearGradient(0,0,0,h);
+  for(let i=0;i<=360;i+=60){
+    const {r,g,b} = hsvToRgb(i,1,1);
+    grad.addColorStop(i/360, `rgb(${r},${g},${b})`);
+  }
+  ctx.clearRect(0,0,w,h);
+  ctx.fillStyle = grad;
+  ctx.fillRect(0,0,w,h);
+
+  // indicator
+  const y = (cpH/360)*h;
+  ctx.strokeStyle = "rgba(255,255,255,.9)";
+  ctx.lineWidth = 2;
+  ctx.beginPath();
+  ctx.rect(1, y-2, w-2, 4);
+  ctx.stroke();
+}
+
+function drawSV(){
+  const ctx = cpSV.getContext("2d");
+  const w = cpSV.width, h = cpSV.height;
+
+  // base hue
+  const {r,g,b} = hsvToRgb(cpH,1,1);
+  ctx.clearRect(0,0,w,h);
+  ctx.fillStyle = `rgb(${r},${g},${b})`;
+  ctx.fillRect(0,0,w,h);
+
+  // white -> transparent (saturation)
+  const gw = ctx.createLinearGradient(0,0,w,0);
+  gw.addColorStop(0, "rgba(255,255,255,1)");
+  gw.addColorStop(1, "rgba(255,255,255,0)");
+  ctx.fillStyle = gw;
+  ctx.fillRect(0,0,w,h);
+
+  // black -> transparent (brightness)
+  const gb = ctx.createLinearGradient(0,0,0,h);
+  gb.addColorStop(0, "rgba(0,0,0,0)");
+  gb.addColorStop(1, "rgba(0,0,0,1)");
+  ctx.fillStyle = gb;
+  ctx.fillRect(0,0,w,h);
+
+  // indicator
+  const x = cpS * w;
+  const y = (1 - cpV) * h;
+  ctx.strokeStyle = "rgba(255,255,255,.95)";
+  ctx.lineWidth = 2;
+  ctx.beginPath();
+  ctx.arc(x, y, 7, 0, Math.PI*2);
+  ctx.stroke();
+  ctx.strokeStyle = "rgba(0,0,0,.5)";
+  ctx.lineWidth = 1;
+  ctx.beginPath();
+  ctx.arc(x, y, 8, 0, Math.PI*2);
+  ctx.stroke();
+}
+
+function cpUpdatePreview(){
+  const {r,g,b} = hsvToRgb(cpH, cpS, cpV);
+  const hex = rgbToHex(r,g,b);
+  cpPreview.style.background = hex;
+  cpHex.value = hex;
+  drawSV();
+  drawHue();
+}
+
+function openColorPicker(cssVar, inputEl, swatchEl){
+  ensureThemeSnapshots();
+
+  cpTargetVar = cssVar;
+  cpTargetInput = inputEl || null;
+  cpTargetSwatch = swatchEl || null;
+
+  const modeObj = (themeEditMode==="dark") ? (state.theme.dark||{}) : (state.theme.light||{});
+  const current = (modeObj[cssVar] || getComputedStyle(document.documentElement).getPropertyValue(cssVar).trim() || "").trim();
+  const rgb = hexToRgb(current) || hexToRgb((/^rgb/i.test(current) ? "" : current)) || null;
+
+  if(rgb){
+    const hsv = rgbToHsv(rgb.r, rgb.g, rgb.b);
+    cpH = hsv.h; cpS = hsv.s; cpV = hsv.v;
+  }else{
+    // fallback: use computed color as rgb via canvas parsing
+    // keep previous H/S/V if present
+    cpH = cpH || 0; cpS = cpS || 1; cpV = cpV || 1;
+  }
+
+  cpVarLabel.textContent = `${cssVar} (${themeEditMode})`;
+  cpUpdatePreview();
+  colorPickerDialog.showModal();
+}
+
+function setThemeVarFromHex(hex){
+  const rgb = hexToRgb(hex);
+  if(!rgb) return false;
+  const modeObj = (themeEditMode==="dark") ? state.theme.dark : state.theme.light;
+  modeObj[cpTargetVar] = rgbToHex(rgb.r, rgb.g, rgb.b);
+  saveState();
+  applyThemeStyles();
+
+  if(cpTargetInput) cpTargetInput.value = modeObj[cpTargetVar];
+  if(cpTargetSwatch) cpTargetSwatch.style.background = modeObj[cpTargetVar];
+  return true;
+}
+
+function pointerPos(evt, canvas){
+  const r = canvas.getBoundingClientRect();
+  const x = (evt.clientX - r.left) * (canvas.width / r.width);
+  const y = (evt.clientY - r.top) * (canvas.height / r.height);
+  return {x, y};
+}
+
+function handleSV(evt){
+  const {x,y} = pointerPos(evt, cpSV);
+  cpS = clamp01(x / cpSV.width);
+  cpV = clamp01(1 - (y / cpSV.height));
+  cpUpdatePreview();
+}
+function handleHue(evt){
+  const {y} = pointerPos(evt, cpHue);
+  cpH = clamp01(y / cpHue.height) * 360;
+  cpUpdatePreview();
+}
+
+function bindDrag(canvas, handler){
+  let down = false;
+  const onDown = (e)=>{ down = true; handler(e); canvas.setPointerCapture?.(e.pointerId); };
+  const onMove = (e)=>{ if(down) handler(e); };
+  const onUp   = ()=>{ down = false; };
+
+  canvas.addEventListener("pointerdown", onDown);
+  canvas.addEventListener("pointermove", onMove);
+  window.addEventListener("pointerup", onUp);
+}
+
+bindDrag(cpSV, handleSV);
+bindDrag(cpHue, handleHue);
+
+cpHex.addEventListener("input", ()=>{
+  const hex = cpHex.value.trim();
+  const rgb = hexToRgb(hex);
+  if(!rgb) return;
+  const hsv = rgbToHsv(rgb.r, rgb.g, rgb.b);
+  cpH = hsv.h; cpS = hsv.s; cpV = hsv.v;
+  cpPreview.style.background = rgbToHex(rgb.r,rgb.g,rgb.b);
+  drawSV(); drawHue();
+});
+
+cpCancel.addEventListener("click", ()=> colorPickerDialog.close());
+cpApply.addEventListener("click", ()=>{
+  if(!cpTargetVar) return colorPickerDialog.close();
+  const ok = setThemeVarFromHex(cpHex.value.trim());
+  if(!ok){ alert("Invalid hex color. Use #RRGGBB."); return; }
+  colorPickerDialog.close();
+});
+
+
+
+/* ===================== Shift Checklists + Audit ===================== */
+const gateOverlay = document.getElementById("gateOverlay");
+const openGateBtn = document.getElementById("openGateBtn");
+const finishShiftBtn = document.getElementById("finishShiftBtn");
+const shiftFinalBadge = document.getElementById("shiftFinalBadge");
+
+const openingChecklistDialog = document.getElementById("openingChecklistDialog");
+const closingChecklistDialog = document.getElementById("closingChecklistDialog");
+const openingChecklistClose = document.getElementById("openingChecklistClose");
+const closingChecklistClose = document.getElementById("closingChecklistClose");
+const openingChecklistBody = document.getElementById("openingChecklistBody");
+const closingChecklistBody = document.getElementById("closingChecklistBody");
+const openingChecklistSave = document.getElementById("openingChecklistSave");
+const closingChecklistSave = document.getElementById("closingChecklistSave");
+const closingChecklistCancel = document.getElementById("closingChecklistCancel");
+
+function ensurePeoplePresentOrWarn(){
+  const dateISO = toISODate(curDate);
+  const k = dayKey(dateISO);
+  const people = (state.peopleByKey && Array.isArray(state.peopleByKey[k])) ? state.peopleByKey[k] : [];
+  const has = people.some(p => String(p||"").trim().length);
+  if(!has){
+    alert("Enter at least one name at the top first.");
+    return false;
+  }
+  return true;
+}
+
+function resetCurrentShiftDay(){
+  if(!adminUnlocked) return;
+  const dateISO = toISODate(curDate);
+  const k = dayKey(dateISO);
+  if(!confirm(`Reset this shift back to square one?\n\nThis will clear names, checklist progress, finalization, and task checkmarks for: ${dateISO} (${curShift}).`)) return;
+
+  if(state.logs && state.logs[k]) delete state.logs[k];
+  if(state.peopleByKey && state.peopleByKey[k]) delete state.peopleByKey[k];
+  if(state.checklistsByKey && state.checklistsByKey[k]) delete state.checklistsByKey[k];
+  if(state.finalizedByKey && state.finalizedByKey[k]) delete state.finalizedByKey[k];
+
+  saveState();
+  renderPeopleInputs();
+  syncGatesAndLocks();
+  render();
+}
+
+function buildChecklistUI(which){
+  const dateISO = toISODate(curDate);
+  const k = dayKey(dateISO);
+  const entry = ensureChecklistEntry(k);
+
+  const list = (which==="closing") ? entry.closingItems : entry.openingItems;
+  const map = (which==="closing") ? entry.closing : entry.opening;
+  const host = (which==="closing") ? closingChecklistBody : openingChecklistBody;
+  host.innerHTML = "";
+
+  const note = document.createElement("div");
+  note.className = "muted";
+  note.textContent = (which==="closing")
+    ? "These are non-optional. Complete them to finalize the shift for auditing."
+    : "These are non-optional. Complete them to unlock today’s tasks.";
+  host.appendChild(note);
+
+  // Bulk action: check all (fast sign-off)
+  const bulkBar = document.createElement("div");
+  bulkBar.style.display = "flex";
+  bulkBar.style.alignItems = "center";
+  bulkBar.style.gap = "10px";
+  bulkBar.style.margin = "10px 0 12px";
+  // Opening: add a name field on the same line (synced with the top name bar)
+  if(which === "opening"){
+    bulkBar.style.justifyContent = "space-between";
+    const left = document.createElement("div");
+    left.style.display = "flex";
+    left.style.alignItems = "center";
+    left.style.gap = "8px";
+
+    const nameInput = document.createElement("input");
+    nameInput.id = "openingNameInline";
+    nameInput.type = "text";
+    nameInput.className = "input";
+    nameInput.placeholder = "Name";
+    nameInput.style.maxWidth = "220px";
+    nameInput.style.width = "220px";
+
+    const lockedName = (isShiftFinalized(k) && !adminUnlocked);
+    nameInput.disabled = lockedName;
+
+    // Seed from the main people bar (first name slot)
+    const people = getPeopleForDate(dateISO);
+    nameInput.value = (people && people[0]) ? people[0] : "";
+
+    nameInput.addEventListener("input", ()=>{
+      if(lockedName) return;
+      const p = getPeopleForDate(dateISO);
+      if(!p.length) p.push("");
+      p[0] = nameInput.value;
+      saveState();
+
+      // Sync back to the top bar's first input without rerendering
+      const topFirst = document.querySelector("#peopleInputs input");
+      if(topFirst && topFirst !== document.activeElement){
+        topFirst.value = nameInput.value;
+      }
+    });
+
+    left.appendChild(nameInput);
+    bulkBar.appendChild(left);
+  } else {
+    bulkBar.style.justifyContent = "flex-end";
+  }
+
+  const checkAllBtn = document.createElement("button");
+  checkAllBtn.className = "btn";
+  checkAllBtn.type = "button";
+  checkAllBtn.textContent = "Check all";
+  checkAllBtn.title = "Mark all items complete";
+  const lockedBulk = (isShiftFinalized(k) && !adminUnlocked);
+  checkAllBtn.disabled = lockedBulk;
+
+  checkAllBtn.addEventListener("click", ()=>{
+    if(lockedBulk) return;
+    for(let i=0;i<list.length;i++) map[i] = true;
+    saveState();
+    buildChecklistUI(which);
+    syncGatesAndLocks();
+    render();
+  });
+
+  bulkBar.appendChild(checkAllBtn);
+  host.appendChild(bulkBar);
+
+  list.forEach((text, i)=>{
+    const row = document.createElement("div");
+    row.className = "row";
+    row.style.gridTemplateColumns = adminUnlocked ? "auto 1fr auto" : "auto 1fr";
+    row.style.cursor = "pointer";
+
+    const chk = document.createElement("button");
+    chk.className = "chk";
+    chk.dataset.checked = map[i] ? "true" : "false";
+    chk.textContent = map[i] ? "✓" : "";
+    chk.title = "Toggle";
+
+    const label = document.createElement("div");
+    label.className = "name";
+    label.style.fontWeight = "600";
+    label.textContent = text;
+
+    const locked = (isShiftFinalized(k) && !adminUnlocked);
+    chk.disabled = locked;
+
+    const toggle = ()=>{
+      if(locked) return;
+      map[i] = !map[i];
+      chk.dataset.checked = map[i] ? "true" : "false";
+      chk.textContent = map[i] ? "✓" : "";
+      saveState();
+      syncGatesAndLocks();
+      // Update main list completion display without closing dialogs
+      render();
+    };
+
+    // Click anywhere on the row toggles completion
+    row.addEventListener("click", ()=> toggle());
+    chk.addEventListener("click", (ev)=>{ ev.stopPropagation(); toggle(); });
+
+    row.appendChild(chk);
+    row.appendChild(label);
+
+    if(adminUnlocked){
+      const actions = document.createElement("div");
+      actions.className = "actions";
+      actions.style.display = "flex";
+      actions.style.gap = "6px";
+
+      const editBtn = el("button",{class:"btn icon", title:"Edit", onclick:(ev)=>{
+        ev.stopPropagation();
+        const next = prompt("Edit item:", text);
+        if(next==null) return;
+        const v = next.trim();
+        if(!v){ alert("Item cannot be blank."); return; }
+
+        // Update template (future) and today snapshot (audit text for this day)
+        const tpl = templateList(which);
+        if(i < tpl.length) tpl[i] = v;
+        list[i] = v;
+        saveState();
+        buildChecklistUI(which);
+      }}, "✏️");
+
+      const archiveBtn = el("button",{class:"btn icon", title:"Remove", onclick:(ev)=>{
+        ev.stopPropagation();
+        if(!confirm("Remove this checklist item?")) return;
+
+        const tpl = templateList(which);
+
+        // Remove from template by index when possible
+        if(i < tpl.length) tpl.splice(i,1);
+
+        // Remove from today's snapshot list + shift completion map (keep indices aligned)
+        const old = list.slice();
+        old.splice(i,1);
+
+        // rebuild completion map as a dense index map
+        const oldFlags = old.map((_, idx)=>{
+          // idx here corresponds to new index; old index in prior list is idx < i ? idx : idx+1
+          const priorIdx = (idx < i) ? idx : (idx+1);
+          return !!map[priorIdx];
+        });
+
+        // Write back
+        if(which==="closing") entry.closingItems = old;
+        else entry.openingItems = old;
+
+        const newMap = {};
+        oldFlags.forEach((v, idx)=>{ newMap[idx] = v; });
+        if(which==="closing") entry.closing = newMap;
+        else entry.opening = newMap;
+
+        saveState();
+        buildChecklistUI(which);
+        syncGatesAndLocks();
+        render();
+      }}, "🗑️");
+
+      actions.appendChild(editBtn);
+      actions.appendChild(archiveBtn);
+      row.appendChild(actions);
+    }
+
+    host.appendChild(row);
+  });
+}
+
+function openOpeningChecklist(){
+  const dateISO = toISODate(curDate);
+  const k = dayKey(dateISO);
+  if(isShiftFinalized(k) && !adminUnlocked) return;
+
+  buildChecklistUI("opening");
+  openingChecklistDialog.showModal();
+}
+function openClosingChecklist(){
+  const dateISO = toISODate(curDate);
+  const k = dayKey(dateISO);
+  if(isShiftFinalized(k) && !adminUnlocked) return;
+
+  buildChecklistUI("closing");
+  closingChecklistDialog.showModal();
+}
+
+if(openGateBtn) openGateBtn.addEventListener("click", openOpeningChecklist);
+
+if(openingChecklistSave) openingChecklistClose.addEventListener("click", ()=> openingChecklistDialog.close());
+closingChecklistClose.addEventListener("click", ()=> closingChecklistDialog.close());
+
+openingChecklistSave.addEventListener("click", ()=>{
+  const dateISO = toISODate(curDate);
+  const k = dayKey(dateISO);
+  if(!ensurePeoplePresentOrWarn()) return;
+
+  if(!checklistCompleteFor(k, "opening")){
+    alert("Finish every opening checklist item first.");
+    return;
+  }
+  const entry = ensureChecklistEntry(k);
+  if(!entry.openingDoneAt) entry.openingDoneAt = new Date().toISOString();
+  saveState();
+  openingChecklistDialog.close();
+  syncGatesAndLocks();
+  render();
+});
+
+if(closingChecklistCancel) closingChecklistCancel.addEventListener("click", ()=> closingChecklistDialog.close());
+
+if(closingChecklistSave) closingChecklistSave.addEventListener("click", ()=>{
+  const dateISO = toISODate(curDate);
+  const k = dayKey(dateISO);
+
+  if(!ensurePeoplePresentOrWarn()) return;
+  if(!checklistCompleteFor(k, "closing")){
+    alert("Finish every closing checklist item first.");
+    return;
+  }
+
+  const entry = ensureChecklistEntry(k);
+  if(!entry.closingDoneAt) entry.closingDoneAt = new Date().toISOString();
+
+  setShiftFinalized(k);
+  saveState();
+
+  closingChecklistDialog.close();
+  syncGatesAndLocks();
+  renderPeopleInputs();
+  render();
+});
+
+if(finishShiftBtn) finishShiftBtn.addEventListener("click", ()=>{
+  const dateISO = toISODate(curDate);
+  const k = dayKey(dateISO);
+
+  // closing should be last: only allow finalize when all tasks are done (unless admin)
+  if(!adminUnlocked){
+    const scores = computeScore(dateISO);
+    if(scores.total > 0 && scores.done < scores.total){
+      alert("Finish all tasks first, then run the closing checklist.");
+      return;
+    }
+  }
+  openClosingChecklist();
+});
+
+/* ===================== Completion Actions (Bored / Finish) ===================== */
+const completionBar = document.getElementById("completionBar");
+const boredDialog = document.getElementById("boredDialog");
+const boredSpinText = document.getElementById("boredSpinText");
+const boredCloseBtn = document.getElementById("boredCloseBtn");
+const boredAgainBtn = document.getElementById("boredAgainBtn");
+const confettiCanvas = document.getElementById("confettiCanvas");
+
+let boredSpinTimer = null;
+
+function otherTaskPool(dateISO){
+  // Tasks NOT on the current day+shift (includes other weekdays and other shift tasks)
+  const wd = weekdayIndexFromISO(dateISO);
+  return state.tasks
+    .filter(t=>{
+      const okDay = Array.isArray(t.weekdays) && t.weekdays.includes(wd);
+      const shifts = Array.isArray(t.shifts) ? t.shifts : ["opening"];
+      const okShift = shifts.includes(curShift);
+      return !(okDay && okShift);
+    })
+    .map(t=>{
+      const r = latestRevision(t) || getRevisionForDate(t, dateISO) || {name:"(unnamed)", category:"-"};
+      return { name: r.name || "(unnamed)", category: (r.category||"-"), shifts: Array.isArray(t.shifts)?t.shifts:["opening"], weekdays: Array.isArray(t.weekdays)?t.weekdays:[] };
+    })
+    .filter(x=>x.name && x.name !== "(unnamed)");
+}
+
+function spinBored(dateISO){
+  const pool = otherTaskPool(dateISO);
+  if(!pool.length){
+    boredSpinText.textContent = "No other tasks found.";
+    return;
+  }
+  // Fast shuffle animation: cycle text, then stop on selection
+  const durationMs = 1600;
+  const stepMs = 60;
+  const start = performance.now();
+
+  if(boredSpinTimer) clearInterval(boredSpinTimer);
+  boredSpinText.textContent = "…";
+
+  boredSpinTimer = setInterval(()=>{
+    const now = performance.now();
+    const pick = pool[Math.floor(Math.random()*pool.length)];
+    boredSpinText.textContent = `${pick.name}  ·  ${pick.category}`;
+    if(now - start >= durationMs){
+      clearInterval(boredSpinTimer);
+      boredSpinTimer = null;
+      const finalPick = pool[Math.floor(Math.random()*pool.length)];
+      boredSpinText.textContent = `${finalPick.name}  ·  ${finalPick.category}`;
+    }
+  }, stepMs);
+}
+
+function openBoredDialog(){
+  const dateISO = toISODate(curDate);
+  spinBored(dateISO);
+  boredDialog.showModal();
+}
+
+boredCloseBtn?.addEventListener("click", ()=>{
+  if(boredSpinTimer) clearInterval(boredSpinTimer);
+  boredSpinTimer = null;
+  boredDialog.close();
+});
+boredAgainBtn?.addEventListener("click", ()=>{
+  const dateISO = toISODate(curDate);
+  spinBored(dateISO);
+});
+
+function burstConfetti(){
+  if(!confettiCanvas) return;
+  const ctx = confettiCanvas.getContext("2d");
+  const dpr = window.devicePixelRatio || 1;
+  const w = Math.floor(window.innerWidth * dpr);
+  const h = Math.floor(window.innerHeight * dpr);
+  confettiCanvas.width = w;
+  confettiCanvas.height = h;
+  confettiCanvas.style.display = "block";
+
+  const colors = ["#ff5a5f","#ffd166","#06d6a0","#118ab2","#c77dff"];
+  const N = 140;
+  const parts = Array.from({length:N}, ()=>({
+    x: (Math.random()*w),
+    y: -20 * dpr,
+    vx: (Math.random()*2-1) * 2.2 * dpr,
+    vy: (Math.random()*2+1) * 2.7 * dpr,
+    g: (Math.random()*0.08+0.06) * dpr,
+    r: (Math.random()*6+4) * dpr,
+    a: Math.random()*Math.PI*2,
+    va: (Math.random()*0.3-0.15),
+    c: colors[Math.floor(Math.random()*colors.length)],
+    life: Math.random()*30 + 80
+  }));
+
+  let alive = true;
+  function frame(){
+    if(!alive) return;
+    ctx.clearRect(0,0,w,h);
+    for(const p of parts){
+      p.vy += p.g;
+      p.x += p.vx;
+      p.y += p.vy;
+      p.a += p.va;
+      p.life -= 1;
+      ctx.save();
+      ctx.translate(p.x,p.y);
+      ctx.rotate(p.a);
+      ctx.fillStyle = p.c;
+      ctx.globalAlpha = Math.max(0, Math.min(1, p.life/90));
+      ctx.fillRect(-p.r, -p.r/2, p.r*2, p.r);
+      ctx.restore();
+    }
+    const anyLive = parts.some(p=>p.life>0 && p.y < h + 50*dpr);
+    if(anyLive){
+      requestAnimationFrame(frame);
+    }else{
+      alive = false;
+      confettiCanvas.style.display = "none";
+    }
+  }
+  requestAnimationFrame(frame);
+}
+
+function setCompletionBarVisible(on){
+  if(!completionBar) return;
+  completionBar.style.display = on ? "block" : "none";
+}
+
+let completionUI = null;
+
+function ensureCompletionBarUI(){
+  if(!completionBar) return;
+  if(completionUI) return;
+
+  const card = document.createElement("div");
+  card.className = "completion-card";
+
+  const row = document.createElement("div");
+  row.className = "completion-actions";
+
+  const boredBtn = document.createElement("button");
+  boredBtn.className = "btn";
+  boredBtn.type = "button";
+  boredBtn.textContent = "Bored?";
+
+  const finishBtn = document.createElement("button");
+  finishBtn.className = "btn primary";
+  finishBtn.type = "button";
+  finishBtn.textContent = "Finish Shift";
+
+  boredBtn.addEventListener("click", ()=>{
+    if(boredBtn.disabled) return;
+    openBoredDialog();
+  });
+
+  finishBtn.addEventListener("click", ()=>{
+    // Always derive current key at click time (day/shift can change)
+    const dateISO = toISODate(curDate);
+    const k = dayKey(dateISO);
+
+    if(finishBtn.disabled) return;
+
+    // Reclick should always confetti
+    if(isShiftFinalized(k)){
+      burstConfetti();
+      return;
+    }
+
+    if(curShift === "closing"){
+      // Use existing closing checklist workflow as final gate
+      openClosingChecklist();
+      // confetti happens on successful finalize
+      return;
+    }
+
+    // Opening shift: finalize immediately (audit marker)
+    setShiftFinalized(k);
+    saveState();
+    burstConfetti();
+    renderCompletionBar();
+  });
+
+  row.appendChild(boredBtn);
+  row.appendChild(finishBtn);
+  card.appendChild(row);
+  completionBar.appendChild(card);
+
+  completionUI = { card, row, boredBtn, finishBtn };
+}
+
+function renderCompletionBar(){
+  if(!completionBar) return;
+
+  ensureCompletionBarUI();
+
+  const dateISO = toISODate(curDate);
+  const k = dayKey(dateISO);
+
+  // Buttons are always visible, but locked until all day tasks are finished
+  // (and opening checklist completed for Opening shift).
+  const scores = computeScore(dateISO);
+  const openOk = (curShift === "opening") ? checklistCompleteFor(k,"opening") : true;
+  const doneAll = (scores.total > 0) ? (scores.done >= scores.total) : true;
+  const ready = openOk && doneAll;
+
+  setCompletionBarVisible(true);
+
+  const boredBtn = completionUI.boredBtn;
+  const finishBtn = completionUI.finishBtn;
+
+  // Lock state
+  boredBtn.disabled = !ready;
+  finishBtn.disabled = !ready;
+  if(!ready){
+    boredBtn.title = !openOk ? "Complete Opening Checklist first" : "Finish all tasks first";
+    finishBtn.title = !openOk ? "Complete Opening Checklist first" : "Finish all tasks first";
+    boredBtn.style.opacity = "0.6";
+    finishBtn.style.opacity = "0.6";
+  }else{
+    boredBtn.title = "";
+    finishBtn.title = "";
+    boredBtn.style.opacity = "";
+    finishBtn.style.opacity = "";
+  }
+
+  // Finish paint (gold shimmer after finalized)
+  if(isShiftFinalized(k)){
+    finishBtn.classList.add("gold-shimmer");
+    finishBtn.classList.remove("primary");
+    finishBtn.classList.add("btn");
+  }else{
+    finishBtn.classList.remove("gold-shimmer");
+    finishBtn.classList.add("primary");
+  }
+}
+
+/* Hook confetti + gold on closing finalize */
+(function hookClosingFinalizeFX(){
+  const _save = document.getElementById("closingChecklistSave");
+  if(!_save) return;
+  _save.addEventListener("click", ()=>{
+    const dateISO = toISODate(curDate);
+    const k = dayKey(dateISO);
+    // After existing finalize runs, state should be finalized
+    setTimeout(()=>{
+      if(isShiftFinalized(k)){
+        burstConfetti();
+      }
+    }, 50);
+  }, {capture:false});
+})();
+
+function isGateActiveNow(){
+  const dateISO = toISODate(curDate);
+  const k = dayKey(dateISO);
+  const finalized = isShiftFinalized(k);
+  if(finalized) return false;
+  if(adminUnlocked) return false;
+  if(curShift !== "opening") return false;
+  return !checklistCompleteFor(k, "opening");
+}
+
+function syncGatesAndLocks(){
+  const dateISO = toISODate(curDate);
+  const k = dayKey(dateISO);
+  const finalized = isShiftFinalized(k);
+
+  // Opening gate blocks tasks in opening shift until checklist done (unless admin)
+  const openingDone = checklistCompleteFor(k, "opening");
+  const shouldGate = (curShift==="opening" && !openingDone && !adminUnlocked && !finalized);
+
+  // No modal overlay on entry; just prevent task interactions until opening checklist is complete.
+  if(gateOverlay){
+    gateOverlay.style.display = "none";
+    gateOverlay.setAttribute("aria-hidden","true");
+  }
+
+  // Finish button is now handled by the completion bar
+  if(finishShiftBtn){
+    finishShiftBtn.style.display = "none";
+  }
+
+  if(shiftFinalBadge){
+    shiftFinalBadge.style.display = finalized ? "" : "none";
+  }
+
+  // If finalized, prevent accidental toggles by disabling pointer events on list (staff only)
+  if(!adminUnlocked && finalized){
+    if(listRoot) listRoot.style.pointerEvents = "none";
+  }else{
+    if(listRoot) listRoot.style.pointerEvents = "";
+  }
+}
+
+
+
+/* ===================== Checklist Template Editor (Admin) ===================== */
+const editOpeningBtn = $("#editOpeningBtn");
+const editClosingBtn = $("#editClosingBtn");
+const resetDayBtn   = $("#resetDayBtn");
+
+const archiveBtn    = $("#archiveBtn");
+const archiveDialog = $("#archiveDialog");
+const archiveBody   = $("#archiveBody");
+const archiveClose  = $("#archiveClose");
+
+const checklistEditorDialog = $("#checklistEditorDialog");
+const checklistEditorTitle  = $("#checklistEditorTitle");
+const checklistEditorBody   = $("#checklistEditorBody");
+const checklistEditorAdd    = $("#checklistEditorAdd");
+const checklistEditorClose  = $("#checklistEditorClose");
+
+let editingChecklistWhich = "opening";
+
+function renderChecklistEditor(){
+  ensureChecklistTemplates();
+  const list = templateList(editingChecklistWhich);
+
+  checklistEditorTitle.textContent = (editingChecklistWhich === "closing") ? "Edit Closing Checklist" : "Edit Opening Checklist";
+  checklistEditorBody.innerHTML = "";
+
+  list.forEach((text, idx)=>{
+    const row = el("div",{class:"row", style:"grid-template-columns:1fr auto; gap:10px; background:transparent; padding:6px 0;"},
+      el("div",{},
+        el("div",{class:"name"}, text),
+      ),
+      el("div",{class:"actions"},
+        el("button",{class:"btn icon", title:"Move up", onclick:()=>{ if(idx<=0) return; const tmp=list[idx-1]; list[idx-1]=list[idx]; list[idx]=tmp; saveState(); renderChecklistEditor(); }}, "⬆️"),
+        el("button",{class:"btn icon", title:"Move down", onclick:()=>{ if(idx>=list.length-1) return; const tmp=list[idx+1]; list[idx+1]=list[idx]; list[idx]=tmp; saveState(); renderChecklistEditor(); }}, "⬇️"),
+        el("button",{class:"btn icon", title:"Edit", onclick:()=>{
+          const next = prompt("Edit item:", text);
+          if(next==null) return;
+          const v = next.trim();
+          if(!v){ alert("Item cannot be blank."); return; }
+          list[idx] = v;
+          saveState();
+          renderChecklistEditor();
+        }}, "✏️"),
+        el("button",{class:"btn icon", title:"Archive", onclick:()=>{
+          if(!confirm("Remove this checklist item?")) return;
+          list.splice(idx,1);
+          saveState();
+          renderChecklistEditor();
+        }}, "🗄️")
+      )
+    );
+    checklistEditorBody.appendChild(row);
+  });
+
+  if(!list.length){
+    checklistEditorBody.appendChild(el("div",{class:"muted"},"No items yet."));
+  }
+}
+
+function openChecklistEditor(which){
+  if(!adminUnlocked) return;
+  editingChecklistWhich = (which==="closing") ? "closing" : "opening";
+  renderChecklistEditor();
+  checklistEditorDialog.showModal();
+}
+
+if(editOpeningBtn) editOpeningBtn.addEventListener("click", ()=> openChecklistEditor("opening"));
+if(editClosingBtn) editClosingBtn.addEventListener("click", ()=> openChecklistEditor("closing"));
+
+if(resetDayBtn) 
+function renderArchive(){
+  const items = (state.archivedTasks || []).slice().reverse();
+  archiveBody.innerHTML = "";
+
+  if(!items.length){
+    archiveBody.appendChild(el("div",{class:"muted"},"No archived tasks."));
+    return;
+  }
+
+  for(const t of items){
+    const r = latestRevision(t) || {name:"(unnamed)", category:"-"};
+    const wd = Array.isArray(t.weekdays) && t.weekdays.length ? t.weekdays[0] : null;
+    const sh = Array.isArray(t.shifts) && t.shifts.length ? t.shifts[0] : null;
+
+    const meta = [];
+    if(wd!=null) meta.push(["Sun","Mon","Tue","Wed","Thu","Fri","Sat"][wd]);
+    if(sh) meta.push(sh[0].toUpperCase()+sh.slice(1));
+    if(r.category && r.category !== "-") meta.push(r.category);
+
+    const row = el("div",{class:"card", style:"display:flex;align-items:center;justify-content:space-between;gap:12px;"},
+      el("div",{},
+        el("div",{style:"font-weight:700;"}, r.name),
+        el("div",{class:"muted"}, meta.join(" · ") + (t.archivedAt ? ` · archived ${new Date(t.archivedAt).toLocaleString()}` : ""))
+      ),
+      el("button",{class:"btn primary", onclick:()=>restoreArchivedTask(t.id)}, "Restore")
+    );
+    archiveBody.appendChild(row);
+  }
+}
+
+function restoreArchivedTask(taskId){
+  const idx = (state.archivedTasks || []).findIndex(x=>x.id===taskId);
+  if(idx < 0) return;
+  const t = state.archivedTasks[idx];
+
+  // If ID collides (unlikely), mint a new one
+  if(state.tasks.some(x=>x.id===t.id)){
+    const nextId = state.tasks.length ? Math.max(...state.tasks.map(x=>x.id)) + 1 : 1;
+    t.id = nextId;
+  }
+
+  delete t.archivedAt;
+  state.tasks.push(t);
+  state.archivedTasks.splice(idx, 1);
+  saveState();
+  refreshCategoryFilter();
+  render();
+  renderArchive();
+}
+
+archiveBtn?.addEventListener("click", ()=>{
+  if(!adminUnlocked) return;
+  renderArchive();
+  archiveDialog.showModal();
+});
+archiveClose?.addEventListener("click", ()=> archiveDialog.close());
+
+resetDayBtn.addEventListener("click", ()=> resetCurrentShiftDay());
+
+if(checklistEditorAdd) checklistEditorAdd.addEventListener("click", ()=>{
+  ensureChecklistTemplates();
+  const list = templateList(editingChecklistWhich);
+  const v = prompt("New item:");
+  if(v==null) return;
+  const t = v.trim();
+  if(!t){ alert("Item cannot be blank."); return; }
+  list.push(t);
+  saveState();
+  renderChecklistEditor();
+});
+
+if(checklistEditorClose) checklistEditorClose.addEventListener("click", ()=> checklistEditorDialog.close());
+
+
+/* ===================== Courtside Weekly Tasks Preset (from 2025 task list PDF) ===================== */
+function applyCourtside2025WeeklyTasksPreset(){
+  // One-time seeding: replaces existing weekly tasks with the courtside 2025 list.
+  // A JSON backup is kept in prefs in case you need to recover.
+  if(state.prefs && state.prefs._courtside2025WeeklyTasksApplied) return;
+
+  try{
+    state.prefs ??= {};
+    // Backup current tasks (if any)
+    state.prefs._backupTasksBeforeCourtside2025 = JSON.stringify(state.tasks || []);
+  }catch(_e){ /* ignore */ }
+
+  const eff = "0001-01-01";
+  const preset = [
+  {
+    "name": "Wipe down blenders – top, sides + put clear covers in the dishwasher",
+    "category": "Shift Tasks",
+    "shifts": [
+      "opening"
+    ],
+    "weekdays": [
+      0,
+      1,
+      2,
+      3,
+      4,
+      5,
+      6
+    ],
+    "order": 500
+  },
+  {
+    "name": "Refill grab n go",
+    "category": "Shift Tasks",
+    "shifts": [
+      "opening"
+    ],
+    "weekdays": [
+      0,
+      1,
+      2,
+      3,
+      4,
+      5,
+      6
+    ],
+    "order": 510
+  },
+  {
+    "name": "Fill ice bins",
+    "category": "Shift Tasks",
+    "shifts": [
+      "opening"
+    ],
+    "weekdays": [
+      0,
+      1,
+      2,
+      3,
+      4,
+      5,
+      6
+    ],
+    "order": 520
+  },
+  {
+    "name": "Fill napkin dispensers + wipe down the tops",
+    "category": "Shift Tasks",
+    "shifts": [
+      "opening"
+    ],
+    "weekdays": [
+      0,
+      1,
+      2,
+      3,
+      4,
+      5,
+      6
+    ],
+    "order": 530
+  },
+  {
+    "name": "Fill plastic cups + lids + straws",
+    "category": "Shift Tasks",
+    "shifts": [
+      "opening"
+    ],
+    "weekdays": [
+      0,
+      1,
+      2,
+      3,
+      4,
+      5,
+      6
+    ],
+    "order": 540
+  },
+  {
+    "name": "Wash matcha and acai containers",
+    "category": "Shift Tasks",
+    "shifts": [
+      "opening"
+    ],
+    "weekdays": [
+      0
+    ],
+    "order": 100
+  },
+  {
+    "name": "Wash dragonfruit and beet containers",
+    "category": "Shift Tasks",
+    "shifts": [
+      "opening"
+    ],
+    "weekdays": [
+      0
+    ],
+    "order": 110
+  },
+  {
+    "name": "Wipe down the tops of all fruit and powder containers",
+    "category": "Shift Tasks",
+    "shifts": [
+      "opening"
+    ],
+    "weekdays": [
+      0
+    ],
+    "order": 120
+  },
+  {
+    "name": "Wash strawberry and banana containers",
+    "category": "Shift Tasks",
+    "shifts": [
+      "opening"
+    ],
+    "weekdays": [
+      1
+    ],
+    "order": 100
+  },
+  {
+    "name": "Wash strawberry and pineapple puree container",
+    "category": "Shift Tasks",
+    "shifts": [
+      "opening"
+    ],
+    "weekdays": [
+      1
+    ],
+    "order": 110
+  },
+  {
+    "name": "Wipe down computer screens",
+    "category": "Shift Tasks",
+    "shifts": [
+      "opening"
+    ],
+    "weekdays": [
+      1,
+      3,
+      5
+    ],
+    "order": 200
+  },
+  {
+    "name": "Use steel polish under the powders and blender areas",
+    "category": "Shift Tasks",
+    "shifts": [
+      "opening"
+    ],
+    "weekdays": [
+      1,
+      3,
+      5
+    ],
+    "order": 210
+  },
+  {
+    "name": "Grab weekly business office items (envelopes, receipt paper etc.)",
+    "category": "Shift Tasks",
+    "shifts": [
+      "opening"
+    ],
+    "weekdays": [
+      1
+    ],
+    "order": 220
+  },
+  {
+    "name": "Wash raspberry and mango containers",
+    "category": "Shift Tasks",
+    "shifts": [
+      "opening"
+    ],
+    "weekdays": [
+      2
+    ],
+    "order": 100
+  },
+  {
+    "name": "Wash berry and mango puree containers",
+    "category": "Shift Tasks",
+    "shifts": [
+      "opening"
+    ],
+    "weekdays": [
+      2
+    ],
+    "order": 110
+  },
+  {
+    "name": "Wash mat on top of dishwasher and wipe top of dishwasher",
+    "category": "Shift Tasks",
+    "shifts": [
+      "opening"
+    ],
+    "weekdays": [
+      2,
+      4,
+      6
+    ],
+    "order": 200
+  },
+  {
+    "name": "Wash cup with measuring spoons + everything in it",
+    "category": "Shift Tasks",
+    "shifts": [
+      "opening"
+    ],
+    "weekdays": [
+      2,
+      4,
+      6
+    ],
+    "order": 210
+  },
+  {
+    "name": "Lift all fruit containers and wipe underneath them",
+    "category": "Shift Tasks",
+    "shifts": [
+      "opening"
+    ],
+    "weekdays": [
+      2
+    ],
+    "order": 220
+  },
+  {
+    "name": "Wash pineapple and blueberry containers",
+    "category": "Shift Tasks",
+    "shifts": [
+      "opening"
+    ],
+    "weekdays": [
+      3
+    ],
+    "order": 100
+  },
+  {
+    "name": "Wash seasonal and skim containers",
+    "category": "Shift Tasks",
+    "shifts": [
+      "opening"
+    ],
+    "weekdays": [
+      3,
+      6
+    ],
+    "order": 110
+  },
+  {
+    "name": "Wipe down silverware shelves + silverware containers",
+    "category": "Shift Tasks",
+    "shifts": [
+      "opening"
+    ],
+    "weekdays": [
+      3
+    ],
+    "order": 220
+  },
+  {
+    "name": "Wash kale and spinach containers",
+    "category": "Shift Tasks",
+    "shifts": [
+      "opening"
+    ],
+    "weekdays": [
+      4
+    ],
+    "order": 100
+  },
+  {
+    "name": "Wash strawberry and pineapple puree containers",
+    "category": "Shift Tasks",
+    "shifts": [
+      "opening"
+    ],
+    "weekdays": [
+      4
+    ],
+    "order": 110
+  },
+  {
+    "name": "Wipe down the ice bins and taps area",
+    "category": "Shift Tasks",
+    "shifts": [
+      "opening"
+    ],
+    "weekdays": [
+      4
+    ],
+    "order": 220
+  },
+  {
+    "name": "Wash expresso and coconut containers",
+    "category": "Shift Tasks",
+    "shifts": [
+      "opening"
+    ],
+    "weekdays": [
+      5
+    ],
+    "order": 100
+  },
+  {
+    "name": "Wash berry and mango containers",
+    "category": "Shift Tasks",
+    "shifts": [
+      "opening"
+    ],
+    "weekdays": [
+      5
+    ],
+    "order": 110
+  },
+  {
+    "name": "Stock protein bars + chips",
+    "category": "Shift Tasks",
+    "shifts": [
+      "opening"
+    ],
+    "weekdays": [
+      5
+    ],
+    "order": 220
+  },
+  {
+    "name": "Wash oats and cookie containers",
+    "category": "Shift Tasks",
+    "shifts": [
+      "opening"
+    ],
+    "weekdays": [
+      6
+    ],
+    "order": 100
+  },
+  {
+    "name": "Wipe down recipe cards + menu cards",
+    "category": "Shift Tasks",
+    "shifts": [
+      "opening"
+    ],
+    "weekdays": [
+      6
+    ],
+    "order": 220
+  },
+  {
+    "name": "Refill grab n go",
+    "category": "Shift Tasks",
+    "shifts": [
+      "closing"
+    ],
+    "weekdays": [
+      0,
+      1,
+      2,
+      3,
+      4,
+      5,
+      6
+    ],
+    "order": 510
+  },
+  {
+    "name": "Sweep floor (under counters, under ice bin, next to counters, etc.)",
+    "category": "Shift Tasks",
+    "shifts": [
+      "closing"
+    ],
+    "weekdays": [
+      0,
+      1,
+      2,
+      3,
+      4,
+      5,
+      6
+    ],
+    "order": 540
+  },
+  {
+    "name": "Mop floor - get under counters, ice bin, etc.",
+    "category": "Shift Tasks",
+    "shifts": [
+      "closing"
+    ],
+    "weekdays": [
+      0,
+      1,
+      2,
+      3,
+      4,
+      5,
+      6
+    ],
+    "order": 550
+  },
+  {
+    "name": "Fill ice bins",
+    "category": "Shift Tasks",
+    "shifts": [
+      "closing"
+    ],
+    "weekdays": [
+      0,
+      1,
+      3,
+      5
+    ],
+    "order": 520
+  },
+  {
+    "name": "Fill ice bin",
+    "category": "Shift Tasks",
+    "shifts": [
+      "closing"
+    ],
+    "weekdays": [
+      2,
+      4,
+      6
+    ],
+    "order": 520
+  },
+  {
+    "name": "Wash pumpkin protein and dried pumpkin containers",
+    "category": "Shift Tasks",
+    "shifts": [
+      "closing"
+    ],
+    "weekdays": [
+      0
+    ],
+    "order": 100
+  },
+  {
+    "name": "Wash coffee containers in the dishwasher",
+    "category": "Shift Tasks",
+    "shifts": [
+      "closing"
+    ],
+    "weekdays": [
+      0
+    ],
+    "order": 110
+  },
+  {
+    "name": "Fill plastic cups + lids + straws",
+    "category": "Shift Tasks",
+    "shifts": [
+      "closing"
+    ],
+    "weekdays": [
+      0
+    ],
+    "order": 560
+  },
+  {
+    "name": "Wash vanilla whey and powder yogurt containers",
+    "category": "Shift Tasks",
+    "shifts": [
+      "closing"
+    ],
+    "weekdays": [
+      1
+    ],
+    "order": 100
+  },
+  {
+    "name": "Wash cacao container",
+    "category": "Shift Tasks",
+    "shifts": [
+      "closing"
+    ],
+    "weekdays": [
+      1
+    ],
+    "order": 110
+  },
+  {
+    "name": "Wash ice scoops, metal + plastic",
+    "category": "Shift Tasks",
+    "shifts": [
+      "closing"
+    ],
+    "weekdays": [
+      1,
+      3,
+      5
+    ],
+    "order": 120
+  },
+  {
+    "name": "Stock almond milk in bar fridge",
+    "category": "Shift Tasks",
+    "shifts": [
+      "closing"
+    ],
+    "weekdays": [
+      1,
+      3,
+      5
+    ],
+    "order": 130
+  },
+  {
+    "name": "Refill wines and bottles beers",
+    "category": "Shift Tasks",
+    "shifts": [
+      "closing"
+    ],
+    "weekdays": [
+      1,
+      3,
+      5
+    ],
+    "order": 140
+  },
+  {
+    "name": "Wash chocolate whey and classic coffee containers",
+    "category": "Shift Tasks",
+    "shifts": [
+      "closing"
+    ],
+    "weekdays": [
+      2
+    ],
+    "order": 100
+  },
+  {
+    "name": "Wash avocado container",
+    "category": "Shift Tasks",
+    "shifts": [
+      "closing"
+    ],
+    "weekdays": [
+      2
+    ],
+    "order": 110
+  },
+  {
+    "name": "Refill canned cocktails and canned beers",
+    "category": "Shift Tasks",
+    "shifts": [
+      "closing"
+    ],
+    "weekdays": [
+      2,
+      4,
+      6
+    ],
+    "order": 120
+  },
+  {
+    "name": "Use steel polish under supplements and extracts",
+    "category": "Shift Tasks",
+    "shifts": [
+      "closing"
+    ],
+    "weekdays": [
+      2,
+      4,
+      6
+    ],
+    "order": 130
+  },
+  {
+    "name": "Refill dressings and condiments",
+    "category": "Shift Tasks",
+    "shifts": [
+      "closing"
+    ],
+    "weekdays": [
+      2,
+      4,
+      6
+    ],
+    "order": 140
+  },
+  {
+    "name": "Wash vanilla mass and french vanilla containers",
+    "category": "Shift Tasks",
+    "shifts": [
+      "closing"
+    ],
+    "weekdays": [
+      3
+    ],
+    "order": 100
+  },
+  {
+    "name": "Wash lemon container",
+    "category": "Shift Tasks",
+    "shifts": [
+      "closing"
+    ],
+    "weekdays": [
+      3
+    ],
+    "order": 110
+  },
+  {
+    "name": "Wash chocolate mass and spiced chai containers",
+    "category": "Shift Tasks",
+    "shifts": [
+      "closing"
+    ],
+    "weekdays": [
+      4
+    ],
+    "order": 100
+  },
+  {
+    "name": "Wash banana container",
+    "category": "Shift Tasks",
+    "shifts": [
+      "closing"
+    ],
+    "weekdays": [
+      4
+    ],
+    "order": 110
+  },
+  {
+    "name": "Wash vanilla plant and chocolate truffle containers",
+    "category": "Shift Tasks",
+    "shifts": [
+      "closing"
+    ],
+    "weekdays": [
+      5
+    ],
+    "order": 100
+  },
+  {
+    "name": "Wash strawberry container",
+    "category": "Shift Tasks",
+    "shifts": [
+      "closing"
+    ],
+    "weekdays": [
+      5
+    ],
+    "order": 110
+  },
+  {
+    "name": "Wash chocolate plant and caramel container",
+    "category": "Shift Tasks",
+    "shifts": [
+      "closing"
+    ],
+    "weekdays": [
+      6
+    ],
+    "order": 100
+  }
+];
+
+  let nextId = (Array.isArray(state.tasks) && state.tasks.length)
+    ? (Math.max(...state.tasks.map(t=>Number(t.id)||0)) + 1)
+    : 1;
+
+  state.tasks = preset.map((p)=>({
+    id: nextId++,
+    weekdays: Array.isArray(p.weekdays) ? p.weekdays.slice() : [0,1,2,3,4,5,6],
+    shifts: Array.isArray(p.shifts) ? p.shifts.slice() : ["opening"],
+    order: (typeof p.order === "number" && Number.isFinite(p.order)) ? p.order : 0,
+    revisions: [{ effective: eff, name: String(p.name||"").trim(), category: String(p.category||"-").trim() || "-" }]
+  })).filter(t=>t.revisions[0].name);
+
+  state.prefs._courtside2025WeeklyTasksApplied = true;
+  saveState();
+}
+
+/* ===================== Init ===================== */
+(function init(){
+  ensureChecklistTemplates();
+  applyDarkMode(!!state.prefs.darkMode);
+  ensureThemeSnapshots();
+  applyThemeStyles();
+  migrateSplitDualShiftTasks();
+  applyCourtside2025WeeklyTasksPreset();
+  curShift = suggestedShiftFromClock();
+  state.prefs.shift = curShift;
+  saveState();
+  applyShiftUI();
+  refreshCategoryFilter();
+  render();
+  setAdminLockedUI();
+})();
+</script>
+</body>
+</html>

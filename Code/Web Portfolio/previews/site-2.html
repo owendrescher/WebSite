@@ -1,0 +1,56 @@
+<!DOCTYPE html>
+<html lang="en">
+  <head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <title>Placeholder Site Two</title>
+    <style>
+      * { box-sizing: border-box; }
+      body {
+        margin: 0;
+        min-height: 100vh;
+        font-family: Georgia, "Times New Roman", serif;
+        background:
+          linear-gradient(120deg, #07241f, #123f3d 42%, #235a55 100%);
+        color: #f0fff8;
+      }
+      .grid {
+        min-height: 100vh;
+        display: grid;
+        grid-template-columns: 1.2fr 1fr;
+      }
+      .left,
+      .right { padding: clamp(1.2rem, 3vw, 2.3rem); }
+      .left { border-right: 1px solid rgba(255, 255, 255, 0.22); }
+      h1 { margin: 0; font-size: clamp(2rem, 5vw, 3.5rem); line-height: 0.95; }
+      p { color: #d4efe4; line-height: 1.7; }
+      .tile {
+        margin-top: 1rem;
+        background: rgba(255, 255, 255, 0.07);
+        border: 1px solid rgba(255, 255, 255, 0.15);
+        border-radius: 14px;
+        padding: 1rem;
+      }
+      @media (max-width: 700px) {
+        .grid { grid-template-columns: 1fr; }
+        .left { border-right: 0; border-bottom: 1px solid rgba(255, 255, 255, 0.22); }
+      }
+    </style>
+  </head>
+  <body>
+    <main class="grid">
+      <section class="left">
+        <h1>Placeholder Site Two</h1>
+        <p>
+          Use this page as a stand-in for your second project. The split layout helps test how
+          your real previews look in an iframe.
+        </p>
+      </section>
+      <section class="right">
+        <div class="tile">Feature Card A</div>
+        <div class="tile">Feature Card B</div>
+        <div class="tile">Feature Card C</div>
+      </section>
+    </main>
+  </body>
+</html>

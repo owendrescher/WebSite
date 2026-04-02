@@ -1,0 +1,70 @@
+Monday,lundi,lunedì,Montag,lunes,xīngqī yī
+Tuesday,mardi,martedì,Dienstag,martes,xīngqī èr
+Wednesday,mercredi,mercoledì,Mittwoch,miércoles,xīngqī sān
+Thursday,jeudi,giovedì,Donnerstag,jueves,xīngqī sì
+Friday,vendredi,venerdì,Freitag,viernes,xīngqī wǔ
+Saturday,samedi,sabato,Samstag,sábado,xīngqī liù
+Sunday,dimanche,domenica,Sonntag,domingo,xīngqī tiān
+January,janvier,gennaio,Januar,enero,yīyuè
+February,février,febbraio,Februar,febrero,èryuè
+March,mars,marzo,März,marzo,sānyuè
+April,avril,aprile,April,abril,sìyuè
+May,mai,maggio,Mai,mayo,wǔyuè
+June,juin,giugno,Juni,junio,liùyuè
+July,juillet,luglio,Juli,julio,qīyuè
+August,août,agosto,August,agosto,bāyuè
+September,septembre,settembre,September,septiembre,jiǔyuè
+October,octobre,ottobre,Oktober,octubre,shíyuè
+November,novembre,novembre,November,noviembre,shíyīyuè
+December,décembre,dicembre,Dezember,diciembre,shí'èryuè
+Spring,printemps,primavera,Frühling,primavera,chūntiān
+Summer,été,estate,Sommer,verano,xiàtiān
+Autumn,automne,autunno,Herbst,otoño,qiūtiān
+Winter,hiver,inverno,Winter,invierno,dōngtiān
+Hour,heure,ora,Stunde,hora,xiǎoshí
+Minute,minute,minuto,Minute,minuto,fēnzhōng
+Second,seconde,secondo,Sekunde,segundo,miǎo
+Morning,matin,mattina,Morgen,mañana,zǎoshang
+Afternoon,après-midi,pomeriggio,Nachmittag,tarde,xiàwǔ
+Evening,soir,sera,Abend,noche,wǎnshàng
+Night,nuit,notte,Nacht,noche,yèli
+Day,jour,giorno,Tag,día,rì
+Week,semaine,settimana,Woche,semana,xīngqī
+Month,mois,mese,Monat,mes,yuè
+Year,an,anno,Jahr,año,nián
+Half past,et demie,e mezza,halb,y media,bàn
+Quarter past,et quart,e un quarto,Viertel nach,y cuarto,yíkè
+Quarter to,moins le quart,meno un quarto,Viertel vor,menos cuarto,sān kè
+O'clock,heure,in punto,Uhr,en punto,diǎn zhōng
+Early,tôt,presto,früh,temprano,zǎo
+Late,tard,tardi,spät,tarde,wǎn
+Yesterday,hier,ieri,gestern,ayer,zuótiān
+Today,aujourd'hui,oggi,heute,hoy,jīntiān
+Tomorrow,demain,domani,morgen,mañana,míngtiān
+Twelve o'clock,Douze heures,Dodici,Zwölf Uhr,Doce en punto,Shí'èr diǎn zhōng
+Three thirty pm,Quinze heures trente,Quindici e trenta,Drei Uhr dreißig,Tres y media,Xiàwǔ sān diǎn bàn
+Two fifty-one am,Deux heures cinquante et un,Due e cinquantuno,Zwei Uhr einundfünfzig,Dos cincuenta y uno,Zǎoshang liǎng diǎn wǔshíyī fēn
+Eight fifteen am,Huit heures quinze,Otto e quindici,Acht Uhr fünfzehn,Ocho y cuarto,Zǎoshang bā diǎn shíwǔ fēn
+Ten twenty-two pm,Vingt-deux heures vingt-deux,Venti e ventidue,Zweiundzwanzig Uhr zweiundzwanzig,Diez veintidós de la noche,Wǎnshàng shí diǎn èrshí'èr fēn
+Six o'clock am,Six heures,Sei,Sechs Uhr,Seis en punto,Zǎoshang liù diǎn
+Eleven forty-five am,Onze heures quarante-cinq,Undici e quarantacinque,Elf Uhr fünfundvierzig,Once cuarenta y cinco,Zǎoshang shíyī diǎn sìshíwǔ fēn
+Four ten pm,Seize heures dix,Sedici e dieci,Vier Uhr zehn,Cuatro y diez de la tarde,Xiàwǔ sì diǎn shí fēn
+Nine oh-five pm,Vingt et une heures cinq,Ventuno e cinque,Neun Uhr fünf,Nueve y cinco de la noche,Wǎnshàng jiǔ diǎn wǔ fēn
+Seven twenty am,Sept heures vingt,Sette e venti,Sieben Uhr zwanzig,Siete y veinte,Zǎoshang qī diǎn èrshí fēn
+Five fifty pm,Dix-sept heures cinquante,Diciassette e cinquanta,Fünf Uhr fünfzig,Cinco y cincuenta de la tarde,Xiàwǔ wǔ diǎn wǔshí fēn
+One thirty-three pm,Treize heures trente-trois,Tredici e trentatré,Dreizehn Uhr dreiunddreißig,Una y treinta y tres de la tarde,Xiàwǔ yī diǎn sānshísān fēn
+Eleven o'clock pm,Vingt-trois heures,Ventitré,Dreiundzwanzig Uhr,Once en punto de la noche,Wǎnshàng shíyī diǎn
+Twelve fifteen am,Zéro heure quinze,Zero e quindici,Null Uhr fünfzehn,Doce y cuarto de la madrugada,Lìngchén shí'èr diǎn shíwǔ fēn
+Eight forty pm,Vingt heures quarante,Venti e quaranta,Zwanzig Uhr vierzig,Ocho cuarenta de la noche,Wǎnshàng bā diǎn sìshí fēn
+Six oh-five pm,Dix-huit heures cinq,Diciotto e cinque,Achtzehn Uhr fünf,Seis y cinco de la tarde,Xiàwǔ liù diǎn wǔ fēn
+Two twenty-two pm,Quatorze heures vingt-deux,Quattordici e ventidue,Vierzehn Uhr zweiundzwanzig,Dos veintidós de la tarde,Xiàwǔ èr diǎn èrshí'èr fēn
+Five fifty-five am,Cinq heures cinquante-cinq,Cinque e cinquantacinque,Fünf Uhr fünfundfünfzig,Cinco cincuenta y cinco de la mañana,Zǎoshang wǔ diǎn wǔshíwǔ fēn
+Nine thirty am,Neuf heures trente,Nove e trenta,Neun Uhr dreißig,Nueve y media de la mañana,Zǎoshang jiǔ diǎn bàn
+Seven forty-five pm,Dix-neuf heures quarante-cinq,Diciannove e quarantacinque,Neunzehn Uhr fünfundvierzig,Siete cuarenta y cinco de la noche,Wǎnshàng qī diǎn sìshíwǔ fēn
+Dawn,Aube,Alba,Morgendämmerung,Amanecer,Líxià
+Dusk,Crépuscule,Crepuscolo,Abenddämmerung,Anochecer,Huánghūn
+Midnight,Minuit,Mezzanotte,Mitternacht,Medianoche,Bànyè
+Noon,Midi,Mezzogiorno,Mittag,Mediodía,Zhōngwǔ
+Breakfast,Petit-déjeuner,Colazione,Frühstück,Desayuno,Zǎocān
+Lunch,Déjeuner,Pranzo,Mittagessen,Almuerzo,Wǔcān
+Dinner,Dîner,Cena,Abendessen,Cena,Wǎncān

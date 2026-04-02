@@ -1,0 +1,77 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0"/>
+  <title>Language Matching Game</title>
+  <link rel="stylesheet" href="style.css" />
+  <link rel="stylesheet" href="style.css?v=1.0.1" />
+
+</head>
+<body>
+  <div id="menu-screen">
+    <h1>Language Matching Game</h1>
+
+    <div class="section">
+      <h3>Select the set of words to use:</h3>
+      <div id="wordset-buttons"></div>
+    </div>
+
+    <div class="section">
+      <h3>Select the interval percentage of top words:</h3>
+      <div id="interval-buttons"></div>
+    </div>
+
+    <div class="section">
+      <h3>Select the number of words to display:</h3>
+      <div id="display-buttons"></div>
+    </div>
+
+    <div class="section">
+      <h3>Select the language:</h3>
+      <div id="language-buttons"></div>
+    </div>
+
+    <div class="section">
+      <button id="toggle-theme">Toggle Color Scheme</button>
+      <button id="proceed-btn">Proceed</button>
+      <button onclick="exitGame()">Exit</button>
+    </div>
+  </div>
+
+  <div id="game-screen" style="display: none;">
+    <header>
+      <div id="stats">
+        <span id="correct">Correct: 0</span>
+        <span id="incorrect">Incorrect: 0</span>
+        <span id="accuracy">Accuracy: N/A</span>
+        <span id="timer">Time: 0.00</span>
+      </div>
+    </header>
+
+    <section id="game-area">
+      <div id="english-column" class="word-column"></div>
+      <div id="divider"></div>
+      <div id="translated-column" class="word-column"></div>
+    </section>
+
+    <footer>
+      <button onclick="resetGame()">Reset</button>
+      <button onclick="newWords()">New Words</button>
+      <button onclick="shuffleWords()">Shuffle</button>
+      <button onclick="alphabetizeWords()">Alphabetize</button>
+      <button onclick="backToMenu()">Back to Menu</button>
+      <button onclick="exitGame()">Exit</button>
+    </footer>
+    
+    <div id="scoreboard-container">
+      <div id="scoreboard">🏆 High Scores will appear here...</div>
+    </div>
+
+  </div>
+
+  <script src="https://cdn.jsdelivr.net/npm/papaparse@5.4.1/papaparse.min.js"></script>
+  <script src="main.js?v=<%= Date.now() %>"></script>
+
+</body>
+</html>

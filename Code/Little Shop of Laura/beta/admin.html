@@ -1,0 +1,84 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Add Shop Item | Little Shop of Laura's</title>
+  <meta name="description" content="Add new products to the Little Shop of Laura collection.">
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+  <link
+    href="https://fonts.googleapis.com/css2?family=Cormorant+Garamond:wght@400;500;600;700&family=Manrope:wght@400;500;600;700&display=swap"
+    rel="stylesheet"
+  >
+  <link rel="stylesheet" href="styles.css">
+</head>
+<body class="site-body">
+  <header class="site-header">
+    <a class="brand" href="index.html">Little Shop of Laura's</a>
+    <nav class="site-nav">
+      <a class="back-link" href="index.html">Back to storefront</a>
+    </nav>
+  </header>
+
+  <main class="admin-main">
+    <section class="admin-hero">
+      <div class="admin-copy">
+        <p class="eyebrow">Item Management</p>
+        <h1>Add new objects to the shop collection.</h1>
+        <p>
+          Upload an image, enter the piece details, and save. New items are stored in the
+          browser and shown immediately on the main shop page.
+        </p>
+      </div>
+
+      <div class="admin-image-preview" id="admin-image-preview"></div>
+    </section>
+
+    <section class="admin-panel">
+      <form class="admin-form" id="admin-form">
+        <label>
+          Item image
+          <input type="file" id="item-image" accept="image/*" required>
+        </label>
+        <label>
+          Item name
+          <input type="text" id="item-name" placeholder="Ex. Marble Object" required>
+        </label>
+        <label>
+          Price
+          <input type="number" id="item-price" placeholder="Ex. 140" min="0" step="0.01" required>
+        </label>
+        <label>
+          Description
+          <textarea id="item-description" placeholder="Describe the piece, material, and mood." required></textarea>
+        </label>
+        <label>
+          Feature image treatment
+          <select id="image-mode">
+            <option value="beigescale">Beigescale</option>
+            <option value="grayscale">Grayscale</option>
+            <option value="black-white">Black and White</option>
+            <option value="original">Original</option>
+          </select>
+        </label>
+        <button type="submit">Add item to shop</button>
+        <p class="form-message" id="admin-message" aria-live="polite"></p>
+      </form>
+
+      <div class="admin-help">
+        <p class="admin-note">How it works</p>
+        <h3>Shared persistent shop data</h3>
+        <ul>
+          <li>Uploaded images are stored as browser data, so they persist on this machine and browser.</li>
+          <li>New items appear at the front of the shop collection on the main page.</li>
+          <li>The storefront modal supports left and right arrow navigation across the full collection.</li>
+        </ul>
+      </div>
+    </section>
+  </main>
+
+  <script src="shop-data.js"></script>
+  <script src="admin.js"></script>
+</body>
+</html>

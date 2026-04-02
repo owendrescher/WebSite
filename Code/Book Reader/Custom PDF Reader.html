@@ -1,0 +1,2651 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <title>PDF Reader & Annotator (Power)</title>
+
+  <!-- PDF.js text layer CSS -->
+  <link rel="stylesheet"
+        href="https://cdnjs.cloudflare.com/ajax/libs/pdf.js/2.16.105/pdf_viewer.min.css">
+
+  <style>
+    * { box-sizing: border-box; }
+
+    body {
+      margin: 0;
+      font-family: Arial, sans-serif;
+      display: flex;
+      height: 100vh;
+      overflow: hidden;
+      background: #111;
+      color: #eee;
+    }
+
+    #sidebar {
+      width: 320px;
+      min-width: 230px;
+      max-width: 480px;
+      border-right: 1px solid #333;
+      padding: 10px;
+      box-sizing: border-box;
+      display: flex;
+      flex-direction: column;
+      gap: 8px;
+      background: #181818;
+      position: relative;
+      overflow-y: auto; /* <-- scrollable sidebar */
+    }
+
+    /* Sidebar resize handle */
+    #sidebarResizer {
+      position: sticky;
+      /* keep the grab area aligned */
+      top: 0;
+      right: -4px;
+      width: 8px;
+      height: 100%;
+      cursor: col-resize;
+      z-index: 10;
+    }
+
+    #sidebar h3 {
+      margin: 0;
+      font-size: 1.1rem;
+    }
+
+    #viewerContainer {
+      flex: 1;
+      position: relative;
+      overflow: auto;
+      background: #000;
+    }
+
+    #pageContainer {
+      position: relative;
+      margin: 10px auto;
+    }
+
+    #pdfCanvas {
+      display: block;
+      background: #222;
+      transition: background 0.2s;
+    }
+
+    #textLayer {
+      position: absolute;
+      top: 0;
+      left: 0;
+      pointer-events: auto;
+      z-index: 1;
+    }
+
+    /* Text layer: invisible text but selectable */
+    #textLayer .endOfContent { display: none; }
+    #textLayer span {
+      color: transparent;
+      -webkit-text-fill-color: transparent;
+    }
+    #textLayer span::selection {
+      background: rgba(255, 255, 0, 0.5);
+    }
+
+    /* Search highlight */
+    .search-hit {
+      background: rgba(0, 150, 255, 0.35) !important;
+    }
+    .search-hit-active {
+      background: rgba(0, 200, 255, 0.8) !important;
+    }
+
+    #markerLayer {
+      position: absolute;
+      top: 0;
+      left: 0;
+      pointer-events: none;
+      z-index: 4;
+    }
+
+    #highlightLayer {
+      position: absolute;
+      top: 0;
+      left: 0;
+      pointer-events: none;
+      z-index: 2;
+    }
+
+    #drawLayer {
+      position: absolute;
+      top: 0;
+      left: 0;
+      pointer-events: none;
+      z-index: 5;
+    }
+
+    #pageContainer.mode-highlight {
+      cursor: cell;
+    }
+
+    #pageContainer.mode-highlight #textLayer,
+    #pageContainer.mode-highlight #textLayer span {
+      cursor: cell !important;
+    }
+
+    #pageContainer.mode-draw #drawLayer {
+      pointer-events: auto;
+      cursor: crosshair;
+    }
+
+    #pageContainer.mode-draw #textLayer,
+    #pageContainer.mode-draw #markerLayer .note-marker {
+      pointer-events: none;
+    }
+
+    .input-group {
+      display: flex;
+      gap: 5px;
+      align-items: center;
+    }
+
+    input[type="file"],
+    input[type="text"],
+    select {
+      width: 100%;
+      padding: 4px 6px;
+      background: #121212;
+      color: #eee;
+      border: 1px solid #444;
+      border-radius: 4px;
+      font-size: 0.9rem;
+    }
+
+    button {
+      padding: 4px 8px;
+      cursor: pointer;
+      border-radius: 4px;
+      border: 1px solid #444;
+      background: #2a2a2a;
+      color: #eee;
+      font-size: 0.85rem;
+      transition: background 0.1s, box-shadow 0.1s, transform 0.05s;
+    }
+
+    button:hover {
+      background: #3a3a3a;
+    }
+
+    button.small {
+      padding: 2px 5px;
+      font-size: 0.75rem;
+    }
+
+    /* Depressed bookmark button */
+    #bookmarkBtn.pressed {
+      background: #444;
+      box-shadow: inset 0 0 4px #000;
+      transform: translateY(1px);
+    }
+
+    #pageControls,
+    #zoomControls,
+    #searchControls,
+    #bookmarkControls,
+    #readingProgress {
+      display: flex;
+      gap: 5px;
+      align-items: center;
+      font-size: 0.85rem;
+    }
+
+    #readingProgress input[type="range"] {
+      flex: 1;
+    }
+
+    #notesSection {
+      flex: 1;
+      display: flex;
+      flex-direction: column;
+      border-top: 1px solid #333;
+      padding-top: 6px;
+      margin-top: 6px;
+      min-height: 120px;
+    }
+
+    #notesList {
+      flex: 1;
+      overflow-y: auto;
+      border: 1px solid #333;
+      padding: 5px;
+      margin-top: 4px;
+      background: #151515;
+      font-size: 0.85rem;
+    }
+
+    .note-item {
+      border-bottom: 1px solid #333;
+      padding: 4px 2px;
+      cursor: pointer;
+    }
+
+    .note-item:last-child {
+      border-bottom: none;
+    }
+
+    .note-meta {
+      font-size: 0.75em;
+      color: #aaa;
+    }
+
+    .note-text {
+      margin-top: 2px;
+      color: #eee;
+      white-space: pre-wrap;
+    }
+
+    .note-actions {
+      margin-top: 4px;
+      display: flex;
+      gap: 4px;
+      flex-wrap: wrap;
+    }
+
+    .note-actions button {
+      font-size: 0.7rem;
+      padding: 1px 5px;
+    }
+
+    #notesForm textarea {
+      width: 100%;
+      box-sizing: border-box;
+      resize: vertical;
+      min-height: 40px;
+      max-height: 120px;
+      padding: 4px;
+      background: #111;
+      color: #eee;
+      border: 1px solid #444;
+      border-radius: 4px;
+      font-family: inherit;
+      font-size: 0.85rem;
+    }
+
+    #status {
+      font-size: 0.75em;
+      color: #aaa;
+      margin-top: 3px;
+      min-height: 1em;
+    }
+
+    .note-marker {
+      position: absolute;
+      width: 18px;
+      height: 18px;
+      border-radius: 50%;
+      border: 1px solid #ccc;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      font-size: 11px;
+      cursor: pointer;
+      box-shadow: 0 0 2px rgba(0,0,0,0.6);
+      pointer-events: auto;
+      user-select: none;
+    }
+
+    .marker-tag-question { background: #ffeb3b; }
+    .marker-tag-important { background: #ff5252; }
+    .marker-tag-idea { background: #64b5f6; }
+    .marker-tag-todo { background: #81c784; }
+    .marker-tag-other { background: #e0e0e0; }
+
+    /* BIG bookmark corner indicator */
+    #bookmarkCorner {
+      position: absolute;
+      top: 0;
+      left: 0;
+      pointer-events: none;
+      display: none;
+      background: linear-gradient(
+        45deg,
+        #ff4444 0,
+        #ff4444 16px,
+        transparent 16px
+      );
+    }
+
+    /* Highlight overlay blocks */
+    .highlight-block {
+      position: absolute;
+      background: rgba(255, 255, 0, 0.25);
+      pointer-events: none;
+    }
+
+    /* Startup modal */
+    #startupModal {
+      position: fixed;
+      inset: 0;
+      background: rgba(0, 0, 0, 0.7);
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      z-index: 9999;
+    }
+
+    #startupModal.hidden { display: none; }
+
+    #startupContent {
+      background: #202020;
+      border-radius: 8px;
+      padding: 16px;
+      width: 420px;
+      max-width: 90vw;
+      color: #eee;
+      box-shadow: 0 0 16px rgba(0,0,0,0.7);
+    }
+
+    #startupContent h2 {
+      margin: 0 0 8px 0;
+      font-size: 1.2rem;
+    }
+
+    #startupContent p {
+      margin: 4px 0 10px 0;
+      font-size: 0.9rem;
+      color: #ccc;
+    }
+
+    #startupButtons {
+      display: flex;
+      gap: 8px;
+      margin-bottom: 10px;
+    }
+
+    #recentList {
+      max-height: 220px;
+      overflow-y: auto;
+      border: 1px solid #333;
+      padding: 6px;
+      background: #151515;
+      border-radius: 4px;
+      font-size: 0.9rem;
+    }
+
+    .recent-item {
+      padding: 4px;
+      border-bottom: 1px solid #333;
+      cursor: pointer;
+    }
+
+    .recent-item:last-child {
+      border-bottom: none;
+    }
+
+    .recent-item:hover {
+      background: #262626;
+    }
+
+    .recent-name { font-weight: 600; }
+    .recent-meta { font-size: 0.8rem; color: #aaa; }
+
+    /* Sections in sidebar */
+    .section-title {
+      font-size: 0.85rem;
+      text-transform: uppercase;
+      color: #bbb;
+      border-top: 1px solid #333;
+      padding-top: 4px;
+      margin-top: 4px;
+    }
+
+    #tocList, #pageMiniNav {
+      max-height: 120px;
+      overflow-y: auto;
+      border: 1px solid #333;
+      padding: 4px;
+      background: #151515;
+      font-size: 0.8rem;
+    }
+
+    .toc-item {
+      padding: 2px 2px;
+      cursor: pointer;
+      border-radius: 3px;
+    }
+    .toc-item:hover {
+      background: #2a2a2a;
+    }
+
+    .page-mini {
+      padding: 2px 3px;
+      cursor: pointer;
+      border-radius: 3px;
+      display: flex;
+      justify-content: space-between;
+      align-items: center;
+    }
+    .page-mini span {
+      font-size: 0.75rem;
+    }
+    .page-mini:hover {
+      background: #2a2a2a;
+    }
+    .page-mini-current {
+      background: #333;
+    }
+
+    .mini-note-dot {
+      width: 6px;
+      height: 6px;
+      border-radius: 50%;
+      background: #ffeb3b;
+      margin-left: 3px;
+    }
+
+    .mini-bookmark-flag {
+      width: 10px;
+      height: 6px;
+      background: #ff4444;
+      margin-left: 3px;
+      clip-path: polygon(0 0, 100% 0, 100% 100%, 0 50%);
+    }
+
+    #searchControls input[type="text"] {
+      flex: 1;
+    }
+
+    #statsBlock {
+      font-size: 0.8rem;
+      color: #bbb;
+    }
+
+    #citationBlock {
+      font-size: 0.8rem;
+      color: #ccc;
+      max-height: 70px;
+      overflow-y: auto;
+    }
+
+    #settingsRow {
+      display: flex;
+      flex-wrap: wrap;
+      gap: 4px;
+      align-items: center;
+      font-size: 0.8rem;
+    }
+
+    #settingsRow label {
+      display: flex;
+      align-items: center;
+      gap: 3px;
+      font-size: 0.78rem;
+    }
+
+  </style>
+</head>
+<body>
+  <!-- Startup modal -->
+  <div id="startupModal">
+    <div id="startupContent">
+      <h2>Open a PDF</h2>
+      <p>Choose a new PDF or reopen one you've used here before. “Continue Reading” will use your last bookmark.</p>
+      <div id="startupButtons">
+        <button id="newPdfBtn">New PDF…</button>
+        <button id="importStateBtn">Import All State…</button>
+      </div>
+      <div id="recentContainer">
+        <strong>Previously opened PDFs</strong>
+        <div id="recentList"></div>
+      </div>
+    </div>
+  </div>
+
+  <div id="sidebar">
+    <div id="sidebarResizer"></div>
+
+    <h3>PDF Reader</h3>
+
+    <!-- File upload -->
+    <div class="input-group">
+      <input type="file" id="fileInput" accept="application/pdf">
+    </div>
+
+    <!-- Page controls -->
+    <div id="pageControls">
+      <button id="prevPageBtn">&lt;</button>
+      <span>Page <span id="pageNum">0</span>/<span id="pageCount">0</span></span>
+      <button id="nextPageBtn">&gt;</button>
+    </div>
+
+    <!-- Reading progress -->
+    <div id="readingProgress">
+      <input type="range" id="pageSlider" min="1" max="1" value="1">
+      <span id="pageSliderLabel">1</span>
+    </div>
+
+    <!-- Zoom controls -->
+    <div id="zoomControls">
+      <button id="zoomOutBtn">-</button>
+      <span>Zoom</span>
+      <button id="zoomInBtn">+</button>
+      <button id="resetZoomBtn">Reset</button>
+    </div>
+
+    <!-- Bookmark / continue -->
+    <div id="bookmarkControls">
+      <button id="bookmarkBtn">Bookmark Page</button>
+      <button id="continueBtn">Continue</button>
+      <button id="addNamedBookmarkBtn" class="small">+Named</button>
+    </div>
+
+    <!-- Bookmarks list -->
+    <div class="section-title">Bookmarks</div>
+    <div id="bookmarkList" style="max-height:80px;overflow-y:auto;border:1px solid #333;padding:4px;background:#151515;font-size:0.8rem;"></div>
+
+    <!-- Search -->
+    <div class="section-title">Search</div>
+    <div id="searchControls">
+      <input type="text" id="searchInput" placeholder="Search (Ctrl+F)">
+      <button id="searchPrevBtn" class="small">↑</button>
+      <button id="searchNextBtn" class="small">↓</button>
+      <button id="searchClearBtn" class="small">×</button>
+    </div>
+
+    <!-- TOC -->
+    <div class="section-title">Outline / TOC</div>
+    <div id="tocList"></div>
+
+    <!-- Mini page nav -->
+    <div class="section-title">Pages</div>
+    <div id="pageMiniNav"></div>
+
+    <!-- Notes -->
+    <div class="section-title">Notes</div>
+    <div class="input-group">
+      <select id="noteTagSelect">
+        <option value="question">Question</option>
+        <option value="important">Important</option>
+        <option value="idea">Idea</option>
+        <option value="todo">To-do</option>
+        <option value="other" selected>Other</option>
+      </select>
+      <button id="stickyNoteButton" class="small">Place on click</button>
+      <button id="highlightNoteButton" class="small">Highlight+Note</button>
+    </div>
+    <div class="input-group">
+      <textarea id="noteText" placeholder="Write a note for this page..."></textarea>
+    </div>
+    <div class="input-group">
+      <span style="font-size:0.75rem;">Filter:</span>
+      <select id="noteFilterSelect">
+        <option value="all">All</option>
+        <option value="question">Question</option>
+        <option value="important">Important</option>
+        <option value="idea">Idea</option>
+        <option value="todo">To-do</option>
+        <option value="other">Other</option>
+      </select>
+      <button id="saveNoteBtn" class="small">Save Note</button>
+    </div>
+    <div class="section-title">Draw</div>
+    <div class="input-group">
+      <label style="font-size:0.75rem;">Color <input type="color" id="drawColorInput" value="#ff5050"></label>
+      <label style="font-size:0.75rem;flex:1;">Size <input type="range" id="drawSizeInput" min="2" max="18" value="4"></label>
+      <span id="drawSizeLabel" style="font-size:0.75rem;min-width:32px;text-align:right;">4px</span>
+    </div>
+    <div id="notesSection">
+      <div id="notesList"></div>
+    </div>
+
+    <!-- Export / import -->
+    <div class="section-title">Export / Import</div>
+    <div class="input-group">
+      <button id="exportNotesBtn" class="small">Export Notes</button>
+      <button id="importNotesBtn" class="small">Import Notes</button>
+      <button id="exportStateBtn" class="small">Export All</button>
+      <input type="file" id="notesFileInput" accept="application/json" style="display:none;">
+      <input type="file" id="stateFileInput" accept="application/json" style="display:none;">
+    </div>
+
+    <!-- Stats / citation -->
+    <div class="section-title">Stats & Citation</div>
+    <div id="statsBlock"></div>
+    <div id="citationBlock"></div>
+
+    <!-- Settings -->
+    <div class="section-title">Settings</div>
+    <div id="settingsRow">
+      <label><input type="checkbox" id="lowInkToggle"> Low-ink mode</label>
+      <label><input type="checkbox" id="twoPageToggle"> Two-page (stub)</label>
+      <label>Notes font
+        <select id="notesFontSizeSelect">
+          <option value="0.75">S</option>
+          <option value="0.85" selected>M</option>
+          <option value="0.95">L</option>
+        </select>
+      </label>
+    </div>
+
+    <div id="status"></div>
+  </div>
+
+  <div id="viewerContainer">
+    <div id="pageContainer">
+      <canvas id="pdfCanvas"></canvas>
+      <div id="textLayer" class="textLayer"></div>
+      <div id="highlightLayer"></div>
+      <div id="markerLayer"></div>
+      <canvas id="drawLayer"></canvas>
+      <div id="bookmarkCorner"></div>
+    </div>
+  </div>
+
+  <!-- PDF.js -->
+  <script src="https://cdnjs.cloudflare.com/ajax/libs/pdf.js/2.16.105/pdf.min.js"></script>
+  <script>
+    // Configure worker
+    pdfjsLib.GlobalWorkerOptions.workerSrc =
+      "https://cdnjs.cloudflare.com/ajax/libs/pdf.js/2.16.105/pdf.worker.min.js";
+
+    // DOM refs
+    const fileInput = document.getElementById('fileInput');
+    const pdfCanvas = document.getElementById('pdfCanvas');
+    const ctx = pdfCanvas.getContext('2d', { alpha: false });
+    const pageNumSpan = document.getElementById('pageNum');
+    const pageCountSpan = document.getElementById('pageCount');
+    const prevPageBtn = document.getElementById('prevPageBtn');
+    const nextPageBtn = document.getElementById('nextPageBtn');
+    const zoomInBtn = document.getElementById('zoomInBtn');
+    const zoomOutBtn = document.getElementById('zoomOutBtn');
+    const resetZoomBtn = document.getElementById('resetZoomBtn');
+    const bookmarkBtn = document.getElementById('bookmarkBtn');
+    const continueBtn = document.getElementById('continueBtn');
+    const addNamedBookmarkBtn = document.getElementById('addNamedBookmarkBtn');
+    const stickyNoteButton = document.getElementById('stickyNoteButton');
+    const highlightNoteButton = document.getElementById('highlightNoteButton');
+    const noteText = document.getElementById('noteText');
+    const noteTagSelect = document.getElementById('noteTagSelect');
+    const noteFilterSelect = document.getElementById('noteFilterSelect');
+    const saveNoteBtn = document.getElementById('saveNoteBtn');
+    const notesList = document.getElementById('notesList');
+    const drawColorInput = document.getElementById('drawColorInput');
+    const drawSizeInput = document.getElementById('drawSizeInput');
+    const drawSizeLabel = document.getElementById('drawSizeLabel');
+    const statusEl = document.getElementById('status');
+    const viewerContainer = document.getElementById('viewerContainer');
+    const pageContainer = document.getElementById('pageContainer');
+    const textLayerDiv = document.getElementById('textLayer');
+    const markerLayer = document.getElementById('markerLayer');
+    const highlightLayer = document.getElementById('highlightLayer');
+    const drawCanvas = document.getElementById('drawLayer');
+    const drawCtx = drawCanvas.getContext('2d');
+    const bookmarkCorner = document.getElementById('bookmarkCorner');
+
+    const startupModal = document.getElementById('startupModal');
+    const newPdfBtn = document.getElementById('newPdfBtn');
+    const recentList = document.getElementById('recentList');
+
+    const searchInput = document.getElementById('searchInput');
+    const searchPrevBtn = document.getElementById('searchPrevBtn');
+    const searchNextBtn = document.getElementById('searchNextBtn');
+    const searchClearBtn = document.getElementById('searchClearBtn');
+
+    const tocList = document.getElementById('tocList');
+    const pageMiniNav = document.getElementById('pageMiniNav');
+    const pageSlider = document.getElementById('pageSlider');
+    const pageSliderLabel = document.getElementById('pageSliderLabel');
+
+    const bookmarkList = document.getElementById('bookmarkList');
+
+    const exportNotesBtn = document.getElementById('exportNotesBtn');
+    const importNotesBtn = document.getElementById('importNotesBtn');
+    const notesFileInput = document.getElementById('notesFileInput');
+    const exportStateBtn = document.getElementById('exportStateBtn');
+    const importStateBtn = document.getElementById('importStateBtn');
+    const stateFileInput = document.getElementById('stateFileInput');
+
+    const statsBlock = document.getElementById('statsBlock');
+    const citationBlock = document.getElementById('citationBlock');
+
+    const lowInkToggle = document.getElementById('lowInkToggle');
+    const twoPageToggle = document.getElementById('twoPageToggle');
+    const notesFontSizeSelect = document.getElementById('notesFontSizeSelect');
+
+    const sidebar = document.getElementById('sidebar');
+    const sidebarResizer = document.getElementById('sidebarResizer');
+
+    // State
+    let pdfDoc = null;
+    let currentPageNum = 1;
+    let currentScale = 1.2;
+    let currentDocId = null;
+    let lastClickPosition = null; // for sticky note placement
+    let lowInkMode = false;
+
+    // search state
+    let searchResults = [];
+    let searchIndex = -1;
+
+    // per-doc stats/settings caches (in localStorage too)
+    let readingStartTimestamp = null;
+    let perDocStats = {}; // { pagesVisited: Set, totalTimeMs }
+    let perDocSettings = {}; // { zoom, lowInk, notesFontScale }
+    let horizontalSwipeAccum = 0;
+    let horizontalSwipeResetTimer = null;
+    let lastHorizontalPageTurnAt = 0;
+    let saveReadingPositionTimer = null;
+    let interactionMode = null;
+    let activeDrawStroke = null;
+    let editUndoStack = [];
+    let editRedoStack = [];
+    let currentDrawColor = '#ff5050';
+    let currentDrawSize = 4;
+
+    // ====== UTIL: status ======
+    function setStatus(msg) {
+      statusEl.textContent = msg || '';
+      if (msg) console.log(msg);
+    }
+
+    // ====== UTIL: persistent doc storage ======
+    const DOC_DB_NAME = 'pdfReaderDB';
+    const DOC_STORE_NAME = 'docs';
+    let docDbPromise = null;
+    let activeRenderTask = null;
+    let renderRequestId = 0;
+    let legacyDocsMigrated = false;
+
+    function requestToPromise(request) {
+      return new Promise((resolve, reject) => {
+        request.onsuccess = () => resolve(request.result);
+        request.onerror = () => reject(request.error);
+      });
+    }
+
+    function openDocDb() {
+      if (docDbPromise) return docDbPromise;
+      docDbPromise = new Promise((resolve, reject) => {
+        const request = indexedDB.open(DOC_DB_NAME, 1);
+        request.onupgradeneeded = () => {
+          const db = request.result;
+          if (!db.objectStoreNames.contains(DOC_STORE_NAME)) {
+            db.createObjectStore(DOC_STORE_NAME, { keyPath: 'id' });
+          }
+        };
+        request.onsuccess = () => resolve(request.result);
+        request.onerror = () => reject(request.error);
+      }).catch((error) => {
+        console.error('IndexedDB unavailable', error);
+        docDbPromise = null;
+        throw error;
+      });
+      return docDbPromise;
+    }
+
+    async function withDocStore(mode, run) {
+      const db = await openDocDb();
+      return new Promise((resolve, reject) => {
+        const tx = db.transaction(DOC_STORE_NAME, mode);
+        const store = tx.objectStore(DOC_STORE_NAME);
+        Promise.resolve(run(store, tx)).then(resolve).catch(reject);
+        tx.onerror = () => reject(tx.error);
+        tx.onabort = () => reject(tx.error || new Error('IndexedDB transaction aborted.'));
+      });
+    }
+
+    async function migrateLegacyStoredDocs() {
+      if (legacyDocsMigrated) return;
+      const raw = localStorage.getItem('pdfStoredDocs');
+      legacyDocsMigrated = true;
+      if (!raw) return;
+
+      try {
+        const docs = JSON.parse(raw);
+        const entries = Object.values(docs || {});
+        for (const doc of entries) {
+          if (!doc || !doc.id || !doc.data) continue;
+          const existing = await withDocStore('readonly', (store) => requestToPromise(store.get(doc.id)));
+          if (existing) continue;
+          await withDocStore('readwrite', (store) => requestToPromise(store.put({
+            id: doc.id,
+            name: doc.name || 'Untitled PDF',
+            data: base64ToUint8Array(doc.data).buffer,
+            created: doc.created || Date.now(),
+            lastOpened: doc.lastOpened || Date.now()
+          })));
+        }
+        localStorage.removeItem('pdfStoredDocs');
+      } catch (error) {
+        legacyDocsMigrated = false;
+        console.error('Could not migrate legacy stored PDFs.', error);
+      }
+    }
+
+    async function getStoredDocs(includeData = false) {
+      await migrateLegacyStoredDocs();
+      const docs = await withDocStore('readonly', (store) => requestToPromise(store.getAll()));
+      const entries = Array.isArray(docs) ? docs : [];
+      if (includeData) return entries;
+      return entries.map(({ data, ...meta }) => meta);
+    }
+
+    async function getStoredDoc(id) {
+      await migrateLegacyStoredDocs();
+      return withDocStore('readonly', (store) => requestToPromise(store.get(id)));
+    }
+
+    async function addOrUpdateDocEntry(id, name, buffer) {
+      const existing = await getStoredDoc(id);
+      const record = {
+        id,
+        name,
+        data: buffer,
+        created: existing?.created || Date.now(),
+        lastOpened: Date.now()
+      };
+      await withDocStore('readwrite', (store) => requestToPromise(store.put(record)));
+    }
+
+    async function updateDocLastOpened(id) {
+      const existing = await getStoredDoc(id);
+      if (!existing) return;
+      existing.lastOpened = Date.now();
+      await withDocStore('readwrite', (store) => requestToPromise(store.put(existing)));
+    }
+
+    function arrayBufferToBase64(buffer) {
+      const bytes = new Uint8Array(buffer);
+      const chunkSize = 0x8000;
+      let binary = '';
+      for (let i = 0; i < bytes.length; i += chunkSize) {
+        const chunk = bytes.subarray(i, i + chunkSize);
+        binary += String.fromCharCode(...chunk);
+      }
+      return btoa(binary);
+    }
+
+    function base64ToUint8Array(base64) {
+      const binary = atob(base64);
+      const len = binary.length;
+      const bytes = new Uint8Array(len);
+      for (let i = 0; i < len; i++) {
+        bytes[i] = binary.charCodeAt(i);
+      }
+      return bytes;
+    }
+
+    // ====== PER-DOC STATS / SETTINGS ======
+    function getStatsKey() {
+      return currentDocId ? 'pdfStats_' + currentDocId : null;
+    }
+    function getSettingsKey() {
+      return currentDocId ? 'pdfSettings_' + currentDocId : null;
+    }
+
+    function loadStats() {
+      const key = getStatsKey();
+      if (!key) return { pagesVisited: [], totalTimeMs: 0 };
+      const raw = localStorage.getItem(key);
+      if (!raw) return { pagesVisited: [], totalTimeMs: 0 };
+      try {
+        const obj = JSON.parse(raw);
+        return {
+          pagesVisited: obj.pagesVisited || [],
+          totalTimeMs: obj.totalTimeMs || 0
+        };
+      } catch {
+        return { pagesVisited: [], totalTimeMs: 0 };
+      }
+    }
+
+    function saveStats(stats) {
+      const key = getStatsKey();
+      if (!key) return;
+      const toSave = {
+        pagesVisited: Array.from(new Set(stats.pagesVisited || [])),
+        totalTimeMs: stats.totalTimeMs || 0
+      };
+      localStorage.setItem(key, JSON.stringify(toSave));
+    }
+
+    function loadSettings() {
+      const key = getSettingsKey();
+      if (!key) return {};
+      const raw = localStorage.getItem(key);
+      if (!raw) return {};
+      try {
+        return JSON.parse(raw);
+      } catch {
+        return {};
+      }
+    }
+
+    function saveSettings(settings) {
+      const key = getSettingsKey();
+      if (!key) return;
+      localStorage.setItem(key, JSON.stringify(settings));
+      if (currentDocId) {
+        perDocSettings[currentDocId] = { ...(perDocSettings[currentDocId] || {}), ...settings };
+      }
+    }
+
+    function applySettingsToUI(settings) {
+      if (settings.zoom) currentScale = settings.zoom;
+      if (typeof settings.lowInk === 'boolean') {
+        lowInkMode = settings.lowInk;
+        lowInkToggle.checked = lowInkMode;
+        updateLowInkMode();
+      }
+      if (settings.notesFontScale) {
+        notesFontSizeSelect.value = String(settings.notesFontScale);
+        notesList.style.fontSize = settings.notesFontScale + 'rem';
+      }
+      if (settings.drawColor) {
+        currentDrawColor = settings.drawColor;
+        drawColorInput.value = settings.drawColor;
+      }
+      if (settings.drawSize) {
+        currentDrawSize = Number(settings.drawSize) || 4;
+        drawSizeInput.value = String(currentDrawSize);
+        drawSizeLabel.textContent = currentDrawSize + 'px';
+      }
+    }
+
+    function updateStatsOnPageRender(pageNum) {
+      if (!currentDocId) return;
+      const stats = perDocStats[currentDocId] || loadStats();
+      const now = Date.now();
+      if (readingStartTimestamp != null) {
+        const delta = now - readingStartTimestamp;
+        stats.totalTimeMs = (stats.totalTimeMs || 0) + delta;
+      }
+      stats.pagesVisited = stats.pagesVisited || [];
+      if (!stats.pagesVisited.includes(pageNum)) stats.pagesVisited.push(pageNum);
+      saveStats(stats);
+      perDocStats[currentDocId] = stats;
+      readingStartTimestamp = now;
+      updateStatsBlock();
+    }
+
+    function updateStatsBlock() {
+      if (!currentDocId || !pdfDoc) {
+        statsBlock.textContent = '';
+        return;
+      }
+      const stats = perDocStats[currentDocId] || loadStats();
+      const pagesVisitedCount = (stats.pagesVisited || []).length;
+      const pct = pdfDoc.numPages ? Math.round((pagesVisitedCount / pdfDoc.numPages) * 100) : 0;
+      const minutes = Math.round((stats.totalTimeMs || 0) / 60000);
+      statsBlock.textContent =
+        `Visited pages: ${pagesVisitedCount}/${pdfDoc.numPages} (${pct}%) · Time ~ ${minutes} min`;
+    }
+
+    // ====== BOOKMARKS ======
+    function getBookmarkKey() {
+      return currentDocId ? 'pdfBookmark_' + currentDocId : null;
+    }
+    function getNamedBookmarksKey() {
+      return currentDocId ? 'pdfBookmarksNamed_' + currentDocId : null;
+    }
+
+    function getBookmarkData() {
+      const key = getBookmarkKey();
+      if (!key) return null;
+      const raw = localStorage.getItem(key);
+      if (!raw) return null;
+      try {
+        return JSON.parse(raw);
+      } catch {
+        return null;
+      }
+    }
+
+    function setBookmark(page) {
+      const key = getBookmarkKey();
+      if (!key) return;
+      const data = { page, timestamp: Date.now() };
+      localStorage.setItem(key, JSON.stringify(data));
+    }
+
+    function clearBookmark() {
+      const key = getBookmarkKey();
+      if (!key) return;
+      localStorage.removeItem(key);
+    }
+
+    function getNamedBookmarks() {
+      const key = getNamedBookmarksKey();
+      if (!key) return [];
+      const raw = localStorage.getItem(key);
+      if (!raw) return [];
+      try {
+        const arr = JSON.parse(raw);
+        return Array.isArray(arr) ? arr : [];
+      } catch {
+        return [];
+      }
+    }
+
+    function saveNamedBookmarks(list) {
+      const key = getNamedBookmarksKey();
+      if (!key) return;
+      localStorage.setItem(key, JSON.stringify(list));
+    }
+
+    function addNamedBookmarkForCurrentPage() {
+      if (!pdfDoc || !currentDocId) {
+        setStatus('No document loaded.');
+        return;
+      }
+      const name = prompt('Bookmark name:', `Page ${currentPageNum}`);
+      if (!name) return;
+      let bookmarks = getNamedBookmarks();
+      bookmarks.push({ name: name.trim(), page: currentPageNum, time: Date.now() });
+      saveNamedBookmarks(bookmarks);
+      refreshBookmarkListUI();
+      setStatus('Named bookmark added.');
+    }
+
+    function deleteNamedBookmark(index) {
+      let bookmarks = getNamedBookmarks();
+      if (index < 0 || index >= bookmarks.length) return;
+      bookmarks.splice(index, 1);
+      saveNamedBookmarks(bookmarks);
+      refreshBookmarkListUI();
+    }
+
+    function refreshBookmarkUI() {
+      if (!currentDocId || !pdfDoc) {
+        bookmarkBtn.classList.remove('pressed');
+        bookmarkCorner.style.display = 'none';
+        return;
+      }
+      const data = getBookmarkData();
+      if (data && data.page === currentPageNum) {
+        bookmarkBtn.classList.add('pressed');
+        bookmarkCorner.style.display = 'block';
+      } else {
+        bookmarkBtn.classList.remove('pressed');
+        bookmarkCorner.style.display = 'none';
+      }
+    }
+
+    function refreshBookmarkListUI() {
+      bookmarkList.innerHTML = '';
+      const data = getBookmarkData();
+      if (data && data.page) {
+        const div = document.createElement('div');
+        div.style.marginBottom = '4px';
+        const btn = document.createElement('button');
+        btn.className = 'small';
+        btn.textContent = `Continue → page ${data.page}`;
+        btn.onclick = () => jumpToBookmark();
+        const del = document.createElement('button');
+        del.className = 'small';
+        del.textContent = '×';
+        del.style.marginLeft = '4px';
+        del.onclick = () => { clearBookmark(); refreshBookmarkUI(); refreshBookmarkListUI(); };
+        div.appendChild(btn);
+        div.appendChild(del);
+        bookmarkList.appendChild(div);
+      }
+
+      const named = getNamedBookmarks();
+      if (!named.length) return;
+      named.forEach((bm, idx) => {
+        const row = document.createElement('div');
+        row.style.display = 'flex';
+        row.style.alignItems = 'center';
+        row.style.justifyContent = 'space-between';
+        row.style.marginBottom = '2px';
+
+        const left = document.createElement('span');
+        left.textContent = `${bm.name} (p${bm.page})`;
+        left.style.cursor = 'pointer';
+        left.onclick = () => {
+          currentPageNum = bm.page;
+          renderPage(currentPageNum);
+          setStatus(`Jumped to bookmark "${bm.name}" (page ${bm.page})`);
+        };
+
+        const right = document.createElement('button');
+        right.className = 'small';
+        right.textContent = '×';
+        right.onclick = (e) => {
+          e.stopPropagation();
+          deleteNamedBookmark(idx);
+        };
+
+        row.appendChild(left);
+        row.appendChild(right);
+        bookmarkList.appendChild(row);
+      });
+    }
+
+    function toggleBookmarkForCurrentPage() {
+      if (!pdfDoc || !currentDocId) {
+        setStatus('No document loaded.');
+        return;
+      }
+      const data = getBookmarkData();
+      if (data && data.page === currentPageNum) {
+        clearBookmark();
+        setStatus('Bookmark cleared.');
+      } else {
+        setBookmark(currentPageNum);
+        setStatus('Bookmark set on page ' + currentPageNum);
+      }
+      refreshBookmarkUI();
+      refreshBookmarkListUI();
+      updateMiniNav();
+    }
+
+    function jumpToBookmark() {
+      if (!pdfDoc || !currentDocId) {
+        setStatus('No document loaded.');
+        return;
+      }
+      const data = getBookmarkData();
+      if (!data || !data.page) {
+        setStatus('No bookmark set yet.');
+        return;
+      }
+      if (data.page < 1 || data.page > pdfDoc.numPages) {
+        setStatus('Bookmark is invalid.');
+        return;
+      }
+      currentPageNum = data.page;
+      renderPage(currentPageNum);
+      setStatus('Continued reading at page ' + currentPageNum);
+    }
+
+    function loadBookmarkIfAvailable(autoMessage = true) {
+      if (!pdfDoc || !currentDocId) return;
+      const data = getBookmarkData();
+      if (!data || !data.page) return;
+      if (data.page < 1 || data.page > pdfDoc.numPages) return;
+      currentPageNum = data.page;
+      renderPage(currentPageNum);
+      if (autoMessage) {
+        setStatus('Resumed at bookmark (page ' + currentPageNum + ').');
+      }
+    }
+
+    // ====== NOTES & HIGHLIGHTS ======
+    function getNotesKey(docId) {
+      return 'pdfNotes_' + docId;
+    }
+
+    function getHighlightsKey(docId) {
+      return 'pdfHighlights_' + docId;
+    }
+
+    function loadAllNotes() {
+      if (!currentDocId) return {};
+      const key = getNotesKey(currentDocId);
+      const raw = localStorage.getItem(key);
+      if (!raw) return {};
+      try {
+        return JSON.parse(raw);
+      } catch (e) {
+        console.warn('Notes parse error', e);
+        return {};
+      }
+    }
+
+    function saveAllNotes(notesObj) {
+      if (!currentDocId) return;
+      const key = getNotesKey(currentDocId);
+      localStorage.setItem(key, JSON.stringify(notesObj));
+    }
+
+    function loadAllHighlights() {
+      if (!currentDocId) return {};
+      const key = getHighlightsKey(currentDocId);
+      const raw = localStorage.getItem(key);
+      if (!raw) return {};
+      try {
+        return JSON.parse(raw);
+      } catch (e) {
+        console.warn('Highlights parse error', e);
+        return {};
+      }
+    }
+
+    function saveAllHighlights(obj) {
+      if (!currentDocId) return;
+      const key = getHighlightsKey(currentDocId);
+      localStorage.setItem(key, JSON.stringify(obj));
+    }
+
+    function getDrawingsKey(docId) {
+      return 'pdfDrawings_' + docId;
+    }
+
+    function loadAllDrawings() {
+      if (!currentDocId) return {};
+      const key = getDrawingsKey(currentDocId);
+      const raw = localStorage.getItem(key);
+      if (!raw) return {};
+      try {
+        return JSON.parse(raw);
+      } catch (e) {
+        console.warn('Drawings parse error', e);
+        return {};
+      }
+    }
+
+    function saveAllDrawings(obj) {
+      if (!currentDocId) return;
+      const key = getDrawingsKey(currentDocId);
+      localStorage.setItem(key, JSON.stringify(obj));
+    }
+
+    function isTypingTarget(target) {
+      return !!target && (
+        target === searchInput ||
+        target === noteText ||
+        !!target.closest?.('input, textarea, select, button')
+      );
+    }
+
+    function createEditId(prefix) {
+      return prefix + '_' + Date.now() + '_' + Math.random().toString(36).slice(2, 7);
+    }
+
+    function pushEditHistory(action) {
+      editUndoStack.push(action);
+      if (editUndoStack.length > 200) editUndoStack.shift();
+      editRedoStack = [];
+    }
+
+    function setInteractionMode(mode) {
+      interactionMode = interactionMode === mode ? null : mode;
+      pageContainer.classList.toggle('mode-highlight', interactionMode === 'highlight');
+      pageContainer.classList.toggle('mode-draw', interactionMode === 'draw');
+
+      if (interactionMode !== 'highlight') {
+        window.getSelection()?.removeAllRanges();
+      }
+      if (interactionMode !== 'draw') {
+        activeDrawStroke = null;
+        redrawDrawingsForCurrentPage();
+      }
+
+      if (interactionMode === 'highlight') {
+        setStatus('Highlight mode enabled. Select text to highlight. Press H again to turn it off.');
+      } else if (interactionMode === 'draw') {
+        setStatus('Draw mode enabled. Drag on the page to draw. Hold Shift for a horizontal straightedge. Press D again to turn it off.');
+      } else {
+        setStatus('');
+      }
+    }
+
+    function getSelectionHighlightData(showErrors = true) {
+      if (!currentDocId || !pdfDoc) {
+        if (showErrors) setStatus('No document loaded.');
+        return null;
+      }
+      const sel = window.getSelection();
+      if (!sel || sel.rangeCount === 0) {
+        if (showErrors) setStatus('Select some text first.');
+        return null;
+      }
+      const range = sel.getRangeAt(0);
+      if (!textLayerDiv.contains(range.commonAncestorContainer)) {
+        if (showErrors) setStatus('Selection must be on the PDF text.');
+        return null;
+      }
+      const selectedText = sel.toString().trim();
+      if (!selectedText) {
+        if (showErrors) setStatus('Selection is empty.');
+        return null;
+      }
+
+      const rects = Array.from(range.getClientRects());
+      const canvasRect = pageContainer.getBoundingClientRect();
+      const blocks = rects.map(r => ({
+        xRatio: (r.left - canvasRect.left) / pdfCanvas.width,
+        yRatio: (r.top - canvasRect.top) / pdfCanvas.height,
+        wRatio: r.width / pdfCanvas.width,
+        hRatio: r.height / pdfCanvas.height
+      }));
+
+      if (!blocks.length) {
+        if (showErrors) setStatus('Selection is empty.');
+        return null;
+      }
+
+      return { sel, selectedText, blocks };
+    }
+
+    function addHighlightNoteFromSelection(showErrors = false) {
+      const selectionData = getSelectionHighlightData(showErrors);
+      if (!selectionData) return false;
+
+      const { sel, selectedText, blocks } = selectionData;
+      const noteBody = noteText.value.trim() || selectedText;
+      const tag = noteTagSelect.value || 'other';
+      const pageKey = String(currentPageNum);
+      const noteId = createEditId('note');
+      const highlightId = createEditId('highlight');
+      const allNotes = loadAllNotes();
+      const allHighlights = loadAllHighlights();
+      if (!allNotes[pageKey]) allNotes[pageKey] = [];
+      if (!allHighlights[pageKey]) allHighlights[pageKey] = {};
+
+      const highlight = {
+        blocks,
+        text: selectedText,
+        kind: 'selection-note-highlight'
+      };
+      allHighlights[pageKey][highlightId] = highlight;
+      const noteObj = {
+        id: noteId,
+        text: noteBody,
+        xRatio: blocks[0]?.xRatio ?? 0.05,
+        yRatio: blocks[0]?.yRatio ?? 0.1,
+        time: Date.now(),
+        tag,
+        highlightId,
+        highlightSnippet: selectedText
+      };
+      allNotes[pageKey].push(noteObj);
+      saveAllNotes(allNotes);
+      saveAllHighlights(allHighlights);
+      pushEditHistory({
+        docId: currentDocId,
+        kind: 'highlight-note',
+        pageKey,
+        noteId,
+        highlightId,
+        noteData: noteObj,
+        highlightData: highlight
+      });
+
+      noteText.value = '';
+      sel.removeAllRanges();
+      loadNotesForCurrentPage();
+      setStatus('Highlight + note added.');
+      return true;
+    }
+
+    function getDrawingsForCurrentPage() {
+      const allDrawings = loadAllDrawings();
+      return allDrawings[String(currentPageNum)] || [];
+    }
+
+    function getDrawPointFromEvent(e) {
+      const rect = drawCanvas.getBoundingClientRect();
+      return {
+        xRatio: clamp01((e.clientX - rect.left) / rect.width),
+        yRatio: clamp01((e.clientY - rect.top) / rect.height)
+      };
+    }
+
+    function getStrokeWidthPx(stroke) {
+      return Math.max(2, stroke.widthPx || ((stroke.widthRatio || 0.004) * drawCanvas.width));
+    }
+
+    function drawStroke(stroke) {
+      const points = stroke?.points || [];
+      if (!points.length) return;
+
+      drawCtx.save();
+      drawCtx.strokeStyle = stroke.color || 'rgba(255, 80, 80, 0.9)';
+      drawCtx.fillStyle = stroke.color || 'rgba(255, 80, 80, 0.9)';
+      drawCtx.lineJoin = 'round';
+      drawCtx.lineCap = 'round';
+      drawCtx.lineWidth = getStrokeWidthPx(stroke);
+
+      const firstPoint = points[0];
+      const firstX = firstPoint.xRatio * drawCanvas.width;
+      const firstY = firstPoint.yRatio * drawCanvas.height;
+
+      if (points.length === 1) {
+        drawCtx.beginPath();
+        drawCtx.arc(firstX, firstY, drawCtx.lineWidth / 2, 0, Math.PI * 2);
+        drawCtx.fill();
+      } else {
+        drawCtx.beginPath();
+        drawCtx.moveTo(firstX, firstY);
+        for (let i = 1; i < points.length; i++) {
+          const point = points[i];
+          drawCtx.lineTo(point.xRatio * drawCanvas.width, point.yRatio * drawCanvas.height);
+        }
+        drawCtx.stroke();
+      }
+
+      drawCtx.restore();
+    }
+
+    function redrawDrawingsForCurrentPage(extraStroke = null) {
+      drawCtx.clearRect(0, 0, drawCanvas.width, drawCanvas.height);
+      if (!currentDocId || !pdfDoc) return;
+      const strokes = getDrawingsForCurrentPage();
+      strokes.forEach(drawStroke);
+      if (extraStroke) drawStroke(extraStroke);
+    }
+
+    function saveFreeDrawStroke(stroke) {
+      const allDrawings = loadAllDrawings();
+      const pageKey = String(currentPageNum);
+      if (!allDrawings[pageKey]) allDrawings[pageKey] = [];
+      allDrawings[pageKey].push(stroke);
+      saveAllDrawings(allDrawings);
+      pushEditHistory({
+        docId: currentDocId,
+        kind: 'free-draw',
+        pageKey,
+        id: stroke.id,
+        data: stroke
+      });
+      redrawDrawingsForCurrentPage();
+      setStatus('Drawing added.');
+    }
+
+    function beginFreeDraw(e) {
+      if (interactionMode !== 'draw' || !pdfDoc) return;
+      e.preventDefault();
+      e.stopPropagation();
+      const point = getDrawPointFromEvent(e);
+      activeDrawStroke = {
+        id: createEditId('draw'),
+        color: currentDrawColor,
+        widthPx: currentDrawSize,
+        points: [point]
+      };
+      drawCanvas.setPointerCapture?.(e.pointerId);
+      redrawDrawingsForCurrentPage(activeDrawStroke);
+    }
+
+    function continueFreeDraw(e) {
+      if (interactionMode !== 'draw' || !activeDrawStroke) return;
+      e.preventDefault();
+      const point = getDrawPointFromEvent(e);
+      if (e.shiftKey && activeDrawStroke.points.length) {
+        point.yRatio = activeDrawStroke.points[0].yRatio;
+      }
+      const lastPoint = activeDrawStroke.points[activeDrawStroke.points.length - 1];
+      if (lastPoint && Math.abs(lastPoint.xRatio - point.xRatio) < 0.001 && Math.abs(lastPoint.yRatio - point.yRatio) < 0.001) {
+        return;
+      }
+      activeDrawStroke.points.push(point);
+      redrawDrawingsForCurrentPage(activeDrawStroke);
+    }
+
+    function endFreeDraw(e) {
+      if (!activeDrawStroke) return;
+      if (e) {
+        e.preventDefault();
+        drawCanvas.releasePointerCapture?.(e.pointerId);
+      }
+      const stroke = activeDrawStroke;
+      activeDrawStroke = null;
+      if (stroke.points.length) saveFreeDrawStroke(stroke);
+      else redrawDrawingsForCurrentPage();
+    }
+
+    function applyUndoRedoAction(action, direction) {
+      if (!action || action.docId !== currentDocId) return false;
+
+      if (action.kind === 'highlight-note') {
+        const allNotes = loadAllNotes();
+        const allHighlights = loadAllHighlights();
+        const pageNotes = allNotes[action.pageKey] || [];
+        const pageHighlights = allHighlights[action.pageKey] || {};
+        if (direction === 'undo') {
+          allNotes[action.pageKey] = pageNotes.filter(note => note.id !== action.noteId);
+          if (allNotes[action.pageKey].length === 0) delete allNotes[action.pageKey];
+          delete pageHighlights[action.highlightId];
+          if (Object.keys(pageHighlights).length === 0) delete allHighlights[action.pageKey];
+          else allHighlights[action.pageKey] = pageHighlights;
+        } else {
+          if (!allNotes[action.pageKey]) allNotes[action.pageKey] = [];
+          if (!allNotes[action.pageKey].some(note => note.id === action.noteId)) {
+            allNotes[action.pageKey].push(action.noteData);
+          }
+          if (!allHighlights[action.pageKey]) allHighlights[action.pageKey] = {};
+          allHighlights[action.pageKey][action.highlightId] = action.highlightData;
+        }
+        saveAllNotes(allNotes);
+        saveAllHighlights(allHighlights);
+      } else if (action.kind === 'free-draw') {
+        const allDrawings = loadAllDrawings();
+        const pageDrawings = allDrawings[action.pageKey] || [];
+        if (direction === 'undo') {
+          allDrawings[action.pageKey] = pageDrawings.filter(stroke => stroke.id !== action.id);
+          if (allDrawings[action.pageKey].length === 0) delete allDrawings[action.pageKey];
+        } else {
+          if (!allDrawings[action.pageKey]) allDrawings[action.pageKey] = [];
+          if (!allDrawings[action.pageKey].some(stroke => stroke.id === action.id)) {
+            allDrawings[action.pageKey].push(action.data);
+          }
+        }
+        saveAllDrawings(allDrawings);
+      } else {
+        return false;
+      }
+
+      loadNotesForCurrentPage();
+      redrawDrawingsForCurrentPage();
+      return true;
+    }
+
+    function undoEditAction() {
+      const action = editUndoStack.pop();
+      if (!action) {
+        setStatus('Nothing to undo.');
+        return;
+      }
+      if (!applyUndoRedoAction(action, 'undo')) {
+        editUndoStack.push(action);
+        return;
+      }
+      editRedoStack.push(action);
+      setStatus('Undo.');
+    }
+
+    function redoEditAction() {
+      const action = editRedoStack.pop();
+      if (!action) {
+        setStatus('Nothing to redo.');
+        return;
+      }
+      if (!applyUndoRedoAction(action, 'redo')) {
+        editRedoStack.push(action);
+        return;
+      }
+      editUndoStack.push(action);
+      setStatus('Redo.');
+    }
+
+    function editNoteAtIndex(index) {
+      const allNotes = loadAllNotes();
+      const pageKey = String(currentPageNum);
+      const list = allNotes[pageKey] || [];
+      const note = list[index];
+      if (!note) return;
+      const newText = prompt('Edit note:', note.text);
+      if (newText === null) return;
+      const trimmed = newText.trim();
+      if (!trimmed) {
+        deleteNoteAtIndex(index);
+        return;
+      }
+      note.text = trimmed;
+      note.time = Date.now();
+      saveAllNotes(allNotes);
+      loadNotesForCurrentPage();
+      setStatus('Note updated.');
+    }
+
+    function deleteNoteAtIndex(index) {
+      const allNotes = loadAllNotes();
+      const pageKey = String(currentPageNum);
+      const list = allNotes[pageKey] || [];
+      if (index < 0 || index >= list.length) return;
+      const deleted = list.splice(index, 1)[0];
+      if (list.length === 0) delete allNotes[pageKey];
+      saveAllNotes(allNotes);
+
+      if (deleted && deleted.highlightId != null) {
+        const allHighlights = loadAllHighlights();
+        if (allHighlights[pageKey]) {
+          delete allHighlights[pageKey][deleted.highlightId];
+          if (Object.keys(allHighlights[pageKey]).length === 0) delete allHighlights[pageKey];
+          saveAllHighlights(allHighlights);
+        }
+      }
+
+      loadNotesForCurrentPage();
+      setStatus('Note deleted.');
+    }
+
+    function addNoteWithClickPosition() {
+      if (!currentDocId) {
+        setStatus('No document loaded.');
+        return;
+      }
+      const textVal = noteText.value.trim();
+      if (!textVal) {
+        setStatus('Note is empty.');
+        return;
+      }
+      const allNotes = loadAllNotes();
+      const pageKey = String(currentPageNum);
+      if (!allNotes[pageKey]) allNotes[pageKey] = [];
+
+      const pos = lastClickPosition || { xRatio: 0.05, yRatio: 0.1 };
+      const noteObj = {
+        text: textVal,
+        xRatio: pos.xRatio,
+        yRatio: pos.yRatio,
+        time: Date.now(),
+        tag: noteTagSelect.value || 'other',
+        highlightId: null,
+        highlightSnippet: null
+      };
+      allNotes[pageKey].push(noteObj);
+      saveAllNotes(allNotes);
+      noteText.value = '';
+      lastClickPosition = null;
+      loadNotesForCurrentPage();
+      setStatus('Note added on page ' + currentPageNum);
+    }
+
+    function addNoteFromSelection() {
+      addHighlightNoteFromSelection(true);
+    }
+
+    function loadNotesForCurrentPage() {
+      notesList.innerHTML = '';
+      if (!currentDocId) return;
+      const allNotes = loadAllNotes();
+      const filterTag = noteFilterSelect.value || 'all';
+      const pageKey = String(currentPageNum);
+      const list = allNotes[pageKey] || [];
+      list.forEach((note, idx) => {
+        if (filterTag !== 'all' && note.tag !== filterTag) return;
+
+        const wrapper = document.createElement('div');
+        wrapper.className = 'note-item';
+
+        const date = new Date(note.time || Date.now());
+        const dateStr = date.toLocaleString();
+
+        const meta = document.createElement('div');
+        meta.className = 'note-meta';
+        meta.textContent =
+          `#${idx + 1} – Page ${currentPageNum} • ${dateStr} • [${note.tag || 'other'}]`;
+
+        const textDiv = document.createElement('div');
+        textDiv.className = 'note-text';
+        textDiv.textContent = note.text;
+
+        if (note.highlightSnippet) {
+          const hl = document.createElement('div');
+          hl.className = 'note-meta';
+          hl.textContent = `“${note.highlightSnippet.slice(0, 80)}${note.highlightSnippet.length > 80 ? '…' : ''}”`;
+          wrapper.appendChild(hl);
+        }
+
+        const actions = document.createElement('div');
+        actions.className = 'note-actions';
+
+        const editBtn = document.createElement('button');
+        editBtn.textContent = 'Edit';
+        editBtn.className = 'small';
+        editBtn.addEventListener('click', (ev) => {
+          ev.stopPropagation();
+          editNoteAtIndex(idx);
+        });
+
+        const deleteBtn = document.createElement('button');
+        deleteBtn.textContent = 'Delete';
+        deleteBtn.className = 'small';
+        deleteBtn.addEventListener('click', (ev) => {
+          ev.stopPropagation();
+          deleteNoteAtIndex(idx);
+        });
+
+        actions.appendChild(editBtn);
+        actions.appendChild(deleteBtn);
+
+        wrapper.appendChild(meta);
+        wrapper.appendChild(textDiv);
+        wrapper.appendChild(actions);
+
+        wrapper.addEventListener('click', () => {
+          viewerContainer.scrollTop =
+            pageContainer.offsetTop + (note.yRatio || 0) * pdfCanvas.height - viewerContainer.clientHeight / 2;
+        });
+
+        notesList.appendChild(wrapper);
+      });
+      notesList.style.fontSize = (notesFontSizeSelect.value || '0.85') + 'rem';
+      redrawMarkersAndHighlights();
+      redrawDrawingsForCurrentPage();
+      updateMiniNav();
+    }
+
+    function redrawMarkersAndHighlights() {
+      markerLayer.innerHTML = '';
+      highlightLayer.innerHTML = '';
+      if (!currentDocId || !pdfDoc) return;
+      const allNotes = loadAllNotes();
+      const allHighlights = loadAllHighlights();
+      const pageKey = String(currentPageNum);
+      const list = allNotes[pageKey] || [];
+      list.forEach((note, idx) => {
+        const marker = document.createElement('div');
+        marker.className = 'note-marker';
+        const tagClass = note.tag ? 'marker-tag-' + note.tag : 'marker-tag-other';
+        marker.classList.add(tagClass);
+        marker.textContent = idx + 1;
+        const x = (note.xRatio || 0.05) * pdfCanvas.width;
+        const y = (note.yRatio || 0.1) * pdfCanvas.height;
+        marker.style.left = x + 'px';
+        marker.style.top = y + 'px';
+        marker.title = note.text;
+
+        marker.onmousedown = (e) => {
+          e.stopPropagation();
+          const dragOffsetX = e.clientX - marker.getBoundingClientRect().left;
+          const dragOffsetY = e.clientY - marker.getBoundingClientRect().top;
+          document.body.style.userSelect = 'none';
+
+          const moveHandler = (moveEvent) => {
+            const rect = pageContainer.getBoundingClientRect();
+            let nx = moveEvent.clientX - rect.left - dragOffsetX;
+            let ny = moveEvent.clientY - rect.top - dragOffsetY;
+            nx = Math.max(0, Math.min(nx, pdfCanvas.width - 18));
+            ny = Math.max(0, Math.min(ny, pdfCanvas.height - 18));
+            marker.style.left = nx + 'px';
+            marker.style.top = ny + 'px';
+          };
+
+          const upHandler = () => {
+            document.body.style.userSelect = '';
+            document.removeEventListener('mousemove', moveHandler);
+            document.removeEventListener('mouseup', upHandler);
+
+            const left = parseFloat(marker.style.left);
+            const top = parseFloat(marker.style.top);
+            const allNotesLocal = loadAllNotes();
+            const lpageKey = String(currentPageNum);
+            if (allNotesLocal[lpageKey] && allNotesLocal[lpageKey][idx]) {
+              allNotesLocal[lpageKey][idx].xRatio = left / pdfCanvas.width;
+              allNotesLocal[lpageKey][idx].yRatio = top / pdfCanvas.height;
+              saveAllNotes(allNotesLocal);
+            }
+          };
+
+          document.addEventListener('mousemove', moveHandler);
+          document.addEventListener('mouseup', upHandler);
+        };
+
+        marker.onclick = (e) => {
+          e.stopPropagation();
+          const wantEdit = confirm('Note #' + (idx + 1) + ':\n\n' + note.text + '\n\nEdit this note?');
+          if (wantEdit) {
+            editNoteAtIndex(idx);
+          }
+        };
+
+        markerLayer.appendChild(marker);
+      });
+
+      const highlightsForPage = (allHighlights[pageKey] || {});
+      Object.values(highlightsForPage).forEach(h => {
+        (h.blocks || []).forEach(b => {
+          const div = document.createElement('div');
+          div.className = 'highlight-block';
+          div.style.left = (b.xRatio * pdfCanvas.width) + 'px';
+          div.style.top = (b.yRatio * pdfCanvas.height) + 'px';
+          div.style.width = (b.wRatio * pdfCanvas.width) + 'px';
+          div.style.height = (b.hRatio * pdfCanvas.height) + 'px';
+          highlightLayer.appendChild(div);
+        });
+      });
+
+      refreshBookmarkUI();
+    }
+
+    // ====== SEARCH ======
+    function clearSearchHighlights() {
+      searchResults = [];
+      searchIndex = -1;
+      const spans = textLayerDiv.querySelectorAll('.search-hit, .search-hit-active');
+      spans.forEach(s => s.classList.remove('search-hit', 'search-hit-active'));
+    }
+
+    function performSearch(term) {
+      clearSearchHighlights();
+      if (!term || !pdfDoc) return;
+      const lower = term.toLowerCase();
+      const spans = Array.from(textLayerDiv.querySelectorAll('span'));
+      spans.forEach((sp, idx) => {
+        const txt = sp.textContent || '';
+        if (txt.toLowerCase().includes(lower)) {
+          sp.classList.add('search-hit');
+          searchResults.push({ element: sp, index: idx });
+        }
+      });
+      if (!searchResults.length) {
+        setStatus('No matches.');
+        return;
+      }
+      searchIndex = 0;
+      focusSearchResult();
+    }
+
+    function focusSearchResult() {
+      if (searchIndex < 0 || searchIndex >= searchResults.length) return;
+      searchResults.forEach(r => r.element.classList.remove('search-hit-active'));
+      const hit = searchResults[searchIndex];
+      hit.element.classList.add('search-hit-active');
+      const rect = hit.element.getBoundingClientRect();
+      const containerRect = viewerContainer.getBoundingClientRect();
+      const offset = rect.top - containerRect.top + viewerContainer.scrollTop - 60;
+      viewerContainer.scrollTop = offset;
+      setStatus(`Match ${searchIndex + 1}/${searchResults.length}`);
+    }
+
+    function searchNext() {
+      if (!searchResults.length) return;
+      searchIndex = (searchIndex + 1) % searchResults.length;
+      focusSearchResult();
+    }
+
+    function searchPrev() {
+      if (!searchResults.length) return;
+      searchIndex = (searchIndex - 1 + searchResults.length) % searchResults.length;
+      focusSearchResult();
+    }
+
+    // ====== TOC / MINI NAV ======
+    async function loadOutline() {
+      tocList.innerHTML = '';
+      if (!pdfDoc) return;
+      try {
+        const outline = await pdfDoc.getOutline();
+        if (!outline || !outline.length) {
+          tocList.innerHTML = '<div style="color:#777;font-size:0.8rem;">No outline available.</div>';
+          return;
+        }
+        outline.forEach(item => addOutlineItem(item, 0));
+      } catch {
+        tocList.innerHTML = '<div style="color:#777;font-size:0.8rem;">No outline.</div>';
+      }
+    }
+
+    function addOutlineItem(item, depth) {
+      const div = document.createElement('div');
+      div.className = 'toc-item';
+      div.style.paddingLeft = (depth * 10 + 2) + 'px';
+      div.textContent = item.title || '(no title)';
+      div.onclick = async () => {
+        if (!item.dest && !item.url) return;
+        let dest = item.dest;
+        if (typeof dest === 'string') {
+          dest = await pdfDoc.getDestination(dest);
+        }
+        if (dest) {
+          const ref = dest[0];
+          const pageIndex = await pdfDoc.getPageIndex(ref);
+          currentPageNum = pageIndex + 1;
+          renderPage(currentPageNum);
+        }
+      };
+      tocList.appendChild(div);
+      if (item.items && item.items.length) {
+        item.items.forEach(child => addOutlineItem(child, depth + 1));
+      }
+    }
+
+    function updateMiniNav() {
+      if (!pdfDoc || !currentDocId) {
+        pageMiniNav.innerHTML = '';
+        return;
+      }
+      const allNotes = loadAllNotes();
+      const bookmark = getBookmarkData();
+      const pageCount = pdfDoc.numPages;
+      pageMiniNav.innerHTML = '';
+      const fragment = document.createDocumentFragment();
+      for (let p = 1; p <= pageCount; p++) {
+        const row = document.createElement('div');
+        row.className = 'page-mini';
+        if (p === currentPageNum) row.classList.add('page-mini-current');
+        const left = document.createElement('span');
+        left.textContent = `p${p}`;
+        const right = document.createElement('span');
+        right.style.display = 'flex';
+        right.style.alignItems = 'center';
+
+        const hasNotes = !!(allNotes[String(p)] && allNotes[String(p)].length);
+        if (hasNotes) {
+          const dot = document.createElement('div');
+          dot.className = 'mini-note-dot';
+          right.appendChild(dot);
+        }
+        if (bookmark && bookmark.page === p) {
+          const flag = document.createElement('div');
+          flag.className = 'mini-bookmark-flag';
+          right.appendChild(flag);
+        }
+
+        row.appendChild(left);
+        row.appendChild(right);
+        row.onclick = () => {
+          currentPageNum = p;
+          renderPage(currentPageNum);
+        };
+        fragment.appendChild(row);
+      }
+      pageMiniNav.appendChild(fragment);
+
+      pageSlider.max = String(pageCount);
+      pageSlider.value = String(currentPageNum);
+      pageSliderLabel.textContent = String(currentPageNum);
+    }
+
+    // ====== CITATION / METADATA ======
+    async function loadMetadata() {
+      citationBlock.textContent = '';
+      if (!pdfDoc) return;
+      try {
+        const meta = await pdfDoc.getMetadata();
+        const info = meta.info || {};
+        const title = info.Title || '(No title)';
+        const author = info.Author || '(Unknown author)';
+        const year = (info.CreationDate || '').match(/\d{4}/)?.[0] || '';
+        const source = info.Producer || info.Creator || '';
+        const apa =
+          `${author}. (${year || 'n.d.'}). ${title}${source ? '. ' + source : ''}.`;
+        citationBlock.textContent =
+          `Title: ${title}\nAuthors: ${author}\nYear: ${year}\nAPA-ish: ${apa}`;
+      } catch {
+        citationBlock.textContent = 'No metadata available.';
+      }
+    }
+
+    // ====== LOW INK ======
+    function updateLowInkMode() {
+      pdfCanvas.style.background = lowInkMode ? '#fafafa' : '#222';
+    }
+
+    function clamp01(value) {
+      return Math.max(0, Math.min(1, value));
+    }
+
+    function getCurrentPageScrollRatio() {
+      const pageScrollableHeight = Math.max(0, pageContainer.offsetHeight - viewerContainer.clientHeight);
+      if (pageScrollableHeight <= 0) return 0;
+      const scrollWithinPage = viewerContainer.scrollTop - pageContainer.offsetTop;
+      return clamp01(scrollWithinPage / pageScrollableHeight);
+    }
+
+    function restorePageScrollRatio(scrollRatio) {
+      const pageScrollableHeight = Math.max(0, pageContainer.offsetHeight - viewerContainer.clientHeight);
+      const target = pageContainer.offsetTop + clamp01(scrollRatio || 0) * pageScrollableHeight;
+      viewerContainer.scrollTop = Math.max(0, target);
+    }
+
+    function getSavedReadingPosition() {
+      if (!currentDocId || !pdfDoc) return null;
+      const settings = perDocSettings[currentDocId] || loadSettings();
+      const page = Number(settings.lastPage);
+      if (!Number.isInteger(page) || page < 1 || page > pdfDoc.numPages) return null;
+      return {
+        page,
+        scrollRatio: clamp01(Number(settings.lastScrollRatio) || 0)
+      };
+    }
+
+    function persistReadingPosition(immediate = false) {
+      if (!currentDocId || !pdfDoc) return;
+
+      const saveNow = () => {
+        const settings = loadSettings();
+        settings.lastPage = currentPageNum;
+        settings.lastScrollRatio = getCurrentPageScrollRatio();
+        saveSettings(settings);
+      };
+
+      if (immediate) {
+        clearTimeout(saveReadingPositionTimer);
+        saveReadingPositionTimer = null;
+        saveNow();
+        return;
+      }
+
+      clearTimeout(saveReadingPositionTimer);
+      saveReadingPositionTimer = setTimeout(() => {
+        saveReadingPositionTimer = null;
+        saveNow();
+      }, 120);
+    }
+
+    // ====== RENDERING ======
+    async function renderPage(num, options = {}) {
+      if (!pdfDoc) return;
+      const { scrollRatio = null } = options;
+      const requestId = ++renderRequestId;
+      setStatus('Rendering page ' + num + '...');
+
+      const page = await pdfDoc.getPage(num);
+      if (requestId !== renderRequestId) {
+        page.cleanup();
+        return;
+      }
+      const viewport = page.getViewport({ scale: currentScale });
+
+      pdfCanvas.height = viewport.height;
+      pdfCanvas.width = viewport.width;
+
+      pageContainer.style.width = viewport.width + 'px';
+      pageContainer.style.height = viewport.height + 'px';
+      textLayerDiv.style.width = viewport.width + 'px';
+      textLayerDiv.style.height = viewport.height + 'px';
+      markerLayer.style.width = viewport.width + 'px';
+      markerLayer.style.height = viewport.height + 'px';
+      highlightLayer.style.width = viewport.width + 'px';
+      highlightLayer.style.height = viewport.height + 'px';
+      drawCanvas.width = viewport.width;
+      drawCanvas.height = viewport.height;
+      drawCanvas.style.width = viewport.width + 'px';
+      drawCanvas.style.height = viewport.height + 'px';
+
+      const flagSize = Math.min(viewport.width, viewport.height) * 0.4;
+      bookmarkCorner.style.width = flagSize + 'px';
+      bookmarkCorner.style.height = flagSize + 'px';
+
+      const renderContext = {
+        canvasContext: ctx,
+        viewport: viewport
+      };
+      if (activeRenderTask) {
+        try {
+          activeRenderTask.cancel();
+        } catch {}
+      }
+      activeRenderTask = page.render(renderContext);
+      try {
+        await activeRenderTask.promise;
+      } catch (err) {
+        if (err && err.name === 'RenderingCancelledException') {
+          return;
+        }
+        throw err;
+      } finally {
+        if (requestId === renderRequestId) {
+          activeRenderTask = null;
+        }
+      }
+
+      const textContent = await page.getTextContent();
+      if (requestId !== renderRequestId) {
+        page.cleanup();
+        return;
+      }
+      textLayerDiv.replaceChildren();
+      clearSearchHighlights();
+      await pdfjsLib.renderTextLayer({
+        textContent,
+        container: textLayerDiv,
+        viewport,
+        textDivs: []
+      }).promise;
+
+      if (requestId !== renderRequestId) {
+        page.cleanup();
+        return;
+      }
+
+      pageNumSpan.textContent = num;
+      pageSlider.value = String(num);
+      pageSliderLabel.textContent = String(num);
+      setStatus('');
+
+      loadNotesForCurrentPage();
+      if (scrollRatio != null) {
+        restorePageScrollRatio(scrollRatio);
+      }
+      updateStatsOnPageRender(num);
+      persistReadingPosition(true);
+      page.cleanup();
+    }
+
+    function queueRenderPage(num) {
+      if (!pdfDoc) return;
+      if (num < 1 || num > pdfDoc.numPages) return;
+      currentPageNum = num;
+      renderPage(num);
+    }
+
+    function handleHorizontalTouchpadSwipe(e) {
+      if (!pdfDoc) return;
+      if (e.ctrlKey) return;
+      if (e.deltaMode !== WheelEvent.DOM_DELTA_PIXEL) return;
+
+      const absX = Math.abs(e.deltaX);
+      const absY = Math.abs(e.deltaY);
+      if (absX < 10 || absX <= absY * 1.25) return;
+
+      const now = Date.now();
+      if (now - lastHorizontalPageTurnAt < 250) {
+        e.preventDefault();
+        return;
+      }
+
+      horizontalSwipeAccum += e.deltaX;
+      clearTimeout(horizontalSwipeResetTimer);
+      horizontalSwipeResetTimer = setTimeout(() => {
+        horizontalSwipeAccum = 0;
+      }, 140);
+
+      if (Math.abs(horizontalSwipeAccum) < 90) {
+        e.preventDefault();
+        return;
+      }
+
+      const direction = horizontalSwipeAccum > 0 ? 1 : -1;
+      horizontalSwipeAccum = 0;
+      lastHorizontalPageTurnAt = now;
+      e.preventDefault();
+      queueRenderPage(currentPageNum + direction);
+    }
+
+    // ====== LOADING PDF ======
+    async function loadPdfFromUint8(uint8, docId, name) {
+      try {
+        setStatus('Loading PDF...');
+        const loadingTask = pdfjsLib.getDocument({ data: uint8 });
+        pdfDoc = await loadingTask.promise;
+        currentPageNum = 1;
+        currentDocId = docId;
+        pageCountSpan.textContent = pdfDoc.numPages;
+        editUndoStack = [];
+        editRedoStack = [];
+        interactionMode = null;
+        activeDrawStroke = null;
+        pageContainer.classList.remove('mode-highlight', 'mode-draw');
+        try {
+          await updateDocLastOpened(docId);
+        } catch (storageError) {
+          console.warn('Could not update stored PDF metadata.', storageError);
+        }
+        setStatus('PDF loaded.');
+
+        perDocStats[docId] = loadStats();
+        perDocSettings[docId] = loadSettings();
+        applySettingsToUI(perDocSettings[docId] || {});
+        updateLowInkMode();
+        const savedReadingPosition = getSavedReadingPosition();
+        if (savedReadingPosition) {
+          currentPageNum = savedReadingPosition.page;
+        }
+        await renderPage(currentPageNum, { scrollRatio: savedReadingPosition?.scrollRatio ?? 0 });
+        if (savedReadingPosition) {
+          setStatus('Resumed at page ' + currentPageNum + '.');
+        }
+        refreshBookmarkUI();
+        refreshBookmarkListUI();
+        updateMiniNav();
+        loadOutline();
+        loadMetadata();
+        updateStatsBlock();
+        readingStartTimestamp = Date.now();
+      } catch (err) {
+        console.error(err);
+        setStatus('Error loading stored PDF.');
+      }
+    }
+
+    async function loadPdfFromFile(file) {
+      try {
+        const fileReader = new FileReader();
+        fileReader.onload = async function(e) {
+          const arrayBuffer = e.target.result;
+          const typedarray = new Uint8Array(arrayBuffer);
+          const docId = 'doc_' + Date.now() + '_' + file.name;
+          const persistPromise = addOrUpdateDocEntry(docId, file.name, arrayBuffer).catch((storageError) => {
+            console.warn('Could not save PDF for the recent list.', storageError);
+          });
+          await loadPdfFromUint8(typedarray, docId, file.name);
+          await persistPromise;
+        };
+        fileReader.readAsArrayBuffer(file);
+      } catch (err) {
+        console.error(err);
+        setStatus('Error loading PDF file.');
+      }
+    }
+
+    // ====== STARTUP MODAL ======
+    async function populateRecentList() {
+      recentList.innerHTML = '';
+      let entries = [];
+      try {
+        entries = (await getStoredDocs()).sort((a, b) => (b.lastOpened || 0) - (a.lastOpened || 0));
+      } catch {
+        recentList.innerHTML = '<div style="color:#777;font-size:0.9rem;">Saved PDFs are unavailable in this browser.</div>';
+        return;
+      }
+      if (!entries.length) {
+        recentList.innerHTML = '<div style="color:#777;font-size:0.9rem;">No previously opened PDFs.</div>';
+        return;
+      }
+      entries.forEach((doc) => {
+        const div = document.createElement('div');
+        div.className = 'recent-item';
+        const lastOpened = doc.lastOpened ? new Date(doc.lastOpened).toLocaleString() : 'Unknown';
+        div.innerHTML = `
+          <div class="recent-name">${doc.name}</div>
+          <div class="recent-meta">Last opened: ${lastOpened}</div>
+        `;
+        div.onclick = async () => {
+          startupModal.classList.add('hidden');
+          try {
+            const storedDoc = await getStoredDoc(doc.id);
+            if (!storedDoc || !storedDoc.data) {
+              setStatus('Stored PDF data is missing.');
+              return;
+            }
+            await loadPdfFromUint8(new Uint8Array(storedDoc.data), doc.id, doc.name);
+          } catch (error) {
+            console.error(error);
+            setStatus('Error loading stored PDF.');
+          }
+        };
+        recentList.appendChild(div);
+      });
+    }
+
+    function showStartupModal() {
+      populateRecentList();
+      startupModal.classList.remove('hidden');
+    }
+
+    function hideStartupModal() {
+      startupModal.classList.add('hidden');
+    }
+
+    // ====== EXPORT / IMPORT NOTES & STATE ======
+    function downloadJSON(filename, dataObj) {
+      const blob = new Blob([JSON.stringify(dataObj, null, 2)], { type: 'application/json' });
+      const url = URL.createObjectURL(blob);
+      const a = document.createElement('a');
+      a.href = url;
+      a.download = filename;
+      document.body.appendChild(a);
+      a.click();
+      a.remove();
+      URL.revokeObjectURL(url);
+    }
+
+    function exportNotes() {
+      if (!currentDocId) {
+        setStatus('No document.');
+        return;
+      }
+      const notes = loadAllNotes();
+      const highlights = loadAllHighlights();
+      downloadJSON(`notes_${currentDocId}.json`, { notes, highlights });
+      setStatus('Notes exported.');
+    }
+
+    function importNotesFromFile(file) {
+      const reader = new FileReader();
+      reader.onload = (e) => {
+        try {
+          const obj = JSON.parse(e.target.result);
+          if (obj.notes) saveAllNotes(obj.notes);
+          if (obj.highlights) saveAllHighlights(obj.highlights);
+          loadNotesForCurrentPage();
+          setStatus('Notes imported.');
+        } catch {
+          setStatus('Invalid notes file.');
+        }
+      };
+      reader.readAsText(file);
+    }
+
+    async function exportAllState() {
+      let docs = [];
+      try {
+        docs = await getStoredDocs(true);
+      } catch (storageError) {
+        console.error(storageError);
+        setStatus('Could not read saved PDFs for export.');
+        return;
+      }
+      const state = {
+        docs: {},
+        bookmarks: {},
+        bookmarksNamed: {},
+        notes: {},
+        highlights: {},
+        drawings: {},
+        stats: {},
+        settings: {}
+      };
+      docs.forEach((doc) => {
+        state.docs[doc.id] = {
+          id: doc.id,
+          name: doc.name,
+          data: arrayBufferToBase64(doc.data),
+          created: doc.created,
+          lastOpened: doc.lastOpened
+        };
+      });
+      Object.keys(state.docs).forEach(id => {
+        state.bookmarks[id] = localStorage.getItem('pdfBookmark_' + id) || null;
+        state.bookmarksNamed[id] = localStorage.getItem('pdfBookmarksNamed_' + id) || null;
+        state.notes[id] = localStorage.getItem('pdfNotes_' + id) || null;
+        state.highlights[id] = localStorage.getItem('pdfHighlights_' + id) || null;
+        state.drawings[id] = localStorage.getItem('pdfDrawings_' + id) || null;
+        state.stats[id] = localStorage.getItem('pdfStats_' + id) || null;
+        state.settings[id] = localStorage.getItem('pdfSettings_' + id) || null;
+      });
+      downloadJSON('pdf_reader_state.json', state);
+      setStatus('All state exported.');
+    }
+
+    function importAllStateFromFile(file) {
+      const reader = new FileReader();
+      reader.onload = async (e) => {
+        try {
+          const obj = JSON.parse(e.target.result);
+          if (obj.docs) {
+            const docs = Object.values(obj.docs);
+            for (const doc of docs) {
+              if (!doc || !doc.id) continue;
+              const data = typeof doc.data === 'string' ? base64ToUint8Array(doc.data).buffer : doc.data;
+              try {
+                await withDocStore('readwrite', (store) => requestToPromise(store.put({
+                  id: doc.id,
+                  name: doc.name || 'Untitled PDF',
+                  data,
+                  created: doc.created || Date.now(),
+                  lastOpened: doc.lastOpened || Date.now()
+                })));
+              } catch (storageError) {
+                console.error(storageError);
+                setStatus('State import could not save stored PDFs.');
+                return;
+              }
+            }
+          }
+          Object.keys(obj.bookmarks || {}).forEach(id => {
+            const v = obj.bookmarks[id];
+            if (v == null) localStorage.removeItem('pdfBookmark_' + id);
+            else localStorage.setItem('pdfBookmark_' + id, v);
+          });
+          Object.keys(obj.bookmarksNamed || {}).forEach(id => {
+            const v = obj.bookmarksNamed[id];
+            if (v == null) localStorage.removeItem('pdfBookmarksNamed_' + id);
+            else localStorage.setItem('pdfBookmarksNamed_' + id, v);
+          });
+          Object.keys(obj.notes || {}).forEach(id => {
+            const v = obj.notes[id];
+            if (v == null) localStorage.removeItem('pdfNotes_' + id);
+            else localStorage.setItem('pdfNotes_' + id, v);
+          });
+          Object.keys(obj.highlights || {}).forEach(id => {
+            const v = obj.highlights[id];
+            if (v == null) localStorage.removeItem('pdfHighlights_' + id);
+            else localStorage.setItem('pdfHighlights_' + id, v);
+          });
+          Object.keys(obj.drawings || {}).forEach(id => {
+            const v = obj.drawings[id];
+            if (v == null) localStorage.removeItem('pdfDrawings_' + id);
+            else localStorage.setItem('pdfDrawings_' + id, v);
+          });
+          Object.keys(obj.stats || {}).forEach(id => {
+            const v = obj.stats[id];
+            if (v == null) localStorage.removeItem('pdfStats_' + id);
+            else localStorage.setItem('pdfStats_' + id, v);
+          });
+          Object.keys(obj.settings || {}).forEach(id => {
+            const v = obj.settings[id];
+            if (v == null) localStorage.removeItem('pdfSettings_' + id);
+            else localStorage.setItem('pdfSettings_' + id, v);
+          });
+          setStatus('State imported. Reload tool to see changes.');
+          populateRecentList();
+        } catch {
+          setStatus('Invalid state file.');
+        }
+      };
+      reader.readAsText(file);
+    }
+
+    // ====== SIDEBAR RESIZE ======
+    (function setupSidebarResize() {
+      let dragging = false;
+      let startX = 0;
+      let startWidth = 0;
+      sidebarResizer.addEventListener('mousedown', (e) => {
+        dragging = true;
+        startX = e.clientX;
+        startWidth = sidebar.offsetWidth;
+        document.body.style.userSelect = 'none';
+      });
+      document.addEventListener('mousemove', (e) => {
+        if (!dragging) return;
+        const dx = e.clientX - startX;
+        let newWidth = startWidth + dx;
+        newWidth = Math.max(230, Math.min(480, newWidth));
+        sidebar.style.width = newWidth + 'px';
+      });
+      document.addEventListener('mouseup', () => {
+        dragging = false;
+        document.body.style.userSelect = '';
+      });
+    })();
+
+    // ====== EVENTS ======
+    fileInput.addEventListener('change', (e) => {
+      const file = e.target.files[0];
+      if (file) {
+        hideStartupModal();
+        loadPdfFromFile(file);
+      }
+    });
+
+    newPdfBtn.addEventListener('click', () => {
+      fileInput.click();
+    });
+
+    prevPageBtn.addEventListener('click', () => {
+      queueRenderPage(currentPageNum - 1);
+    });
+    nextPageBtn.addEventListener('click', () => {
+      queueRenderPage(currentPageNum + 1);
+    });
+
+    pageSlider.addEventListener('input', () => {
+      const val = parseInt(pageSlider.value || '1', 10);
+      pageSliderLabel.textContent = String(val);
+    });
+    pageSlider.addEventListener('change', () => {
+      const val = parseInt(pageSlider.value || '1', 10);
+      queueRenderPage(val);
+    });
+
+    zoomInBtn.addEventListener('click', () => {
+      currentScale *= 1.2;
+      renderPage(currentPageNum);
+      const settings = loadSettings();
+      settings.zoom = currentScale;
+      saveSettings(settings);
+    });
+    zoomOutBtn.addEventListener('click', () => {
+      currentScale /= 1.2;
+      renderPage(currentPageNum);
+      const settings = loadSettings();
+      settings.zoom = currentScale;
+      saveSettings(settings);
+    });
+    resetZoomBtn.addEventListener('click', () => {
+      currentScale = 1.2;
+      renderPage(currentPageNum);
+      const settings = loadSettings();
+      settings.zoom = currentScale;
+      saveSettings(settings);
+    });
+
+    bookmarkBtn.addEventListener('click', toggleBookmarkForCurrentPage);
+    continueBtn.addEventListener('click', jumpToBookmark);
+    addNamedBookmarkBtn.addEventListener('click', addNamedBookmarkForCurrentPage);
+
+    stickyNoteButton.addEventListener('click', () => {
+      if (!pdfDoc) {
+        setStatus('Load a PDF first.');
+        return;
+      }
+      setStatus('Click somewhere on the page, then press "Save Note".');
+    });
+
+    saveNoteBtn.addEventListener('click', addNoteWithClickPosition);
+    highlightNoteButton.addEventListener('click', addNoteFromSelection);
+    noteFilterSelect.addEventListener('change', () => loadNotesForCurrentPage());
+
+    pageContainer.addEventListener('click', (e) => {
+      if (interactionMode) return;
+      const rect = pageContainer.getBoundingClientRect();
+      const x = e.clientX - rect.left;
+      const y = e.clientY - rect.top;
+      lastClickPosition = {
+        xRatio: x / pdfCanvas.width,
+        yRatio: y / pdfCanvas.height
+      };
+      setStatus('Click position stored for next note.');
+    });
+
+    viewerContainer.addEventListener('wheel', handleHorizontalTouchpadSwipe, { passive: false });
+    viewerContainer.addEventListener('scroll', () => persistReadingPosition(), { passive: true });
+    drawCanvas.addEventListener('pointerdown', beginFreeDraw);
+    drawCanvas.addEventListener('pointermove', continueFreeDraw);
+    drawCanvas.addEventListener('pointerup', endFreeDraw);
+    drawCanvas.addEventListener('pointercancel', endFreeDraw);
+    document.addEventListener('mouseup', () => {
+      if (interactionMode !== 'highlight') return;
+      setTimeout(() => addHighlightNoteFromSelection(false), 0);
+    });
+
+    searchInput.addEventListener('keydown', (e) => {
+      if (e.key === 'Enter') {
+        performSearch(searchInput.value.trim());
+      }
+    });
+    searchNextBtn.addEventListener('click', () => {
+      if (!searchResults.length) performSearch(searchInput.value.trim());
+      else searchNext();
+    });
+    searchPrevBtn.addEventListener('click', () => {
+      if (!searchResults.length) performSearch(searchInput.value.trim());
+      else searchPrev();
+    });
+    searchClearBtn.addEventListener('click', () => {
+      clearSearchHighlights();
+      searchInput.value = '';
+      setStatus('');
+    });
+
+    exportNotesBtn.addEventListener('click', exportNotes);
+    importNotesBtn.addEventListener('click', () => notesFileInput.click());
+    notesFileInput.addEventListener('change', (e) => {
+      const file = e.target.files[0];
+      if (file) importNotesFromFile(file);
+    });
+
+    exportStateBtn.addEventListener('click', exportAllState);
+    importStateBtn.addEventListener('click', () => stateFileInput.click());
+    stateFileInput.addEventListener('change', (e) => {
+      const file = e.target.files[0];
+      if (file) importAllStateFromFile(file);
+    });
+
+    lowInkToggle.addEventListener('change', () => {
+      lowInkMode = lowInkToggle.checked;
+      updateLowInkMode();
+      const s = loadSettings();
+      s.lowInk = lowInkMode;
+      saveSettings(s);
+    });
+
+    notesFontSizeSelect.addEventListener('change', () => {
+      const scale = parseFloat(notesFontSizeSelect.value || '0.85');
+      notesList.style.fontSize = scale + 'rem';
+      const s = loadSettings();
+      s.notesFontScale = scale;
+      saveSettings(s);
+    });
+
+    drawColorInput.addEventListener('input', () => {
+      currentDrawColor = drawColorInput.value || '#ff5050';
+      const s = loadSettings();
+      s.drawColor = currentDrawColor;
+      saveSettings(s);
+      redrawDrawingsForCurrentPage(activeDrawStroke);
+    });
+
+    drawSizeInput.addEventListener('input', () => {
+      currentDrawSize = Math.max(2, parseInt(drawSizeInput.value || '4', 10));
+      drawSizeLabel.textContent = currentDrawSize + 'px';
+      const s = loadSettings();
+      s.drawSize = currentDrawSize;
+      saveSettings(s);
+      redrawDrawingsForCurrentPage(activeDrawStroke);
+    });
+
+    twoPageToggle.addEventListener('change', () => {
+      setStatus('Two-page mode not implemented yet (stub).');
+    });
+
+    document.addEventListener('keydown', (e) => {
+      if (e.ctrlKey && !isTypingTarget(e.target)) {
+        const lowerKey = e.key.toLowerCase();
+        if (lowerKey === 'z') {
+          e.preventDefault();
+          undoEditAction();
+          return;
+        }
+        if (lowerKey === 'y') {
+          e.preventDefault();
+          redoEditAction();
+          return;
+        }
+      }
+
+      if (isTypingTarget(e.target)) return;
+      if (!pdfDoc) return;
+      if (e.key === 'ArrowRight') {
+        queueRenderPage(currentPageNum + 1);
+      } else if (e.key === 'ArrowLeft') {
+        queueRenderPage(currentPageNum - 1);
+      } else if (e.key === 'h' || e.key === 'H') {
+        e.preventDefault();
+        setInteractionMode('highlight');
+      } else if (e.key === 'd' || e.key === 'D') {
+        e.preventDefault();
+        setInteractionMode('draw');
+      } else if (e.key === 'b' || e.key === 'B') {
+        toggleBookmarkForCurrentPage();
+      } else if (e.key === 'c' || e.key === 'C') {
+        jumpToBookmark();
+      } else if (e.key === '/') {
+        e.preventDefault();
+        searchInput.focus();
+      } else if (e.key === 'n' || e.key === 'N') {
+        noteText.focus();
+      }
+    });
+
+    noteText.addEventListener('keydown', (e) => {
+      if (e.ctrlKey && e.key === 'Enter') {
+        addNoteWithClickPosition();
+      }
+    });
+
+    document.addEventListener('keydown', (e) => {
+      if (e.ctrlKey && e.key === 'f') {
+        e.preventDefault();
+        searchInput.focus();
+      }
+    });
+
+    window.addEventListener('load', () => {
+      showStartupModal();
+    });
+    window.addEventListener('beforeunload', () => persistReadingPosition(true));
+    document.addEventListener('visibilitychange', () => {
+      if (document.visibilityState === 'hidden') {
+        persistReadingPosition(true);
+      }
+    });
+  </script>
+</body>
+</html>

@@ -1,0 +1,243 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Little Shop of Laura's</title>
+  <meta
+    name="description"
+    content="An interior design portfolio, shopping studio, appointment space, and class experience."
+  >
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+  <link
+    href="https://fonts.googleapis.com/css2?family=Cormorant+Garamond:wght@400;500;600;700&family=Manrope:wght@400;500;600;700&display=swap"
+    rel="stylesheet"
+  >
+  <link rel="stylesheet" href="styles.css">
+</head>
+<body class="site-body landing-body">
+  <div class="landing-bg" aria-hidden="true">
+    <div class="landing-bg-layer layer-one"></div>
+    <div class="landing-bg-layer layer-two"></div>
+    <div class="landing-bg-layer layer-three"></div>
+  </div>
+
+  <header class="site-header" id="top">
+    <a class="brand" href="#top">Little Shop of Laura's</a>
+    <nav class="site-nav">
+      <a href="#portfolio">Portfolio</a>
+      <a href="#shop">Shop</a>
+      <a href="#appointments">Appointments</a>
+      <a href="#classes">Classes</a>
+    </nav>
+  </header>
+
+  <main>
+    <section class="hero-section">
+      <div class="hero-copy">
+        <h1>Objects, interiors, and quiet drama.</h1>
+      </div>
+    </section>
+
+    <section class="portfolio-section" id="portfolio">
+      <div class="section-intro">
+        <p class="eyebrow">Portfolio</p>
+        <h2>Interior aesthetics rendered as atmosphere.</h2>
+      </div>
+
+      <div class="portfolio-rail">
+        <button class="aesthetic-tab is-active" data-aesthetic="gallery-noir" type="button">Gallery Noir</button>
+        <button class="aesthetic-tab" data-aesthetic="linen-form" type="button">Linen Form</button>
+        <button class="aesthetic-tab" data-aesthetic="monastic-modern" type="button">Monastic Modern</button>
+      </div>
+
+      <div class="portfolio-stage">
+        <article class="aesthetic-scene is-visible" id="gallery-noir">
+          <div class="scene-image scene-one"></div>
+          <div class="scene-copy">
+            <p class="scene-index">01</p>
+            <h3>Gallery Noir</h3>
+            <p>
+              Smoked oak, plaster, and clean negative space. A home that feels like a private
+              exhibition, sharpened by contrast and softened by texture.
+            </p>
+          </div>
+        </article>
+
+        <article class="aesthetic-scene" id="linen-form">
+          <div class="scene-image scene-two"></div>
+          <div class="scene-copy">
+            <p class="scene-index">02</p>
+            <h3>Linen Form</h3>
+            <p>
+              Relaxed drape, tonal neutrals, and pieces with visible hand. Minimalism held open
+              by fabric, daylight, and gentle imperfection.
+            </p>
+          </div>
+        </article>
+
+        <article class="aesthetic-scene" id="monastic-modern">
+          <div class="scene-image scene-three"></div>
+          <div class="scene-copy">
+            <p class="scene-index">03</p>
+            <h3>Monastic Modern</h3>
+            <p>
+              Quiet geometry, low forms, and strict editing. A disciplined visual language that
+              makes stillness feel luxurious.
+            </p>
+          </div>
+        </article>
+      </div>
+    </section>
+
+    <section class="shop-section" id="shop">
+      <div class="section-intro">
+        <p class="eyebrow">Shop</p>
+        <h2>Collected pieces, shown with room to breathe.</h2>
+        <p>
+          Click any item for a full-screen detail view.
+        </p>
+      </div>
+
+      <div class="shop-grid" id="shop-grid"></div>
+    </section>
+
+    <section class="service-section" id="appointments">
+      <div class="service-copy">
+        <p class="eyebrow">Appointments</p>
+        <h2>Reserve a private shopping visit.</h2>
+        <p>
+          Choose from Tuesday and Thursday appointments between 10:00 AM and 5:00 PM. Only the
+          current month and the following month are available.
+        </p>
+      </div>
+
+      <div class="appointment-system">
+        <div class="calendar-shell">
+          <div class="calendar-header">
+            <button class="calendar-nav" id="calendar-prev" type="button" aria-label="Current month">&#8592;</button>
+            <h3 id="calendar-title"></h3>
+            <button class="calendar-nav" id="calendar-next" type="button" aria-label="Next month">&#8594;</button>
+          </div>
+          <div class="calendar-weekdays">
+            <span>Sun</span>
+            <span>Mon</span>
+            <span>Tue</span>
+            <span>Wed</span>
+            <span>Thu</span>
+            <span>Fri</span>
+            <span>Sat</span>
+          </div>
+          <div class="calendar-grid" id="calendar-grid"></div>
+        </div>
+
+        <div class="appointment-panel">
+          <div class="slot-summary">
+            <p class="eyebrow">Selected Date</p>
+            <h3 id="selected-date-label">Choose a Tuesday or Thursday</h3>
+            <p id="selected-date-note">Half-hour appointment slots from 10:00 AM to 5:00 PM.</p>
+          </div>
+
+          <div class="slot-list" id="slot-list"></div>
+
+          <form class="service-form appointment-form" id="appointment-form">
+            <label>
+              Name
+              <input type="text" name="name" placeholder="Your name" required>
+            </label>
+            <label>
+              Email
+              <input type="email" name="email" placeholder="name@email.com" required>
+            </label>
+            <label>
+              Focus
+              <select name="focus" required>
+                <option value="">Select a focus</option>
+                <option>Decor and styling</option>
+                <option>Furniture sourcing</option>
+                <option>Material consultation</option>
+              </select>
+            </label>
+            <input type="hidden" name="appointmentDate" id="appointment-date">
+            <input type="hidden" name="appointmentTime" id="appointment-time">
+            <button class="button button-solid" type="submit">Book appointment</button>
+            <p class="form-message" data-form-message="appointment-form" aria-live="polite"></p>
+          </form>
+        </div>
+      </div>
+    </section>
+
+    <section class="class-section" id="classes">
+      <div class="section-intro">
+        <p class="eyebrow">Classes</p>
+        <h2>Select a class to be part of.</h2>
+      </div>
+
+      <div class="class-layout">
+        <div class="class-list">
+          <article>
+            <p class="scene-index">March 22</p>
+            <h3>The Minimal Shelf</h3>
+            <p>Composition, spacing, and material balance for surfaces that feel calm.</p>
+          </article>
+          <article>
+            <p class="scene-index">March 29</p>
+            <h3>Monochrome Layering</h3>
+            <p>Depth, warmth, and contrast in black-and-white interiors without clutter.</p>
+          </article>
+          <article>
+            <p class="scene-index">April 5</p>
+            <h3>Objects & Atmosphere</h3>
+            <p>Choose fewer objects, place them better, and let a room exhale.</p>
+          </article>
+        </div>
+
+        <form class="service-form compact" id="class-form">
+          <label>
+            Name
+            <input type="text" name="name" placeholder="Your name" required>
+          </label>
+          <label>
+            Email
+            <input type="email" name="email" placeholder="name@email.com" required>
+          </label>
+          <label>
+            Class selection
+            <select name="class" required>
+              <option value="">Choose a class</option>
+              <option>The Minimal Shelf</option>
+              <option>Monochrome Layering</option>
+              <option>Objects & Atmosphere</option>
+            </select>
+          </label>
+          <button class="button button-ghost" type="submit">Join class</button>
+          <p class="form-message" data-form-message="class-form" aria-live="polite"></p>
+        </form>
+      </div>
+
+    </section>
+  </main>
+
+  <div class="shop-modal" id="shop-modal" aria-hidden="true">
+    <button class="modal-close" id="modal-close" type="button" aria-label="Close item detail">Close</button>
+    <button class="modal-arrow left" id="modal-prev" type="button" aria-label="Previous item">&#8592;</button>
+    <button class="modal-arrow right" id="modal-next" type="button" aria-label="Next item">&#8594;</button>
+
+    <div class="modal-content">
+      <div class="modal-image-wrap">
+        <img id="modal-image" alt="">
+      </div>
+      <div class="modal-copy">
+        <p class="eyebrow">Shop Detail</p>
+        <h2 id="modal-name"></h2>
+        <p class="modal-price" id="modal-price"></p>
+        <p id="modal-description"></p>
+      </div>
+    </div>
+  </div>
+
+  <script src="shop-data.js"></script>
+  <script src="script.js"></script>
+</body>
+</html>
