@@ -12,7 +12,12 @@ $ErrorActionPreference = "Stop"
 
 $projectRoot = Split-Path -Parent $MyInvocation.MyCommand.Path
 Import-Module (Join-Path $projectRoot "SpotifyLyrics.Core.psm1") -Force -DisableNameChecking
-[Console]::TreatControlCAsInput = $false
+try {
+    [Console]::TreatControlCAsInput = $false
+}
+catch {
+    # Some non-console hosts do not expose a valid console handle.
+}
 $buildFiles = @(
     (Join-Path $projectRoot "dual-lyrics-server.ps1")
     (Join-Path $projectRoot "dual-lyrics.ps1")
@@ -72,6 +77,7 @@ function Write-HttpResponse {
         [System.Net.Sockets.NetworkStream]$Stream,
 
         [Parameter(Mandatory = $true)]
+        [AllowEmptyCollection()]
         [byte[]]$BodyBytes,
 
         [string]$ContentType = "application/octet-stream",
@@ -83,6 +89,11 @@ function Write-HttpResponse {
         "HTTP/1.1 $StatusCode $StatusText"
         "Content-Type: $ContentType"
         "Content-Length: $($BodyBytes.Length)"
+        "Access-Control-Allow-Origin: *"
+        "Access-Control-Allow-Methods: GET, OPTIONS"
+        "Access-Control-Allow-Headers: Content-Type"
+        "Access-Control-Allow-Private-Network: true"
+        "Access-Control-Max-Age: 600"
         "Cache-Control: no-store, no-cache, must-revalidate, max-age=0"
         "Pragma: no-cache"
         "Expires: 0"
@@ -748,6 +759,11 @@ try {
             $method = if ($parts.Count -ge 1) { $parts[0] } else { "" }
             $rawPath = if ($parts.Count -ge 2) { $parts[1] } else { "/" }
             $path = $rawPath.Split("?")[0]
+
+            if ($method -eq "OPTIONS") {
+                Write-HttpResponse -Stream $stream -BodyBytes (New-Object byte[] 0) -ContentType "text/plain; charset=utf-8" -StatusCode 204 -StatusText "No Content"
+                continue
+            }
 
             if ($method -ne "GET") {
                 Write-JsonResponse -Stream $stream -Data @{ error = "Method not allowed" } -StatusCode 405 -StatusText "Method Not Allowed"

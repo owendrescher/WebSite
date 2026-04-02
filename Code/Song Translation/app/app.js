@@ -22,6 +22,7 @@ const els = {
 const SONG_SYNC_POLL_MS = 1000;
 const RESET_POSITION_MS = 800;
 const DRIFT_RESYNC_MS = 5000;
+const LOCAL_API_BASE = "http://localhost:8974";
 
 const state = {
   payload: null,
@@ -29,6 +30,7 @@ const state = {
   activeTrackKey: "",
   lastRenderKey: "",
   config: null,
+  apiBase: "",
   pollInFlight: false,
   pendingImmediateRefresh: false,
   lastImmediateRefreshAtMs: 0,
@@ -45,6 +47,65 @@ const state = {
     playbackStatus: ""
   }
 };
+
+function normalizeApiBase(base) {
+  return String(base || "").trim().replace(/\/+$/, "");
+}
+
+function getApiBaseCandidates() {
+  const params = new URLSearchParams(window.location.search);
+  const candidates = [];
+  const queryBase = normalizeApiBase(params.get("apiBase"));
+
+  if (queryBase) {
+    candidates.push(queryBase);
+  }
+
+  if (window.location.protocol === "http:" || window.location.protocol === "https:") {
+    candidates.push(normalizeApiBase(window.location.origin));
+  }
+
+  candidates.push(LOCAL_API_BASE);
+  return [...new Set(candidates.filter(Boolean))];
+}
+
+function getApiUrl(path, base = state.apiBase) {
+  return `${base}${path}`;
+}
+
+async function requestJson(url) {
+  const response = await fetch(url, { cache: "no-store" });
+  if (!response.ok) {
+    throw new Error(`Request failed (${response.status})`);
+  }
+
+  return response.json();
+}
+
+async function resolveApiBase(forceRefresh = false) {
+  if (state.apiBase && !forceRefresh) {
+    return state.apiBase;
+  }
+
+  let lastError = null;
+  for (const candidate of getApiBaseCandidates()) {
+    try {
+      await requestJson(getApiUrl("/api/config", candidate));
+      state.apiBase = candidate;
+      return candidate;
+    } catch (error) {
+      lastError = error;
+    }
+  }
+
+  state.apiBase = "";
+  throw lastError || new Error("Could not reach the local Spotify bridge.");
+}
+
+async function apiGetJson(path, options = {}) {
+  const base = await resolveApiBase(Boolean(options.forceRefresh));
+  return requestJson(getApiUrl(path, base));
+}
 
 function normalizeLanguageTag(tag) {
   return String(tag || "").trim().toLowerCase();
@@ -644,6 +705,35 @@ function updateAlbumArt(track) {
   els.albumFallback.classList.remove("hidden");
 }
 
+function showConnectionHelp(error) {
+  resetPlaybackState();
+  state.transitioningTrack = false;
+  state.payload = null;
+  state.activeIndex = -1;
+  state.activeTrackKey = "";
+  state.lastRenderKey = "";
+
+  els.list.replaceChildren();
+  els.empty.hidden = false;
+  els.statusLabel.textContent = "Local bridge offline";
+  els.title.textContent = "Dual Lyrics";
+  els.artist.textContent = "Run Song Translation/dual-lyrics.ps1 to connect Spotify and lyric translation.";
+  els.translationChip.textContent = "Bridge required";
+  els.modeChip.textContent = "Waiting for localhost";
+  els.progressBar.style.width = "0%";
+  els.elapsed.textContent = "00:00";
+  els.duration.textContent = "00:00";
+  els.empty.querySelector("h3").textContent = "Start the Spotify bridge";
+  els.emptyCopy.textContent = `This page can live in the website, but Spotify access still comes from the local PowerShell server at ${LOCAL_API_BASE}. Start dual-lyrics.ps1 and it will reconnect automatically.`;
+  els.panelLanguageFlag.replaceChildren();
+  els.panelLanguageFlag.classList.add("hidden");
+  updateAlbumArt(null);
+
+  if (error?.message) {
+    els.fullscreenButton.title = error.message;
+  }
+}
+
 function renderLyrics(payload) {
   const lyrics = payload?.lyrics;
   const mode = lyrics?.mode || "missing";
@@ -781,13 +871,12 @@ function renderLanguageChoices(config) {
 }
 
 async function fetchConfig() {
-  const response = await fetch("/api/config", { cache: "no-store" });
-  state.config = await response.json();
+  state.config = await apiGetJson("/api/config");
   renderLanguageChoices(state.config);
 }
 
 async function updateTargetLanguage(targetLanguage) {
-  await fetch(`/api/preferences?targetLanguage=${encodeURIComponent(targetLanguage)}`, { cache: "no-store" });
+  await apiGetJson(`/api/preferences?targetLanguage=${encodeURIComponent(targetLanguage)}`);
   state.lastRenderKey = "";
   await fetchConfig();
   await loadState();
@@ -795,9 +884,8 @@ async function updateTargetLanguage(targetLanguage) {
 
 async function loadState() {
   try {
-    const response = await fetch("/api/state", { cache: "no-store" });
     const previousTrackKey = state.payload?.track?.trackKey || "";
-    state.payload = await response.json();
+    state.payload = await apiGetJson("/api/state");
     const currentTrackKey = state.payload?.track?.trackKey || "";
     if (currentTrackKey && currentTrackKey !== previousTrackKey) {
       state.followActiveLine = true;
@@ -817,10 +905,7 @@ async function loadState() {
       requestImmediateStateRefresh();
     }
   } catch (error) {
-    els.statusLabel.textContent = "Connection problem";
-    els.title.textContent = "Dual Lyrics";
-    els.artist.textContent = error.message || "Start the PowerShell server to load Spotify state.";
-    resetPlaybackState();
+    showConnectionHelp(error);
   }
 }
 
@@ -891,6 +976,5 @@ async function bootstrap() {
 }
 
 bootstrap().catch((error) => {
-  els.statusLabel.textContent = "Startup failed";
-  els.artist.textContent = error.message;
+  showConnectionHelp(error);
 });

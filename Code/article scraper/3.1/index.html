@@ -310,9 +310,78 @@
     let batch = null;
     let queue = [];
     let idx = 0;
+    let apiBase = "";
+
+    const LOCAL_API_BASE = "http://localhost:5000";
 
     // per-domain counters for final naming
     const finalCounts = new Map();
+
+    function normalizeApiBase(base){
+      return String(base || "").trim().replace(/\/+$/, "");
+    }
+
+    function getApiBaseCandidates(){
+      const params = new URLSearchParams(window.location.search);
+      const candidates = [];
+      const queryBase = normalizeApiBase(params.get("apiBase"));
+
+      if (queryBase) candidates.push(queryBase);
+
+      if (window.location.protocol === "http:" || window.location.protocol === "https:") {
+        candidates.push(normalizeApiBase(window.location.origin));
+      }
+
+      candidates.push(LOCAL_API_BASE);
+      return [...new Set(candidates.filter(Boolean))];
+    }
+
+    function getApiUrl(path, base = apiBase){
+      return `${base}${path}`;
+    }
+
+    function resolveToolUrl(path){
+      const value = String(path || "");
+      if (!value) return value;
+      if (/^https?:\/\//i.test(value)) return value;
+      return getApiUrl(value.startsWith("/") ? value : `/${value}`);
+    }
+
+    async function resolveApiBase(forceRefresh = false){
+      if (apiBase && !forceRefresh) return apiBase;
+
+      let lastError = null;
+      for (const candidate of getApiBaseCandidates()) {
+        try {
+          const res = await fetch(`${candidate}/`, { cache: "no-store" });
+          if (!res.ok) throw new Error(`Request failed (${res.status})`);
+          apiBase = candidate;
+          return candidate;
+        } catch (err) {
+          lastError = err;
+        }
+      }
+
+      apiBase = "";
+      throw lastError || new Error("Could not reach the local screenshot server.");
+    }
+
+    async function apiFetch(path, init = {}, options = {}){
+      const base = await resolveApiBase(Boolean(options.forceRefresh));
+      return fetch(getApiUrl(path, base), init);
+    }
+
+    function showConnectionHelp(error){
+      $("thumbs").innerHTML = "";
+      $("zipLink").style.display = "none";
+      $("zipLink").href = "#";
+      setStatus(
+        "Local screenshot server offline.\n" +
+        "Start article scraper/3.1/app.py, then try again.\n" +
+        `Expected local server: ${LOCAL_API_BASE}\n` +
+        (error?.message ? `Last error: ${error.message}` : "")
+      );
+    }
 
     function setStatus(s){ $("status").textContent = s; }
 
@@ -333,6 +402,7 @@
 
     function openModalForItem(item){
       $("modalBack").style.display = "flex";
+      $("cropImg").crossOrigin = "anonymous";
       $("cropImg").src = item.raw_url;
 
       $("modalTitle").textContent = `Crop (Instagram 1080×1080)`;
@@ -404,7 +474,7 @@
       const finalName = nextFinalName(item.domain);
 
       // save crop to server
-      const saveRes = await fetch("/api/save_crop", {
+      const saveRes = await apiFetch("/api/save_crop", {
         method: "POST",
         headers: {"Content-Type":"application/json"},
         body: JSON.stringify({
@@ -417,7 +487,7 @@
       if (!saveRes.ok) throw new Error(saveData.error || "save_crop failed");
 
       // delete raw screenshot on server
-      const delRes = await fetch("/api/delete_raw", {
+      const delRes = await apiFetch("/api/delete_raw", {
         method: "POST",
         headers: {"Content-Type":"application/json"},
         body: JSON.stringify({ raw_file: item.raw_file })
@@ -436,14 +506,14 @@
     }
 
     async function finishBatchZip(){
-      const res = await fetch("/api/zip_final", {
+      const res = await apiFetch("/api/zip_final", {
         method: "POST",
         headers: {"Content-Type":"application/json"},
         body: JSON.stringify({ batch })
       });
       const data = await res.json();
       if (!res.ok) throw new Error(data.error || "zip_final failed");
-      return data.zip_url;
+      return resolveToolUrl(data.zip_url);
     }
 
     $("closeModal").addEventListener("click", () => {
@@ -533,13 +603,20 @@
 
       setStatus("Generating capped screenshots…");
 
-      const res = await fetch("/api/run", {
-        method: "POST",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ urls, headful: $("headful").checked })
-      });
+      let res;
+      let data;
+      try {
+        res = await apiFetch("/api/run", {
+          method: "POST",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify({ urls, headful: $("headful").checked })
+        });
+        data = await res.json();
+      } catch (error) {
+        showConnectionHelp(error);
+        return;
+      }
 
-      const data = await res.json();
       if (!res.ok) {
         setStatus("Error: " + (data.error || res.statusText));
         return;
@@ -559,18 +636,22 @@
           continue;
         }
 
+        const rawUrl = resolveToolUrl(it.raw_url);
         card.innerHTML = `
           <div class="cardHead">
-            <a href="${it.raw_url}" target="_blank" rel="noopener">${it.domain}</a>
+            <a href="${rawUrl}" target="_blank" rel="noopener">${it.domain}</a>
             <span class="chip">raw (capped)</span>
           </div>
           <div class="imgWrap">
-            <img class="preview" src="${it.raw_url}" alt="preview">
+            <img class="preview" src="${rawUrl}" alt="preview" crossorigin="anonymous">
           </div>
         `;
         $("thumbs").appendChild(card);
 
-        queue.push(it);
+        queue.push({
+          ...it,
+          raw_url: rawUrl
+        });
       }
 
       if (!queue.length) {
