@@ -313,6 +313,7 @@
     let apiBase = "";
 
     const LOCAL_API_BASE = "http://localhost:5000";
+    const LOOPBACK_API_BASE = "http://127.0.0.1:5000";
     const HEALTH_PATH = "/api/health";
 
     // per-domain counters for final naming
@@ -329,11 +330,8 @@
 
       if (queryBase) candidates.push(queryBase);
 
+      candidates.push(LOOPBACK_API_BASE);
       candidates.push(LOCAL_API_BASE);
-
-      if (window.location.protocol === "http:" || window.location.protocol === "https:") {
-        candidates.push(normalizeApiBase(window.location.origin));
-      }
 
       return [...new Set(candidates.filter(Boolean))];
     }
@@ -352,7 +350,7 @@
     async function resolveApiBase(forceRefresh = false){
       if (apiBase && !forceRefresh) return apiBase;
 
-      let lastError = null;
+      const errors = [];
       for (const candidate of getApiBaseCandidates()) {
         try {
           const res = await fetch(`${candidate}${HEALTH_PATH}`, { cache: "no-store" });
@@ -364,12 +362,13 @@
           apiBase = candidate;
           return candidate;
         } catch (err) {
-          lastError = err;
+          const detail = err?.message ? err.message : "Request failed";
+          errors.push(`${candidate}${HEALTH_PATH} -> ${detail}`);
         }
       }
 
       apiBase = "";
-      throw lastError || new Error("Could not reach the local screenshot server.");
+      throw new Error(errors.join("\n") || "Could not reach the local screenshot server.");
     }
 
     async function apiFetch(path, init = {}, options = {}){
@@ -385,7 +384,7 @@
         "Local screenshot server offline.\n" +
         "owentools.xyz is only the front end for this tool.\n" +
         "Start article scraper/3.1/app.py, then try again.\n" +
-        `Expected local server: ${LOCAL_API_BASE}\n` +
+        `Expected local server: ${LOCAL_API_BASE} or ${LOOPBACK_API_BASE}\n` +
         (error?.message ? `Last error: ${error.message}` : "")
       );
     }
