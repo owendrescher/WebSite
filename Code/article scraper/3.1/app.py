@@ -188,6 +188,15 @@ def index():
     return send_from_directory(str(BASE_DIR), "index.html")
 
 
+@app.route("/api/health", methods=["GET"])
+def health():
+    return jsonify({
+        "ok": True,
+        "service": "article-screenshotter",
+        "output_dir": str(OUTPUT_DIR)
+    })
+
+
 @app.route("/output/<path:filename>")
 def output_files(filename):
     return send_from_directory(str(OUTPUT_DIR), filename)

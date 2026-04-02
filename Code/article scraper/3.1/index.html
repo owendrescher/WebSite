@@ -313,6 +313,7 @@
     let apiBase = "";
 
     const LOCAL_API_BASE = "http://localhost:5000";
+    const HEALTH_PATH = "/api/health";
 
     // per-domain counters for final naming
     const finalCounts = new Map();
@@ -328,11 +329,12 @@
 
       if (queryBase) candidates.push(queryBase);
 
+      candidates.push(LOCAL_API_BASE);
+
       if (window.location.protocol === "http:" || window.location.protocol === "https:") {
         candidates.push(normalizeApiBase(window.location.origin));
       }
 
-      candidates.push(LOCAL_API_BASE);
       return [...new Set(candidates.filter(Boolean))];
     }
 
@@ -353,8 +355,12 @@
       let lastError = null;
       for (const candidate of getApiBaseCandidates()) {
         try {
-          const res = await fetch(`${candidate}/`, { cache: "no-store" });
+          const res = await fetch(`${candidate}${HEALTH_PATH}`, { cache: "no-store" });
           if (!res.ok) throw new Error(`Request failed (${res.status})`);
+          const data = await res.json();
+          if (!data?.ok || data?.service !== "article-screenshotter") {
+            throw new Error("Wrong backend service");
+          }
           apiBase = candidate;
           return candidate;
         } catch (err) {
@@ -377,6 +383,7 @@
       $("zipLink").href = "#";
       setStatus(
         "Local screenshot server offline.\n" +
+        "owentools.xyz is only the front end for this tool.\n" +
         "Start article scraper/3.1/app.py, then try again.\n" +
         `Expected local server: ${LOCAL_API_BASE}\n` +
         (error?.message ? `Last error: ${error.message}` : "")
