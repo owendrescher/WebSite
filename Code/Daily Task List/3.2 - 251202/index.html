@@ -68,6 +68,28 @@
     font: 400 var(--font-size)/1.45 system-ui, -apple-system, "Segoe UI", Inter, Roboto, "Helvetica Neue", Arial, "Noto Sans", sans-serif;
   }
 
+  .owentools-home-link{
+    position:fixed;
+    top:max(12px, env(safe-area-inset-top));
+    left:max(12px, env(safe-area-inset-left));
+    z-index:9999;
+    width:44px;
+    height:44px;
+    display:grid;
+    place-items:center;
+    padding:0;
+    border-radius:14px;
+    border:1px solid rgba(0,0,0,.12);
+    background:rgba(255,255,255,.88);
+    color:#111316;
+    text-decoration:none;
+    font:800 .82rem/1 system-ui, sans-serif;
+    text-transform:lowercase;
+    letter-spacing:.04em;
+    backdrop-filter:blur(12px);
+    box-shadow:0 12px 28px rgba(0,0,0,.16);
+  }
+
   .wrap{max-width:980px; margin:0 auto; padding:16px;}
 
   /* ===== HEADER (fixed size) ===== */
@@ -232,7 +254,8 @@
 </style>
 </head>
 <body>
-  <div class="wrap">
+<a class="owentools-home-link" href="../../index.html" aria-label="Back to owentools" title="Back to owentools">ot</a>
+<div class="wrap">
     <div class="topbar">
       <div class="seg">
         <button class="btn icon" id="prevDay" title="Previous day">◀</button>

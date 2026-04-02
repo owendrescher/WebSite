@@ -6,9 +6,33 @@
   <title>Language Matching Game</title>
   <link rel="stylesheet" href="style.css" />
   <link rel="stylesheet" href="style.css?v=1.0.1" />
+  <style>
+    .owentools-home-link {
+      position: fixed;
+      top: max(12px, env(safe-area-inset-top));
+      left: max(12px, env(safe-area-inset-left));
+      z-index: 9999;
+      width: 44px;
+      height: 44px;
+      display: grid;
+      place-items: center;
+      padding: 0;
+      border-radius: 14px;
+      border: 1px solid rgba(0, 0, 0, 0.12);
+      background: rgba(255, 255, 255, 0.88);
+      color: #111316;
+      text-decoration: none;
+      font: 800 0.82rem/1 system-ui, sans-serif;
+      text-transform: lowercase;
+      letter-spacing: 0.04em;
+      backdrop-filter: blur(12px);
+      box-shadow: 0 12px 28px rgba(0, 0, 0, 0.16);
+    }
+  </style>
 
 </head>
 <body>
+  <a class="owentools-home-link" href="../index.html" aria-label="Back to owentools" title="Back to owentools">ot</a>
   <div id="menu-screen">
     <h1>Language Matching Game</h1>
 

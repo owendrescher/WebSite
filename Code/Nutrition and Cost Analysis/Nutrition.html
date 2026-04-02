@@ -31,6 +31,28 @@
       min-height: 100vh;
     }
 
+    .owentools-home-link {
+      position: fixed;
+      top: max(12px, env(safe-area-inset-top));
+      left: max(12px, env(safe-area-inset-left));
+      z-index: 9999;
+      width: 44px;
+      height: 44px;
+      display: grid;
+      place-items: center;
+      padding: 0;
+      border-radius: 14px;
+      border: 1px solid rgba(29, 38, 31, 0.12);
+      background: rgba(255, 252, 246, 0.88);
+      color: #1d261f;
+      text-decoration: none;
+      font: 800 0.82rem/1 system-ui, sans-serif;
+      text-transform: lowercase;
+      letter-spacing: 0.04em;
+      backdrop-filter: blur(12px);
+      box-shadow: 0 12px 28px rgba(47, 41, 28, 0.14);
+    }
+
     .shell {
       width: min(1400px, calc(100% - 32px));
       margin: 24px auto 48px;
@@ -603,6 +625,7 @@
   </style>
 </head>
 <body>
+  <a class="owentools-home-link" href="../index.html" aria-label="Back to owentools" title="Back to owentools">ot</a>
   <div class="shell">
     <section class="hero">
       <h1>Nutrition + Cost Sheet Builder</h1>
