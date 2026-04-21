@@ -1,0 +1,264 @@
+:root {
+  --bg: #f4f7f1;
+  --ink: #17220f;
+  --panel: #ffffff;
+  --country: #d6dfd0;
+  --country-hover: #9ebc84;
+  --country-active: #5f8a3f;
+  --border: #7d8f70;
+  --combo-fill: rgba(95, 138, 63, 0.2);
+  --combo-border: #35571e;
+}
+
+* {
+  box-sizing: border-box;
+}
+
+body {
+  margin: 0;
+  font-family: "Segoe UI", Tahoma, sans-serif;
+  color: var(--ink);
+  background: radial-gradient(circle at 15% 20%, #edf5e6, var(--bg) 40%);
+  min-height: 100vh;
+}
+
+.topbar {
+  padding: 1rem 1.25rem;
+  border-bottom: 1px solid #dce8d1;
+}
+
+.topbar h1 {
+  margin: 0;
+  font-size: 1.4rem;
+}
+
+.topbar p {
+  margin: 0.35rem 0 0;
+}
+
+.layout {
+  display: grid;
+  grid-template-columns: minmax(0, 2fr) minmax(320px, 1fr);
+  gap: 1rem;
+  padding: 1rem;
+  align-items: stretch;
+}
+
+.map-wrap,
+.info-panel {
+  background: var(--panel);
+  border: 1px solid #d8e1d0;
+  border-radius: 12px;
+  box-shadow: 0 8px 22px rgba(44, 68, 31, 0.09);
+}
+
+.map-wrap {
+  position: relative;
+  padding: 0.25rem;
+  height: clamp(320px, 56vh, 560px);
+  overflow: hidden;
+  contain: layout paint;
+}
+
+#world-map {
+  width: 100%;
+  height: 100%;
+  display: block;
+  border-radius: 10px;
+  touch-action: manipulation;
+}
+
+.country {
+  stroke: var(--border);
+  stroke-width: 0.65;
+  vector-effect: non-scaling-stroke;
+  cursor: pointer;
+  transition: opacity 140ms ease, stroke 140ms ease, filter 140ms ease;
+}
+
+.country:hover,
+.country:focus-visible {
+  stroke: #5c7746;
+  filter: saturate(1.08) brightness(1.04);
+  outline: none;
+}
+
+.country.is-selected {
+  stroke: rgba(53, 87, 30, 0.05);
+  opacity: 0.98;
+}
+
+.country.is-selected:hover,
+.country.is-selected:focus-visible {
+  stroke: rgba(53, 87, 30, 0.05);
+}
+
+.selection-layer {
+  pointer-events: none;
+}
+
+.combo-fill {
+  fill: var(--combo-fill);
+}
+
+.combo-border {
+  fill: none;
+  stroke: var(--combo-border);
+  stroke-width: 2.1;
+  stroke-linejoin: round;
+  stroke-linecap: round;
+  vector-effect: non-scaling-stroke;
+}
+
+.map-controls {
+  position: absolute;
+  top: 0.8rem;
+  left: 0.8rem;
+  display: flex;
+  gap: 0.35rem;
+  z-index: 5;
+}
+
+.map-controls button {
+  border: 1px solid #c8d9ba;
+  background: #f7fbf4;
+  color: #24361a;
+  border-radius: 7px;
+  padding: 0.25rem 0.5rem;
+  font-size: 0.8rem;
+  font-weight: 600;
+  cursor: pointer;
+}
+
+.map-controls button:hover {
+  background: #e7f1df;
+}
+
+.info-panel {
+  padding: 0.8rem;
+  height: 100%;
+  overflow: auto;
+}
+
+.info-panel-head {
+  display: flex;
+  align-items: start;
+  justify-content: space-between;
+  gap: 0.9rem;
+}
+
+.info-panel h2 {
+  margin-top: 0;
+  margin-bottom: 0.3rem;
+  font-size: 1.2rem;
+}
+
+.info-panel p {
+  margin-top: 0;
+  margin-bottom: 0.6rem;
+  color: #3f5231;
+  font-size: 0.9rem;
+}
+
+.secondary-action {
+  border: 1px solid #c9d8bc;
+  background: #f7fbf4;
+  color: #24361a;
+  border-radius: 10px;
+  padding: 0.5rem 0.7rem;
+  font: inherit;
+  font-size: 0.82rem;
+  font-weight: 700;
+  cursor: pointer;
+  white-space: nowrap;
+}
+
+.secondary-action:hover {
+  background: #e6f0de;
+}
+
+.selection-summary {
+  margin-bottom: 0.75rem;
+  font-size: 0.82rem;
+  font-weight: 700;
+  text-transform: uppercase;
+  letter-spacing: 0.06em;
+  color: #557042;
+}
+
+.details-list {
+  margin: 0;
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: 0.35rem;
+  font-size: 0.84rem;
+}
+
+.row {
+  border: 1px solid #e7eedf;
+  border-radius: 8px;
+  padding: 0.32rem 0.42rem;
+  min-width: 0;
+}
+
+.row dt {
+  font-weight: 700;
+  text-transform: uppercase;
+  letter-spacing: 0.02em;
+  font-size: 0.67rem;
+  color: #405333;
+}
+
+.row dd {
+  margin: 0.15rem 0 0;
+  white-space: normal;
+  overflow-wrap: anywhere;
+  line-height: 1.35;
+  font-size: 0.82rem;
+}
+
+.tooltip {
+  position: absolute;
+  pointer-events: none;
+  background: rgba(23, 34, 15, 0.9);
+  color: #fff;
+  padding: 0.3rem 0.5rem;
+  border-radius: 4px;
+  font-size: 0.85rem;
+}
+
+.sr-only {
+  position: absolute;
+  width: 1px;
+  height: 1px;
+  padding: 0;
+  margin: -1px;
+  overflow: hidden;
+  clip: rect(0, 0, 0, 0);
+  border: 0;
+}
+
+@media (max-width: 980px) {
+  .layout {
+    grid-template-columns: 1fr;
+  }
+
+  .map-wrap {
+    height: clamp(300px, 52vh, 500px);
+  }
+
+  .details-list {
+    grid-template-columns: 1fr;
+  }
+}
+
+@media (max-width: 640px) {
+  .info-panel-head {
+    flex-direction: column;
+    align-items: stretch;
+  }
+
+  .secondary-action {
+    width: 100%;
+  }
+}

@@ -1,0 +1,422 @@
+<!DOCTYPE html>
+<html lang="en">
+  <head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <title>Script Learning Studio</title>
+    <link rel="stylesheet" href="styles.css?v=20260410a" />
+    <style>
+      .owentools-home-link {
+        position: fixed;
+        top: max(12px, env(safe-area-inset-top));
+        left: max(12px, env(safe-area-inset-left));
+        z-index: 9999;
+        width: 44px;
+        height: 44px;
+        display: grid;
+        place-items: center;
+        border-radius: 14px;
+        border: 1px solid rgba(255, 255, 255, 0.16);
+        background: rgba(14, 22, 36, 0.82);
+        color: #fff7ec;
+        text-decoration: none;
+        font: 800 0.82rem/1 system-ui, sans-serif;
+        text-transform: lowercase;
+        letter-spacing: 0.04em;
+        backdrop-filter: blur(12px);
+        box-shadow: 0 12px 28px rgba(0, 0, 0, 0.28);
+      }
+    </style>
+  </head>
+  <body data-script="none">
+    <a class="owentools-home-link" href="../index.html" aria-label="Back to owentools" title="Back to owentools">ot</a>
+    <div class="page-shell">
+      <header class="hero">
+        <div class="hero-copy">
+          <p id="hero-eyebrow" class="eyebrow">Script Learning Studio</p>
+          <h1 id="hero-title">Three writing systems. One practice flow.</h1>
+          <p id="hero-text" class="hero-text">
+            Move between Arabic, Korean Hangul, and Cyrillic without leaving the same app. Each
+            path keeps the same speed match, four-choice drill, guided tracing, pronunciation
+            playback, and local progress tracking.
+          </p>
+          <div id="hero-badges" class="hero-badges"></div>
+        </div>
+
+        <div class="hero-metrics">
+          <article class="metric-card">
+            <p class="metric-label" id="metric-one-label">Mode 1</p>
+            <p class="metric-value" id="metric-one-value">Speed Match</p>
+            <p class="metric-text" id="metric-one-text">
+              Fastest-clear matching rounds with elapsed time, streak, accuracy, and a saved local
+              leaderboard.
+            </p>
+          </article>
+
+          <article class="metric-card">
+            <p class="metric-label" id="metric-two-label">Mode 2</p>
+            <p class="metric-value" id="metric-two-value">Quick Choice</p>
+            <p class="metric-text" id="metric-two-text">
+              See one live character, pick the right sound from four options, and keep the name
+              hidden until the answer resolves.
+            </p>
+          </article>
+
+          <article class="metric-card">
+            <p class="metric-label" id="metric-three-label">Mode 3</p>
+            <p class="metric-value" id="metric-three-value">Trace Practice</p>
+            <p class="metric-text" id="metric-three-text">
+              Trace the rendered glyph, step through stroke cues, and play back the script sound in
+              the browser.
+            </p>
+          </article>
+        </div>
+      </header>
+
+      <main class="dashboard">
+        <section id="script-panel" class="panel">
+          <div class="panel-header">
+            <div>
+              <p class="panel-kicker">Choose A Script</p>
+              <h2>Pick the writing system you want to practice</h2>
+              <p class="panel-text">
+                The site stays connected: switch scripts any time and keep the same match, choice,
+                and trace flow.
+              </p>
+            </div>
+          </div>
+
+          <div id="script-grid" class="script-grid"></div>
+        </section>
+
+        <section id="script-toolbar" class="panel toolbar-panel is-hidden">
+          <div class="toolbar-row">
+            <div>
+              <p class="panel-kicker">Active Script</p>
+              <h2 id="toolbar-title">Arabic</h2>
+              <p id="toolbar-text" class="panel-text">
+                28 letters with speed match, quick choice, and tracing.
+              </p>
+            </div>
+
+            <div class="toolbar-actions">
+              <div id="script-switcher" class="script-switcher" aria-label="Switch script"></div>
+              <button id="browse-scripts" class="button button-secondary" type="button">
+                Browse Scripts
+              </button>
+            </div>
+          </div>
+        </section>
+
+        <section id="mode-panel" class="panel is-hidden">
+          <div class="panel-header">
+            <div>
+              <p id="mode-panel-kicker" class="panel-kicker">Script Practice</p>
+              <h2 id="mode-panel-title">Pick one way to practice</h2>
+              <p id="mode-panel-text" class="panel-text">
+                Start with speed matching, switch to four-choice recognition, or slow down and
+                trace the glyph shape with ordered stroke cues.
+              </p>
+            </div>
+          </div>
+
+          <div class="mode-grid">
+            <button id="mode-match" class="mode-card" type="button">
+              <span class="mode-number">01</span>
+              <strong id="mode-match-title">Letter Speed Match</strong>
+              <span id="mode-match-text">
+                Clear one mixed board of symbol and sound pairs as fast as you can.
+              </span>
+            </button>
+
+            <button id="mode-choice" class="mode-card" type="button">
+              <span class="mode-number">02</span>
+              <strong id="mode-choice-title">Quick Choice</strong>
+              <span id="mode-choice-text">
+                See one symbol and choose the right sound from four random options.
+              </span>
+            </button>
+
+            <button id="mode-trace" class="mode-card" type="button">
+              <span class="mode-number">03</span>
+              <strong id="mode-trace-title">Guided Letter Tracing</strong>
+              <span id="mode-trace-text">
+                Trace the live glyph, replay stroke cues, and hear the letter sound.
+              </span>
+            </button>
+          </div>
+        </section>
+
+        <section id="match-panel" class="panel match-panel is-hidden">
+          <div class="match-shell">
+            <aside class="match-sidebar">
+              <div class="match-sidebar-top">
+                <button id="match-home" class="match-back" type="button">Change Mode</button>
+                <div class="button-row match-actions">
+                  <button id="match-start" class="button button-primary" type="button">
+                    Start Speed Round
+                  </button>
+                  <button id="match-reset" class="button button-secondary" type="button">
+                    Reset
+                  </button>
+                </div>
+              </div>
+
+              <div class="match-sidebar-copy">
+                <p id="match-prompt-label" class="panel-kicker">Warm-up</p>
+                <h2 id="match-title">Letter Speed Match</h2>
+                <p id="match-letter-name" class="prompt-name">Drag a tile onto its matching partner</p>
+                <p id="match-copy" class="prompt-copy">
+                  Match script symbols to English sound cues by dragging one tile onto the correct
+                  partner.
+                </p>
+                <div id="match-letter" class="match-focus" aria-live="polite">12 tiles live</div>
+              </div>
+
+              <div class="match-stats-rail">
+                <article class="score-card rail">
+                  <span class="score-label">Elapsed</span>
+                  <strong id="time-left">0:00.0</strong>
+                </article>
+                <article class="score-card rail">
+                  <span class="score-label">Score</span>
+                  <strong id="score-value">0</strong>
+                </article>
+                <article class="score-card rail">
+                  <span class="score-label">Streak</span>
+                  <strong id="streak-value">0</strong>
+                </article>
+                <article class="score-card rail">
+                  <span class="score-label">Accuracy</span>
+                  <strong id="accuracy-value">--</strong>
+                </article>
+              </div>
+
+              <div class="time-meter" aria-hidden="true">
+                <div id="time-meter-fill" class="time-meter-fill"></div>
+              </div>
+
+              <p id="match-feedback" class="feedback" aria-live="polite">
+                Drag one symbol tile onto one sound tile. The stopwatch starts on your first drag.
+              </p>
+
+              <div id="match-summary" class="summary-card is-hidden">
+                <h3>Round Complete</h3>
+                <p id="summary-copy">Nice work.</p>
+              </div>
+
+              <div class="leaderboard match-leaderboard">
+                <div class="leaderboard-header">
+                  <div>
+                    <p class="panel-kicker">Local Scores</p>
+                    <h3>Fastest Clears</h3>
+                  </div>
+                  <p class="leaderboard-note">Saved in this browser only.</p>
+                </div>
+                <ol id="leaderboard-list" class="leaderboard-list"></ol>
+              </div>
+            </aside>
+
+            <div class="match-board-wrap">
+              <div id="answer-grid" class="answer-grid" role="group" aria-label="Matching tiles"></div>
+            </div>
+          </div>
+        </section>
+
+        <section id="choice-panel" class="panel choice-panel is-hidden">
+          <div class="choice-shell">
+            <div class="choice-topbar">
+              <div>
+                <p id="choice-prompt-label" class="panel-kicker">Warm-up</p>
+                <h2 id="choice-title">Quick Choice</h2>
+                <p id="choice-copy" class="panel-text">
+                  Start a round, then choose the matching sound cue for each live script symbol.
+                </p>
+              </div>
+
+              <div class="button-row compact">
+                <button id="choice-home" class="button button-secondary" type="button">Change Mode</button>
+                <button id="choice-start" class="button button-primary" type="button">
+                  Start Choice Round
+                </button>
+                <button id="choice-reset" class="button button-secondary" type="button">Reset</button>
+              </div>
+            </div>
+
+            <div class="choice-layout">
+              <div class="choice-stage-card">
+                <div class="choice-symbol-wrap">
+                  <div id="choice-symbol" class="choice-symbol" aria-live="polite">?</div>
+                  <p id="choice-reveal" class="choice-reveal">The character name appears after each answer.</p>
+                </div>
+
+                <div id="choice-options" class="choice-options" role="group" aria-label="Multiple choice answers"></div>
+              </div>
+
+              <aside class="choice-sidebar">
+                <div class="match-stats-rail choice-stats-rail">
+                  <article class="score-card rail">
+                    <span class="score-label">Elapsed</span>
+                    <strong id="choice-time">0:00.0</strong>
+                  </article>
+                  <article class="score-card rail">
+                    <span class="score-label">Score</span>
+                    <strong id="choice-score">0</strong>
+                  </article>
+                  <article class="score-card rail">
+                    <span class="score-label">Streak</span>
+                    <strong id="choice-streak">0</strong>
+                  </article>
+                  <article class="score-card rail">
+                    <span class="score-label">Accuracy</span>
+                    <strong id="choice-accuracy">--</strong>
+                  </article>
+                </div>
+
+                <div class="time-meter" aria-hidden="true">
+                  <div id="choice-progress-fill" class="time-meter-fill"></div>
+                </div>
+
+                <p id="choice-feedback" class="feedback info" aria-live="polite">
+                  Pick the right sound from four choices. The stopwatch starts on your first answer.
+                </p>
+
+                <div id="choice-summary" class="summary-card is-hidden">
+                  <h3>Round Complete</h3>
+                  <p id="choice-summary-copy">Nice work.</p>
+                </div>
+
+                <div class="leaderboard choice-leaderboard">
+                  <div class="leaderboard-header">
+                    <div>
+                      <p class="panel-kicker">Local Scores</p>
+                      <h3>Fastest Choice Runs</h3>
+                    </div>
+                    <p class="leaderboard-note">Saved in this browser only.</p>
+                  </div>
+                  <ol id="choice-leaderboard-list" class="leaderboard-list"></ol>
+                </div>
+              </aside>
+            </div>
+          </div>
+        </section>
+
+        <section id="trace-panel" class="panel is-hidden">
+          <div class="panel-header">
+            <div>
+              <p class="panel-kicker" id="trace-panel-kicker">Guided Tracing</p>
+              <h2 id="trace-panel-title">Trace the glyph</h2>
+              <p id="trace-panel-text" class="panel-text">
+                Practice one symbol at a time with ordered stroke cues and browser pronunciation
+                playback.
+              </p>
+            </div>
+
+            <div class="button-row compact">
+              <button id="trace-home" class="button button-secondary" type="button">Change Mode</button>
+              <button id="trace-random" class="button button-secondary" type="button">
+                Random Letter
+              </button>
+              <button id="trace-pronounce" class="button button-ghost" type="button">
+                Play sound
+              </button>
+            </div>
+          </div>
+
+          <div class="trace-toolbar">
+            <label class="select-wrap" for="letter-select">
+              <span id="letter-select-label">Pick a letter</span>
+              <select id="letter-select"></select>
+            </label>
+            <div class="mastery-chip">
+              <span>Mastered locally</span>
+              <strong id="mastery-count">0 / 0</strong>
+            </div>
+          </div>
+
+          <div class="trace-layout">
+            <div class="trace-stage-card">
+              <div class="trace-meta">
+                <div>
+                  <p id="trace-symbol" class="trace-symbol">ا</p>
+                  <h3 id="trace-name">Alif</h3>
+                  <p id="trace-sound" class="trace-sound">أَ - aa / a - long "a" as in "father"</p>
+                </div>
+
+                <div class="trace-status-group">
+                  <span id="trace-status" class="status-pill">Preparing trace guide</span>
+                  <span id="trace-complete-badge" class="complete-badge is-hidden">Completed</span>
+                </div>
+              </div>
+
+              <div class="trace-board-wrap">
+                <div class="trace-board-copy">
+                  <p class="panel-kicker">Trace The Guide</p>
+                  <p id="trace-board-note" class="trace-board-note">
+                    The board uses the rendered glyph itself as the target, while the ordered steps
+                    on the right handle stroke direction.
+                  </p>
+                </div>
+
+                <div class="trace-board">
+                  <svg id="trace-board-svg" viewBox="0 0 200 200" aria-label="Tracing surface"></svg>
+                </div>
+              </div>
+
+              <div class="button-row">
+                <button id="trace-clear" class="button button-secondary" type="button">
+                  Clear board
+                </button>
+                <button id="trace-demo" class="button button-primary" type="button">
+                  Replay stroke order
+                </button>
+              </div>
+
+              <p id="trace-audio-status" class="audio-status" aria-live="polite">
+                Audio is checking browser speech support.
+              </p>
+
+              <p id="trace-message" class="feedback info" aria-live="polite">
+                Follow the ordered stroke guide and cover the full shape to complete the letter.
+              </p>
+            </div>
+
+            <div class="trace-notes">
+              <article class="note-card">
+                <p class="panel-kicker">Current Letter</p>
+                <h3>How to form it</h3>
+                <p id="trace-note-copy" class="note-copy"></p>
+              </article>
+
+              <article class="note-card">
+                <p class="panel-kicker">Stroke Order</p>
+                <div class="stroke-demo-frame">
+                  <img id="stroke-demo-image" class="stroke-demo-image" alt="" hidden />
+                  <p id="stroke-demo-empty" class="stroke-demo-empty is-hidden"></p>
+                  <p id="stroke-demo-caption" class="stroke-demo-caption"></p>
+                </div>
+                <ol id="stroke-list" class="stroke-list"></ol>
+              </article>
+
+              <article class="note-card subtle">
+                <p class="panel-kicker">Practice Note</p>
+                <p id="practice-note-copy" class="note-copy">
+                  Trace the live glyph shape rather than a simplified placeholder path.
+                </p>
+              </article>
+            </div>
+          </div>
+        </section>
+      </main>
+    </div>
+
+    <script src="script-data.js?v=20260410a"></script>
+    <script src="arabic-data.js?v=20260410a"></script>
+    <script src="korean-data.js?v=20260410a"></script>
+    <script src="cyrillic-data.js?v=20260410a"></script>
+    <script src="app-shell.js?v=20260410a"></script>
+    <script src="app-match.js?v=20260410a"></script>
+    <script src="app-choice.js?v=20260416a"></script>
+    <script src="app-trace.js?v=20260410a"></script>
+  </body>
+</html>

@@ -1,18 +1,13 @@
 const tools = [
   {
-    title: "Web Portfolio",
-    href: "Web Portfolio/index.html",
-    preview: "Web Portfolio/index.html",
+    title: "Animation Helper",
+    href: "Animation Helper/index.html",
+    preview: "Animation Helper/index.html",
   },
   {
-    title: "Solar System",
-    href: "SolarSystem.html",
-    preview: "SolarSystem.html",
-  },
-  {
-    title: "Daily Task List",
-    href: "Daily Task List/tasks_v1.html",
-    preview: "Daily Task List/tasks_v1.html",
+    title: "Arabic Script Learning",
+    href: "Arabic Script Learning/index.html",
+    preview: "Arabic Script Learning/index.html",
   },
   {
     title: "Article Scraper",
@@ -25,14 +20,9 @@ const tools = [
     preview: "Book Reader/Custom PDF Reader.html",
   },
   {
-    title: "Nutrition Analysis",
-    href: "Nutrition and Cost Analysis/Nutrition.html",
-    preview: "Nutrition and Cost Analysis/Nutrition.html",
-  },
-  {
-    title: "MLB Overlay",
-    href: "MLB Overlay/index.html",
-    preview: "MLB Overlay/index.html",
+    title: "Club Automation",
+    href: "Club-Automation Replacement/index.html",
+    preview: "Club-Automation Replacement/index.html",
   },
   {
     title: "Converted Lang Game",
@@ -40,14 +30,9 @@ const tools = [
     preview: "Converted Lang Game/index.html",
   },
   {
-    title: "Song Translation",
-    href: "Song Translation/app/index.html",
-    preview: "Song Translation/app/index.html",
-  },
-  {
-    title: "Roman Script Tool",
-    href: "functional roman script translator/app/index.html",
-    preview: "functional roman script translator/app/index.html",
+    title: "Daily Task List",
+    href: "Daily Task List/tasks_v1.html",
+    preview: "Daily Task List/tasks_v1.html",
   },
   {
     title: "Little Shop of Laura",
@@ -55,19 +40,46 @@ const tools = [
     preview: "Little Shop of Laura/index.html",
   },
   {
+    title: "Map Info",
+    href: "Map Info/index.html",
+    preview: "Map Info/index.html",
+  },
+  {
+    title: "MLB Overlay",
+    href: "MLB Overlay/index.html",
+    preview: "MLB Overlay/index.html",
+  },
+  {
+    title: "Nutrition Analysis",
+    href: "Nutrition and Cost Analysis/Nutrition.html",
+    preview: "Nutrition and Cost Analysis/Nutrition.html",
+  },
+  {
+    title: "Song Translation",
+    href: "Song Translation/app/index.html",
+    preview: "Song Translation/app/index.html",
+  },
+  {
+    title: "Solar System",
+    href: "SolarSystem.html",
+    preview: "SolarSystem.html",
+  },
+  {
     title: "To-Do List",
     href: "To-Do List/test.html",
     preview: "To-Do List/test.html",
   },
   {
-    title: "Codex Test",
-    href: "codex test/index.html",
-    preview: "codex test/index.html",
+    title: "Web Portfolio",
+    href: "Web Portfolio/index.html",
+    preview: "Web Portfolio/index.html",
   },
 ];
 
-const panels = document.querySelectorAll("[data-tool-index]");
+const panels = Array.from(document.querySelectorAll("[data-tool-index]"));
 const launcherGrid = document.getElementById("launcher-grid");
+const toolCore = launcherGrid?.querySelector(".tool-core");
+const overflowLinks = document.getElementById("core-extra-links");
 
 function createPanelMarkup(tool) {
   return `
@@ -112,6 +124,7 @@ function populatePanels() {
       return;
     }
 
+    panel.hidden = false;
     panel.href = tool.href;
     panel.setAttribute("aria-label", `Open ${tool.title}`);
     panel.innerHTML = createPanelMarkup(tool);
@@ -120,6 +133,24 @@ function populatePanels() {
     if (frame) {
       frame.addEventListener("load", () => hideEmbeddedHomeLink(frame));
     }
+  });
+}
+
+function populateOverflowLinks() {
+  if (!overflowLinks) {
+    return;
+  }
+
+  const overflowTools = tools.slice(panels.length);
+  overflowLinks.innerHTML = "";
+  overflowLinks.hidden = overflowTools.length === 0;
+
+  overflowTools.forEach((tool) => {
+    const link = document.createElement("a");
+    link.className = "core-extra-link";
+    link.href = tool.href;
+    link.textContent = tool.title;
+    overflowLinks.appendChild(link);
   });
 }
 
@@ -140,6 +171,32 @@ function setupReveal() {
     node.style.transitionDelay = `${Math.min(index * 35, 300)}ms`;
     observer.observe(node);
   });
+
+  if (toolCore) {
+    toolCore.style.transitionDelay = `${Math.min(panels.length * 35, 320)}ms`;
+    observer.observe(toolCore);
+  }
+}
+
+function shouldUseTileLayout() {
+  if (!launcherGrid) {
+    return false;
+  }
+
+  const crampedViewport = window.innerWidth <= 1180 || window.innerHeight <= 760;
+  const crampedGrid = launcherGrid.clientWidth > 0 && launcherGrid.clientWidth < 1180;
+
+  return crampedViewport || crampedGrid;
+}
+
+function syncLayoutMode() {
+  if (!launcherGrid) {
+    return;
+  }
+
+  const useTileLayout = shouldUseTileLayout();
+  launcherGrid.classList.toggle("is-tile-layout", useTileLayout);
+  document.body.classList.toggle("tiles-mode", useTileLayout);
 }
 
 function setupPointerGlow() {
@@ -162,5 +219,9 @@ function setupPointerGlow() {
 }
 
 populatePanels();
+populateOverflowLinks();
 setupReveal();
+syncLayoutMode();
 setupPointerGlow();
+
+window.addEventListener("resize", syncLayoutMode);

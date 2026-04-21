@@ -90,6 +90,15 @@
       font-size: 14px;
       outline:none;
     }
+    select{
+      padding: 8px 10px;
+      border-radius: 12px;
+      border:1px solid var(--border2);
+      background: rgba(3, 7, 18, .55);
+      color:var(--text);
+      font-size: 13px;
+      outline:none;
+    }
     textarea::placeholder{ color: rgba(229,231,235,.45); }
 
     .right{ display:flex; flex-direction:column; gap:12px; }
@@ -138,7 +147,7 @@
       border:1px solid var(--border);
       border-radius: 16px;
       overflow:hidden;
-      background: rgba(255,255,255,.03);
+      background: linear-gradient(180deg, rgba(255,255,255,.04), rgba(255,255,255,.02));
     }
     .cardHead{
       padding: 10px 12px;
@@ -164,6 +173,54 @@
       border-radius: 999px;
       color: var(--muted);
       background: rgba(0,0,0,.18);
+    }
+
+    .cardMeta{
+      padding: 0 12px 10px;
+      display:flex;
+      justify-content:space-between;
+      gap:10px;
+      flex-wrap:wrap;
+      color: var(--muted);
+      font-size: 12px;
+    }
+
+    .previewFrame{
+      border:1px solid rgba(255,255,255,.08);
+      border-radius: 14px;
+      overflow:hidden;
+      background: rgba(5,9,20,.7);
+    }
+
+    .previewBar{
+      display:flex;
+      align-items:center;
+      gap:8px;
+      padding: 9px 11px;
+      border-bottom:1px solid rgba(255,255,255,.08);
+      background: rgba(255,255,255,.04);
+    }
+
+    .previewDots{
+      display:flex;
+      gap:5px;
+      flex:0 0 auto;
+    }
+
+    .previewDots span{
+      width:8px;
+      height:8px;
+      border-radius:999px;
+      background: rgba(255,255,255,.2);
+    }
+
+    .previewSite{
+      min-width:0;
+      color: rgba(229,231,235,.86);
+      font-size:12px;
+      white-space:nowrap;
+      overflow:hidden;
+      text-overflow:ellipsis;
     }
 
     .imgWrap{ padding: 10px; }
@@ -262,6 +319,25 @@
           </div>
 
           <div class="row">
+            <label class="toggle">Width
+              <select id="viewportWidth">
+                <option value="1366">1366px</option>
+                <option value="1440" selected>1440px</option>
+                <option value="1600">1600px</option>
+                <option value="1800">1800px</option>
+              </select>
+            </label>
+            <label class="toggle">Height cap
+              <select id="captureHeight">
+                <option value="2200">2200px</option>
+                <option value="3000" selected>3000px</option>
+                <option value="3800">3800px</option>
+                <option value="4600">4600px</option>
+              </select>
+            </label>
+          </div>
+
+          <div class="row">
             <button id="clear" class="ghost">Clear</button>
           </div>
 
@@ -304,6 +380,10 @@
   <script src="https://cdn.jsdelivr.net/npm/cropperjs@1.6.2/dist/cropper.min.js"></script>
   <script>
     const $ = (id) => document.getElementById(id);
+
+    document.querySelector(".title p").textContent = "Cookie accept pass, warmed website screenshots, square crop flow, and downloadable final batches.";
+    $("go").textContent = "Generate -> Crop";
+    $("modalTitle").textContent = "Crop 1/1 (Instagram 1080x1080)";
 
     let cropper = null;
 
@@ -470,6 +550,12 @@
       $("cropImg").src = "";
     }
 
+    function applyFriendlyCropCopy(item){
+      if (!item) return;
+      $("modalTitle").textContent = "Crop (Instagram 1080x1080)";
+      $("progressText").textContent = `Item ${idx + 1} / ${queue.length} - ${item.domain}`;
+    }
+
     async function saveCropAndDeleteRaw(item){
       if (!cropper) throw new Error("Cropper not ready");
 
@@ -510,6 +596,7 @@
 
       idx = 0;
       openModalForItem(queue[idx]);
+      applyFriendlyCropCopy(queue[idx]);
     }
 
     async function finishBatchZip(){
@@ -543,6 +630,7 @@
         return;
       }
       openModalForItem(queue[idx]);
+      applyFriendlyCropCopy(queue[idx]);
     });
 
     $("saveNext").addEventListener("click", async () => {
@@ -578,6 +666,7 @@
       }
 
       openModalForItem(queue[idx]);
+      applyFriendlyCropCopy(queue[idx]);
     });
 
     $("clear").addEventListener("click", () => {
@@ -616,7 +705,12 @@
         res = await apiFetch("/api/run", {
           method: "POST",
           headers: { "Content-Type": "application/json" },
-          body: JSON.stringify({ urls, headful: $("headful").checked })
+          body: JSON.stringify({
+            urls,
+            headful: $("headful").checked,
+            viewport_width: Number($("viewportWidth").value || 1440),
+            max_height: Number($("captureHeight").value || 3000)
+          })
         });
         data = await res.json();
       } catch (error) {
@@ -644,13 +738,31 @@
         }
 
         const rawUrl = resolveToolUrl(it.raw_url);
+        const siteLabel = (() => {
+          try {
+            const parsed = new URL(it.url);
+            return `${parsed.hostname}${parsed.pathname === "/" ? "" : parsed.pathname}`;
+          } catch {
+            return it.url;
+          }
+        })();
         card.innerHTML = `
           <div class="cardHead">
             <a href="${rawUrl}" target="_blank" rel="noopener">${it.domain}</a>
-            <span class="chip">raw (capped)</span>
+            <span class="chip">${$("viewportWidth").value}px capture</span>
+          </div>
+          <div class="cardMeta">
+            <span>Raw website screenshot</span>
+            <span>Cap ${$("captureHeight").value}px</span>
           </div>
           <div class="imgWrap">
-            <img class="preview" src="${rawUrl}" alt="preview" crossorigin="anonymous">
+            <div class="previewFrame">
+              <div class="previewBar">
+                <div class="previewDots"><span></span><span></span><span></span></div>
+                <div class="previewSite">${siteLabel}</div>
+              </div>
+              <img class="preview" src="${rawUrl}" alt="Website screenshot preview" crossorigin="anonymous">
+            </div>
           </div>
         `;
         $("thumbs").appendChild(card);

@@ -1,0 +1,270 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Animation Helper Layer Studio</title>
+  <link rel="stylesheet" href="styles.css">
+  <style>
+    .owentools-home-link {
+      position: fixed;
+      top: max(12px, env(safe-area-inset-top));
+      left: max(12px, env(safe-area-inset-left));
+      z-index: 9999;
+      width: 44px;
+      height: 44px;
+      display: grid;
+      place-items: center;
+      border-radius: 14px;
+      border: 1px solid rgba(255, 255, 255, 0.16);
+      background: rgba(18, 20, 28, 0.82);
+      color: #eef2ff;
+      text-decoration: none;
+      font: 800 0.82rem/1 system-ui, sans-serif;
+      text-transform: lowercase;
+      letter-spacing: 0.04em;
+      backdrop-filter: blur(12px);
+      box-shadow: 0 12px 28px rgba(0, 0, 0, 0.28);
+    }
+  </style>
+</head>
+<body>
+  <a class="owentools-home-link" href="../index.html" aria-label="Back to owentools" title="Back to owentools">ot</a>
+  <div class="app-shell">
+    <header class="topbar">
+      <div class="brand-inline">
+        <span class="brand-mini">Animation Helper</span>
+        <h1>Layer Studio</h1>
+        <span id="toolSummary" class="current-tool-pill">Move</span>
+      </div>
+
+      <div class="topbar-actions">
+        <button id="newProjectBtn" class="action-btn" title="New project">New</button>
+        <button id="openImageBtn" class="action-btn" title="Import image">Import</button>
+        <button id="saveImageBtn" class="action-btn action-btn--primary" title="Export PNG">Export</button>
+        <input id="fileInput" type="file" accept="image/*" hidden>
+      </div>
+    </header>
+
+    <section class="ribbon">
+      <div class="toolbar-strip toolbar-strip--tools" id="toolGrid" aria-label="Tools">
+        <button class="tool-btn is-active" data-tool="move" title="Move" aria-label="Move">🫳</button>
+        <button class="tool-btn" data-tool="hand" title="Pan view" aria-label="Pan view">✋</button>
+        <button class="tool-btn" data-tool="select" title="Rectangular selection" aria-label="Rectangular selection">🔲</button>
+        <button class="tool-btn" data-tool="pencil" title="Pencil" aria-label="Pencil">✏️</button>
+        <button class="tool-btn" data-tool="brush" title="Brush" aria-label="Brush">🖌️</button>
+        <button class="tool-btn" data-tool="blur" title="Blur tool" aria-label="Blur tool">💨</button>
+        <button class="tool-btn" data-tool="gradient" title="Gradient" aria-label="Gradient">🌈</button>
+        <button class="tool-btn" data-tool="eraser" title="Eraser" aria-label="Eraser">🩹</button>
+        <button class="tool-btn" data-tool="fill" title="Fill" aria-label="Fill">🪣</button>
+        <button class="tool-btn" data-tool="eyedropper" title="Picker" aria-label="Picker">💉</button>
+        <button class="tool-btn" data-tool="line" title="Line" aria-label="Line">📏</button>
+        <button class="tool-btn" data-tool="rectangle" title="Rectangle" aria-label="Rectangle">▭</button>
+        <button class="tool-btn" data-tool="ellipse" title="Ellipse" aria-label="Ellipse">⬭</button>
+        <button class="tool-btn" data-tool="text" title="Text" aria-label="Text">🔤</button>
+      </div>
+
+      <div class="toolbar-strip toolbar-strip--quick" aria-label="Quick actions">
+        <button id="undoBtn" class="action-btn icon-btn" title="Undo" aria-label="Undo">↶</button>
+        <button id="redoBtn" class="action-btn icon-btn" title="Redo" aria-label="Redo">↷</button>
+        <button id="clearLayerBtn" class="action-btn icon-btn" title="Clear active layer" aria-label="Clear active layer">🧼</button>
+        <button id="smartCutoutBtn" class="action-btn icon-btn action-btn--primary" title="Cut out subject on active layer" aria-label="Cut out subject">✂️</button>
+      </div>
+
+      <div class="toolbar-strip toolbar-strip--colors" aria-label="Main colors">
+        <button id="primaryColorChip" class="color-chip color-chip--main" aria-label="Primary color"></button>
+        <button id="secondaryColorChip" class="color-chip color-chip--main" aria-label="Secondary color"></button>
+        <button id="swapColorsBtn" class="action-btn icon-btn" title="Swap colors" aria-label="Swap colors">🔁</button>
+        <input id="primaryColorInput" type="color" value="#111111" hidden>
+        <input id="secondaryColorInput" type="color" value="#ffffff" hidden>
+      </div>
+
+      <div class="toolbar-strip toolbar-strip--menus" aria-label="Menus">
+        <details class="menu-pop">
+          <summary>🖌️ Brush</summary>
+          <div class="menu-content">
+            <label class="stacked-field" for="sizeRange">
+              Size
+              <input id="sizeRange" type="range" min="1" max="96" value="8">
+            </label>
+            <label class="stacked-field" for="sizeNumber">
+              PX
+              <input id="sizeNumber" type="number" min="1" max="96" value="8">
+            </label>
+            <label class="stacked-field" for="textSizeInput">
+              Text
+              <input id="textSizeInput" type="number" min="8" max="144" value="30">
+            </label>
+          </div>
+        </details>
+
+        <details class="menu-pop">
+          <summary>📐 Shape</summary>
+          <div class="menu-content">
+            <label class="stacked-field" for="shapeModeSelect">
+              Mode
+              <select id="shapeModeSelect">
+                <option value="stroke">Outline</option>
+                <option value="fill">Fill</option>
+                <option value="both">Both</option>
+              </select>
+            </label>
+          </div>
+        </details>
+
+        <details class="menu-pop">
+          <summary>✂️ Cutout</summary>
+          <div class="menu-content">
+            <label class="stacked-field" for="cutoutModeSelect">
+              Mode
+              <select id="cutoutModeSelect">
+                <option value="remove">Remove</option>
+                <option value="add">Add</option>
+              </select>
+            </label>
+            <button id="applySelectionCutoutBtn" class="action-btn">Apply Selection</button>
+            <button id="deselectSelectionBtn" class="action-btn">Deselect</button>
+            <p class="menu-note">Brush adds. Eraser removes. Smart cutout follows the current mode.</p>
+          </div>
+        </details>
+
+        <details class="menu-pop">
+          <summary>fx Adjust</summary>
+          <div class="menu-content">
+            <div class="adjustment-grid">
+              <button class="action-btn adjust-btn" data-adjust="grayscale">Gray</button>
+              <button class="action-btn adjust-btn" data-adjust="invert">Invert</button>
+              <button class="action-btn adjust-btn" data-adjust="sepia">Sepia</button>
+              <button class="action-btn adjust-btn" data-adjust="blur">Blur</button>
+              <button class="action-btn adjust-btn" data-adjust="sharpen">Sharp</button>
+            </div>
+
+            <label class="stacked-field" for="brightnessRange">
+              Bright
+              <input id="brightnessRange" type="range" min="25" max="200" value="100">
+            </label>
+            <label class="stacked-field" for="contrastRange">
+              Contrast
+              <input id="contrastRange" type="range" min="25" max="200" value="100">
+            </label>
+            <button id="applyToneBtn" class="action-btn">Apply Tone</button>
+          </div>
+        </details>
+
+        <details class="menu-pop">
+          <summary>🧱 Canvas</summary>
+          <div class="menu-content">
+            <label class="stacked-field" for="canvasWidthInput">
+              W
+              <input id="canvasWidthInput" type="number" min="64" max="4096" value="960">
+            </label>
+            <label class="stacked-field" for="canvasHeightInput">
+              H
+              <input id="canvasHeightInput" type="number" min="64" max="4096" value="540">
+            </label>
+            <button id="resizeCanvasBtn" class="action-btn">Resize</button>
+          </div>
+        </details>
+
+        <details class="menu-pop">
+          <summary>🔍 View</summary>
+          <div class="menu-content">
+            <label class="stacked-field" for="zoomRange">
+              Zoom
+              <input id="zoomRange" type="range" min="25" max="400" step="25" value="100">
+            </label>
+            <div class="zoom-readout" id="zoomReadout">100%</div>
+          </div>
+        </details>
+      </div>
+
+      <div class="smart-status-chip" id="smartCutoutStatus">Model idle.</div>
+    </section>
+
+    <div id="colorPopover" class="color-popover" hidden>
+      <div class="color-popover__head">
+        <span id="colorPopoverTitle">Primary Color</span>
+        <button id="closeColorPopoverBtn" class="action-btn icon-btn" type="button" aria-label="Close color picker">✕</button>
+      </div>
+      <div id="colorField" class="color-field">
+        <div id="colorFieldHandle" class="color-field__handle"></div>
+      </div>
+      <label class="stacked-field" for="hueRange">
+        Hue
+        <input id="hueRange" type="range" min="0" max="360" value="0">
+      </label>
+      <label class="stacked-field" for="brightnessSlider">
+        Brightness
+        <input id="brightnessSlider" type="range" min="0" max="100" value="100">
+      </label>
+      <label class="stacked-field" for="colorHexInput">
+        Hex
+        <input id="colorHexInput" type="text" value="#111111" spellcheck="false">
+      </label>
+      <div id="palette" class="palette" aria-label="Color palette"></div>
+    </div>
+
+    <main class="workspace">
+      <section class="canvas-stage">
+        <div class="canvas-scroll">
+          <div id="canvasWrapper" class="canvas-wrapper">
+            <div id="layerCanvasStack" class="layer-canvas-stack" aria-label="Layer stack"></div>
+            <canvas id="previewCanvas" width="960" height="540"></canvas>
+          </div>
+        </div>
+      </section>
+
+      <aside class="layers-panel">
+        <section class="panel panel--layers">
+          <div class="layers-panel-top">
+            <p class="panel-title">Layers</p>
+            <span id="layerCountTag" class="panel-tag">0 Layers</span>
+          </div>
+
+          <div class="layer-actions">
+            <button id="addLayerBtn" class="action-btn icon-btn" title="Add layer" aria-label="Add layer">➕</button>
+            <button id="duplicateLayerBtn" class="action-btn icon-btn" title="Duplicate layer" aria-label="Duplicate layer">📑</button>
+            <button id="deleteLayerBtn" class="action-btn icon-btn" title="Delete layer" aria-label="Delete layer">🗑️</button>
+            <button id="mergeDownBtn" class="action-btn icon-btn" title="Merge down" aria-label="Merge down">🪄</button>
+            <button id="moveLayerUpBtn" class="action-btn icon-btn" title="Move layer up" aria-label="Move layer up">🔼</button>
+            <button id="moveLayerDownBtn" class="action-btn icon-btn" title="Move layer down" aria-label="Move layer down">🔽</button>
+          </div>
+
+          <label class="stacked-field" for="layerOpacityRange">
+            Opacity
+            <input id="layerOpacityRange" type="range" min="0" max="100" value="100">
+          </label>
+
+          <label class="stacked-field" for="blendModeSelect">
+            Blend
+            <select id="blendModeSelect">
+              <option value="source-over">Normal</option>
+              <option value="multiply">Multiply</option>
+              <option value="screen">Screen</option>
+              <option value="overlay">Overlay</option>
+              <option value="darken">Darken</option>
+              <option value="lighten">Lighten</option>
+            </select>
+          </label>
+
+          <div id="layersList" class="layers-list" aria-label="Layers list"></div>
+        </section>
+      </aside>
+    </main>
+
+    <footer class="statusbar">
+      <span id="statusTool">Tool: Move</span>
+      <span id="statusCoords">Coords: --, --</span>
+      <span id="statusSize">Brush: 8 px</span>
+      <span id="statusCanvas">Canvas: 960 x 540</span>
+      <span id="statusLayer">Layer: --</span>
+    </footer>
+  </div>
+
+  <script src="https://cdn.jsdelivr.net/npm/@tensorflow/tfjs-core@4.22.0/dist/tf-core.min.js"></script>
+  <script src="https://cdn.jsdelivr.net/npm/@tensorflow/tfjs-converter@4.22.0/dist/tf-converter.min.js"></script>
+  <script src="https://cdn.jsdelivr.net/npm/@tensorflow/tfjs-backend-webgl@4.22.0/dist/tf-backend-webgl.min.js"></script>
+  <script src="https://cdn.jsdelivr.net/npm/@tensorflow-models/body-pix@2.2.1/dist/body-pix.min.js"></script>
+  <script src="app.js"></script>
+</body>
+</html>
