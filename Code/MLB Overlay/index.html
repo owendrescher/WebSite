@@ -4,7 +4,7 @@
     <meta charset="utf-8" />
     <meta name="viewport" content="width=device-width, initial-scale=1" />
     <title>MLB Show Stream Overlay</title>
-    <link rel="stylesheet" href="styles.css?v=20260407d" />
+    <link rel="stylesheet" href="styles.css?v=20260425i" />
   </head>
   <body>
     <section id="betInputPanel" class="utility-panel bet-input-panel">
@@ -271,6 +271,7 @@
                 <div class="lineup-team-header">
                   <img class="lineup-logo away-lineup-logo" src="placeholder.png" alt="Away logo" />
                   <span class="away-lineup-team"></span>
+                  <span class="team-streak lineup-team-streak away-lineup-streak"></span>
                 </div>
                 <div class="lineup-team-pitcher away-lineup-pitcher"></div>
                 <ol class="lineup-list away-lineup-list"></ol>
@@ -279,6 +280,7 @@
                 <div class="lineup-team-header">
                   <img class="lineup-logo home-lineup-logo" src="placeholder.png" alt="Home logo" />
                   <span class="home-lineup-team"></span>
+                  <span class="team-streak lineup-team-streak home-lineup-streak"></span>
                 </div>
                 <div class="lineup-team-pitcher home-lineup-pitcher"></div>
                 <ol class="lineup-list home-lineup-list"></ol>
@@ -288,13 +290,17 @@
               <section class="lineup-pitching-panel away-pitching">
                 <div class="lineup-pitching-header">Pitching • <span class="lineup-pitching-team-code"></span></div>
                 <div class="current-pitcher-card"></div>
-                <div class="lineup-pitching-subhead">Bullpen</div>
+                <div class="lineup-pitching-subhead">Starters</div>
+                <ul class="rotation-list"></ul>
+                <div class="lineup-pitching-subhead">Relief</div>
                 <ul class="bullpen-list"></ul>
               </section>
               <section class="lineup-pitching-panel home-pitching">
                 <div class="lineup-pitching-header">Pitching • <span class="lineup-pitching-team-code"></span></div>
                 <div class="current-pitcher-card"></div>
-                <div class="lineup-pitching-subhead">Bullpen</div>
+                <div class="lineup-pitching-subhead">Starters</div>
+                <ul class="rotation-list"></ul>
+                <div class="lineup-pitching-subhead">Relief</div>
                 <ul class="bullpen-list"></ul>
               </section>
             </div>
@@ -358,10 +364,15 @@
           <div class="scoreboard-main">
             <div class="score-row away-row">
               <div class="team-left">
-                <img class="team-logo away-logo" src="placeholder.png" alt="Away logo" />
+                <div class="team-logo-stack">
+                  <img class="team-logo away-logo" src="placeholder.png" alt="Away logo" />
+                  <span class="team-streak team-logo-streak away-streak"></span>
+                </div>
                 <div class="team-id">
                   <span class="team away"></span>
-                  <span class="team-record away-record"></span>
+                  <span class="team-record-line">
+                    <span class="team-record away-record"></span>
+                  </span>
                 </div>
                 <div class="meta-block away-meta">
                   <span class="matchup-line away-matchup"></span>
@@ -371,10 +382,15 @@
 
             <div class="score-row home-row">
               <div class="team-left">
-                <img class="team-logo home-logo" src="placeholder.png" alt="Home logo" />
+                <div class="team-logo-stack">
+                  <img class="team-logo home-logo" src="placeholder.png" alt="Home logo" />
+                  <span class="team-streak team-logo-streak home-streak"></span>
+                </div>
                 <div class="team-id">
                   <span class="team home"></span>
-                  <span class="team-record home-record"></span>
+                  <span class="team-record-line">
+                    <span class="team-record home-record"></span>
+                  </span>
                 </div>
                 <div class="meta-block home-meta">
                   <span class="matchup-line home-matchup"></span>
@@ -408,6 +424,6 @@
       </article>
     </template>
 
-    <script src="app.js?v=20260407d"></script>
+    <script src="app.js?v=20260425i"></script>
   </body>
 </html>
