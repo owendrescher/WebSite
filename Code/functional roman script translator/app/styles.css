@@ -1,0 +1,360 @@
+:root {
+  --bg: #08110f;
+  --panel: rgba(10, 17, 15, 0.72);
+  --panel-strong: rgba(15, 24, 22, 0.92);
+  --line: rgba(193, 255, 216, 0.16);
+  --text: #f3f8f4;
+  --muted: #a7b8af;
+  --soft: #7f9188;
+  --accent: #6af2ae;
+  --accent-strong: #c0ff8f;
+  --warning: #ffd27c;
+  --shadow: 0 24px 80px rgba(0, 0, 0, 0.35);
+}
+
+* {
+  box-sizing: border-box;
+}
+
+html,
+body {
+  height: 100%;
+}
+
+body {
+  margin: 0;
+  font-family: "Manrope", sans-serif;
+  color: var(--text);
+  background:
+    radial-gradient(circle at top left, rgba(125, 255, 191, 0.16), transparent 30%),
+    radial-gradient(circle at 80% 20%, rgba(232, 255, 158, 0.12), transparent 25%),
+    linear-gradient(135deg, #050907 0%, #0c1714 48%, #14211c 100%);
+  overflow: hidden;
+}
+
+.background {
+  position: fixed;
+  inset: 0;
+  pointer-events: none;
+}
+
+.orb {
+  position: absolute;
+  border-radius: 999px;
+  filter: blur(24px);
+  opacity: 0.45;
+}
+
+.orb-a {
+  width: 24rem;
+  height: 24rem;
+  top: -6rem;
+  right: -4rem;
+  background: radial-gradient(circle, rgba(106, 242, 174, 0.55) 0%, rgba(106, 242, 174, 0) 70%);
+}
+
+.orb-b {
+  width: 18rem;
+  height: 18rem;
+  bottom: -4rem;
+  left: -4rem;
+  background: radial-gradient(circle, rgba(255, 214, 123, 0.38) 0%, rgba(255, 214, 123, 0) 68%);
+}
+
+.grain {
+  position: absolute;
+  inset: 0;
+  opacity: 0.09;
+  background-image:
+    linear-gradient(rgba(255,255,255,0.08) 1px, transparent 1px),
+    linear-gradient(90deg, rgba(255,255,255,0.06) 1px, transparent 1px);
+  background-size: 4px 4px, 4px 4px;
+  mix-blend-mode: soft-light;
+}
+
+.app-shell {
+  position: relative;
+  z-index: 1;
+  max-width: 1200px;
+  height: 100%;
+  margin: 0 auto;
+  padding: 32px 24px;
+  display: grid;
+  grid-template-columns: minmax(280px, 380px) minmax(0, 1fr);
+  gap: 24px;
+}
+
+.hero-card,
+.lyrics-panel {
+  backdrop-filter: blur(18px);
+  background: var(--panel);
+  border: 1px solid var(--line);
+  border-radius: 28px;
+  box-shadow: var(--shadow);
+}
+
+.hero-card {
+  padding: 28px;
+  display: flex;
+  flex-direction: column;
+  justify-content: space-between;
+  min-height: 0;
+}
+
+.eyebrow,
+.panel-kicker,
+.status {
+  text-transform: uppercase;
+  letter-spacing: 0.16em;
+  font-size: 0.73rem;
+  color: var(--accent);
+}
+
+.hero-top {
+  display: grid;
+  gap: 18px;
+}
+
+#track-title {
+  margin: 12px 0 8px;
+  font-family: "Instrument Serif", serif;
+  font-size: clamp(2.6rem, 5vw, 4.6rem);
+  line-height: 0.92;
+  font-weight: 400;
+}
+
+.artist {
+  margin: 0;
+  color: var(--muted);
+  font-size: 1rem;
+  line-height: 1.55;
+  max-width: 26ch;
+}
+
+.chip-stack {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 10px;
+}
+
+.lang-picker {
+  display: inline-flex;
+  align-items: center;
+  gap: 10px;
+  padding: 8px 12px;
+  border-radius: 999px;
+  background: rgba(255, 255, 255, 0.05);
+  border: 1px solid rgba(255, 255, 255, 0.08);
+  color: var(--muted);
+  font-size: 0.85rem;
+}
+
+.lang-picker select {
+  border: none;
+  background: transparent;
+  color: var(--text);
+  font: inherit;
+  outline: none;
+}
+
+.lang-picker option {
+  color: #08110f;
+  background: #f3f8f4;
+}
+
+.chip {
+  display: inline-flex;
+  align-items: center;
+  padding: 9px 14px;
+  border-radius: 999px;
+  background: rgba(106, 242, 174, 0.12);
+  border: 1px solid rgba(106, 242, 174, 0.24);
+  color: var(--text);
+  font-size: 0.85rem;
+}
+
+.chip.subtle {
+  background: rgba(255, 255, 255, 0.05);
+  border-color: rgba(255, 255, 255, 0.08);
+  color: var(--muted);
+}
+
+.progress-wrap {
+  display: grid;
+  gap: 12px;
+}
+
+.progress-track {
+  height: 8px;
+  border-radius: 999px;
+  background: rgba(255, 255, 255, 0.08);
+  overflow: hidden;
+}
+
+.progress-bar {
+  width: 0%;
+  height: 100%;
+  border-radius: inherit;
+  background: linear-gradient(90deg, var(--accent) 0%, var(--accent-strong) 100%);
+  transition: width 180ms linear;
+}
+
+.progress-labels {
+  display: flex;
+  justify-content: space-between;
+  color: var(--soft);
+  font-size: 0.84rem;
+}
+
+.lyrics-panel {
+  min-height: 0;
+  display: flex;
+  flex-direction: column;
+  overflow: hidden;
+}
+
+.panel-head {
+  padding: 28px 28px 18px;
+  display: flex;
+  justify-content: space-between;
+  align-items: end;
+  gap: 16px;
+  border-bottom: 1px solid rgba(255,255,255,0.06);
+}
+
+.panel-head h2 {
+  margin: 6px 0 0;
+  font-size: 1.4rem;
+}
+
+.ghost-button {
+  border: 1px solid rgba(255,255,255,0.1);
+  background: rgba(255,255,255,0.04);
+  color: var(--text);
+  border-radius: 999px;
+  padding: 10px 16px;
+  font: inherit;
+  cursor: pointer;
+}
+
+.hidden {
+  display: none;
+}
+
+.ghost-button:hover {
+  background: rgba(255,255,255,0.08);
+}
+
+.lyrics-scroll {
+  flex: 1;
+  overflow: auto;
+  padding: 24px 28px 42vh;
+  scroll-behavior: smooth;
+}
+
+.lyrics-list {
+  display: grid;
+  gap: 16px;
+}
+
+.lyric-line {
+  padding: 18px 20px;
+  border-radius: 22px;
+  border: 1px solid rgba(255,255,255,0.04);
+  background: rgba(255,255,255,0.02);
+  transform: scale(0.985);
+  opacity: 0.48;
+  transition: transform 220ms ease, opacity 220ms ease, background 220ms ease, border-color 220ms ease;
+}
+
+.lyric-line.active {
+  background: linear-gradient(135deg, rgba(106, 242, 174, 0.18), rgba(255, 234, 176, 0.1));
+  border-color: rgba(106, 242, 174, 0.26);
+  opacity: 1;
+  transform: scale(1);
+}
+
+.lyric-line.past {
+  opacity: 0.38;
+}
+
+.lyric-line.future {
+  opacity: 0.62;
+}
+
+.lyric-original {
+  margin: 0;
+  font-size: clamp(1.15rem, 2vw, 1.8rem);
+  line-height: 1.24;
+  font-weight: 800;
+}
+
+.lyric-translation {
+  margin: 8px 0 0;
+  color: var(--muted);
+  font-size: 1rem;
+  line-height: 1.5;
+}
+
+.lyric-phonetic {
+  margin: 8px 0 0;
+  color: var(--warning);
+  font-size: 0.96rem;
+  line-height: 1.45;
+  letter-spacing: 0.02em;
+}
+
+.lyric-time {
+  display: inline-block;
+  margin-top: 10px;
+  color: var(--soft);
+  font-size: 0.75rem;
+  letter-spacing: 0.09em;
+  text-transform: uppercase;
+}
+
+.empty-state {
+  max-width: 520px;
+  padding: 18vh 0 0;
+}
+
+.empty-state h3 {
+  margin: 0 0 12px;
+  font-family: "Instrument Serif", serif;
+  font-size: clamp(2rem, 4vw, 3.4rem);
+  font-weight: 400;
+  line-height: 0.95;
+}
+
+.empty-state p {
+  margin: 0;
+  color: var(--muted);
+  line-height: 1.65;
+}
+
+@media (max-width: 920px) {
+  body {
+    overflow: auto;
+  }
+
+  .app-shell {
+    height: auto;
+    min-height: 100%;
+    grid-template-columns: 1fr;
+    padding: 18px;
+  }
+
+  .hero-card {
+    gap: 22px;
+  }
+
+  .lyrics-scroll {
+    padding: 18px 18px 28vh;
+  }
+
+  .panel-head {
+    padding: 22px 18px 16px;
+    align-items: start;
+    flex-direction: column;
+  }
+}
