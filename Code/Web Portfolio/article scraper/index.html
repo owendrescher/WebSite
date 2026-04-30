@@ -4,6 +4,7 @@
   <meta charset="utf-8"/>
   <meta name="viewport" content="width=device-width, initial-scale=1"/>
   <title>Article Screenshotter</title>
+  <link rel="icon" type="image/png" href="../../favicon.png?v=2" />
 
   <!-- Cropper.js -->
   <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/cropperjs@1.6.2/dist/cropper.min.css">
@@ -24,11 +25,36 @@
       --radius:16px;
     }
 
+    .owentools-home-link{
+      position:fixed;
+      top:max(12px, env(safe-area-inset-top));
+      left:max(12px, env(safe-area-inset-left));
+      z-index:9999;
+      width:44px;
+      height:44px;
+      display:grid;
+      place-items:center;
+      padding:0;
+      border-radius:14px;
+      border:1px solid rgba(255,255,255,.14);
+      background:rgba(11,18,32,.82);
+      color:#e5e7eb;
+      text-decoration:none;
+      font:800 .82rem/1 system-ui, sans-serif;
+      text-transform:lowercase;
+      letter-spacing:.04em;
+      backdrop-filter:blur(12px);
+      box-shadow:0 12px 28px rgba(0,0,0,.28);
+    }
+
     *{ box-sizing:border-box; }
     html,body{ height:100%; }
     body{
       margin:0;
-      background: radial-gradient(1200px 800px at 20% 0%, #122548 0%, var(--bg) 55%);
+      background:
+        radial-gradient(900px 640px at 12% -8%, rgba(96,165,250,.24), transparent 58%),
+        radial-gradient(700px 520px at 88% 6%, rgba(52,211,153,.16), transparent 56%),
+        linear-gradient(145deg, #070d19 0%, var(--bg) 48%, #10192c 100%);
       color:var(--text);
       font-family: ui-sans-serif, system-ui, -apple-system, Segoe UI, Roboto, Arial, sans-serif;
     }
@@ -37,7 +63,7 @@
 
     .header{ display:flex; justify-content:space-between; gap:14px; align-items:flex-end; flex-wrap:wrap; margin-bottom: 14px; }
     .title{ display:flex; flex-direction:column; gap:6px; }
-    .title h1{ margin:0; font-size: 26px; letter-spacing:.2px; }
+    .title h1{ margin:0; font-size: clamp(30px, 4vw, 56px); line-height:.92; letter-spacing:-.04em; }
     .title p{ margin:0; color:var(--muted); font-size: 14px; }
 
     .panel{
@@ -46,6 +72,7 @@
       border-radius: var(--radius);
       box-shadow: var(--shadow);
       overflow:hidden;
+      backdrop-filter: blur(18px);
     }
 
     .controls{
@@ -67,6 +94,15 @@
       font-size: 14px;
       outline:none;
     }
+    select{
+      padding: 8px 10px;
+      border-radius: 12px;
+      border:1px solid var(--border2);
+      background: rgba(3, 7, 18, .55);
+      color:var(--text);
+      font-size: 13px;
+      outline:none;
+    }
     textarea::placeholder{ color: rgba(229,231,235,.45); }
 
     .right{ display:flex; flex-direction:column; gap:12px; }
@@ -83,6 +119,7 @@
       font-weight: 650;
       cursor:pointer;
       transition: transform .06s ease, background .2s ease, border-color .2s ease;
+      box-shadow: inset 0 1px 0 rgba(255,255,255,.08);
     }
     button:hover{ background: rgba(96,165,250,.20); border-color: rgba(96,165,250,.35); }
     button:active{ transform: translateY(1px); }
@@ -115,7 +152,8 @@
       border:1px solid var(--border);
       border-radius: 16px;
       overflow:hidden;
-      background: rgba(255,255,255,.03);
+      background: linear-gradient(180deg, rgba(255,255,255,.04), rgba(255,255,255,.02));
+      box-shadow: 0 16px 36px rgba(0,0,0,.24);
     }
     .cardHead{
       padding: 10px 12px;
@@ -141,6 +179,54 @@
       border-radius: 999px;
       color: var(--muted);
       background: rgba(0,0,0,.18);
+    }
+
+    .cardMeta{
+      padding: 0 12px 10px;
+      display:flex;
+      justify-content:space-between;
+      gap:10px;
+      flex-wrap:wrap;
+      color: var(--muted);
+      font-size: 12px;
+    }
+
+    .previewFrame{
+      border:1px solid rgba(255,255,255,.08);
+      border-radius: 14px;
+      overflow:hidden;
+      background: rgba(5,9,20,.7);
+    }
+
+    .previewBar{
+      display:flex;
+      align-items:center;
+      gap:8px;
+      padding: 9px 11px;
+      border-bottom:1px solid rgba(255,255,255,.08);
+      background: rgba(255,255,255,.04);
+    }
+
+    .previewDots{
+      display:flex;
+      gap:5px;
+      flex:0 0 auto;
+    }
+
+    .previewDots span{
+      width:8px;
+      height:8px;
+      border-radius:999px;
+      background: rgba(255,255,255,.2);
+    }
+
+    .previewSite{
+      min-width:0;
+      color: rgba(229,231,235,.86);
+      font-size:12px;
+      white-space:nowrap;
+      overflow:hidden;
+      text-overflow:ellipsis;
     }
 
     .imgWrap{ padding: 10px; }
@@ -209,10 +295,26 @@
       .modalBtns{ flex-direction:column; align-items:stretch; }
       .leftBtns, .rightBtns{ justify-content:stretch; }
     }
+
+    @media (orientation: portrait), (max-aspect-ratio: 10 / 11){
+      html, body{ height:auto; min-height:100%; }
+      .wrap{ width:100%; padding: max(62px, env(safe-area-inset-top)) 12px 28px; }
+      .header{ align-items:flex-start; }
+      .title h1{ font-size: clamp(2.2rem, 12vw, 4.4rem); }
+      .controls{ grid-template-columns:1fr; padding:12px; }
+      .row, .right{ align-items:stretch; }
+      .row > *, button, select, textarea{ width:100%; }
+      .thumbs{ grid-template-columns:1fr; gap:12px; }
+      .modalBack{ align-items:stretch; padding:8px; }
+      .modal{ width:100%; max-height:calc(100svh - 16px); overflow:auto; }
+      .modalTop, .modalBtns, .rightBtns{ align-items:stretch; flex-direction:column; }
+      .cropArea img{ max-height:58vh; }
+    }
   </style>
 </head>
 
 <body>
+  <a class="owentools-home-link" href="../../index.html" aria-label="Back to owentools" title="Back to owentools">ot</a>
   <div class="wrap">
     <div class="header">
       <div class="title">
@@ -235,6 +337,25 @@
 
           <div class="row">
             <label class="toggle"><input type="checkbox" id="headful">Show browser (debug)</label>
+          </div>
+
+          <div class="row">
+            <label class="toggle">Width
+              <select id="viewportWidth">
+                <option value="1366">1366px</option>
+                <option value="1440" selected>1440px</option>
+                <option value="1600">1600px</option>
+                <option value="1800">1800px</option>
+              </select>
+            </label>
+            <label class="toggle">Height cap
+              <select id="captureHeight">
+                <option value="2200">2200px</option>
+                <option value="3000" selected>3000px</option>
+                <option value="3800">3800px</option>
+                <option value="4600">4600px</option>
+              </select>
+            </label>
           </div>
 
           <div class="row">
@@ -278,8 +399,13 @@
   </div>
 
   <script src="https://cdn.jsdelivr.net/npm/cropperjs@1.6.2/dist/cropper.min.js"></script>
+  <script src="https://cdn.jsdelivr.net/npm/jszip@3.10.1/dist/jszip.min.js"></script>
   <script>
     const $ = (id) => document.getElementById(id);
+
+    document.querySelector(".title p").textContent = "Cookie accept pass, warmed website screenshots, square crop flow, and downloadable final batches.";
+    $("go").textContent = "Generate -> Crop";
+    $("modalTitle").textContent = "Crop 1/1 (Instagram 1080x1080)";
 
     let cropper = null;
 
@@ -287,11 +413,107 @@
     let batch = null;
     let queue = [];
     let idx = 0;
+    let apiBase = "";
+    let backendMode = true;
+    let clientZip = null;
+
+    const LOCAL_API_BASE = "http://localhost:5000";
+    const LOOPBACK_API_BASE = "http://127.0.0.1:5000";
+    const HEALTH_PATH = "/api/health";
 
     // per-domain counters for final naming
     const finalCounts = new Map();
 
+    function normalizeApiBase(base){
+      return String(base || "").trim().replace(/\/+$/, "");
+    }
+
+    function getApiBaseCandidates(){
+      const params = new URLSearchParams(window.location.search);
+      const candidates = [];
+      const queryBase = normalizeApiBase(params.get("apiBase"));
+
+      if (queryBase) candidates.push(queryBase);
+
+      candidates.push(LOOPBACK_API_BASE);
+      candidates.push(LOCAL_API_BASE);
+
+      return [...new Set(candidates.filter(Boolean))];
+    }
+
+    function getApiUrl(path, base = apiBase){
+      return `${base}${path}`;
+    }
+
+    function resolveToolUrl(path){
+      const value = String(path || "");
+      if (!value) return value;
+      if (/^https?:\/\//i.test(value)) return value;
+      return getApiUrl(value.startsWith("/") ? value : `/${value}`);
+    }
+
+    async function resolveApiBase(forceRefresh = false){
+      if (apiBase && !forceRefresh) return apiBase;
+
+      const errors = [];
+      for (const candidate of getApiBaseCandidates()) {
+        try {
+          const res = await fetch(`${candidate}${HEALTH_PATH}`, { cache: "no-store" });
+          if (!res.ok) throw new Error(`Request failed (${res.status})`);
+          const data = await res.json();
+          if (!data?.ok || data?.service !== "article-screenshotter") {
+            throw new Error("Wrong backend service");
+          }
+          apiBase = candidate;
+          return candidate;
+        } catch (err) {
+          const detail = err?.message ? err.message : "Request failed";
+          errors.push(`${candidate}${HEALTH_PATH} -> ${detail}`);
+        }
+      }
+
+      apiBase = "";
+      throw new Error(errors.join("\n") || "Could not reach the local screenshot server.");
+    }
+
+    async function apiFetch(path, init = {}, options = {}){
+      const base = await resolveApiBase(Boolean(options.forceRefresh));
+      return fetch(getApiUrl(path, base), init);
+    }
+
+    function showConnectionHelp(error){
+      $("thumbs").innerHTML = "";
+      $("zipLink").style.display = "none";
+      $("zipLink").href = "#";
+      setStatus(
+        "Local screenshot server offline.\n" +
+        "owentools.xyz is only the front end for this tool.\n" +
+        "Start article scraper/3.1/app.py, then try again.\n" +
+        `Expected local server: ${LOCAL_API_BASE} or ${LOOPBACK_API_BASE}\n` +
+        (error?.message ? `Last error: ${error.message}` : "")
+      );
+    }
+
     function setStatus(s){ $("status").textContent = s; }
+
+    function screenshotServiceUrl(url){
+      return `https://image.thum.io/get/width/${Number($("viewportWidth").value || 1440)}/crop/${Number($("captureHeight").value || 3000)}/noanimate/${url}`;
+    }
+
+    function domainFromUrl(url){
+      try {
+        return new URL(url).hostname.replace(/^www\./, "").toLowerCase();
+      } catch {
+        return "site";
+      }
+    }
+
+    function getValidUrls(raw){
+      return String(raw || "")
+        .split(/\r?\n/)
+        .map((url) => url.trim())
+        .filter((url) => /^https?:\/\//i.test(url));
+    }
 
     function nextFinalName(domain){
       const cur = (finalCounts.get(domain) || 0) + 1;
@@ -310,6 +532,7 @@
 
     function openModalForItem(item){
       $("modalBack").style.display = "flex";
+      $("cropImg").crossOrigin = "anonymous";
       $("cropImg").src = item.raw_url;
 
       $("modalTitle").textContent = `Crop (Instagram 1080×1080)`;
@@ -370,6 +593,12 @@
       $("cropImg").src = "";
     }
 
+    function applyFriendlyCropCopy(item){
+      if (!item) return;
+      $("modalTitle").textContent = "Crop (Instagram 1080x1080)";
+      $("progressText").textContent = `Item ${idx + 1} / ${queue.length} - ${item.domain}`;
+    }
+
     async function saveCropAndDeleteRaw(item){
       if (!cropper) throw new Error("Cropper not ready");
 
@@ -380,8 +609,14 @@
       const dataUrl = await toBase64PNG(blob);
       const finalName = nextFinalName(item.domain);
 
+      if (!backendMode) {
+        if (!clientZip) clientZip = new JSZip();
+        clientZip.file(finalName, blob);
+        return finalName;
+      }
+
       // save crop to server
-      const saveRes = await fetch("/api/save_crop", {
+      const saveRes = await apiFetch("/api/save_crop", {
         method: "POST",
         headers: {"Content-Type":"application/json"},
         body: JSON.stringify({
@@ -394,7 +629,7 @@
       if (!saveRes.ok) throw new Error(saveData.error || "save_crop failed");
 
       // delete raw screenshot on server
-      const delRes = await fetch("/api/delete_raw", {
+      const delRes = await apiFetch("/api/delete_raw", {
         method: "POST",
         headers: {"Content-Type":"application/json"},
         body: JSON.stringify({ raw_file: item.raw_file })
@@ -410,17 +645,73 @@
 
       idx = 0;
       openModalForItem(queue[idx]);
+      applyFriendlyCropCopy(queue[idx]);
     }
 
     async function finishBatchZip(){
-      const res = await fetch("/api/zip_final", {
+      if (!backendMode) {
+        if (!clientZip) throw new Error("No browser crops were saved");
+        const zipBlob = await clientZip.generateAsync({ type: "blob" });
+        return URL.createObjectURL(zipBlob);
+      }
+
+      const res = await apiFetch("/api/zip_final", {
         method: "POST",
         headers: {"Content-Type":"application/json"},
         body: JSON.stringify({ batch })
       });
       const data = await res.json();
       if (!res.ok) throw new Error(data.error || "zip_final failed");
-      return data.zip_url;
+      return resolveToolUrl(data.zip_url);
+    }
+
+    function renderClientSideCards(urls){
+      backendMode = false;
+      clientZip = new JSZip();
+      batch = `browser_${Date.now()}`;
+      queue = urls.map((url) => ({
+        url,
+        domain: domainFromUrl(url),
+        raw_file: "",
+        raw_url: screenshotServiceUrl(url)
+      }));
+
+      $("thumbs").innerHTML = "";
+      queue.forEach((it) => {
+        const card = document.createElement("div");
+        card.className = "card";
+        const siteLabel = (() => {
+          try {
+            const parsed = new URL(it.url);
+            return `${parsed.hostname}${parsed.pathname === "/" ? "" : parsed.pathname}`;
+          } catch {
+            return it.url;
+          }
+        })();
+        card.innerHTML = `
+          <div class="cardHead">
+            <a href="${it.raw_url}" target="_blank" rel="noopener">${it.domain}</a>
+            <span class="chip">browser mode</span>
+          </div>
+          <div class="cardMeta">
+            <span>Remote screenshot preview</span>
+            <span>Crop locally</span>
+          </div>
+          <div class="imgWrap">
+            <div class="previewFrame">
+              <div class="previewBar">
+                <div class="previewDots"><span></span><span></span><span></span></div>
+                <div class="previewSite">${siteLabel}</div>
+              </div>
+              <img class="preview" src="${it.raw_url}" alt="Website screenshot preview" crossorigin="anonymous">
+            </div>
+          </div>
+        `;
+        $("thumbs").appendChild(card);
+      });
+
+      setStatus("Local server unavailable, so browser mode is active.\nScreenshots are loaded through a web capture service, then cropped and zipped in this page.");
+      processQueue();
     }
 
     $("closeModal").addEventListener("click", () => {
@@ -435,6 +726,7 @@
         try {
           const zipUrl = await finishBatchZip();
           $("zipLink").href = zipUrl;
+          $("zipLink").download = backendMode ? "" : "article-screenshots-final.zip";
           $("zipLink").style.display = "inline";
           setStatus(`Done cropping.\nFinal ZIP: ${zipUrl}`);
         } catch(e){
@@ -443,6 +735,7 @@
         return;
       }
       openModalForItem(queue[idx]);
+      applyFriendlyCropCopy(queue[idx]);
     });
 
     $("saveNext").addEventListener("click", async () => {
@@ -469,6 +762,7 @@
         try {
           const zipUrl = await finishBatchZip();
           $("zipLink").href = zipUrl;
+          $("zipLink").download = backendMode ? "" : "article-screenshots-final.zip";
           $("zipLink").style.display = "inline";
           setStatus(`All done.\nFinal ZIP: ${zipUrl}`);
         } catch(e){
@@ -478,6 +772,7 @@
       }
 
       openModalForItem(queue[idx]);
+      applyFriendlyCropCopy(queue[idx]);
     });
 
     $("clear").addEventListener("click", () => {
@@ -489,6 +784,8 @@
       queue = [];
       idx = 0;
       finalCounts.clear();
+      backendMode = true;
+      clientZip = null;
       setStatus("Cleared.");
     });
 
@@ -501,6 +798,8 @@
       queue = [];
       idx = 0;
       finalCounts.clear();
+      backendMode = true;
+      clientZip = null;
 
       const urls = $("urls").value;
       if (!urls.trim()) {
@@ -510,13 +809,30 @@
 
       setStatus("Generating capped screenshots…");
 
-      const res = await fetch("/api/run", {
-        method: "POST",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ urls, headful: $("headful").checked })
-      });
+      let res;
+      let data;
+      try {
+        res = await apiFetch("/api/run", {
+          method: "POST",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify({
+            urls,
+            headful: $("headful").checked,
+            viewport_width: Number($("viewportWidth").value || 1440),
+            max_height: Number($("captureHeight").value || 3000)
+          })
+        });
+        data = await res.json();
+      } catch (error) {
+        const validUrls = getValidUrls(urls);
+        if (validUrls.length && window.JSZip) {
+          renderClientSideCards(validUrls);
+        } else {
+          showConnectionHelp(error);
+        }
+        return;
+      }
 
-      const data = await res.json();
       if (!res.ok) {
         setStatus("Error: " + (data.error || res.statusText));
         return;
@@ -536,18 +852,40 @@
           continue;
         }
 
+        const rawUrl = resolveToolUrl(it.raw_url);
+        const siteLabel = (() => {
+          try {
+            const parsed = new URL(it.url);
+            return `${parsed.hostname}${parsed.pathname === "/" ? "" : parsed.pathname}`;
+          } catch {
+            return it.url;
+          }
+        })();
         card.innerHTML = `
           <div class="cardHead">
-            <a href="${it.raw_url}" target="_blank" rel="noopener">${it.domain}</a>
-            <span class="chip">raw (capped)</span>
+            <a href="${rawUrl}" target="_blank" rel="noopener">${it.domain}</a>
+            <span class="chip">${$("viewportWidth").value}px capture</span>
+          </div>
+          <div class="cardMeta">
+            <span>Raw website screenshot</span>
+            <span>Cap ${$("captureHeight").value}px</span>
           </div>
           <div class="imgWrap">
-            <img class="preview" src="${it.raw_url}" alt="preview">
+            <div class="previewFrame">
+              <div class="previewBar">
+                <div class="previewDots"><span></span><span></span><span></span></div>
+                <div class="previewSite">${siteLabel}</div>
+              </div>
+              <img class="preview" src="${rawUrl}" alt="Website screenshot preview" crossorigin="anonymous">
+            </div>
           </div>
         `;
         $("thumbs").appendChild(card);
 
-        queue.push(it);
+        queue.push({
+          ...it,
+          raw_url: rawUrl
+        });
       }
 
       if (!queue.length) {

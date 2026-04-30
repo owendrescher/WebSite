@@ -145,7 +145,7 @@ h3 {
 }
 
 h1 {
-  max-width: 10ch;
+  max-width: 18ch;
   font-size: clamp(2.2rem, 5vw, 4.4rem);
   line-height: 0.95;
 }
@@ -186,7 +186,8 @@ h1 span {
 }
 
 .about,
-.contact {
+.contact,
+.more-tools {
   padding: clamp(1rem, 2vw, 2rem);
   border: 1px solid var(--border);
   border-radius: var(--card-radius);
@@ -212,6 +213,41 @@ h1 span {
   color: #ffffff;
   text-decoration: none;
   border-bottom: 1px solid rgba(255, 255, 255, 0.35);
+}
+
+.tool-link-grid {
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: 0.7rem;
+}
+
+.tool-link-card {
+  display: grid;
+  gap: 0.35rem;
+  min-height: 116px;
+  padding: 0.85rem;
+  border: 1px solid var(--border);
+  border-radius: calc(var(--card-radius) - 8px);
+  background: rgba(255, 255, 255, 0.03);
+  color: var(--text);
+  text-decoration: none;
+}
+
+.tool-link-card strong {
+  font-family: var(--font-display);
+  font-size: 1.05rem;
+  line-height: 1.1;
+}
+
+.tool-link-card span {
+  color: var(--muted);
+  line-height: 1.55;
+}
+
+.tool-link-card:hover,
+.tool-link-card:focus-visible {
+  border-color: rgba(255, 255, 255, 0.42);
+  background: rgba(255, 255, 255, 0.06);
 }
 
 .about-layout {
@@ -577,6 +613,10 @@ body[data-style="technical"] .eyebrow {
   }
 
   .project-card {
+    grid-template-columns: 1fr;
+  }
+
+  .tool-link-grid {
     grid-template-columns: 1fr;
   }
 

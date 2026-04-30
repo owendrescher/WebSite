@@ -4,12 +4,37 @@
   <meta charset="UTF-8" />
   <meta name="viewport" content="width=device-width, initial-scale=1.0" />
   <title>World Information Map</title>
+  <link rel="icon" type="image/png" href="../favicon.png?v=2" />
   <link rel="stylesheet" href="styles.css" />
+  <style>
+    .owentools-home-link {
+      position: fixed;
+      top: max(12px, env(safe-area-inset-top));
+      left: max(12px, env(safe-area-inset-left));
+      z-index: 9999;
+      width: 44px;
+      height: 44px;
+      display: grid;
+      place-items: center;
+      padding: 0;
+      border-radius: 14px;
+      border: 1px solid rgba(255, 255, 255, 0.16);
+      background: rgba(8, 10, 14, 0.82);
+      color: #fff;
+      text-decoration: none;
+      font: 800 0.82rem/1 system-ui, sans-serif;
+      text-transform: lowercase;
+      letter-spacing: 0.04em;
+      backdrop-filter: blur(12px);
+      box-shadow: 0 12px 28px rgba(0, 0, 0, 0.28);
+    }
+  </style>
 </head>
 <body>
+  <a class="owentools-home-link" href="../index.html" aria-label="Back to owentools" title="Back to owentools">ot</a>
   <header class="topbar">
     <h1>World Information Map</h1>
-    <p>Click a country to view current details.</p>
+    <p>Click countries to build a combined profile. Re-click any selected country to remove it.</p>
   </header>
 
   <main class="layout">
@@ -25,8 +50,14 @@
     </section>
 
     <aside class="info-panel" aria-live="polite">
-      <h2 id="country-title">Select a country</h2>
-      <p id="country-subtitle">Data is loaded from public country APIs.</p>
+      <div class="info-panel-head">
+        <div>
+          <h2 id="country-title">Build a country combo</h2>
+          <p id="country-subtitle">Selections merge into one shared profile with combined totals where available.</p>
+        </div>
+        <button id="clear-selection" class="secondary-action" type="button">Clear</button>
+      </div>
+      <p id="selection-summary" class="selection-summary">0 countries selected</p>
       <dl id="country-details" class="details-list"></dl>
     </aside>
   </main>
