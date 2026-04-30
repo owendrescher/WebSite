@@ -1,0 +1,41 @@
+<!doctype html>
+<html lang="en">
+  <head>
+    <meta charset="utf-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1" />
+    <title>MLB Overlay Fast Skeleton</title>
+    <link rel="stylesheet" href="styles.css" />
+  </head>
+  <body>
+    <main class="app-shell">
+      <header class="topbar">
+        <div>
+          <h1>MLB Overlay</h1>
+          <p id="summary">Fast skeleton initializing</p>
+        </div>
+        <form id="controls" class="controls">
+          <input id="dateInput" type="date" />
+          <button type="submit">Load</button>
+        </form>
+      </header>
+
+      <section class="content-grid">
+        <section class="games-panel">
+          <div class="panel-heading">
+            <strong>Scoreboard</strong>
+            <span id="loadState">Idle</span>
+          </div>
+          <div id="games" class="games-grid" aria-live="polite"></div>
+        </section>
+
+        <aside id="detailPanel" class="detail-panel" aria-live="polite">
+          <div class="detail-empty">
+            <strong>Select a game</strong>
+            <span>Details load on demand.</span>
+          </div>
+        </aside>
+      </section>
+    </main>
+    <script src="app.js"></script>
+  </body>
+</html>

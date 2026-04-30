@@ -1,0 +1,150 @@
+<!doctype html>
+<html lang="en">
+  <head>
+    <meta charset="utf-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1" />
+    <title>MLB Show Stream Overlay</title>
+    <link rel="stylesheet" href="styles.css" />
+  </head>
+  <body>
+    <section id="betInputPanel" class="utility-panel bet-input-panel">
+      <header><strong>Bet Input</strong></header>
+      <form id="betForm" class="bet-form">
+        <label>Bet Description <input id="betDesc" required placeholder="LAA ML" /></label>
+        <label>Odds <input id="betOdds" required placeholder="+135 / -110" /></label>
+        <label>Amount <input id="betAmount" type="number" min="0" step="0.01" required /></label>
+        <button type="submit">Add</button>
+      </form>
+    </section>
+
+    <aside id="betDisplay" class="utility-panel retro-panel movable" data-panel="bet">
+      <header class="panel-header" data-drag-handle>
+        <strong>BET LOG</strong>
+        <div class="panel-header-actions">
+          <span class="hint">DAY: <span id="betDayLabel"></span></span>
+          <button id="clearBetsBtn" class="panel-action-btn" type="button">CLEAR</button>
+        </div>
+      </header>
+      <section id="betList" class="panel-list"></section>
+      <div class="panel-resize panel-resize-nw" data-resize-handle data-dir="nw"></div>
+      <div class="panel-resize panel-resize-ne" data-resize-handle data-dir="ne"></div>
+      <div class="panel-resize panel-resize-sw" data-resize-handle data-dir="sw"></div>
+      <div class="panel-resize panel-resize-se" data-resize-handle data-dir="se"></div>
+    </aside>
+
+    <aside id="hrDisplay" class="utility-panel retro-panel movable" data-panel="hr">
+      <header class="panel-header" data-drag-handle>
+        <strong>HOME RUN FEED</strong>
+        <span class="hint">latest first</span>
+      </header>
+      <section id="hrList" class="panel-list"></section>
+      <div class="panel-resize panel-resize-nw" data-resize-handle data-dir="nw"></div>
+      <div class="panel-resize panel-resize-ne" data-resize-handle data-dir="ne"></div>
+      <div class="panel-resize panel-resize-sw" data-resize-handle data-dir="sw"></div>
+      <div class="panel-resize panel-resize-se" data-resize-handle data-dir="se"></div>
+    </aside>
+
+    <main class="overlay" id="overlay">
+      <header class="topbar">
+        <div class="topbar-left">
+          <h1>MLB LIVE GRID</h1>
+          <label>
+            <span>Date</span>
+            <input id="dateInput" type="date" />
+          </label>
+        </div>
+        <label class="theme-label">
+          <span>Style</span>
+          <select id="themeSelect"></select>
+        </label>
+      </header>
+
+      <section id="games" class="games"></section>
+      <footer>
+        <small>2x7 capacity • 15s refresh • EST • middle-click scoreboard for lineup card</small>
+      </footer>
+    </main>
+
+    <template id="gameTemplate">
+      <article class="game-card">
+        <div class="scoreboard">
+          <div class="score-row away-row">
+            <div class="team-left">
+              <img class="team-logo away-logo" src="placeholder.png" alt="Away logo" />
+              <span class="team away"></span>
+              <div class="meta-block away-meta">
+                <span class="pitcher away-pitcher"></span>
+                <span class="hitter away-hitter"></span>
+              </div>
+            </div>
+            <span class="score away-score"></span>
+          </div>
+
+          <div class="inning-badge"></div>
+
+          <div class="score-row home-row">
+            <div class="team-left">
+              <img class="team-logo home-logo" src="placeholder.png" alt="Home logo" />
+              <span class="team home"></span>
+              <div class="meta-block home-meta">
+                <span class="pitcher home-pitcher"></span>
+                <span class="hitter home-hitter"></span>
+              </div>
+            </div>
+            <span class="score home-score"></span>
+          </div>
+
+          <section class="lineup-card" hidden>
+            <header class="lineup-header">
+              <span>LINEUP CARD</span>
+              <span class="lineup-hint">middle-click again to close</span>
+            </header>
+            <div class="lineup-columns">
+              <section class="lineup-team away-lineup">
+                <div class="lineup-team-header">
+                  <img class="lineup-logo away-lineup-logo" src="placeholder.png" alt="Away logo" />
+                  <span class="away-lineup-team"></span>
+                </div>
+                <ol class="lineup-list away-lineup-list"></ol>
+              </section>
+              <section class="lineup-team home-lineup">
+                <div class="lineup-team-header">
+                  <img class="lineup-logo home-lineup-logo" src="placeholder.png" alt="Home logo" />
+                  <span class="home-lineup-team"></span>
+                </div>
+                <ol class="lineup-list home-lineup-list"></ol>
+              </section>
+            </div>
+          </section>
+        </div>
+
+        <div class="details-grid">
+          <section class="detail-col play-col">
+            <h4>Play</h4>
+            <ul class="ticker"></ul>
+            <div class="status"></div>
+          </section>
+          <section class="detail-col base-col">
+            <h4>Bases</h4>
+            <div class="diamond-wrap">
+              <div class="diamond" aria-label="Base runners">
+                <span class="base second"></span>
+                <span class="base first"></span>
+                <span class="base third"></span>
+                <span class="base home"></span>
+              </div>
+            </div>
+          </section>
+          <section class="detail-col count-col">
+            <h4>Count</h4>
+            <div class="count-row"><span>B</span><div class="dots balls-dots"></div></div>
+            <div class="count-row"><span>S</span><div class="dots strikes-dots"></div></div>
+            <div class="count-row"><span>O</span><div class="dots outs-dots"></div></div>
+          </section>
+        </div>
+      </article>
+    </template>
+
+    <script src="app.js"></script>
+  </body>
+</html>
