@@ -401,42 +401,7 @@ function hydrateCountryMaps(countries, geometries) {
 }
 
 function createFlagPatterns(defs, countries) {
-  countries.forEach((country) => {
-    const emoji = country.flags?.emoji;
-    const patternId = getPatternId(country);
-    if (!emoji || !patternId) {
-      return;
-    }
-
-    const pattern = defs.append("pattern")
-      .attr("id", patternId)
-      .attr("patternUnits", "userSpaceOnUse")
-      .attr("width", 72)
-      .attr("height", 72)
-      .attr("patternTransform", "rotate(-18)");
-
-    pattern.append("rect")
-      .attr("width", 72)
-      .attr("height", 72)
-      .attr("fill", "#dce5d6")
-      .attr("opacity", 0.9);
-
-    [
-      [14, 22],
-      [48, 22],
-      [14, 58],
-      [48, 58]
-    ].forEach(([x, y]) => {
-      pattern.append("text")
-        .attr("x", x)
-        .attr("y", y)
-        .attr("font-size", 26)
-        .attr("text-anchor", "middle")
-        .attr("dominant-baseline", "middle")
-        .attr("opacity", 0.28)
-        .text(emoji);
-    });
-  });
+  // Kept as a no-op so the setup path remains stable while countries use solid pastel flag colors.
 }
 
 function getPatternId(country) {
@@ -446,8 +411,50 @@ function getPatternId(country) {
 
 function getCountryFill(id) {
   const country = getCountryData(id);
-  const patternId = getPatternId(country);
-  return patternId && country?.flags?.emoji ? `url(#${patternId})` : DEFAULT_COUNTRY_FILL;
+  return getPastelFlagColor(country);
+}
+
+const FLAG_COLOR_GROUPS = {
+  red: ["AL","AT","BH","BM","CA","CH","CN","CZ","DK","ES","GE","GI","HK","ID","IM","JP","KG","LV","MA","MC","ME","NO","NP","PE","PL","PT","QA","SG","TN","TR","TW","US"],
+  blue: ["AR","AU","BA","BB","BZ","CL","CU","EE","EU","FI","FM","GR","GT","HN","IS","IL","KZ","LI","LU","NI","NZ","PA","PY","SE","SO","SV","UY","VE"],
+  green: ["BD","BJ","BR","CG","CM","DZ","ET","GH","GN","GW","GY","IE","IR","JM","JO","KE","KW","LY","ML","MR","NG","PK","PS","SA","SN","ST","SY","TJ","TM","TZ","ZM","ZW"],
+  yellow: ["AD","BE","BN","BT","CO","DE","EC","ER","LT","MD","MK","MY","RO","RW","SC","TD","UA","VA","VN"],
+  white: ["CY","KR","MT"],
+  black: ["AO","BW","EE","MW","PG","SS","SZ","TT"],
+  orange: ["AM","CI","IN","LK","NE"]
+};
+
+const PASTEL_FLAG_COLORS = {
+  red: "#efb3ad",
+  blue: "#adc9ee",
+  green: "#b7d9bd",
+  yellow: "#f2df9b",
+  white: "#edf0e8",
+  black: "#bec3c4",
+  orange: "#edc49f"
+};
+
+function getPastelFlagColor(country) {
+  const code = toText(country?.cca2).toUpperCase();
+  if (!code) return DEFAULT_COUNTRY_FILL;
+
+  const matches = Object.entries(FLAG_COLOR_GROUPS)
+    .filter(([, codes]) => codes.includes(code))
+    .map(([color]) => color);
+
+  if (matches.length) {
+    return PASTEL_FLAG_COLORS[matches[matches.length - 1]] || DEFAULT_COUNTRY_FILL;
+  }
+
+  const regionFallback = {
+    Africa: "green",
+    Americas: "blue",
+    Asia: "red",
+    Europe: "blue",
+    Oceania: "blue",
+    Antarctic: "white"
+  };
+  return PASTEL_FLAG_COLORS[regionFallback[country?.region] || "white"] || DEFAULT_COUNTRY_FILL;
 }
 
 function getCountryData(id) {
@@ -513,37 +520,8 @@ function renderSelectionState() {
 function updateSelectionVisuals() {
   countryLayer.selectAll("path.country")
     .classed("is-selected", (d) => selectedIds.has(normalizeFeatureId(d.id)));
-
-  const selectedGeometry = [...selectedIds]
-    .map((id) => geometryByNumeric.get(id))
-    .filter(Boolean);
-
-  if (!selectedGeometry.length) {
-    selectionLayer.select(".combo-fill").attr("d", null);
-    selectionLayer.select(".combo-border").attr("d", null);
-    return;
-  }
-
-  const merged = topojson.merge(worldTopology, selectedGeometry);
-  const outline = topojson.mesh(
-    worldTopology,
-    worldTopology.objects.countries,
-    (a, b) => {
-      const aSelected = a && selectedIds.has(normalizeFeatureId(a.id));
-      if (!aSelected) {
-        return false;
-      }
-
-      if (!b) {
-        return true;
-      }
-
-      return !selectedIds.has(normalizeFeatureId(b.id));
-    }
-  );
-
-  selectionLayer.select(".combo-fill").attr("d", path(merged));
-  selectionLayer.select(".combo-border").attr("d", outline ? path(outline) : null);
+  selectionLayer.select(".combo-fill").attr("d", null);
+  selectionLayer.select(".combo-border").attr("d", null);
 }
 
 function getSelectedCountries() {

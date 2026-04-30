@@ -575,12 +575,12 @@ h3 {
   top: 0;
   display: grid;
   align-content: center;
-  gap: 8px;
-  min-width: 154px;
-  min-height: 84px;
+  gap: 4px;
+  min-width: 116px;
+  min-height: 58px;
   max-width: 250px;
-  padding: 16px 20px;
-  border-radius: 20px;
+  padding: 8px 10px;
+  border-radius: 14px;
   border: 2px solid #d3d9e1;
   background: rgba(255, 255, 255, 0.98);
   color: #425466;
@@ -600,28 +600,28 @@ h3 {
 
 .answer-card strong {
   display: block;
-  font-size: 1.16rem;
-  margin-bottom: 6px;
+  font-size: 0.98rem;
+  margin-bottom: 2px;
 }
 
 .answer-card .answer-symbol {
   font-family: var(--glyph-font);
-  font-size: 2.4rem;
+  font-size: 1.9rem;
   line-height: 1;
   color: var(--teal);
 }
 
 .answer-card .answer-detail {
-  font-size: 0.92rem;
+  font-size: 0.76rem;
   color: var(--ink-soft);
 }
 
 .answer-card.is-symbol {
-  min-width: 138px;
+  min-width: 104px;
 }
 
 .answer-card.is-cue {
-  min-width: 186px;
+  min-width: 128px;
 }
 
 .answer-card.is-selected {
@@ -803,11 +803,11 @@ h3 {
 .choice-option {
   appearance: none;
   display: grid;
-  gap: 8px;
-  min-height: 104px;
-  padding: 16px 18px;
+  gap: 4px;
+  min-height: 64px;
+  padding: 9px 10px;
   border: 1px solid rgba(53, 107, 140, 0.14);
-  border-radius: 20px;
+  border-radius: 14px;
   background: rgba(255, 255, 255, 0.92);
   color: var(--ink);
   font: inherit;
@@ -827,13 +827,24 @@ h3 {
 }
 
 .choice-option strong {
-  font-size: 1.2rem;
+  font-size: 1rem;
   font-family: "Palatino Linotype", "Book Antiqua", Georgia, serif;
 }
 
 .choice-option .answer-detail {
+  font-size: 0.78rem;
   color: var(--ink-soft);
   line-height: 1.4;
+}
+
+#match-start,
+#choice-start {
+  display: none;
+}
+
+.match-board-wrap,
+.choice-stage-card {
+  cursor: pointer;
 }
 
 .choice-option.is-correct {

@@ -272,9 +272,46 @@ h3 {
   display: flex;
   align-items: end;
   max-width: min(720px, calc(100% - 36px));
-  background: rgba(17, 17, 17, 0.32);
+  background: rgba(17, 17, 17, 0.22);
   border: 1px solid rgba(255, 255, 255, 0.28);
   border-radius: clamp(14px, 2.2vw, 20px);
+}
+
+.hero-section,
+.scene-image,
+.shop-section,
+.class-section {
+  box-shadow: 0 28px 80px rgba(38, 28, 20, 0.18);
+}
+
+.hero-section::after {
+  background:
+    linear-gradient(180deg, rgba(17, 17, 17, 0.02), rgba(17, 17, 17, 0.42)),
+    linear-gradient(90deg, rgba(17, 17, 17, 0.26), transparent 56%);
+}
+
+.portfolio-stage {
+  filter: drop-shadow(0 24px 54px rgba(38, 28, 20, 0.16));
+}
+
+.aesthetic-tab,
+.button,
+.service-form button {
+  box-shadow: inset 0 1px 0 rgba(255,255,255,0.46), 0 10px 22px rgba(38, 28, 20, 0.08);
+}
+
+.shop-grid {
+  align-items: stretch;
+}
+
+.shop-card {
+  background: rgba(247, 243, 236, 0.82);
+  border: 1px solid rgba(255,255,255,0.56);
+  box-shadow: 0 18px 42px rgba(38, 28, 20, 0.12);
+}
+
+.shop-image-wrap {
+  background: rgba(255,255,255,0.42);
 }
 
 .hero-copy h1 {
@@ -1047,6 +1084,63 @@ h3 {
 
   .modal-content {
     padding: 18px;
+  }
+}
+
+@media (orientation: portrait), (max-aspect-ratio: 10 / 11) {
+  .site-body {
+    padding: max(62px, env(safe-area-inset-top)) 12px 18px;
+  }
+
+  .site-header,
+  .site-nav {
+    flex-direction: column;
+    align-items: stretch;
+  }
+
+  .site-nav {
+    justify-content: start;
+    gap: 10px;
+  }
+
+  .hero-section {
+    min-height: min(720px, 74svh);
+  }
+
+  .hero-copy {
+    left: 14px;
+    right: 14px;
+    bottom: 14px;
+    max-width: none;
+  }
+
+  h1 {
+    font-size: clamp(3rem, 15vw, 5.8rem);
+  }
+
+  h2 {
+    font-size: clamp(2.2rem, 11vw, 4rem);
+  }
+
+  .aesthetic-scene,
+  .service-section,
+  .appointment-system,
+  .class-layout {
+    grid-template-columns: 1fr;
+  }
+
+  .portfolio-stage,
+  .scene-image {
+    min-height: min(560px, 58svh);
+  }
+
+  .shop-grid {
+    grid-template-columns: 1fr;
+  }
+
+  .calendar-grid,
+  .slot-list {
+    min-width: 0;
   }
 }
 

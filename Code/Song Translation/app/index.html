@@ -81,9 +81,43 @@
           </h2>
         </div>
         <div class="panel-actions">
+          <button class="ghost-button" id="manual-toggle" type="button" aria-expanded="false">Manual lyrics</button>
           <button class="ghost-button" id="jump-button" type="button">Following active line</button>
           <button class="ghost-button" id="fullscreen-button" type="button" aria-pressed="false">Fullscreen lyrics</button>
         </div>
+      </div>
+      <div class="manual-panel hidden" id="manual-panel">
+        <div class="manual-grid">
+          <label>
+            Song
+            <input id="manual-title" type="text" placeholder="Track title">
+          </label>
+          <label>
+            Artist
+            <input id="manual-artist" type="text" placeholder="Artist">
+          </label>
+          <label>
+            Source
+            <select id="manual-source">
+              <option value="auto">Auto detect</option>
+              <option value="en">English</option>
+              <option value="fr">French</option>
+              <option value="es">Spanish</option>
+              <option value="it">Italian</option>
+              <option value="de">German</option>
+              <option value="pt">Portuguese</option>
+              <option value="ja">Japanese</option>
+              <option value="ko">Korean</option>
+              <option value="zh">Chinese</option>
+            </select>
+          </label>
+        </div>
+        <textarea id="manual-lyrics" placeholder="Paste lyrics here, or import a .txt/.lrc file."></textarea>
+        <div class="manual-actions">
+          <input id="manual-file" type="file" accept=".txt,.lrc,text/plain">
+          <button class="ghost-button attention" id="manual-translate" type="button">Translate pasted lyrics</button>
+        </div>
+        <p class="manual-note" id="manual-note">Works fully in the browser. Spotify live sync still uses the optional local bridge.</p>
       </div>
       <div class="lyrics-scroll" id="lyrics-scroll">
         <div class="empty-state" id="empty-state">

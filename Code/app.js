@@ -1,78 +1,81 @@
 const tools = [
   {
-    title: "Animation Helper",
+    title: "Animation",
     href: "Animation Helper/index.html",
-    preview: "Animation Helper/index.html",
+    preview: "animation.png",
+    previewType: "image",
   },
   {
-    title: "Arabic Script Learning",
+    title: "Script Learning",
     href: "Arabic Script Learning/index.html",
-    preview: "Arabic Script Learning/index.html",
+    preview: "script.png",
+    previewType: "image",
   },
   {
-    title: "Article Scraper",
+    title: "Articles",
     href: "article scraper/3.1/index.html",
-    preview: "article scraper/3.1/index.html",
+    preview: "articlescan.png",
+    previewType: "image",
   },
   {
-    title: "Book Reader",
+    title: "Reader",
     href: "Book Reader/Custom PDF Reader.html",
-    preview: "Book Reader/Custom PDF Reader.html",
+    preview: "bookreader.png",
+    previewType: "image",
   },
   {
-    title: "Club Automation",
+    title: "Club",
     href: "Club-Automation Replacement/index.html",
-    preview: "Club-Automation Replacement/index.html",
+    preview: "clubauto.png",
+    previewType: "image",
   },
   {
-    title: "Converted Lang Game",
+    title: "Lang Game",
     href: "Converted Lang Game/index.html",
-    preview: "Converted Lang Game/index.html",
+    preview: "matchinggame.png",
+    previewType: "image",
   },
   {
-    title: "Daily Task List",
+    title: "Tasks",
     href: "Daily Task List/tasks_v1.html",
-    preview: "Daily Task List/tasks_v1.html",
+    preview: "dailytask.png",
+    previewType: "image",
   },
   {
-    title: "Little Shop of Laura",
-    href: "Little Shop of Laura/index.html",
-    preview: "Little Shop of Laura/index.html",
-  },
-  {
-    title: "Map Info",
-    href: "Map Info/index.html",
-    preview: "Map Info/index.html",
-  },
-  {
-    title: "MLB Overlay",
-    href: "MLB Overlay/index.html",
-    preview: "MLB Overlay/index.html",
-  },
-  {
-    title: "Nutrition Analysis",
-    href: "Nutrition and Cost Analysis/Nutrition.html",
-    preview: "Nutrition and Cost Analysis/Nutrition.html",
-  },
-  {
-    title: "Song Translation",
-    href: "Song Translation/app/index.html",
-    preview: "Song Translation/app/index.html",
-  },
-  {
-    title: "Solar System",
-    href: "SolarSystem.html",
-    preview: "SolarSystem.html",
-  },
-  {
-    title: "To-Do List",
-    href: "To-Do List/test.html",
-    preview: "To-Do List/test.html",
-  },
-  {
-    title: "Web Portfolio",
+    title: "Portfolio",
     href: "Web Portfolio/index.html",
-    preview: "Web Portfolio/index.html",
+    preview: "webportfolio.png",
+    previewType: "image",
+  },
+  {
+    title: "Map",
+    href: "Map Info/index.html",
+    preview: "mapinfo.png",
+    previewType: "image",
+  },
+  {
+    title: "Baseball",
+    href: "fast-skeleton/dashboard.html",
+    preview: "baseballtrack.png",
+    previewType: "image",
+  },
+  {
+    title: "Nutrition",
+    href: "Nutrition and Cost Analysis/Nutrition.html",
+    preview: "nutritioninfo.png",
+    previewType: "image",
+  },
+  {
+    title: "Lyrics",
+    href: "Song Translation/app/index.html",
+    preview: "songtranslation.png",
+    previewType: "image",
+  },
+  {
+    title: "Solar",
+    href: "SolarSystem.html",
+    preview: "solar.png",
+    previewType: "image",
   },
 ];
 
@@ -82,11 +85,15 @@ const toolCore = launcherGrid?.querySelector(".tool-core");
 const overflowLinks = document.getElementById("core-extra-links");
 
 function createPanelMarkup(tool) {
+  const previewMarkup = tool.previewType === "image"
+    ? `<img class="preview-image" src="${tool.preview}" alt="" loading="lazy" decoding="async">`
+    : `<iframe class="preview-frame" title="${tool.title} preview" src="${tool.preview}" loading="lazy" tabindex="-1"></iframe>`;
+
   return `
     <div class="edge-content">
       <span class="panel-title">${tool.title}</span>
       <div class="mini-preview" aria-hidden="true">
-        <iframe class="preview-frame" title="${tool.title} preview" src="${tool.preview}" loading="lazy" tabindex="-1"></iframe>
+        ${previewMarkup}
       </div>
     </div>
   `;
@@ -183,10 +190,13 @@ function shouldUseTileLayout() {
     return false;
   }
 
-  const crampedViewport = window.innerWidth <= 1180 || window.innerHeight <= 760;
-  const crampedGrid = launcherGrid.clientWidth > 0 && launcherGrid.clientWidth < 1180;
+  const width = window.innerWidth || document.documentElement.clientWidth || 0;
+  const height = window.innerHeight || document.documentElement.clientHeight || 0;
+  const portraitMedia = window.matchMedia?.("(orientation: portrait)")?.matches;
+  const definitelyVertical = height > width * 1.08;
+  const narrowTouchPortrait = portraitMedia && width <= 820;
 
-  return crampedViewport || crampedGrid;
+  return definitelyVertical || narrowTouchPortrait;
 }
 
 function syncLayoutMode() {

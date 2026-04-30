@@ -150,7 +150,7 @@
     if (!matchState.active) {
       const placeholder = document.createElement("div");
       placeholder.className = "match-board-placeholder";
-      placeholder.innerHTML = "<strong>Board ready</strong><span>Press Start Speed Round, then drag one tile onto its partner.</span>";
+      placeholder.innerHTML = "<strong>Board ready</strong><span>Press the board, then drag one tile onto its partner.</span>";
       elements.answerGrid.append(placeholder);
       return;
     }

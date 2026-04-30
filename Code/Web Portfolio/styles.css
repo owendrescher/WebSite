@@ -124,8 +124,8 @@ section {
 }
 
 .hero {
-  margin-top: 3.5rem;
-  padding: 2rem 0 1.35rem;
+  margin-top: 2.2rem;
+  padding: 1.1rem 0 0.4rem;
 }
 
 .eyebrow {
@@ -146,7 +146,7 @@ h3 {
 
 h1 {
   max-width: 10ch;
-  font-size: clamp(2.5rem, 6vw, 5.4rem);
+  font-size: clamp(2.2rem, 5vw, 4.4rem);
   line-height: 0.95;
 }
 
@@ -263,33 +263,33 @@ h1 span {
 }
 
 .projects-head {
-  margin-bottom: 1rem;
+  margin-bottom: 0.45rem;
 }
 
 .project-card {
-  margin: 1.7rem 0 2.2rem;
-  padding: 1rem;
+  margin: 0.9rem 0 1.2rem;
+  padding: 0.72rem;
   border: 1px solid var(--border);
   border-radius: var(--card-radius);
   background: linear-gradient(165deg, rgba(21, 21, 21, 0.9), rgba(8, 8, 8, 0.95));
   box-shadow: var(--shadow);
   display: grid;
-  grid-template-columns: minmax(250px, 330px) minmax(0, 1fr);
-  gap: 1rem;
+  grid-template-columns: minmax(160px, 210px) minmax(0, 1fr);
+  gap: 0.55rem;
   align-items: center;
 }
 
 .project-card:nth-of-type(even) {
-  grid-template-columns: minmax(0, 1fr) minmax(250px, 330px);
+  grid-template-columns: minmax(0, 1fr) minmax(160px, 210px);
 }
 
 .project-meta {
-  padding: 0.8rem 0.6rem;
+  padding: 0.35rem 0.25rem;
 }
 
 .project-meta h3 {
-  font-size: clamp(1.2rem, 2.4vw, 2rem);
-  margin-bottom: 0.28rem;
+  font-size: clamp(1rem, 1.8vw, 1.55rem);
+  margin-bottom: 0.14rem;
 }
 
 .project-meta p {
@@ -308,6 +308,7 @@ h1 span {
   color: #ffffff;
   text-decoration: none;
   font-weight: 700;
+  font-size: 0.84rem;
 }
 
 .project-card:nth-of-type(even) .project-meta {
@@ -320,7 +321,7 @@ h1 span {
 
 .preview-frame-wrap {
   width: 100%;
-  height: clamp(320px, 53vw, 560px);
+  height: clamp(280px, 50vw, 520px);
   border: 1px solid rgba(255, 255, 255, 0.18);
   border-radius: calc(var(--card-radius) - 6px);
   overflow: hidden;

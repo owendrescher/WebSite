@@ -8,13 +8,16 @@
     <style>
       :root {
         color-scheme: dark;
-        font-family: Arial, Helvetica, sans-serif;
+        font-family: Inter, ui-sans-serif, system-ui, -apple-system, Segoe UI, Arial, sans-serif;
       }
 
       body {
         margin: 0;
         overflow: hidden;
-        background: #04060c;
+        background:
+          radial-gradient(900px 620px at 20% 10%, rgba(82, 114, 255, 0.14), transparent 60%),
+          radial-gradient(720px 480px at 86% 16%, rgba(255, 214, 115, 0.12), transparent 58%),
+          #04060c;
       }
 
       .owentools-home-link {
@@ -44,7 +47,9 @@
         inset: 0;
         display: grid;
         place-items: center;
-        background: rgba(0, 0, 0, 0.65);
+        background:
+          radial-gradient(circle at 50% 45%, rgba(79, 102, 184, 0.18), transparent 42%),
+          rgba(0, 0, 0, 0.72);
         color: #f5f8ff;
         text-align: center;
         z-index: 10;
@@ -57,10 +62,24 @@
 
       .panel {
         max-width: 760px;
-        padding: 1.1rem 1.4rem;
-        background: rgba(16, 20, 34, 0.9);
+        padding: clamp(1.1rem, 3vw, 1.8rem);
+        background: rgba(16, 20, 34, 0.82);
         border: 1px solid rgba(162, 186, 255, 0.35);
-        border-radius: 0.75rem;
+        border-radius: 1.2rem;
+        box-shadow: 0 28px 90px rgba(0, 0, 0, 0.42);
+        backdrop-filter: blur(18px);
+      }
+
+      .panel h1 {
+        margin: 0 0 0.8rem;
+        font-size: clamp(2rem, 5vw, 4.4rem);
+        line-height: 0.92;
+        letter-spacing: -0.06em;
+      }
+
+      .panel p {
+        color: rgba(245, 248, 255, 0.82);
+        line-height: 1.58;
       }
 
       #reticle {
@@ -70,8 +89,9 @@
         width: 10px;
         height: 10px;
         transform: translate(-50%, -50%);
-        border: 1px solid rgba(235, 245, 255, 0.85);
+        border: 1px solid rgba(235, 245, 255, 0.9);
         border-radius: 50%;
+        box-shadow: 0 0 18px rgba(255, 245, 190, 0.32);
         z-index: 5;
         pointer-events: none;
       }
@@ -81,12 +101,91 @@
         left: 1rem;
         bottom: 1rem;
         color: #d6e2ff;
-        background: rgba(10, 14, 26, 0.75);
+        background: rgba(10, 14, 26, 0.68);
         border: 1px solid rgba(155, 184, 255, 0.3);
-        border-radius: 0.55rem;
-        padding: 0.7rem 0.85rem;
+        border-radius: 999px;
+        padding: 0.72rem 0.95rem;
         z-index: 6;
         font-size: 0.92rem;
+        backdrop-filter: blur(14px);
+        box-shadow: 0 14px 36px rgba(0,0,0,0.26);
+      }
+
+      #mobile-controls {
+        position: fixed;
+        inset: auto 0 max(12px, env(safe-area-inset-bottom)) 0;
+        z-index: 8;
+        display: none;
+        grid-template-columns: 1fr 1fr;
+        gap: 18px;
+        padding: 0 14px;
+        pointer-events: none;
+      }
+
+      .mobile-pad {
+        display: grid;
+        grid-template-columns: repeat(3, 48px);
+        grid-template-rows: repeat(3, 48px);
+        gap: 8px;
+        pointer-events: auto;
+      }
+
+      .mobile-pad button {
+        border: 1px solid rgba(235, 245, 255, 0.18);
+        border-radius: 16px;
+        background: rgba(10, 14, 26, 0.68);
+        color: #f5f8ff;
+        font: 800 0.86rem/1 Inter, ui-sans-serif, system-ui;
+        backdrop-filter: blur(14px);
+        box-shadow: 0 12px 28px rgba(0,0,0,0.26);
+      }
+
+      .mobile-pad button[data-move="forward"] { grid-column: 2; grid-row: 1; }
+      .mobile-pad button[data-move="left"] { grid-column: 1; grid-row: 2; }
+      .mobile-pad button[data-move="back"] { grid-column: 2; grid-row: 3; }
+      .mobile-pad button[data-move="right"] { grid-column: 3; grid-row: 2; }
+
+      .mobile-actions {
+        justify-self: end;
+        align-self: end;
+        display: grid;
+        gap: 8px;
+        pointer-events: auto;
+      }
+
+      .mobile-actions button {
+        min-width: 104px;
+        min-height: 46px;
+        border: 1px solid rgba(235, 245, 255, 0.18);
+        border-radius: 999px;
+        background: rgba(10, 14, 26, 0.68);
+        color: #f5f8ff;
+        font: 800 0.82rem/1 Inter, ui-sans-serif, system-ui;
+        backdrop-filter: blur(14px);
+      }
+
+      @media (orientation: portrait), (max-aspect-ratio: 10 / 11) {
+        #hud {
+          left: 12px;
+          right: 12px;
+          bottom: calc(132px + env(safe-area-inset-bottom));
+          border-radius: 18px;
+          font-size: 0.78rem;
+        }
+
+        #mobile-controls {
+          display: grid;
+        }
+
+        .panel {
+          max-width: calc(100vw - 24px);
+          max-height: calc(100svh - 36px);
+          overflow: auto;
+        }
+
+        .panel h1 {
+          font-size: clamp(2rem, 11vw, 3.6rem);
+        }
       }
     </style>
   </head>
@@ -109,6 +208,19 @@
 
     <div id="reticle" aria-hidden="true"></div>
     <div id="hud">Initializing...</div>
+    <div id="mobile-controls" aria-label="Mobile flight controls">
+      <div class="mobile-pad" aria-label="Move">
+        <button type="button" data-move="forward">W</button>
+        <button type="button" data-move="left">A</button>
+        <button type="button" data-move="back">S</button>
+        <button type="button" data-move="right">D</button>
+      </div>
+      <div class="mobile-actions">
+        <button type="button" data-action="up">Up</button>
+        <button type="button" data-action="down">Down</button>
+        <button type="button" data-action="fly">Fly</button>
+      </div>
+    </div>
 
     <script type="module">
       import * as THREE from 'https://unpkg.com/three@0.161.0/build/three.module.js';
@@ -117,7 +229,7 @@
       const BOX_SIZE = CREATURE_HEIGHT * 3 * 22.5;
       const HALF_BOX = BOX_SIZE / 2;
 
-      const MOVE_SPEED = 3.1;
+      const MOVE_SPEED = 12.4;
       const JUMP_SPEED = 4.3;
       const GRAVITY = 12.5;
 
@@ -181,7 +293,7 @@
       let isGrounded = true;
       let yaw = 0;
       let pitch = 0;
-      let noGravityMode = false;
+      let noGravityMode = true;
       let lastSpaceTapMs = 0;
       let awaitingSecondTap = false;
       let firstTapReleased = false;
@@ -250,7 +362,15 @@
         }
       }, true);
 
-      overlay.addEventListener('click', () => renderer.domElement.requestPointerLock());
+      function beginExperience() {
+        if (renderer.domElement.requestPointerLock && window.matchMedia('(pointer: fine)').matches) {
+          renderer.domElement.requestPointerLock();
+          return;
+        }
+        overlay.classList.add('hidden');
+      }
+
+      overlay.addEventListener('click', beginExperience);
       document.addEventListener('pointerlockchange', () => {
         const locked = document.pointerLockElement === renderer.domElement;
         overlay.classList.toggle('hidden', locked);
@@ -263,6 +383,29 @@
         pitch -= event.movementY * sensitivity;
         pitch = Math.max(-Math.PI / 2 + 0.01, Math.min(Math.PI / 2 - 0.01, pitch));
       });
+
+      let lastTouchLook = null;
+      renderer.domElement.addEventListener('touchstart', (event) => {
+        if (!overlay.classList.contains('hidden')) return;
+        const touch = event.touches[0];
+        lastTouchLook = touch ? { x: touch.clientX, y: touch.clientY } : null;
+      }, { passive: true });
+
+      renderer.domElement.addEventListener('touchmove', (event) => {
+        if (!lastTouchLook || !overlay.classList.contains('hidden')) return;
+        const touch = event.touches[0];
+        if (!touch) return;
+        const sensitivity = 0.0045;
+        yaw -= (touch.clientX - lastTouchLook.x) * sensitivity;
+        pitch -= (touch.clientY - lastTouchLook.y) * sensitivity;
+        pitch = Math.max(-Math.PI / 2 + 0.01, Math.min(Math.PI / 2 - 0.01, pitch));
+        lastTouchLook = { x: touch.clientX, y: touch.clientY };
+        event.preventDefault();
+      }, { passive: false });
+
+      renderer.domElement.addEventListener('touchend', () => {
+        lastTouchLook = null;
+      }, { passive: true });
 
       // Solar system root at comfortable viewing height
       const solarRoot = new THREE.Group();
@@ -466,32 +609,40 @@
       scene.add(controlGroup);
 
       const controlBack = new THREE.Mesh(
-        new THREE.PlaneGeometry(0.03, 8.2, 7.2),
-        new THREE.MeshStandardMaterial({ color: 0x1f2a48, metalness: 0.2, roughness: 0.7 })
+        new THREE.PlaneGeometry(7.2, 8.2),
+        new THREE.MeshStandardMaterial({
+          color: 0x27365f,
+          emissive: 0x17264f,
+          emissiveIntensity: 0.42,
+          metalness: 0.08,
+          roughness: 0.56,
+          side: THREE.DoubleSide
+        })
       );
-      controlBack.rotation.y = -Math.PI / 2;
+      controlBack.position.set(-0.02, 0.35, 0);
+      controlBack.rotation.y = Math.PI / 2;
       controlGroup.add(controlBack);
 
       function makeWallButton(label, y, z, action) {
         const btn = new THREE.Mesh(
-          new THREE.CylinderGeometry(0.14, 0.14, 0.1, 40),
-          new THREE.MeshStandardMaterial({ color: 0x5a5070, emissive: 0xffefad, emissiveIntensity: 0.42, roughness: 0.42, metalness: 0.22 })
+          new THREE.CylinderGeometry(0.22, 0.22, 0.16, 48),
+          new THREE.MeshStandardMaterial({ color: 0xffd76d, emissive: 0xffb02e, emissiveIntensity: 0.85, roughness: 0.32, metalness: 0.18 })
         );
-        btn.position.set(-0.08, y, z);
+        btn.position.set(-0.18, y, z);
         btn.rotation.z = Math.PI / 2;
         controlGroup.add(btn);
 
         const plate = new THREE.Mesh(
-          new THREE.PlaneGeometry(0.72, 0.24),
-          new THREE.MeshBasicMaterial({ map: makeTextTexture(label, 512, 256), transparent: true, depthWrite: false })
+          new THREE.PlaneGeometry(0.95, 0.34),
+          new THREE.MeshBasicMaterial({ map: makeTextTexture(label, 512, 256), transparent: true, depthWrite: false, side: THREE.DoubleSide })
         );
-        plate.position.set(1.0, 0, 0);
-        plate.lookAt(new THREE.Vector3(0, y, z));
+        plate.position.set(-0.2, y, z + 0.58);
+        plate.rotation.y = Math.PI / 2;
         controlGroup.add(plate);
 
         btn.userData.action = action;
-        btn.userData.restX = -0.08;
-        btn.userData.pushX = -0.15;
+        btn.userData.restX = -0.18;
+        btn.userData.pushX = -0.28;
         interactive.push(btn);
         return btn;
       }
@@ -499,10 +650,10 @@
       function addControlLabel(text, y, z, width = 0.9, height = 0.22) {
         const label = new THREE.Mesh(
           new THREE.PlaneGeometry(width, height),
-          new THREE.MeshBasicMaterial({ map: makeTextTexture(text, 700, 180), transparent: true, depthWrite: false })
+          new THREE.MeshBasicMaterial({ map: makeTextTexture(text, 700, 180), transparent: true, depthWrite: false, side: THREE.DoubleSide })
         );
-        label.position.set(1.0, y, z);
-        label.lookAt(new THREE.Vector3(0, y, z));
+        label.position.set(-0.21, y, z);
+        label.rotation.y = Math.PI / 2;
         controlGroup.add(label);
       }
 
@@ -556,15 +707,15 @@
       const sliderZMax = -0.3;
 
       const sliderTrack = new THREE.Mesh(
-        new THREE.BoxGeometry(0.08, 0.09, sliderZMax - sliderZMin + 0.1),
-        new THREE.MeshStandardMaterial({ color: 0x2e3c61, roughness: 0.55, metalness: 0.2 })
+        new THREE.BoxGeometry(0.12, 0.13, sliderZMax - sliderZMin + 0.1),
+        new THREE.MeshStandardMaterial({ color: 0x8cc7ff, emissive: 0x245b90, emissiveIntensity: 0.45, roughness: 0.44, metalness: 0.12 })
       );
-      sliderTrack.position.set(-0.08, sliderY, (sliderZMin + sliderZMax) / 2);
+      sliderTrack.position.set(-0.18, sliderY, (sliderZMin + sliderZMax) / 2);
       controlGroup.add(sliderTrack);
 
       const sliderKnob = new THREE.Mesh(
-        new THREE.BoxGeometry(0.2, 0.24, 0.22),
-        new THREE.MeshStandardMaterial({ color: 0x7a6e8e, emissive: 0xffefad, emissiveIntensity: 0.5, roughness: 0.38, metalness: 0.25 })
+        new THREE.BoxGeometry(0.32, 0.34, 0.32),
+        new THREE.MeshStandardMaterial({ color: 0xffd76d, emissive: 0xffb02e, emissiveIntensity: 0.85, roughness: 0.32, metalness: 0.18 })
       );
       controlGroup.add(sliderKnob);
       sliderKnob.userData.kind = 'slider';
@@ -574,11 +725,11 @@
       interactive.push(sliderKnob);
 
       const sliderLabel = new THREE.Mesh(
-        new THREE.PlaneGeometry(0.001, 0.9, 0.26),
-        new THREE.MeshBasicMaterial({ map: makeTextTexture('LIGHT', 512, 196), transparent: true })
+        new THREE.PlaneGeometry(1.0, 0.3),
+        new THREE.MeshBasicMaterial({ map: makeTextTexture('LIGHT', 512, 196), transparent: true, side: THREE.DoubleSide })
       );
       sliderLabel.rotation.y = Math.PI / 2;
-      sliderLabel.position.set(0.09, sliderY + 0.32, (sliderZMin + sliderZMax) / 2);
+      sliderLabel.position.set(-0.21, sliderY + 0.46, (sliderZMin + sliderZMax) / 2);
       controlGroup.add(sliderLabel);
 
       function applyCeilingLight(level) {
@@ -590,7 +741,7 @@
         ambient.intensity = ambientLevel;
         bulb.material.emissiveIntensity = 0.15 + clamped * 1.8;
         const z = THREE.MathUtils.lerp(sliderZMin, sliderZMax, clamped);
-        sliderKnob.position.set(-0.08, sliderY, z);
+        sliderKnob.position.set(-0.18, sliderY, z);
       }
 
       function updateButtonHighlights() {
@@ -599,15 +750,15 @@
           const mat = btn.material;
           if (btn.userData.kind === 'time') {
             const active = btn.userData.value === timeMultiplier;
-            mat.color.setHex(active ? 0xfff5bf : 0x5a5070);
-            mat.emissive.setHex(0xffefad);
-            mat.emissiveIntensity = active ? 0.8 : 0.42;
+            mat.color.setHex(active ? 0xffffff : 0xffd76d);
+            mat.emissive.setHex(active ? 0xfff3ad : 0xff9c23);
+            mat.emissiveIntensity = active ? 1.35 : 0.75;
             btn.position.x = active ? btn.userData.pushX : btn.userData.restX;
           } else if (btn.userData.kind === 'mode') {
             const active = btn.userData.value === orbitMode;
-            mat.color.setHex(active ? 0xfff5bf : 0x5a5070);
-            mat.emissive.setHex(0xffefad);
-            mat.emissiveIntensity = active ? 0.8 : 0.42;
+            mat.color.setHex(active ? 0xffffff : 0xffd76d);
+            mat.emissive.setHex(active ? 0xfff3ad : 0xff9c23);
+            mat.emissiveIntensity = active ? 1.35 : 0.75;
             btn.position.x = active ? btn.userData.pushX : btn.userData.restX;
           }
         }
@@ -666,6 +817,42 @@
 
       window.addEventListener('mouseup', () => {
         controlState.dragged = null;
+      });
+
+      document.querySelectorAll('[data-move]').forEach((button) => {
+        const key = button.dataset.move;
+        const setPressed = (pressed) => {
+          moveInput[key] = pressed;
+        };
+        button.addEventListener('pointerdown', (event) => {
+          event.preventDefault();
+          button.setPointerCapture(event.pointerId);
+          setPressed(true);
+        });
+        button.addEventListener('pointerup', () => setPressed(false));
+        button.addEventListener('pointercancel', () => setPressed(false));
+        button.addEventListener('lostpointercapture', () => setPressed(false));
+      });
+
+      document.querySelector('[data-action="fly"]')?.addEventListener('click', () => {
+        noGravityMode = !noGravityMode;
+        velocity.y = 0;
+      });
+
+      document.querySelectorAll('[data-action="up"], [data-action="down"]').forEach((button) => {
+        const key = button.dataset.action;
+        const setPressed = (pressed) => {
+          if (!noGravityMode) noGravityMode = true;
+          verticalInput[key] = pressed;
+        };
+        button.addEventListener('pointerdown', (event) => {
+          event.preventDefault();
+          button.setPointerCapture(event.pointerId);
+          setPressed(true);
+        });
+        button.addEventListener('pointerup', () => setPressed(false));
+        button.addEventListener('pointercancel', () => setPressed(false));
+        button.addEventListener('lostpointercapture', () => setPressed(false));
       });
 
       function updatePlayer(dt) {

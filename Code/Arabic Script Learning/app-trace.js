@@ -587,6 +587,16 @@
     elements.matchReset.addEventListener("click", runtime.resetRound);
     elements.choiceStart.addEventListener("click", runtime.startChoiceRound);
     elements.choiceReset.addEventListener("click", runtime.resetChoiceRound);
+    elements.answerGrid.addEventListener("click", () => {
+      if (!runtime.matchState.active) {
+        runtime.startRound();
+      }
+    });
+    elements.choiceOptions.addEventListener("click", () => {
+      if (!runtime.choiceState.active) {
+        runtime.startChoiceRound();
+      }
+    });
     elements.letterSelect.addEventListener("change", (event) => runtime.selectTraceLetter(event.target.value));
     elements.traceRandom.addEventListener("click", runtime.onRandomLetterClick);
     elements.tracePronounce.addEventListener("click", () => runtime.playLetterSound(runtime.getCurrentTraceLetter(), "trace"));

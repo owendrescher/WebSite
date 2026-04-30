@@ -110,7 +110,7 @@
 
       const placeholder = document.createElement("div");
       placeholder.className = "choice-placeholder";
-      placeholder.textContent = "Press Start Choice Round to begin.";
+      placeholder.textContent = "Press this board to begin.";
       elements.choiceOptions.append(placeholder);
       return;
     }

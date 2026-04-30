@@ -16,7 +16,16 @@ const els = {
   languageSelect: document.getElementById("language-select"),
   albumCover: document.getElementById("album-cover"),
   albumFallback: document.getElementById("album-fallback"),
-  panelLanguageFlag: document.getElementById("panel-language-flag")
+  panelLanguageFlag: document.getElementById("panel-language-flag"),
+  manualToggle: document.getElementById("manual-toggle"),
+  manualPanel: document.getElementById("manual-panel"),
+  manualTitle: document.getElementById("manual-title"),
+  manualArtist: document.getElementById("manual-artist"),
+  manualSource: document.getElementById("manual-source"),
+  manualLyrics: document.getElementById("manual-lyrics"),
+  manualFile: document.getElementById("manual-file"),
+  manualTranslate: document.getElementById("manual-translate"),
+  manualNote: document.getElementById("manual-note")
 };
 
 const SONG_SYNC_POLL_MS = 1000;
@@ -39,6 +48,7 @@ const state = {
   lastAutoCenteredKey: "",
   suppressScrollTrackingUntilMs: 0,
   fullscreenLyrics: false,
+  manualMode: false,
   playback: {
     trackKey: "",
     anchorPositionMs: 0,
@@ -47,6 +57,18 @@ const state = {
     playbackStatus: ""
   }
 };
+
+const FALLBACK_LANGUAGE_CHOICES = [
+  { code: "en", label: "English" },
+  { code: "es", label: "Spanish" },
+  { code: "fr", label: "French" },
+  { code: "it", label: "Italian" },
+  { code: "de", label: "German" },
+  { code: "pt", label: "Portuguese" },
+  { code: "ja", label: "Japanese" },
+  { code: "ko", label: "Korean" },
+  { code: "zh", label: "Chinese" }
+];
 
 function normalizeApiBase(base) {
   return String(base || "").trim().replace(/\/+$/, "");
@@ -276,6 +298,114 @@ function buildTransientPayload() {
       provider: ""
     }
   };
+}
+
+function getCurrentTargetLanguage() {
+  return normalizeLanguageTag(els.languageSelect.value || state.config?.targetLanguage || "en") || "en";
+}
+
+function parseManualLyrics(text) {
+  return String(text || "")
+    .split(/\r?\n/)
+    .map((line) => line.trim())
+    .filter(Boolean)
+    .map((line, index) => {
+      const lrc = line.match(/^\[(\d{1,2}):(\d{2})(?:[.:](\d{1,3}))?\]\s*(.*)$/);
+      if (!lrc) {
+        return { text: line, timestampMs: index * 4200, sourceLanguage: normalizeLanguageCode(els.manualSource.value) };
+      }
+
+      const minutes = Number(lrc[1]);
+      const seconds = Number(lrc[2]);
+      const fraction = String(lrc[3] || "0").padEnd(3, "0").slice(0, 3);
+      return {
+        text: lrc[4].trim(),
+        timestampMs: ((minutes * 60) + seconds) * 1000 + Number(fraction),
+        sourceLanguage: normalizeLanguageCode(els.manualSource.value)
+      };
+    })
+    .filter((line) => line.text);
+}
+
+function guessManualSourceLanguage(lines) {
+  const selected = normalizeLanguageCode(els.manualSource.value);
+  if (selected && selected !== "auto") return selected;
+
+  const joined = lines.map((line) => line.text).slice(0, 12).join(" ");
+  return getScriptLanguageHint(joined) || getLatinLanguageHint(joined) || "auto";
+}
+
+async function translateLine(text, sourceLanguage, targetLanguage) {
+  if (!text.trim()) return "";
+  const source = sourceLanguage && sourceLanguage !== "auto" ? sourceLanguage : "auto";
+  const url = `https://api.mymemory.translated.net/get?q=${encodeURIComponent(text)}&langpair=${encodeURIComponent(`${source}|${targetLanguage}`)}`;
+  const response = await fetch(url, { cache: "no-store" });
+  if (!response.ok) throw new Error(`Translation failed (${response.status})`);
+  const data = await response.json();
+  return data?.responseData?.translatedText || text;
+}
+
+async function buildManualPayload() {
+  const lines = parseManualLyrics(els.manualLyrics.value);
+  if (!lines.length) {
+    throw new Error("Paste lyrics or import a text file first.");
+  }
+
+  const targetLanguage = getCurrentTargetLanguage();
+  const sourceLanguage = guessManualSourceLanguage(lines);
+  const translated = [];
+
+  for (let i = 0; i < lines.length; i += 1) {
+    const line = lines[i];
+    els.manualNote.textContent = `Translating line ${i + 1} of ${lines.length}...`;
+    const translation = await translateLine(line.text, sourceLanguage, targetLanguage);
+    translated.push({
+      ...line,
+      sourceLanguage,
+      translation
+    });
+  }
+
+  const durationMs = Math.max(60000, (translated.at(-1)?.timestampMs || (translated.length * 4200)) + 5000);
+  return {
+    status: "active",
+    settings: {
+      targetLanguage,
+      translationProvider: "browser",
+      languageChoices: FALLBACK_LANGUAGE_CHOICES
+    },
+    track: {
+      trackKey: `manual-${Date.now()}`,
+      title: els.manualTitle.value.trim() || "Manual Lyrics",
+      artist: els.manualArtist.value.trim() || "Browser translation",
+      album: "",
+      sourceApp: "browser",
+      playbackStatus: "Paused",
+      positionMs: 0,
+      endTimeMs: durationMs,
+      lastUpdatedIso: new Date().toISOString()
+    },
+    lyrics: {
+      mode: "plain",
+      synced: [],
+      plain: translated,
+      sourceLanguage,
+      translationVisible: true,
+      provider: "browser"
+    }
+  };
+}
+
+function enableManualMode(payload) {
+  state.manualMode = true;
+  state.payload = payload;
+  state.lastRenderKey = "";
+  state.followActiveLine = true;
+  resetPlaybackState();
+  syncPlaybackState(payload);
+  updateHeader(payload);
+  renderLyrics(payload);
+  els.manualNote.textContent = "Translated in browser mode. Live Spotify sync remains optional.";
 }
 
 function enterTrackTransition() {
@@ -706,6 +836,7 @@ function updateAlbumArt(track) {
 }
 
 function showConnectionHelp(error) {
+  if (state.manualMode) return;
   resetPlaybackState();
   state.transitioningTrack = false;
   state.payload = null;
@@ -717,14 +848,14 @@ function showConnectionHelp(error) {
   els.empty.hidden = false;
   els.statusLabel.textContent = "Local bridge offline";
   els.title.textContent = "Dual Lyrics";
-  els.artist.textContent = "Run Song Translation/dual-lyrics.ps1 to connect Spotify and lyric translation.";
-  els.translationChip.textContent = "Bridge required";
-  els.modeChip.textContent = "Waiting for localhost";
+  els.artist.textContent = "Use Manual lyrics for browser-only translation, or start the local bridge for Spotify sync.";
+  els.translationChip.textContent = "Browser mode available";
+  els.modeChip.textContent = "Manual or local bridge";
   els.progressBar.style.width = "0%";
   els.elapsed.textContent = "00:00";
   els.duration.textContent = "00:00";
-  els.empty.querySelector("h3").textContent = "Start the Spotify bridge";
-  els.emptyCopy.textContent = `This page can live in the website, but Spotify access still comes from the local PowerShell server at ${LOCAL_API_BASE}. Start dual-lyrics.ps1 and it will reconnect automatically.`;
+  els.empty.querySelector("h3").textContent = "Use manual lyrics or start Spotify bridge";
+  els.emptyCopy.textContent = `Manual lyrics translate in this page. Automatic Spotify detection still needs the local bridge at ${LOCAL_API_BASE}, because browsers cannot read desktop app playback state directly.`;
   els.panelLanguageFlag.replaceChildren();
   els.panelLanguageFlag.classList.add("hidden");
   updateAlbumArt(null);
@@ -871,7 +1002,15 @@ function renderLanguageChoices(config) {
 }
 
 async function fetchConfig() {
-  state.config = await apiGetJson("/api/config");
+  try {
+    state.config = await apiGetJson("/api/config");
+  } catch (error) {
+    state.config = {
+      targetLanguage: "en",
+      translationProvider: "browser",
+      languageChoices: FALLBACK_LANGUAGE_CHOICES
+    };
+  }
   renderLanguageChoices(state.config);
 }
 
@@ -883,6 +1022,7 @@ async function updateTargetLanguage(targetLanguage) {
 }
 
 async function loadState() {
+  if (state.manualMode) return;
   try {
     const previousTrackKey = state.payload?.track?.trackKey || "";
     state.payload = await apiGetJson("/api/state");
@@ -916,9 +1056,41 @@ els.fullscreenButton.addEventListener("click", () => {
   setFullscreenLyrics(!state.fullscreenLyrics);
 });
 els.languageSelect.addEventListener("change", (event) => {
+  if (state.manualMode) {
+    state.config = {
+      ...(state.config || {}),
+      targetLanguage: event.target.value,
+      languageChoices: FALLBACK_LANGUAGE_CHOICES
+    };
+    els.manualNote.textContent = "Output language changed. Run manual translation again to refresh the lines.";
+    return;
+  }
   updateTargetLanguage(event.target.value).catch((error) => {
     els.artist.textContent = error.message;
   });
+});
+els.manualToggle.addEventListener("click", () => {
+  const isHidden = els.manualPanel.classList.toggle("hidden");
+  els.manualToggle.setAttribute("aria-expanded", String(!isHidden));
+});
+els.manualFile.addEventListener("change", async (event) => {
+  const file = event.target.files?.[0];
+  if (!file) return;
+  els.manualLyrics.value = await file.text();
+  if (!els.manualTitle.value.trim()) {
+    els.manualTitle.value = file.name.replace(/\.[^.]+$/, "");
+  }
+});
+els.manualTranslate.addEventListener("click", async () => {
+  els.manualTranslate.disabled = true;
+  try {
+    const payload = await buildManualPayload();
+    enableManualMode(payload);
+  } catch (error) {
+    els.manualNote.textContent = error.message;
+  } finally {
+    els.manualTranslate.disabled = false;
+  }
 });
 els.scroll.addEventListener("scroll", handleLyricsScroll, { passive: true });
 window.addEventListener("resize", () => {
