@@ -12,8 +12,12 @@ body.dashboard-page {
   min-height: 0;
   overflow: hidden;
   background:
+    linear-gradient(90deg, rgba(255,255,255,0.025) 1px, transparent 1px),
+    linear-gradient(180deg, rgba(255,255,255,0.018) 1px, transparent 1px),
     radial-gradient(circle at 18% 0%, rgba(69, 168, 119, 0.14), transparent 30%),
+    radial-gradient(circle at 92% 16%, rgba(70, 160, 220, 0.1), transparent 28%),
     linear-gradient(135deg, rgba(8, 13, 18, 0.98), rgba(16, 21, 22, 0.99));
+  background-size: 28px 28px, 28px 28px, auto, auto, auto;
   --dashboard-gap: 10px;
   --dashboard-surface: color-mix(in srgb, var(--panel-bg) 82%, #0c1312 18%);
   --dashboard-panel: color-mix(in srgb, var(--panel-item) 78%, #101816 22%);
@@ -43,6 +47,7 @@ body.dashboard-page .owentools-home-link {
 }
 
 body.dashboard-page .dashboard-shell {
+  position: relative;
   height: 100vh;
   min-height: 0;
   display: grid;
@@ -50,6 +55,18 @@ body.dashboard-page .dashboard-shell {
   gap: var(--dashboard-gap);
   padding: var(--dashboard-gap);
   box-sizing: border-box;
+}
+
+body.dashboard-page .dashboard-shell::before {
+  content: '';
+  position: fixed;
+  inset: 0;
+  pointer-events: none;
+  background:
+    linear-gradient(120deg, transparent 0 34%, rgba(255,255,255,0.05) 35%, transparent 36% 100%),
+    linear-gradient(180deg, transparent, rgba(0,0,0,0.18));
+  mix-blend-mode: screen;
+  opacity: 0.45;
 }
 
 body.dashboard-page .dashboard-main {
@@ -68,10 +85,14 @@ body.dashboard-page[data-overlay-dock='bottom'] .overlay {
   width: auto;
   height: calc(100vh - var(--dashboard-gap) * 2);
   min-height: 0;
-  border: 1px solid color-mix(in srgb, var(--accent) 24%, transparent);
-  border-radius: 8px;
-  background: var(--dashboard-surface);
-  box-shadow: 0 22px 54px rgba(0, 0, 0, 0.34);
+  border: 1px solid color-mix(in srgb, var(--accent) 30%, transparent);
+  border-radius: 6px;
+  background:
+    linear-gradient(90deg, color-mix(in srgb, var(--accent) 12%, transparent), transparent 28%),
+    var(--dashboard-surface);
+  box-shadow:
+    0 22px 54px rgba(0, 0, 0, 0.34),
+    inset 0 1px 0 rgba(255, 255, 255, 0.05);
   grid-template-rows: auto minmax(0, 1fr);
   overflow: hidden;
 }
@@ -85,7 +106,9 @@ body.dashboard-page .topbar {
   min-height: 50px;
   padding: 7px 10px;
   border-bottom: 1px solid color-mix(in srgb, var(--line) 42%, transparent);
-  background: color-mix(in srgb, var(--panel-bg) 86%, #111a18 14%);
+  background:
+    linear-gradient(90deg, color-mix(in srgb, var(--accent) 18%, transparent), transparent 52%),
+    color-mix(in srgb, var(--panel-bg) 86%, #111a18 14%);
 }
 
 body.dashboard-page .topbar-actions {
@@ -98,6 +121,7 @@ body.dashboard-page .topbar-actions {
 
 body.dashboard-page .topbar-left h1 {
   font-size: clamp(1.05rem, 1.2vw, 1.35rem);
+  margin-left: 2.6rem;
 }
 
 body.dashboard-page .dashboard-summary {
@@ -110,6 +134,17 @@ body.dashboard-page .dashboard-summary {
 
 body.dashboard-page .dashboard-hidden {
   display: none;
+}
+
+body.dashboard-page .help-btn {
+  width: 32px;
+  min-width: 32px;
+  height: 32px;
+  display: inline-grid;
+  place-items: center;
+  padding: 0;
+  border-radius: 999px;
+  font-size: 0.92rem;
 }
 
 body.dashboard-page .dashboard-page-tabs {
@@ -144,7 +179,7 @@ body.dashboard-page .dashboard-page-tabs button[aria-selected='true'] {
 body.dashboard-page .games,
 body.dashboard-page[data-overlay-dock='top'] .games,
 body.dashboard-page[data-overlay-dock='bottom'] .games {
-  grid-template-columns: repeat(auto-fit, minmax(clamp(300px, 16.5vw, 420px), 1fr));
+  grid-template-columns: repeat(4, minmax(0, 1fr));
   grid-auto-rows: minmax(clamp(132px, 7.4vw, 184px), auto);
   grid-template-rows: none;
   gap: 8px;
@@ -324,10 +359,17 @@ body.dashboard-page .utility-panel {
   width: auto;
   height: auto;
   max-width: none;
-  border-radius: 8px;
-  border-color: color-mix(in srgb, var(--accent) 20%, transparent);
-  background: var(--dashboard-panel);
-  box-shadow: 0 12px 30px rgba(0, 0, 0, 0.24);
+  border-radius: 4px;
+  border-color: color-mix(in srgb, var(--line) 48%, transparent);
+  background:
+    linear-gradient(90deg, color-mix(in srgb, var(--accent) 16%, transparent), transparent 46%),
+    linear-gradient(180deg, rgba(255, 255, 255, 0.045), transparent 22%),
+    var(--dashboard-panel);
+  box-shadow: inset 0 1px 0 rgba(255,255,255,0.04);
+}
+
+body.dashboard-page .utility-panel::before {
+  opacity: 0.5;
 }
 
 body.dashboard-page .bet-input-panel {
@@ -359,8 +401,13 @@ body.dashboard-page .dashboard-compact-tool {
 
 body.dashboard-page .panel-header {
   cursor: default;
-  padding-bottom: 6px;
-  border-bottom: 1px solid color-mix(in srgb, var(--line) 28%, transparent);
+  padding: 7px 9px;
+  border-bottom: 1px solid color-mix(in srgb, var(--line) 34%, transparent);
+  background:
+    linear-gradient(90deg, color-mix(in srgb, var(--accent) 18%, transparent), transparent 58%),
+    linear-gradient(180deg, rgba(255, 255, 255, 0.06), transparent 62%),
+    color-mix(in srgb, var(--panel-head) 78%, black 22%);
+  font-size: 0.58rem;
 }
 
 body.dashboard-page .panel-list {
@@ -369,9 +416,24 @@ body.dashboard-page .panel-list {
   overflow: auto;
 }
 
+body.dashboard-page .panel-item {
+  border-radius: 4px;
+}
+
+body.dashboard-page .bet-form button,
+body.dashboard-page .panel-action-btn,
+body.dashboard-page .bet-delete-btn {
+  border-radius: 4px;
+}
+
 body.dashboard-page .bet-input-panel header {
-  margin-bottom: 5px;
-  padding-bottom: 5px;
+  margin: -7px -7px 7px;
+  padding: 7px 9px;
+  border-bottom: 1px solid color-mix(in srgb, var(--line) 34%, transparent);
+  background:
+    linear-gradient(180deg, rgba(255, 255, 255, 0.06), transparent 62%),
+    color-mix(in srgb, var(--panel-head) 78%, black 22%);
+  font-size: 0.58rem;
 }
 
 body.dashboard-page .bet-form {
@@ -387,6 +449,17 @@ body.dashboard-page .bet-form textarea {
   max-height: 54px;
   padding: 5px 7px;
   resize: vertical;
+}
+
+body.dashboard-page .bet-form input,
+body.dashboard-page .bet-form select,
+body.dashboard-page .bet-form textarea {
+  border-color: color-mix(in srgb, var(--line) 58%, transparent);
+  background:
+    linear-gradient(180deg, rgba(255, 255, 255, 0.06), transparent 58%),
+    color-mix(in srgb, var(--panel-bg) 82%, black 18%);
+  border-radius: 4px;
+  box-shadow: inset 0 1px 0 rgba(255, 255, 255, 0.05);
 }
 
 body.dashboard-page .bet-leg-builder {
@@ -479,53 +552,59 @@ body.dashboard-page .lineup-modal {
 }
 
 body.dashboard-page .lineup-modal-header {
-  padding: 0.68rem 0.8rem;
-}
-
-body.dashboard-page .lineup-modal-state {
-  padding: 0.58rem 0.8rem;
+  padding: 0.52rem 0.62rem;
 }
 
 body.dashboard-page .lineup-view-toggle {
-  padding: 0.45rem 0.8rem 0;
+  padding: 0.34rem 0.62rem 0;
 }
 
 body.dashboard-page .lineup-live-details {
-  height: clamp(170px, 18vh, 275px);
-  min-height: 170px;
-  max-height: 275px;
+  height: clamp(104px, 12vh, 168px);
+  min-height: 104px;
+  max-height: 168px;
 }
 
 body.dashboard-page .lineup-live-details .detail-col {
-  padding: 0.64rem 0.8rem;
-  gap: 0.36rem;
+  padding: 0.38rem 0.5rem;
+  gap: 0.22rem;
 }
 
 body.dashboard-page .lineup-live-details .detail-col h4 {
-  font-size: 0.96rem;
+  font-size: 0.66rem;
+  margin-bottom: 0;
 }
 
 body.dashboard-page .lineup-live-details .ticker li,
 body.dashboard-page .lineup-live-details .status {
-  font-size: 0.92rem;
-  line-height: 1.22;
+  font-size: 0.6rem;
+  line-height: 1.14;
 }
 
 body.dashboard-page .lineup-live-details .diamond {
-  --base-size: 0.58rem;
-  width: 3.7rem;
-  height: 3.7rem;
+  --base-size: 0.34rem;
+  width: 2rem;
+  height: 2rem;
 }
 
 body.dashboard-page .lineup-live-details .count-row {
-  grid-template-columns: 0.8rem 1fr;
-  gap: 0.36rem;
-  font-size: 0.96rem;
+  grid-template-columns: 0.48rem 1fr;
+  gap: 0.16rem;
+  font-size: 0.58rem;
 }
 
 body.dashboard-page .lineup-live-details .dot {
-  width: 0.58rem;
-  height: 0.58rem;
+  width: 0.3rem;
+  height: 0.3rem;
+}
+
+body.dashboard-page .lineup-modal-team {
+  padding: 0.5rem 0.62rem 0.56rem;
+}
+
+body.dashboard-page .lineup-matchup-strip {
+  padding: 0.42rem 0.62rem;
+  gap: 0.5rem;
 }
 
 body.dashboard-page .lineup-modal-title-wrap strong {
@@ -541,7 +620,7 @@ body.dashboard-page .lineup-team-header {
 body.dashboard-page .lineup-team-pitcher-name,
 body.dashboard-page .lineup-list li,
 body.dashboard-page .bullpen-name {
-  font-size: 0.9rem;
+  font-size: 0.8rem;
 }
 
 body.dashboard-page .lineup-name {
@@ -556,7 +635,7 @@ body.dashboard-page .lineup-dashboard-stats {
   flex: 1 1 auto;
   min-width: 0;
   color: var(--muted);
-  font-size: 0.64rem;
+  font-size: 0.56rem;
   font-weight: 800;
   line-height: 1;
   white-space: nowrap;
@@ -576,6 +655,160 @@ body.dashboard-page .bullpen-today {
   font-size: 0.73rem;
 }
 
+@media (min-width: 1700px) and (max-width: 1920px) and (max-height: 1100px) {
+  body.dashboard-page .games,
+  body.dashboard-page[data-overlay-dock='top'] .games,
+  body.dashboard-page[data-overlay-dock='bottom'] .games {
+    grid-template-columns: repeat(4, minmax(0, 1fr));
+    grid-auto-rows: minmax(clamp(150px, 8.4vw, 176px), auto);
+    gap: 7px;
+    padding: 7px;
+  }
+
+  body.dashboard-page .game-card {
+    min-height: clamp(150px, 8.4vw, 176px);
+    padding: 5px 5px 8px;
+  }
+
+  body.dashboard-page .scoreboard,
+  body.dashboard-page[data-overlay-dock='top'] .scoreboard,
+  body.dashboard-page[data-overlay-dock='bottom'] .scoreboard {
+    --sb-dock-scale: 0.84;
+    --sb-text-scale: 0.98;
+  }
+
+  body.dashboard-page .team-logo,
+  body.dashboard-page[data-overlay-dock='top'] .team-logo,
+  body.dashboard-page[data-overlay-dock='bottom'] .team-logo {
+    width: 1.98rem;
+    height: 1.98rem;
+  }
+
+  body.dashboard-page .team,
+  body.dashboard-page[data-overlay-dock='top'] .team,
+  body.dashboard-page[data-overlay-dock='bottom'] .team {
+    font-size: 0.81rem;
+  }
+
+  body.dashboard-page .score,
+  body.dashboard-page[data-overlay-dock='top'] .score,
+  body.dashboard-page[data-overlay-dock='bottom'] .score {
+    font-size: 1.32rem;
+  }
+
+  body.dashboard-page .team-left,
+  body.dashboard-page[data-overlay-dock='top'] .team-left,
+  body.dashboard-page[data-overlay-dock='bottom'] .team-left {
+    grid-template-columns: 2.25rem 2.8rem minmax(0, 1fr);
+    gap: 0.37rem;
+  }
+
+  body.dashboard-page .lineup-modal {
+    font-size: 0.74rem;
+  }
+
+  body.dashboard-page .lineup-matchup-strip {
+    gap: 7px;
+    padding: 5px 9px;
+  }
+
+  body.dashboard-page .lineup-state-scoreboard {
+    min-width: 176px;
+    padding: 4px 8px;
+    gap: 7px;
+  }
+
+  body.dashboard-page .lineup-inning-scoreboard {
+    min-width: min(440px, 38vw);
+    font-size: 0.52rem;
+  }
+
+  body.dashboard-page .lineup-score-cell {
+    padding: 3px 4px;
+  }
+
+  body.dashboard-page .lineup-modal-header {
+    padding: 0.42rem 0.5rem;
+  }
+
+  body.dashboard-page .lineup-view-toggle {
+    padding: 0.28rem 0.5rem 0;
+  }
+
+  body.dashboard-page .lineup-live-details {
+    height: clamp(92px, 10.4vh, 140px);
+    min-height: 92px;
+    max-height: 140px;
+  }
+
+  body.dashboard-page .lineup-live-details .detail-col {
+    padding: 0.3rem 0.42rem;
+    gap: 0.16rem;
+  }
+
+  body.dashboard-page .lineup-live-details .detail-col h4 {
+    font-size: 0.56rem;
+  }
+
+  body.dashboard-page .lineup-live-details .ticker li,
+  body.dashboard-page .lineup-live-details .status {
+    font-size: 0.52rem;
+    line-height: 1.12;
+  }
+
+  body.dashboard-page .lineup-live-details .diamond {
+    --base-size: 0.28rem;
+    width: 1.7rem;
+    height: 1.7rem;
+  }
+
+  body.dashboard-page .lineup-live-details .count-row {
+    grid-template-columns: 0.42rem 1fr;
+    gap: 0.12rem;
+    font-size: 0.5rem;
+  }
+
+  body.dashboard-page .lineup-live-details .dot {
+    width: 0.26rem;
+    height: 0.26rem;
+  }
+
+  body.dashboard-page .lineup-modal-team {
+    padding: 0.38rem 0.48rem 0.44rem;
+  }
+
+  body.dashboard-page .lineup-modal-title-wrap strong {
+    font-size: 0.84rem;
+  }
+
+  body.dashboard-page .lineup-modal-matchup,
+  body.dashboard-page .lineup-view-btn,
+  body.dashboard-page .lineup-team-header {
+    font-size: 0.7rem;
+  }
+
+  body.dashboard-page .lineup-team-pitcher-name,
+  body.dashboard-page .lineup-list li,
+  body.dashboard-page .bullpen-name {
+    font-size: 0.64rem;
+  }
+
+  body.dashboard-page .lineup-dashboard-stats {
+    font-size: 0.46rem;
+  }
+
+  body.dashboard-page .lineup-team-pitcher-meta,
+  body.dashboard-page .lineup-team-pitcher-empty,
+  body.dashboard-page .lineup-team-pitcher-current,
+  body.dashboard-page .lineup-today,
+  body.dashboard-page .lineup-avg,
+  body.dashboard-page .lineup-pos,
+  body.dashboard-page .bullpen-meta,
+  body.dashboard-page .bullpen-today {
+    font-size: 0.58rem;
+  }
+}
+
 @media (min-width: 2200px) {
   html {
     font-size: clamp(21px, 1vw, 27px);
@@ -592,7 +825,7 @@ body.dashboard-page .bullpen-today {
   body.dashboard-page .games,
   body.dashboard-page[data-overlay-dock='top'] .games,
   body.dashboard-page[data-overlay-dock='bottom'] .games {
-    grid-template-columns: repeat(auto-fit, minmax(clamp(370px, 17.4vw, 490px), 1fr));
+    grid-template-columns: repeat(4, minmax(0, 1fr));
     grid-auto-rows: minmax(clamp(172px, 8.3vw, 238px), auto);
     gap: 10px;
     padding: 10px;
@@ -607,9 +840,9 @@ body.dashboard-page .bullpen-today {
   }
 
   body.dashboard-page .lineup-live-details {
-    height: clamp(245px, 20vh, 340px);
-    min-height: 245px;
-    max-height: 340px;
+    height: clamp(132px, 13vh, 210px);
+    min-height: 132px;
+    max-height: 210px;
   }
 }
 
