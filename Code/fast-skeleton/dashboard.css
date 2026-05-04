@@ -147,6 +147,12 @@ body.dashboard-page .help-btn {
   font-size: 0.92rem;
 }
 
+body.dashboard-page .clear-picks-btn {
+  min-height: 32px;
+  padding-inline: 10px;
+  border-radius: 4px;
+}
+
 body.dashboard-page .dashboard-page-tabs {
   display: flex;
   align-items: center;
@@ -547,7 +553,7 @@ body.dashboard-page .lineup-modal {
   max-height: 100%;
   margin: 0;
   border-radius: 8px;
-  grid-template-rows: auto auto auto minmax(0, 1fr) auto;
+  grid-template-rows: auto minmax(0, 1fr) auto;
   font-size: clamp(0.95rem, 0.86vw, 1.12rem);
 }
 
@@ -556,7 +562,7 @@ body.dashboard-page .lineup-modal-header {
 }
 
 body.dashboard-page .lineup-view-toggle {
-  padding: 0.34rem 0.62rem 0;
+  padding: 0;
 }
 
 body.dashboard-page .lineup-live-details {
@@ -714,7 +720,7 @@ body.dashboard-page .bullpen-today {
 
   body.dashboard-page .lineup-state-scoreboard {
     min-width: 176px;
-    padding: 4px 8px;
+    padding: 0 3px;
     gap: 7px;
   }
 
@@ -732,7 +738,7 @@ body.dashboard-page .bullpen-today {
   }
 
   body.dashboard-page .lineup-view-toggle {
-    padding: 0.28rem 0.5rem 0;
+    padding: 0;
   }
 
   body.dashboard-page .lineup-live-details {
@@ -847,8 +853,30 @@ body.dashboard-page .bullpen-today {
 }
 
 @media (max-width: 1100px) {
+  html:has(body.dashboard-page) {
+    height: auto;
+    overflow: auto;
+  }
+
+  body.dashboard-page {
+    min-height: 100svh;
+    height: auto;
+    overflow: auto;
+  }
+
   body.dashboard-page .dashboard-shell {
     grid-template-columns: 1fr;
+    height: auto;
+    min-height: 100svh;
+  }
+
+  body.dashboard-page .overlay,
+  body.dashboard-page[data-overlay-dock='right'] .overlay,
+  body.dashboard-page[data-overlay-dock='left'] .overlay,
+  body.dashboard-page[data-overlay-dock='top'] .overlay,
+  body.dashboard-page[data-overlay-dock='bottom'] .overlay {
+    height: auto;
+    min-height: calc(100svh - var(--dashboard-gap) * 2);
   }
 
   body.dashboard-page .dashboard-rail {
@@ -857,6 +885,17 @@ body.dashboard-page .bullpen-today {
     grid-template-rows: none;
     grid-auto-rows: max-content;
     overflow: visible;
+    margin-top: var(--dashboard-gap);
+  }
+
+  body.dashboard-page .bet-input-panel,
+  body.dashboard-page #betDisplay,
+  body.dashboard-page #hrDisplay {
+    max-height: none;
+  }
+
+  body.dashboard-page .retro-panel {
+    min-height: 220px;
   }
 
   body.dashboard-page .dashboard-insights {
@@ -869,5 +908,376 @@ body.dashboard-page .bullpen-today {
 
   body.dashboard-page .topbar-actions {
     justify-content: flex-start;
+  }
+}
+
+@media (max-width: 720px) {
+  html:has(body.dashboard-page) {
+    height: auto;
+    overflow: auto;
+  }
+
+  body.dashboard-page {
+    min-height: 100svh;
+    height: auto;
+    overflow: auto;
+    --dashboard-gap: 6px;
+  }
+
+  body.dashboard-page .owentools-home-link {
+    width: 34px;
+    height: 34px;
+    top: max(6px, env(safe-area-inset-top));
+    left: max(6px, env(safe-area-inset-left));
+    border-radius: 10px;
+    font-size: 0.7rem;
+  }
+
+  body.dashboard-page .dashboard-shell {
+    min-height: 100svh;
+    height: auto;
+    display: block;
+    padding: 6px;
+  }
+
+  body.dashboard-page .dashboard-main {
+    display: block;
+    min-height: 0;
+  }
+
+  body.dashboard-page .overlay,
+  body.dashboard-page[data-overlay-dock='right'] .overlay,
+  body.dashboard-page[data-overlay-dock='left'] .overlay,
+  body.dashboard-page[data-overlay-dock='top'] .overlay,
+  body.dashboard-page[data-overlay-dock='bottom'] .overlay {
+    height: auto;
+    min-height: calc(100svh - 12px);
+    overflow: visible;
+    border-radius: 8px;
+    grid-template-rows: auto auto;
+  }
+
+  body.dashboard-page .topbar {
+    position: sticky;
+    top: 0;
+    z-index: 30;
+    grid-template-columns: 1fr;
+    gap: 8px;
+    padding: 8px;
+  }
+
+  body.dashboard-page .topbar-left {
+    display: grid;
+    grid-template-columns: minmax(0, 1fr) auto;
+    align-items: center;
+    gap: 8px;
+  }
+
+  body.dashboard-page .topbar-left h1 {
+    margin-left: 40px;
+    font-size: 1rem;
+    letter-spacing: 0.08em;
+    white-space: nowrap;
+  }
+
+  body.dashboard-page .topbar-left label {
+    min-width: 0;
+  }
+
+  body.dashboard-page .topbar input,
+  body.dashboard-page .topbar select {
+    min-height: 34px;
+    font-size: 16px;
+  }
+
+  body.dashboard-page .topbar-actions {
+    display: grid;
+    grid-template-columns: auto auto 1fr;
+    align-items: center;
+    gap: 6px;
+  }
+
+  body.dashboard-page .dashboard-summary {
+    grid-column: 1 / -1;
+    order: -1;
+    max-width: none;
+    font-size: 0.74rem;
+  }
+
+  body.dashboard-page .clear-picks-btn {
+    min-height: 34px;
+  }
+
+  body.dashboard-page .dashboard-page-tabs {
+    grid-column: 1 / -1;
+    width: 100%;
+    overflow-x: auto;
+    justify-content: flex-start;
+    padding: 3px;
+    scrollbar-width: none;
+  }
+
+  body.dashboard-page .dashboard-page-tabs::-webkit-scrollbar {
+    display: none;
+  }
+
+  body.dashboard-page .dashboard-page-tabs button {
+    flex: 0 0 auto;
+    min-height: 34px;
+    padding: 6px 10px;
+    font-size: 0.76rem;
+  }
+
+  body.dashboard-page .theme-label {
+    justify-self: end;
+  }
+
+  body.dashboard-page .leaders-toolbar {
+    grid-template-columns: 1fr;
+    gap: 6px;
+    padding: 8px;
+  }
+
+  body.dashboard-page .leaders-filter select,
+  body.dashboard-page .leaders-opponents-btn {
+    width: 100%;
+    min-height: 36px;
+    font-size: 16px;
+  }
+
+  body.dashboard-page .games,
+  body.dashboard-page[data-overlay-dock='top'] .games,
+  body.dashboard-page[data-overlay-dock='bottom'] .games {
+    grid-template-columns: 1fr;
+    grid-auto-rows: auto;
+    gap: 8px;
+    overflow: visible;
+    padding: 8px;
+  }
+
+  body.dashboard-page .game-card {
+    min-height: 168px;
+    border-radius: 10px;
+    padding: 6px;
+  }
+
+  body.dashboard-page .scoreboard,
+  body.dashboard-page[data-overlay-dock='top'] .scoreboard,
+  body.dashboard-page[data-overlay-dock='bottom'] .scoreboard {
+    min-height: 154px;
+    grid-template-columns: minmax(0, 1fr) minmax(46px, 58px);
+    border-radius: 10px;
+  }
+
+  body.dashboard-page .score-row {
+    padding: 8px 7px;
+  }
+
+  body.dashboard-page .away-row {
+    padding-bottom: 24px;
+  }
+
+  body.dashboard-page .home-row {
+    padding-top: 24px;
+  }
+
+  body.dashboard-page .team-left {
+    grid-template-columns: 38px minmax(38px, auto) minmax(0, 1fr);
+    gap: 6px;
+  }
+
+  body.dashboard-page .team-logo {
+    width: 36px;
+    height: 36px;
+  }
+
+  body.dashboard-page .team {
+    font-size: 0.92rem;
+  }
+
+  body.dashboard-page .team-record {
+    font-size: 0.48rem;
+  }
+
+  body.dashboard-page .matchup-line {
+    font-size: 0.58rem;
+  }
+
+  body.dashboard-page .scoreboard-side {
+    padding: 5px;
+    gap: 5px;
+  }
+
+  body.dashboard-page .scoreboard-side .score {
+    border-radius: 9px;
+    font-size: 1.22rem;
+  }
+
+  body.dashboard-page .score-state-strip {
+    left: 12px;
+    right: 52px;
+    height: 25px;
+    font-size: 0.56rem;
+  }
+
+  body.dashboard-page .score-mini-context {
+    gap: 3px;
+  }
+
+  body.dashboard-page .score-mini-count {
+    min-width: 21px;
+    height: 17px;
+    font-size: 0.46rem;
+  }
+
+  body.dashboard-page .score-mini-inning {
+    min-width: 42px;
+    height: 17px;
+    font-size: 0.46rem;
+  }
+
+  body.dashboard-page .leaders-page {
+    max-height: none;
+    overflow: visible;
+    padding: 8px;
+  }
+
+  body.dashboard-page .leaders-shell {
+    overflow: visible;
+    padding-right: 0;
+  }
+
+  body.dashboard-page .leaders-card-grid,
+  body.dashboard-page .hot-card-grid {
+    grid-template-columns: 1fr;
+  }
+
+  body.dashboard-page .team-stats-table {
+    font-size: 0.78rem;
+  }
+
+  body.dashboard-page .team-stats-table th,
+  body.dashboard-page .team-stats-table td {
+    padding: 8px;
+  }
+
+  body.dashboard-page .dashboard-rail {
+    position: static;
+    display: grid;
+    grid-template-rows: none;
+    gap: 8px;
+    max-height: none;
+    margin-top: 8px;
+    overflow: visible;
+  }
+
+  body.dashboard-page .bet-input-panel,
+  body.dashboard-page #betDisplay,
+  body.dashboard-page #hrDisplay {
+    min-height: 0;
+    max-height: none;
+  }
+
+  body.dashboard-page .bet-input-panel {
+    overflow: visible;
+  }
+
+  body.dashboard-page .retro-panel {
+    min-height: 220px;
+    max-height: 420px;
+  }
+
+  body.dashboard-page .bet-form input,
+  body.dashboard-page .bet-form select,
+  body.dashboard-page .bet-form textarea {
+    font-size: 16px;
+  }
+
+  body.dashboard-page .lineup-overlay,
+  body.dashboard-page .player-stat-overlay,
+  body.dashboard-page[data-overlay-dock='top'] .lineup-overlay,
+  body.dashboard-page[data-overlay-dock='bottom'] .lineup-overlay,
+  body.dashboard-page[data-overlay-dock='top'] .player-stat-overlay,
+  body.dashboard-page[data-overlay-dock='bottom'] .player-stat-overlay {
+    position: fixed;
+    inset: max(6px, env(safe-area-inset-top)) max(6px, env(safe-area-inset-right)) max(6px, env(safe-area-inset-bottom)) max(6px, env(safe-area-inset-left));
+    z-index: 80;
+  }
+
+  body.dashboard-page .lineup-modal {
+    width: 100%;
+    height: 100%;
+    max-height: 100%;
+    margin: 0;
+    border-radius: 8px;
+  }
+
+  body.dashboard-page .lineup-modal-header {
+    grid-template-columns: minmax(0, 1fr) auto;
+    gap: 6px;
+  }
+
+  body.dashboard-page .lineup-modal-header .lineup-view-toggle {
+    grid-column: 1 / -1;
+    order: 3;
+    justify-content: flex-start;
+    overflow-x: auto;
+  }
+
+  body.dashboard-page .lineup-modal-columns,
+  body.dashboard-page .lineup-pitching-grid {
+    grid-template-columns: 1fr;
+  }
+
+  body.dashboard-page .lineup-modal-team + .lineup-modal-team,
+  body.dashboard-page .lineup-pitching-panel + .lineup-pitching-panel {
+    border-left: 0;
+    border-top: 1px solid var(--line);
+  }
+
+  body.dashboard-page .lineup-matchup-strip {
+    grid-template-columns: 1fr;
+    justify-items: stretch;
+  }
+
+  body.dashboard-page .lineup-state-scoreboard {
+    justify-self: center;
+    min-width: 0;
+    max-width: 100%;
+  }
+
+  body.dashboard-page .lineup-list li {
+    grid-template-columns: 18px minmax(0, 1fr) auto;
+  }
+
+  body.dashboard-page .lineup-dashboard-stats {
+    max-width: 100%;
+  }
+
+  body.dashboard-page .player-stat-modal {
+    width: 100%;
+    height: 100%;
+    max-height: 100%;
+    border-radius: 8px;
+  }
+
+  body.dashboard-page .player-stat-body {
+    grid-template-columns: 1fr;
+    overflow: auto;
+    padding: 10px;
+  }
+
+  body.dashboard-page .player-stat-left {
+    grid-template-columns: 96px minmax(0, 1fr);
+    align-items: start;
+  }
+
+  body.dashboard-page .player-stat-headshot {
+    height: 116px;
+  }
+
+  body.dashboard-page .player-stat-right {
+    grid-template-columns: 1fr;
+    overflow: visible;
   }
 }

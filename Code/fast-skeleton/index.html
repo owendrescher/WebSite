@@ -4,7 +4,19 @@
     <meta charset="utf-8" />
     <meta name="viewport" content="width=device-width, initial-scale=1" />
     <title>MLB Show Stream Overlay</title>
-    <link rel="stylesheet" href="styles.css?v=20260504-team-tone-modern" />
+    <meta name="description" content="Live MLB scoreboard, lineup cards, hot player tracking, team form, pitcher trends, home run feed, and baseball betting stat tools for every MLB team." />
+    <meta name="keywords" content="MLB, baseball, MLB betting, baseball betting, betting stats, live MLB scoreboard, MLB lineups, MLB lineup cards, MLB probable pitchers, MLB hot players, player props, team betting, team baseball betting, hits, batting average, home runs, RBI, OPS, stolen bases, strikeouts, ERA, WHIP, wins, saves, innings pitched, doubles, triples, runs, total bases, extra base hits, walks, BB, runs for, runs against, last seven games, Arizona Diamondbacks, Atlanta Braves, Baltimore Orioles, Boston Red Sox, Chicago Cubs, Chicago White Sox, Cincinnati Reds, Cleveland Guardians, Colorado Rockies, Detroit Tigers, Houston Astros, Kansas City Royals, Los Angeles Angels, Los Angeles Dodgers, Miami Marlins, Milwaukee Brewers, Minnesota Twins, New York Mets, New York Yankees, Athletics, Philadelphia Phillies, Pittsburgh Pirates, San Diego Padres, Seattle Mariners, San Francisco Giants, St Louis Cardinals, Tampa Bay Rays, Texas Rangers, Toronto Blue Jays, Washington Nationals, Arizona Diamondbacks betting, Atlanta Braves betting, Baltimore Orioles betting, Boston Red Sox betting, Chicago Cubs betting, Chicago White Sox betting, Cincinnati Reds betting, Cleveland Guardians betting, Colorado Rockies betting, Detroit Tigers betting, Houston Astros betting, Kansas City Royals betting, Los Angeles Angels betting, Los Angeles Dodgers betting, Miami Marlins betting, Milwaukee Brewers betting, Minnesota Twins betting, New York Mets betting, New York Yankees betting, Athletics betting, Philadelphia Phillies betting, Pittsburgh Pirates betting, San Diego Padres betting, Seattle Mariners betting, San Francisco Giants betting, St Louis Cardinals betting, Tampa Bay Rays betting, Texas Rangers betting, Toronto Blue Jays betting, Washington Nationals betting, Arizona Diamondbacks baseball betting, Atlanta Braves baseball betting, Baltimore Orioles baseball betting, Boston Red Sox baseball betting, Chicago Cubs baseball betting, Chicago White Sox baseball betting, Cincinnati Reds baseball betting, Cleveland Guardians baseball betting, Colorado Rockies baseball betting, Detroit Tigers baseball betting, Houston Astros baseball betting, Kansas City Royals baseball betting, Los Angeles Angels baseball betting, Los Angeles Dodgers baseball betting, Miami Marlins baseball betting, Milwaukee Brewers baseball betting, Minnesota Twins baseball betting, New York Mets baseball betting, New York Yankees baseball betting, Athletics baseball betting, Philadelphia Phillies baseball betting, Pittsburgh Pirates baseball betting, San Diego Padres baseball betting, Seattle Mariners baseball betting, San Francisco Giants baseball betting, St Louis Cardinals baseball betting, Tampa Bay Rays baseball betting, Texas Rangers baseball betting, Toronto Blue Jays baseball betting, Washington Nationals baseball betting" />
+    <meta name="news_keywords" content="Arizona-Diamondbacks-baseball-betting, Atlanta-Braves-baseball-betting, Baltimore-Orioles-baseball-betting, Boston-Red-Sox-baseball-betting, Chicago-Cubs-baseball-betting, Chicago-White-Sox-baseball-betting, Cincinnati-Reds-baseball-betting, Cleveland-Guardians-baseball-betting, Colorado-Rockies-baseball-betting, Detroit-Tigers-baseball-betting, Houston-Astros-baseball-betting, Kansas-City-Royals-baseball-betting, Los-Angeles-Angels-baseball-betting, Los-Angeles-Dodgers-baseball-betting, Miami-Marlins-baseball-betting, Milwaukee-Brewers-baseball-betting, Minnesota-Twins-baseball-betting, New-York-Mets-baseball-betting, New-York-Yankees-baseball-betting, Athletics-baseball-betting, Philadelphia-Phillies-baseball-betting, Pittsburgh-Pirates-baseball-betting, San-Diego-Padres-baseball-betting, Seattle-Mariners-baseball-betting, San-Francisco-Giants-baseball-betting, St-Louis-Cardinals-baseball-betting, Tampa-Bay-Rays-baseball-betting, Texas-Rangers-baseball-betting, Toronto-Blue-Jays-baseball-betting, Washington-Nationals-baseball-betting" />
+    <meta property="og:title" content="MLB Show Stream Overlay" />
+    <meta property="og:description" content="Live MLB scoreboard, lineups, pitcher trends, hot players, home run feed, and betting stat tools." />
+    <meta property="og:type" content="website" />
+    <meta property="og:image" content="baseball.png" />
+    <meta name="twitter:card" content="summary" />
+    <meta name="twitter:title" content="MLB Show Stream Overlay" />
+    <meta name="twitter:description" content="Live MLB scoreboard, lineups, pitcher trends, hot players, and betting stat tools." />
+    <link rel="icon" type="image/png" href="baseball.png" />
+    <link rel="apple-touch-icon" href="baseball.png" />
+    <link rel="stylesheet" href="styles.css?v=20260504-team-sort-mobile" />
   </head>
   <body>
     <section id="betInputPanel" class="utility-panel bet-input-panel">
@@ -196,6 +208,7 @@
         <div class="topbar-actions">
           <button id="overlayDockToggleBtn" class="toolbar-btn" type="button">Scoreboard: Right</button>
           <button id="scoreboardColumnsBtn" class="toolbar-btn" type="button">Cells/Row: 2</button>
+          <button id="clearPendingPicksBtn" class="toolbar-btn clear-picks-btn" type="button">Clear Picks</button>
           <label class="theme-label">
             <span>Style</span>
             <select id="themeSelect"></select>
@@ -221,6 +234,9 @@
       <section id="hotPage" class="leaders-page hot-page" hidden>
         <div class="leaders-empty">Loading hot board...</div>
       </section>
+      <section id="teamStatsPage" class="leaders-page team-stats-page" hidden>
+        <div class="leaders-empty">Loading team stats...</div>
+      </section>
       <button id="overlayResizeHandle" class="overlay-resize-handle" type="button" aria-label="Resize scoreboard area"></button>
 
       <section id="lineupOverlay" class="lineup-overlay" hidden>
@@ -231,12 +247,12 @@
               <strong>LINEUP CARD</strong>
               <span id="lineupModalMatchup" class="lineup-modal-matchup"></span>
             </div>
+            <div class="lineup-view-toggle" role="tablist" aria-label="Lineup card view">
+              <button type="button" class="lineup-view-btn active" data-lineup-view="lineups" aria-selected="true">Lineups</button>
+              <button type="button" class="lineup-view-btn" data-lineup-view="pitching" aria-selected="false">Pitching</button>
+            </div>
             <button id="lineupCloseBtn" class="lineup-close-btn" type="button" aria-label="Close lineup card">×</button>
           </header>
-          <div class="lineup-view-toggle" role="tablist" aria-label="Lineup card view">
-            <button type="button" class="lineup-view-btn active" data-lineup-view="lineups" aria-selected="true">Lineups</button>
-            <button type="button" class="lineup-view-btn" data-lineup-view="pitching" aria-selected="false">Pitching</button>
-          </div>
           <div class="lineup-modal-body">
             <div class="lineup-modal-columns" data-lineup-panel="lineups">
               <div class="lineup-matchup-strip">
@@ -405,6 +421,6 @@
       </article>
     </template>
 
-    <script src="app.js?v=20260504-team-tone-modern"></script>
+    <script src="app.js?v=20260504-team-sort-mobile"></script>
   </body>
 </html>
