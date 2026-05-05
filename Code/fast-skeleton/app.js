@@ -6524,6 +6524,22 @@ function pitcherNameHtml(pitcher) {
   return `${escapeHtml(pitcher?.fullName || pitcher?.name || 'Unknown')}${handednessHtml(pitcher?.throws || pitcher?.pitchHand?.code || pitcher?.pitchHand?.description)}${usedYesterday}${pitcherFireMarkerHtml(pitcher?.id)}${pitcherColdMarkerHtml(pitcher?.id)}${pitcherHomeRunRiskMarkerHtml(pitcher)}${pitcherWhipRiskMarkerHtml(pitcher)}`;
 }
 
+function lineupPitcherNameHtml(pitcher) {
+  const fullName = pitcher?.fullName || pitcher?.name || 'Unknown';
+  const usedYesterday = pitcher?.usedYesterday
+    ? '<span class="pitcher-used-yesterday" title="Pitched yesterday" aria-label="Pitched yesterday">Y</span>'
+    : '';
+  return `
+    <span class="pitcher-name-text">${escapeHtml(lastName(fullName) || fullName)}</span>
+    ${handednessHtml(pitcher?.throws || pitcher?.pitchHand?.code || pitcher?.pitchHand?.description)}
+    ${usedYesterday}
+    ${pitcherFireMarkerHtml(pitcher?.id)}
+    ${pitcherColdMarkerHtml(pitcher?.id)}
+    ${pitcherHomeRunRiskMarkerHtml(pitcher)}
+    ${pitcherWhipRiskMarkerHtml(pitcher)}
+  `;
+}
+
 function hydratePitcherFireStreaks(rootEl) {
   const markers = Array.from(rootEl?.querySelectorAll?.('.pitcher-fire-streak[data-pitcher-fire-id]') || []);
   if (!markers.length) return;
@@ -10885,9 +10901,9 @@ function renderPitcherListItems(listEl, pitchers, color, emptyText) {
     li.className = 'bullpen-item';
     li.dataset.playerId = String(arm.id ?? '');
     li.innerHTML = `
-      <div class="bullpen-main">
-        <span class="bullpen-name" style="color:${color}">${pitcherNameHtml(arm)}</span>
-        <span class="bullpen-meta">${pitcherSeasonMetaLine(arm)}</span>
+      <div class="bullpen-main pitcher-priority-line">
+        <span class="bullpen-name pitcher-priority-name" title="${escapeHtml(arm.fullName || arm.name || 'Pitcher')}" style="color:${color}">${lineupPitcherNameHtml(arm)}</span>
+        <span class="bullpen-meta pitcher-priority-meta">${pitcherSeasonMetaLine(arm)}</span>
       </div>
       <div class="bullpen-today">${arm.today}</div>
     `;
@@ -11010,9 +11026,9 @@ function renderPitchingSide(sectionEl, teamCode, color, staff) {
     const currentLabel = current?.role === 'starter' ? 'Starter' : 'Current Pitcher';
     currentEl.innerHTML = current ? `
       <div class="pitching-card-label">${currentLabel}</div>
-      <div class="pitching-card-main">
-        <div class="pitching-card-name" style="color:${color}">${pitcherNameHtml(current)}</div>
-        <div class="pitching-card-meta">${pitcherSeasonMetaLine(current)}</div>
+      <div class="pitching-card-main pitcher-priority-line">
+        <div class="pitching-card-name pitcher-priority-name" title="${escapeHtml(current.fullName || current.name || 'Pitcher')}" style="color:${color}">${lineupPitcherNameHtml(current)}</div>
+        <div class="pitching-card-meta pitcher-priority-meta">${pitcherSeasonMetaLine(current)}</div>
       </div>
     ` : '<div class="pitching-card-empty">Awaiting pitcher</div>';
   }
@@ -11038,12 +11054,14 @@ function renderLineupPitcherSummary(containerEl, color, staff) {
     return;
   }
   const detailLine = showingCurrent && hasChangedPitcher
-    ? `<span class="lineup-team-pitcher-current">Starter: ${pitcherNameHtml(starter)}</span>`
+    ? `<span class="lineup-team-pitcher-current">Starter: ${escapeHtml(lastName(starter?.fullName || starter?.name || 'Pitcher'))}</span>`
     : '';
   containerEl.innerHTML = `
     <span class="lineup-team-pitcher-label">${showingCurrent ? 'Current Pitcher' : 'Starter'}</span>
-    <span class="lineup-team-pitcher-name" style="color:${color}">${pitcherNameHtml(displayPitcher)}</span>
-    <span class="lineup-team-pitcher-meta">${pitcherSeasonMetaLine(displayPitcher)}</span>
+    <span class="lineup-team-pitcher-main pitcher-priority-line">
+      <span class="lineup-team-pitcher-name pitcher-priority-name" title="${escapeHtml(displayPitcher?.fullName || displayPitcher?.name || 'Pitcher')}" style="color:${color}">${lineupPitcherNameHtml(displayPitcher)}</span>
+      <span class="lineup-team-pitcher-meta pitcher-priority-meta">${pitcherSeasonMetaLine(displayPitcher)}</span>
+    </span>
     ${detailLine}
   `;
 }

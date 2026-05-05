@@ -3474,7 +3474,7 @@ body[data-overlay-dock='bottom'] .score {
   position: relative;
   z-index: 1;
   display: grid;
-  grid-template-columns: minmax(0, 1fr) max-content;
+  grid-template-columns: minmax(0, 1fr);
   align-items: baseline;
   gap: 3px;
   margin: -2px 0 12px;
@@ -3502,13 +3502,20 @@ body[data-overlay-dock='bottom'] .score {
 }
 
 .lineup-team-pitcher-name {
+  display: inline-flex;
+  align-items: baseline;
+  gap: 4px;
   font-size: 1.12rem;
   font-weight: 800;
   line-height: 1.1;
-  min-width: 0;
-  overflow: hidden;
-  text-overflow: ellipsis;
+  min-width: max-content;
+  max-width: 100%;
+  overflow: visible;
   white-space: nowrap;
+}
+
+.lineup-team-pitcher-main {
+  min-width: 0;
 }
 
 .lineup-team-pitcher-meta,
@@ -3518,7 +3525,6 @@ body[data-overlay-dock='bottom'] .score {
 }
 
 .lineup-team-pitcher-meta {
-  justify-self: end;
   text-align: right;
   white-space: nowrap;
 }
@@ -3841,7 +3847,7 @@ body[data-overlay-dock='bottom'] .score {
 .current-pitcher-card { border: 1px solid color-mix(in srgb, var(--line) 80%, transparent); border-radius: 12px; padding: 12px; background: color-mix(in srgb, var(--panel-item) 55%, transparent); }
 .current-pitcher-card[data-player-id], .bullpen-item[data-player-id] { cursor: pointer; }
 .pitching-card-label { font-size: 0.98rem; text-transform: uppercase; letter-spacing: 0.04em; color: var(--muted); }
-.pitching-card-main { display: flex; align-items: baseline; justify-content: space-between; gap: 12px; margin-top: 4px; }
+.pitching-card-main { margin-top: 4px; }
 .pitching-card-name { font-size: 1.23rem; font-weight: 800; min-width: 0; }
 .pitching-card-meta, .pitching-card-empty { font-size: 0.96rem; color: var(--muted); }
 .pitching-card-meta { text-align: right; white-space: nowrap; }
@@ -3882,10 +3888,53 @@ body[data-overlay-dock='bottom'] .score {
 .rotation-list { list-style: none; margin: 0; padding: 0; display: grid; gap: 6px; }
 .bullpen-list { list-style: none; margin: 0; padding: 0; display: grid; gap: 6px; }
 .bullpen-item { border-bottom: 1px dashed color-mix(in srgb, var(--line) 70%, transparent); padding-bottom: 8px; }
-.bullpen-main { display: flex; align-items: baseline; justify-content: space-between; gap: 8px; }
+.bullpen-main { min-width: 0; }
 .bullpen-name { font-size: 1.11rem; font-weight: 700; }
 .bullpen-meta, .bullpen-today { font-size: 0.93rem; color: var(--muted); }
 .bullpen-today { margin-top: 2px; }
+
+.pitcher-priority-line {
+  display: flex;
+  align-items: baseline;
+  gap: 8px;
+  min-width: 0;
+}
+
+.pitcher-priority-name {
+  display: inline-flex;
+  align-items: baseline;
+  gap: 4px;
+  flex: 0 1 auto;
+  min-width: 0;
+  max-width: 100%;
+  overflow: hidden;
+  white-space: nowrap;
+}
+
+.pitcher-name-text {
+  flex: 0 0 auto;
+  min-width: max-content;
+  overflow: visible;
+}
+
+.pitcher-priority-name .handedness-tag,
+.pitcher-priority-name .pitcher-used-yesterday,
+.pitcher-priority-name .pitcher-fire-streak,
+.pitcher-priority-name .pitcher-cold-streak,
+.pitcher-priority-name .pitcher-hr-risk,
+.pitcher-priority-name .pitcher-whip-risk {
+  flex: 0 3 auto;
+  min-width: 0;
+  overflow: hidden;
+}
+
+.pitcher-priority-meta {
+  flex: 1 20 auto;
+  min-width: 0;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
 
 
 .score-state-strip {
