@@ -190,6 +190,7 @@ let leadersRenderSequence = 0;
 let hotRenderSequence = 0;
 let teamStatsRenderSequence = 0;
 let teamStatsSortState = { key: 'abbrev', dir: 'asc' };
+let teamStatsGroupByDivision = false;
 const leadersSeasonCache = new Map();
 const leadersTeamsCache = new Map();
 const teamStatsCache = new Map();
@@ -282,7 +283,7 @@ const TEAM_ABBREV_CANONICAL = {
 
 const TEAM_ABBREV_DISPLAY = {
   ARI: 'AZ',
-  CHW: 'CWS',
+  CHW: 'CHW',
 };
 
 const TEAM_SEARCH_NAMES = {
@@ -349,6 +350,39 @@ const formatDate = (d) => {
   return `${year}-${month}-${day}`;
 };
 
+function parseFlexibleDateInput(value) {
+  const text = String(value || '').trim();
+  if (!text) return '';
+  let year;
+  let month;
+  let day;
+  let match = text.match(/^(\d{4})-(\d{1,2})-(\d{1,2})$/);
+  if (match) {
+    year = Number(match[1]);
+    month = Number(match[2]);
+    day = Number(match[3]);
+  } else {
+    match = text.match(/^(\d{1,2})[/-](\d{1,2})(?:[/-](\d{2,4}))?$/);
+    if (match) {
+      month = Number(match[1]);
+      day = Number(match[2]);
+      year = match[3] ? Number(match[3]) : new Date().getFullYear();
+      if (year < 100) year += 2000;
+    } else {
+      match = text.match(/^(\d{4})(\d{2})(\d{2})$/);
+      if (match) {
+        year = Number(match[1]);
+        month = Number(match[2]);
+        day = Number(match[3]);
+      }
+    }
+  }
+  if (!Number.isFinite(year) || !Number.isFinite(month) || !Number.isFinite(day)) return '';
+  const parsed = new Date(year, month - 1, day);
+  if (parsed.getFullYear() !== year || parsed.getMonth() !== month - 1 || parsed.getDate() !== day) return '';
+  return formatDate(parsed);
+}
+
 function seasonForDate(date) {
   const year = Number(String(date || formatDate(new Date())).slice(0, 4));
   return Number.isFinite(year) ? year : new Date().getFullYear();
@@ -386,6 +420,108 @@ function formatLongDateLabel(date) {
     day: 'numeric',
     year: 'numeric',
   }).format(new Date(Date.UTC(year, month - 1, day, 12, 0, 0)));
+}
+
+let datePickerEl = null;
+let datePickerMonth = null;
+
+function datePickerBaseDate() {
+  return new Date(parseLocalDateValue(parseFlexibleDateInput(dateInput.value) || formatDate(new Date())).getFullYear(), parseLocalDateValue(parseFlexibleDateInput(dateInput.value) || formatDate(new Date())).getMonth(), 1);
+}
+
+function setDateInputValue(date, options = {}) {
+  const next = typeof date === 'string' ? parseFlexibleDateInput(date) : formatDate(date);
+  if (!next) return false;
+  if (dateInput.value !== next) {
+    dateInput.value = next;
+    if (options.dispatch !== false) dateInput.dispatchEvent(new Event('change', { bubbles: true }));
+  }
+  return true;
+}
+
+function closeDatePicker() {
+  datePickerEl?.remove();
+  datePickerEl = null;
+}
+
+function positionDatePicker() {
+  if (!datePickerEl) return;
+  const rect = dateInput.getBoundingClientRect();
+  const margin = 8;
+  const width = Math.min(320, window.innerWidth - margin * 2);
+  datePickerEl.style.width = `${width}px`;
+  datePickerEl.style.left = `${Math.min(Math.max(margin, rect.left), window.innerWidth - width - margin)}px`;
+  datePickerEl.style.top = `${Math.max(margin, Math.min(rect.bottom + margin, window.innerHeight - 360))}px`;
+}
+
+function renderDatePicker() {
+  if (!datePickerEl) return;
+  const monthDate = datePickerMonth || datePickerBaseDate();
+  const selected = parseFlexibleDateInput(dateInput.value) || formatDate(new Date());
+  const today = formatDate(new Date());
+  const first = new Date(monthDate.getFullYear(), monthDate.getMonth(), 1);
+  const start = new Date(first);
+  start.setDate(first.getDate() - first.getDay());
+  const days = [];
+  for (let i = 0; i < 42; i += 1) {
+    const day = new Date(start);
+    day.setDate(start.getDate() + i);
+    const value = formatDate(day);
+    days.push(`<button type="button" class="date-picker-day${day.getMonth() !== first.getMonth() ? ' muted' : ''}${value === selected ? ' selected' : ''}${value === today ? ' today' : ''}" data-date-picker-day="${value}">${day.getDate()}</button>`);
+  }
+  datePickerEl.innerHTML = `
+    <div class="date-picker-head">
+      <button type="button" data-date-picker-year="-1" aria-label="Previous year">&laquo;</button>
+      <button type="button" data-date-picker-shift="-1" aria-label="Previous month">&lsaquo;</button>
+      <strong>${new Intl.DateTimeFormat('en-US', { month: 'long', year: 'numeric' }).format(first)}</strong>
+      <button type="button" data-date-picker-shift="1" aria-label="Next month">&rsaquo;</button>
+      <button type="button" data-date-picker-year="1" aria-label="Next year">&raquo;</button>
+    </div>
+    <div class="date-picker-weekdays"><span>Sun</span><span>Mon</span><span>Tue</span><span>Wed</span><span>Thu</span><span>Fri</span><span>Sat</span></div>
+    <div class="date-picker-grid">${days.join('')}</div>
+    <div class="date-picker-actions">
+      <button type="button" data-date-picker-today>Today</button>
+      <button type="button" data-date-picker-close>Close</button>
+    </div>
+  `;
+  positionDatePicker();
+}
+
+function openDatePicker() {
+  if (!datePickerEl) {
+    datePickerEl = document.createElement('div');
+    datePickerEl.className = 'date-picker-popover';
+    datePickerEl.addEventListener('mousedown', (e) => e.preventDefault());
+    datePickerEl.addEventListener('click', (e) => {
+      const dayBtn = e.target.closest('[data-date-picker-day]');
+      if (dayBtn) {
+        setDateInputValue(dayBtn.dataset.datePickerDay);
+        closeDatePicker();
+        return;
+      }
+      const shiftBtn = e.target.closest('[data-date-picker-shift]');
+      if (shiftBtn) {
+        datePickerMonth.setMonth(datePickerMonth.getMonth() + (Number(shiftBtn.dataset.datePickerShift) || 0));
+        renderDatePicker();
+        return;
+      }
+      const yearBtn = e.target.closest('[data-date-picker-year]');
+      if (yearBtn) {
+        datePickerMonth.setFullYear(datePickerMonth.getFullYear() + (Number(yearBtn.dataset.datePickerYear) || 0));
+        renderDatePicker();
+        return;
+      }
+      if (e.target.closest('[data-date-picker-today]')) {
+        setDateInputValue(formatDate(new Date()));
+        closeDatePicker();
+        return;
+      }
+      if (e.target.closest('[data-date-picker-close]')) closeDatePicker();
+    });
+    document.body.appendChild(datePickerEl);
+  }
+  datePickerMonth = datePickerBaseDate();
+  renderDatePicker();
 }
 
 function parseLocalDateValue(value) {
@@ -448,6 +584,10 @@ function formatLeaderValue(value, valueType = 'count') {
   return Number.isFinite(numeric) ? String(Math.round(numeric)) : String(value || '0');
 }
 
+dateInput.type = 'text';
+dateInput.inputMode = 'numeric';
+dateInput.autocomplete = 'off';
+dateInput.placeholder = 'YYYY-MM-DD';
 dateInput.value = formatDate(new Date());
 
 function storageKey(prefix) {
@@ -3447,6 +3587,7 @@ async function getTeamsForSeason(season) {
         id: Number(team?.id),
         abbreviation: String(team?.abbreviation || team?.fileCode || '').toUpperCase(),
         name: team?.name || team?.teamName || team?.clubName || 'Unknown Team',
+        division: team?.division?.name || 'MLB',
       }))
       .filter((team) => Number.isFinite(team.id) && team.abbreviation)
       .sort((a, b) => String(a.abbreviation).localeCompare(String(b.abbreviation)));
@@ -8357,13 +8498,13 @@ function initOverlayKeyboardShortcuts() {
 
     if (e.key === 'ArrowLeft') {
       e.preventDefault();
-      shiftOverlayPage(-1);
+      if (!navigateOpenLineupGame(-1)) shiftOverlayPage(-1);
       return;
     }
 
     if (e.key === 'ArrowRight') {
       e.preventDefault();
-      shiftOverlayPage(1);
+      if (!navigateOpenLineupGame(1)) shiftOverlayPage(1);
       return;
     }
 
@@ -8461,6 +8602,24 @@ async function fetchTeamStatsGroup(season, group) {
   return map;
 }
 
+async function fetchTeamRispStatsMap(season) {
+  const url = new URL(`${MLB_API_BASE}/teams/stats`);
+  url.searchParams.set('stats', 'statSplits');
+  url.searchParams.set('group', 'hitting');
+  url.searchParams.set('sitCodes', 'risp');
+  url.searchParams.set('season', String(season));
+  url.searchParams.set('gameType', 'R');
+  url.searchParams.set('sportIds', '1');
+  const response = await getJson(url.toString());
+  const map = new Map();
+  for (const split of listify(response?.stats?.[0]?.splits)) {
+    const teamId = Number(split?.team?.id);
+    if (!Number.isFinite(teamId)) continue;
+    map.set(teamId, split?.stat || {});
+  }
+  return map;
+}
+
 async function fetchTeamRecordMap(season) {
   const url = new URL(`${MLB_API_BASE}/standings`);
   url.searchParams.set('sportId', '1');
@@ -8478,6 +8637,7 @@ async function fetchTeamRecordMap(season) {
       map.set(teamId, {
         text: `${wins}-${losses}`,
         pct: cleanSummary(teamRecord?.winningPercentage || ''),
+        gb: cleanSummary(teamRecord?.divisionGamesBack ?? teamRecord?.gamesBack ?? ''),
       });
     }
   }
@@ -8515,17 +8675,28 @@ function formatTeamRate(value) {
 function teamStatsRowHtml(row) {
   return `
     <tr>
-      <td class="team-stats-team">
-        <img src="${escapeHtml(row.logo)}" alt="${escapeHtml(row.abbrev)} logo" />
-        <span style="color:${escapeHtml(row.color)}">${escapeHtml(row.abbrev)}</span>
+      <td>
+        <div class="team-stats-team">
+          <img src="${escapeHtml(row.logo)}" alt="${escapeHtml(row.abbrev)} logo" />
+          <span style="color:${escapeHtml(row.color)}">${escapeHtml(row.abbrev)}</span>
+          <small>${escapeHtml(row.name)}</small>
+        </div>
       </td>
       <td>${escapeHtml(row.record || '---')}</td>
+      <td>${escapeHtml(row.gamesBack || '-')}</td>
       <td>${row.runs}</td>
       <td>${row.homeRuns}</td>
+      <td>${row.stolenBases}</td>
       <td>${row.leftOnBase}</td>
       <td>${escapeHtml(row.avg)}</td>
+      <td>${escapeHtml(row.rispAvg)}</td>
       <td>${escapeHtml(row.era)}</td>
       <td>${escapeHtml(row.slg)}</td>
+      <td>${row.errors}</td>
+      <td>${row.pitcherStrikeOuts}</td>
+      <td>${row.hitterStrikeOuts}</td>
+      <td>${row.pitcherWalks}</td>
+      <td>${row.hitterWalks}</td>
     </tr>
   `;
 }
@@ -8533,12 +8704,20 @@ function teamStatsRowHtml(row) {
 function teamStatsSortValue(row, key) {
   switch (key) {
     case 'record': return Number(row.recordPct) || 0;
+    case 'gamesBack': return row.gamesBack === '-' || row.gamesBack === '' ? 0 : Number(row.gamesBack) || 0;
     case 'runs': return Number(row.runs) || 0;
     case 'homeRuns': return Number(row.homeRuns) || 0;
+    case 'stolenBases': return Number(row.stolenBases) || 0;
     case 'leftOnBase': return Number(row.leftOnBase) || 0;
     case 'avg': return statRate(row.avg) ?? -1;
+    case 'rispAvg': return statRate(row.rispAvg) ?? -1;
     case 'era': return statRate(row.era) ?? Number.POSITIVE_INFINITY;
     case 'slg': return statRate(row.slg) ?? -1;
+    case 'errors': return Number(row.errors) || 0;
+    case 'pitcherStrikeOuts': return Number(row.pitcherStrikeOuts) || 0;
+    case 'hitterStrikeOuts': return Number(row.hitterStrikeOuts) || 0;
+    case 'pitcherWalks': return Number(row.pitcherWalks) || 0;
+    case 'hitterWalks': return Number(row.hitterWalks) || 0;
     case 'abbrev':
     default: return String(row.abbrev || '');
   }
@@ -8570,33 +8749,47 @@ async function getTeamStatsRows(season) {
   let promise = teamStatsCache.get(cacheKey);
   if (!promise) {
     promise = (async () => {
-      const [teams, hittingMap, pitchingMap, recordMap] = await Promise.all([
+      const [teams, hittingMap, pitchingMap, fieldingMap, recordMap, rispMap] = await Promise.all([
         getTeamsForSeason(season),
         fetchTeamStatsGroup(season, 'hitting'),
         fetchTeamStatsGroup(season, 'pitching'),
+        fetchTeamStatsGroup(season, 'fielding').catch(() => new Map()),
         fetchTeamRecordMap(season).catch(() => new Map()),
+        fetchTeamRispStatsMap(season).catch(() => new Map()),
       ]);
       return teams.map((team) => {
-        const hitting = hittingMap.get(Number(team.id)) || {};
-        const pitching = pitchingMap.get(Number(team.id)) || {};
+        const teamId = Number(team.id);
+        const hitting = hittingMap.get(teamId) || {};
+        const pitching = pitchingMap.get(teamId) || {};
+        const fielding = fieldingMap.get(teamId) || {};
+        const risp = rispMap.get(teamId) || {};
         const abbrev = displayTeamAbbrev(team.abbreviation);
-        const recordInfo = recordMap.get(Number(team.id)) || null;
+        const recordInfo = recordMap.get(teamId) || null;
         const record = recordInfo?.text || latestRenderedRecordForTeam(abbrev);
         const parsedRecord = parseRecordValue(record);
         return {
-          id: Number(team.id),
+          id: teamId,
           abbrev,
           name: team.name,
+          division: team.division || 'MLB',
           logo: getLogoPath(abbrev),
           color: getTeamColor(abbrev),
           record,
           recordPct: statRate(recordInfo?.pct) ?? parsedRecord.pct,
+          gamesBack: recordInfo?.gb || '-',
           runs: statNumber(hitting.runs),
           homeRuns: statNumber(hitting.homeRuns),
+          stolenBases: statNumber(hitting.stolenBases),
           leftOnBase: statNumber(hitting.leftOnBase ?? hitting.lob ?? hitting.teamLeftOnBase),
           avg: formatTeamRate(hitting.avg ?? hitting.battingAverage),
+          rispAvg: formatTeamRate(risp.avg ?? risp.battingAverage ?? hitting.avgWithRisp ?? hitting.rispAvg),
           era: cleanSummary(pitching.era) || '---',
           slg: formatTeamRate(hitting.slg ?? hitting.sluggingPercentage),
+          errors: statNumber(fielding.errors),
+          pitcherStrikeOuts: statNumber(pitching.strikeOuts),
+          hitterStrikeOuts: statNumber(hitting.strikeOuts),
+          pitcherWalks: statNumber(pitching.baseOnBalls ?? pitching.walks),
+          hitterWalks: statNumber(hitting.baseOnBalls ?? hitting.walks),
         };
       }).sort((a, b) => String(a.abbrev).localeCompare(String(b.abbrev)));
     })().catch((error) => {
@@ -8608,6 +8801,60 @@ async function getTeamStatsRows(season) {
   return promise;
 }
 
+function teamStatsTableHtml(rows) {
+  return `
+    <div class="team-stats-table-wrap">
+      <table class="team-stats-table">
+        <thead>
+          <tr>
+            ${teamStatsHeaderHtml('abbrev', 'Team')}
+            ${teamStatsHeaderHtml('record', 'Record')}
+            ${teamStatsHeaderHtml('gamesBack', 'GB')}
+            ${teamStatsHeaderHtml('runs', 'R')}
+            ${teamStatsHeaderHtml('homeRuns', 'HR')}
+            ${teamStatsHeaderHtml('stolenBases', 'SB')}
+            ${teamStatsHeaderHtml('leftOnBase', 'LOB')}
+            ${teamStatsHeaderHtml('avg', 'AVG')}
+            ${teamStatsHeaderHtml('rispAvg', 'AVG/RISP')}
+            ${teamStatsHeaderHtml('era', 'ERA')}
+            ${teamStatsHeaderHtml('slg', 'SLG')}
+            ${teamStatsHeaderHtml('errors', 'E')}
+            ${teamStatsHeaderHtml('pitcherStrikeOuts', 'K (P)')}
+            ${teamStatsHeaderHtml('hitterStrikeOuts', 'K (H)')}
+            ${teamStatsHeaderHtml('pitcherWalks', 'BB (P)')}
+            ${teamStatsHeaderHtml('hitterWalks', 'BB (H)')}
+          </tr>
+        </thead>
+        <tbody>${rows.map(teamStatsRowHtml).join('') || '<tr><td colspan="16">No team stats loaded</td></tr>'}</tbody>
+      </table>
+    </div>
+  `;
+}
+
+function divisionShortName(name = '') {
+  return String(name || 'MLB').replace(/^American League\s+/i, 'AL ').replace(/^National League\s+/i, 'NL ');
+}
+
+function teamStatsDivisionTablesHtml(rows) {
+  const groups = new Map();
+  for (const row of rows) {
+    const key = divisionShortName(row.division || 'MLB');
+    if (!groups.has(key)) groups.set(key, []);
+    groups.get(key).push(row);
+  }
+  return [...groups.entries()]
+    .sort(([a], [b]) => a.localeCompare(b))
+    .map(([division, divisionRows]) => `
+      <section class="team-stats-division">
+        <header class="team-stats-division-head">
+          <strong>${escapeHtml(division)}</strong>
+          <span>${divisionRows.length} teams</span>
+        </header>
+        ${teamStatsTableHtml(divisionRows)}
+      </section>
+    `).join('');
+}
+
 function renderTeamStatsBoard(rows, season) {
   const shell = document.createElement('div');
   shell.className = 'leaders-shell team-stats-shell';
@@ -8617,26 +8864,15 @@ function renderTeamStatsBoard(rows, season) {
   shell.innerHTML = `
     <section class="leaders-section team-stats-section">
       <div class="leaders-section-header">
-        <span class="leaders-section-title">Team Stats</span>
-        <span class="leaders-section-subtitle">${visibleRows.length} teams | ${season} regular season</span>
+        <div>
+          <span class="leaders-section-title">Team Stats</span>
+          <span class="leaders-section-subtitle">${visibleRows.length} teams | ${season} regular season</span>
+        </div>
+        <button type="button" class="team-stats-division-toggle${teamStatsGroupByDivision ? ' active' : ''}" data-team-stats-division-toggle aria-pressed="${teamStatsGroupByDivision ? 'true' : 'false'}">
+          ${teamStatsGroupByDivision ? 'Divisions On' : 'Divisions Off'}
+        </button>
       </div>
-      <div class="team-stats-table-wrap">
-        <table class="team-stats-table">
-          <thead>
-            <tr>
-              ${teamStatsHeaderHtml('abbrev', 'Team')}
-              ${teamStatsHeaderHtml('record', 'Record')}
-              ${teamStatsHeaderHtml('runs', 'R')}
-              ${teamStatsHeaderHtml('homeRuns', 'HR')}
-              ${teamStatsHeaderHtml('leftOnBase', 'LOB')}
-              ${teamStatsHeaderHtml('avg', 'AVG')}
-              ${teamStatsHeaderHtml('era', 'ERA')}
-              ${teamStatsHeaderHtml('slg', 'SLG')}
-            </tr>
-          </thead>
-          <tbody>${visibleRows.map(teamStatsRowHtml).join('') || '<tr><td colspan="8">No team stats loaded</td></tr>'}</tbody>
-        </table>
-      </div>
+      ${teamStatsGroupByDivision ? teamStatsDivisionTablesHtml(visibleRows) : teamStatsTableHtml(visibleRows)}
     </section>
   `;
   return shell;
@@ -8644,6 +8880,13 @@ function renderTeamStatsBoard(rows, season) {
 
 function initTeamStatsTableSorting() {
   teamStatsPageEl?.addEventListener('click', (e) => {
+    const toggle = e.target.closest('[data-team-stats-division-toggle]');
+    if (toggle) {
+      teamStatsGroupByDivision = !teamStatsGroupByDivision;
+      teamStatsPageEl.dataset.renderSignature = '';
+      refreshTeamStatsView({ showLoading: false });
+      return;
+    }
     const btn = e.target.closest('[data-team-stats-sort]');
     if (!btn) return;
     const key = btn.dataset.teamStatsSort || 'abbrev';
@@ -12395,7 +12638,15 @@ function initLineupOverlay() {
   lineupCloseBtnEl.addEventListener('click', closeLineupOverlay);
   if (playerStatBackdropEl) playerStatBackdropEl.addEventListener('click', closePlayerStatOverlay);
   if (playerStatCloseBtnEl) playerStatCloseBtnEl.addEventListener('click', closePlayerStatOverlay);
+  let lineupTouchStart = null;
   lineupOverlayEl.addEventListener('click', (e) => {
+    const navBtn = e.target.closest('[data-lineup-nav]');
+    if (navBtn) {
+      e.preventDefault();
+      e.stopPropagation();
+      navigateOpenLineupGame(Number(navBtn.dataset.lineupNav) || 1);
+      return;
+    }
     const pickLogo = e.target.closest('.lineup-logo-pick-trigger[data-lineup-pick-side]');
     if (pickLogo) {
       e.preventDefault();
@@ -12423,8 +12674,38 @@ function initLineupOverlay() {
     e.stopPropagation();
     openPlayerStatOverlay(playerId, game);
   });
+  lineupOverlayEl.addEventListener('touchstart', (e) => {
+    if (lineupOverlayEl.hidden || e.touches.length !== 1) return;
+    const touch = e.touches[0];
+    lineupTouchStart = { x: touch.clientX, y: touch.clientY, at: Date.now() };
+  }, { passive: true });
+  lineupOverlayEl.addEventListener('touchend', (e) => {
+    if (!lineupTouchStart || lineupOverlayEl.hidden || (playerStatOverlayEl && !playerStatOverlayEl.hidden)) {
+      lineupTouchStart = null;
+      return;
+    }
+    const touch = e.changedTouches?.[0];
+    if (!touch) {
+      lineupTouchStart = null;
+      return;
+    }
+    const dx = touch.clientX - lineupTouchStart.x;
+    const dy = touch.clientY - lineupTouchStart.y;
+    const elapsed = Date.now() - lineupTouchStart.at;
+    lineupTouchStart = null;
+    if (elapsed > 900 || Math.abs(dx) < 52 || Math.abs(dx) < Math.abs(dy) * 1.35) return;
+    e.preventDefault();
+    navigateOpenLineupGame(dx < 0 ? 1 : -1);
+  }, { passive: false });
   lineupOverlayEl.addEventListener('keydown', (e) => {
     if (e.key !== 'Enter' && e.key !== ' ') return;
+    const navBtn = e.target.closest('[data-lineup-nav]');
+    if (navBtn) {
+      e.preventDefault();
+      e.stopPropagation();
+      navigateOpenLineupGame(Number(navBtn.dataset.lineupNav) || 1);
+      return;
+    }
     const pickLogo = e.target.closest('.lineup-logo-pick-trigger[data-lineup-pick-side]');
     if (!pickLogo) return;
     e.preventDefault();
@@ -12547,6 +12828,49 @@ let hoveredScoreboardGamePk = '';
 function cardForGamePk(gamePk) {
   const normalized = String(gamePk || '');
   return normalized ? gamesEl?.querySelector?.(`.game-card[data-game-pk='${normalized}']`) || null : null;
+}
+
+function lineupNavigationGames() {
+  const byPk = new Map([
+    ...latestRenderedGames,
+    ...getCachedGames(),
+  ].map((game) => [String(game?.gamePk || ''), game]).filter(([gamePk]) => gamePk));
+  const visibleCards = Array.from(gamesEl?.querySelectorAll?.('.game-card[data-game-pk]') || []);
+  const fromCards = visibleCards
+    .map((card) => card._game || byPk.get(String(card.dataset.gamePk || '')))
+    .filter((game) => game?.gamePk);
+  const fallback = latestRenderedGames.length ? latestRenderedGames : getCachedGames();
+  const seen = new Set();
+  return (fromCards.length ? fromCards : fallback).filter((game) => {
+    const gamePk = String(game?.gamePk || '');
+    if (!gamePk || seen.has(gamePk)) return false;
+    seen.add(gamePk);
+    return true;
+  });
+}
+
+function navigateOpenLineupGame(direction) {
+  if (!lineupOverlayEl || lineupOverlayEl.hidden) return false;
+  if (playerStatOverlayEl && !playerStatOverlayEl.hidden) return false;
+  const games = lineupNavigationGames();
+  if (!games.length) return false;
+  const currentPk = String(activeLineupGame?.gamePk || getOpenLineupGamePk() || '');
+  const currentIndex = games.findIndex((game) => String(game?.gamePk || '') === currentPk);
+  const startIndex = currentIndex >= 0 ? currentIndex : 0;
+  const step = Number(direction) < 0 ? -1 : 1;
+  const nextIndex = (startIndex + step + games.length) % games.length;
+  const nextGame = games[nextIndex];
+  if (!nextGame?.gamePk) return false;
+  const card = cardForGamePk(nextGame.gamePk);
+  if (card) return openLineupFromCard(card);
+  setLineupOpen(nextGame.gamePk);
+  activeLineupGame = nextGame;
+  lineupOverlayEl.hidden = false;
+  lineupOverlayEl.classList.add('open');
+  syncLineupOverlay(nextGame, { forceOpen: true }).catch(() => {
+    if (lineupStatusEl) lineupStatusEl.textContent = 'Lineup data is still loading...';
+  });
+  return true;
 }
 
 function rememberScoreboardCard(card) {
@@ -13004,6 +13328,12 @@ async function loadGames(options = {}) {
 }
 
 dateInput.addEventListener('change', () => {
+  const normalized = parseFlexibleDateInput(dateInput.value);
+  if (!normalized) {
+    dateInput.value = formatDate(new Date());
+  } else if (dateInput.value !== normalized) {
+    dateInput.value = normalized;
+  }
   closeLineupOverlay();
   clearDraftBetSlip();
   closeGamePickDialog();
@@ -13021,6 +13351,29 @@ dateInput.addEventListener('mousedown', (e) => {
   if (e.button !== 1) return;
   e.preventDefault();
 });
+dateInput.addEventListener('focus', () => {
+  openDatePicker();
+});
+dateInput.addEventListener('click', () => openDatePicker());
+dateInput.addEventListener('keydown', (e) => {
+  if (e.key === 'Enter') {
+    e.preventDefault();
+    closeDatePicker();
+    dateInput.dispatchEvent(new Event('change', { bubbles: true }));
+  }
+  if (e.key === 'Escape') closeDatePicker();
+});
+dateInput.addEventListener('blur', () => {
+  const normalized = parseFlexibleDateInput(dateInput.value);
+  if (normalized) dateInput.value = normalized;
+});
+document.addEventListener('mousedown', (e) => {
+  if (!datePickerEl) return;
+  if (e.target === dateInput || datePickerEl.contains(e.target)) return;
+  closeDatePicker();
+});
+window.addEventListener('resize', positionDatePicker);
+window.addEventListener('scroll', positionDatePicker, true);
 
 compactExistingStorage();
 initThemePicker();

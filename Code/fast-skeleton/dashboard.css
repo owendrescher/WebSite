@@ -636,9 +636,16 @@ body.dashboard-page .lineup-name {
   overflow: hidden;
 }
 
+body.dashboard-page .lineup-name-text {
+  flex: 0 0 auto;
+  max-width: 100%;
+  overflow: visible;
+  text-overflow: clip;
+}
+
 body.dashboard-page .lineup-dashboard-stats {
   display: inline-block;
-  flex: 1 1 auto;
+  flex: 1 10 auto;
   min-width: 0;
   color: var(--muted);
   font-size: 0.56rem;
@@ -650,6 +657,19 @@ body.dashboard-page .lineup-dashboard-stats {
   font-variant-numeric: tabular-nums;
 }
 
+body.dashboard-page .lineup-hot-emoji,
+body.dashboard-page .lineup-cold-emoji,
+body.dashboard-page .lineup-avg-burst,
+body.dashboard-page .lineup-power-burst,
+body.dashboard-page .lineup-slug-burst,
+body.dashboard-page .lineup-hit-streak,
+body.dashboard-page .lineup-split-flag,
+body.dashboard-page .handedness-tag {
+  flex-shrink: 3;
+  min-width: 0;
+  overflow: hidden;
+}
+
 body.dashboard-page .lineup-team-pitcher-meta,
 body.dashboard-page .lineup-team-pitcher-empty,
 body.dashboard-page .lineup-team-pitcher-current,
@@ -659,6 +679,13 @@ body.dashboard-page .lineup-pos,
 body.dashboard-page .bullpen-meta,
 body.dashboard-page .bullpen-today {
   font-size: 0.73rem;
+}
+
+body.dashboard-page .lineup-avg,
+body.dashboard-page .lineup-pos {
+  min-width: 0;
+  overflow: hidden;
+  text-overflow: clip;
 }
 
 @media (min-width: 1700px) and (max-width: 1920px) and (max-height: 1100px) {
@@ -1153,12 +1180,38 @@ body.dashboard-page .bullpen-today {
   }
 
   body.dashboard-page .team-stats-table {
-    font-size: 0.78rem;
+    font-size: 0.68rem;
+    min-width: 1040px;
   }
 
   body.dashboard-page .team-stats-table th,
   body.dashboard-page .team-stats-table td {
-    padding: 8px;
+    padding: 6px;
+  }
+
+  body.dashboard-page .team-stats-section .leaders-section-header {
+    align-items: stretch;
+    flex-direction: column;
+  }
+
+  body.dashboard-page .team-stats-division-toggle {
+    width: 100%;
+    min-height: 36px;
+  }
+
+  body.dashboard-page .team-stats-team {
+    grid-template-columns: 28px auto;
+    min-width: 126px;
+    column-gap: 7px;
+  }
+
+  body.dashboard-page .team-stats-team img {
+    width: 28px;
+    height: 28px;
+  }
+
+  body.dashboard-page .team-stats-team small {
+    max-width: 96px;
   }
 
   body.dashboard-page .dashboard-rail {
@@ -1247,11 +1300,34 @@ body.dashboard-page .bullpen-today {
   }
 
   body.dashboard-page .lineup-list li {
-    grid-template-columns: 18px minmax(0, 1fr) auto;
+    grid-template-columns: 18px minmax(0, 1fr);
+    grid-template-areas:
+      "slot name"
+      "slot today";
   }
 
   body.dashboard-page .lineup-dashboard-stats {
     max-width: 100%;
+  }
+
+  body.dashboard-page .lineup-name {
+    flex-wrap: wrap;
+    overflow: visible;
+  }
+
+  body.dashboard-page .lineup-name-text {
+    white-space: normal;
+    overflow-wrap: anywhere;
+  }
+
+  body.dashboard-page .lineup-dashboard-stats {
+    flex-basis: 100%;
+    max-width: 100%;
+  }
+
+  body.dashboard-page .lineup-pos,
+  body.dashboard-page .lineup-avg {
+    display: none;
   }
 
   body.dashboard-page .player-stat-modal {
