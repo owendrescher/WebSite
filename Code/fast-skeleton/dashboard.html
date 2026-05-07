@@ -65,6 +65,10 @@
             <p>Ctrl-click or Cmd-click player pills and matchup entries to open player stat cards. The Leaders and Hot Players pages can be filtered by league, team, or today's opponents.</p>
           </section>
           <section>
+            <h2>Home Run Rating</h2>
+            <p>Home runs are scored on a 1000-point scale: walk-off impact up to 250, inning timing up to 120, game-result swing up to 180, runs scored up to 150, pitcher difficulty up to 200 based on HR/9 and IP reliability, and distance up to 100.</p>
+          </section>
+          <section>
             <h2>Bets And Goals</h2>
             <p>Build player prop or team win slips, track live bet status, export matchup data, and keep a timed focus objective in the dashboard panel.</p>
           </section>
@@ -85,6 +89,7 @@
             </div>
             <div class="topbar-actions">
               <span id="dashboardSummary" class="dashboard-summary">Loading games</span>
+              <a class="toolbar-btn" href="nfl-dashboard/index.html" target="_blank" rel="noopener noreferrer">NFL Center</a>
               <button id="overlayDockToggleBtn" class="toolbar-btn dashboard-hidden" type="button">Scoreboard: Right</button>
               <button id="scoreboardColumnsBtn" class="toolbar-btn help-btn" type="button" aria-label="Open site controls help" title="Controls and site capabilities">?</button>
               <button id="clearPendingPicksBtn" class="toolbar-btn clear-picks-btn" type="button" aria-label="Clear selected bet teams" title="Clear selected bet teams">Clear Picks</button>
@@ -104,6 +109,23 @@
                 <span>Team</span>
                 <select id="leadersTeamSelect">
                   <option value="">League</option>
+                </select>
+              </label>
+              <label class="leaders-filter">
+                <span>Pos</span>
+                <select id="leadersPositionSelect">
+                  <option value="">All</option>
+                  <option value="P">P</option>
+                  <option value="C">C</option>
+                  <option value="1B">1B</option>
+                  <option value="2B">2B</option>
+                  <option value="3B">3B</option>
+                  <option value="SS">SS</option>
+                  <option value="OF">OF</option>
+                  <option value="LF">LF</option>
+                  <option value="CF">CF</option>
+                  <option value="RF">RF</option>
+                  <option value="DH">DH</option>
                 </select>
               </label>
               <button id="leadersOpponentsBtn" class="toolbar-btn leaders-opponents-btn" type="button">Show Today's Opponents</button>
@@ -293,9 +315,13 @@
         <aside id="hrDisplay" class="utility-panel retro-panel" data-panel="hr">
           <header class="panel-header">
             <strong>HOME RUN FEED</strong>
-            <span class="hint">latest first</span>
+            <div class="panel-header-actions">
+              <button id="hrSortToggleBtn" class="hint panel-sort-toggle" type="button">latest first</button>
+              <button id="hrGradeToggleBtn" class="hint panel-sort-toggle" type="button">letter</button>
+            </div>
           </header>
           <section id="hrList" class="panel-list"></section>
+          <section id="hrRatingDialog" class="hr-rating-dialog" hidden></section>
         </aside>
 
       </aside>

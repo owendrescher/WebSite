@@ -484,6 +484,9 @@ select optgroup {
 }
 
 .toolbar-btn {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
   border: 1px solid color-mix(in srgb, var(--accent) 55%, transparent);
   background:
     linear-gradient(180deg, rgba(255, 255, 255, 0.1), transparent 55%),
@@ -498,6 +501,7 @@ select optgroup {
   text-transform: uppercase;
   line-height: 1.2;
   cursor: pointer;
+  text-decoration: none;
   white-space: nowrap;
   box-shadow: 0 8px 16px rgba(0, 0, 0, 0.2), inset 0 1px 0 rgba(255, 255, 255, 0.08);
 }
@@ -3713,6 +3717,12 @@ body[data-overlay-dock='bottom'] .score {
     0 0 16px rgba(102, 190, 255, 0.12);
 }
 
+.lineup-list li.lineup-row-substitution {
+  grid-template-columns: 18px minmax(0, 1fr) auto auto;
+  grid-template-areas: "slot name pos avg";
+  align-items: center;
+}
+
 .lineup-slot { grid-area: slot; color: var(--muted); text-align: right; font-variant-numeric: tabular-nums; font-weight: 700; padding-top: 1px; }
 .lineup-name { grid-area: name; min-width: 0; display: flex; align-items: flex-start; gap: 6px; overflow: hidden; font-weight: 700; color: var(--team-color, var(--text)); }
 .lineup-list li[data-player-id] .lineup-name { cursor: pointer; }
@@ -3726,6 +3736,50 @@ body[data-overlay-dock='bottom'] .score {
   text-overflow: clip;
 }
 .lineup-dashboard-stats { display: none; }
+.lineup-sub-split {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: 4px;
+  width: 100%;
+  min-width: 0;
+}
+
+.lineup-sub-player {
+  min-width: 0;
+  display: grid;
+  grid-template-columns: minmax(0, max-content) auto;
+  grid-template-areas:
+    "name hand"
+    "line line";
+  gap: 1px 4px;
+  align-items: start;
+  overflow: hidden;
+}
+
+.lineup-sub-player:first-child {
+  padding-right: 5px;
+  border-right: 1px solid color-mix(in srgb, var(--team-color, var(--line)) 45%, transparent);
+}
+.lineup-sub-player .lineup-name-text {
+  grid-area: name;
+}
+.lineup-sub-player .handedness-tag {
+  grid-area: hand;
+}
+.lineup-sub-today {
+  grid-area: line;
+  min-width: 24px;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+  color: var(--muted);
+  font-size: 0.78em;
+  font-weight: 700;
+}
+.lineup-row-substitution .lineup-today {
+  display: none;
+}
+
 .handedness-tag {
   flex: 0 1 auto;
   min-width: 0;
@@ -4233,6 +4287,14 @@ body[data-theme='dark-pastel'] .scoreboard .score-mini-count strong {
 .lineup-live-details .status {
   font-size: 0.68rem;
   line-height: 1.14;
+}
+
+.lineup-live-details .play-col[data-play-by-play-trigger] {
+  cursor: pointer;
+}
+
+.lineup-live-details .play-col[data-play-by-play-trigger]:hover {
+  background: rgba(102, 217, 255, 0.12);
 }
 
 .lineup-live-details .diamond {
@@ -5528,10 +5590,27 @@ body[data-overlay-dock='top'] .bet-input-panel { top: calc(var(--overlay-band-si
 .bet-item-active {
   box-shadow: 0 0 0 1px rgba(102, 217, 255, 0.3) inset, 0 0 18px rgba(69, 190, 255, 0.18);
 }
+.panel-sort-toggle {
+  border: 0;
+  padding: 0;
+  background: transparent;
+  color: var(--muted);
+  font: inherit;
+  letter-spacing: inherit;
+  text-transform: inherit;
+  cursor: pointer;
+}
+.panel-sort-toggle:hover,
+.panel-sort-toggle:focus-visible {
+  color: var(--accent);
+  text-decoration: underline;
+  text-underline-offset: 3px;
+  outline: none;
+}
 .hr-item {
   position: relative;
   display: grid;
-  grid-template-columns: 40px 1fr;
+  grid-template-columns: 40px minmax(0, 1fr) 64px;
   gap: 8px;
   align-items: start;
   border-color: color-mix(in srgb, var(--hr-team-color, var(--accent)) 46%, var(--line));
@@ -5547,6 +5626,32 @@ body[data-overlay-dock='top'] .bet-input-panel { top: calc(var(--overlay-band-si
   width: 3px;
   background: var(--hr-team-color, var(--accent));
   box-shadow: 0 0 14px rgba(var(--hr-team-rgb, 102, 217, 255), 0.38);
+}
+.hr-item.hr-item-walkoff {
+  border-color: #f8d46a;
+  box-shadow:
+    inset 0 0 0 1px rgba(255, 221, 118, 0.42),
+    0 0 18px rgba(255, 202, 83, 0.2);
+}
+.hr-item.hr-item-walkoff::after {
+  content: '';
+  position: absolute;
+  inset: 0;
+  z-index: 0;
+  pointer-events: none;
+  border-radius: inherit;
+  background:
+    linear-gradient(115deg, transparent 0%, transparent 32%, rgba(255, 238, 166, 0.34) 45%, transparent 58%, transparent 100%);
+  background-size: 230% 100%;
+  animation: hrWalkoffShimmer 2.2s ease-in-out infinite;
+}
+.hr-item.hr-item-walkoff .hr-rating {
+  border-color: #f8d46a;
+  color: #ffe88f;
+  text-shadow: 0 0 12px rgba(255, 215, 101, 0.58);
+  box-shadow:
+    inset 0 1px 0 rgba(255,255,255,0.12),
+    0 0 18px rgba(255, 209, 82, 0.22);
 }
 .hr-item > * {
   position: relative;
@@ -5573,6 +5678,132 @@ body[data-overlay-dock='top'] .bet-input-panel { top: calc(var(--overlay-band-si
 }
 .hr-meta {
   color: color-mix(in srgb, var(--text) 76%, var(--muted) 24%);
+  white-space: pre-line;
+}
+.hr-copy {
+  min-width: 0;
+}
+.hr-rating {
+  align-self: stretch;
+  display: grid;
+  place-items: center;
+  min-height: 58px;
+  border: 1px solid color-mix(in srgb, var(--hr-team-color, var(--accent)) 60%, var(--line));
+  border-radius: 4px;
+  background:
+    linear-gradient(180deg, rgba(255,255,255,0.07), rgba(255,255,255,0.015)),
+    radial-gradient(circle at 50% 15%, rgba(var(--hr-team-rgb, 102, 217, 255), 0.22), transparent 70%),
+    rgba(4, 15, 25, 0.62);
+  color: var(--accent);
+  font-family: var(--display-font, inherit);
+  font-size: 1.12rem;
+  font-weight: 900;
+  font-variant-numeric: tabular-nums;
+  text-shadow: 0 0 10px rgba(var(--hr-team-rgb, 102, 217, 255), 0.36);
+  box-shadow:
+    inset 0 1px 0 rgba(255,255,255,0.08),
+    0 0 14px rgba(var(--hr-team-rgb, 102, 217, 255), 0.16);
+  cursor: pointer;
+}
+.hr-rating:hover,
+.hr-rating:focus-visible {
+  color: #ffffff;
+  border-color: color-mix(in srgb, var(--hr-team-color, var(--accent)) 76%, white 10%);
+  box-shadow:
+    inset 0 1px 0 rgba(255,255,255,0.1),
+    0 0 18px rgba(var(--hr-team-rgb, 102, 217, 255), 0.26);
+}
+.hr-rating-dialog {
+  margin-top: 8px;
+  padding: 10px;
+  border: 1px solid color-mix(in srgb, var(--accent) 42%, var(--line));
+  border-radius: 5px;
+  background:
+    linear-gradient(180deg, rgba(255,255,255,0.055), transparent 62%),
+    rgba(3, 13, 23, 0.92);
+  box-shadow: inset 0 1px 0 rgba(255,255,255,0.08), 0 0 18px rgba(58, 182, 255, 0.12);
+}
+.hr-rating-dialog[hidden] {
+  display: none;
+}
+.hr-rating-dialog header {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 8px;
+  margin-bottom: 6px;
+}
+.hr-rating-dialog header strong {
+  color: var(--accent);
+  font-family: var(--display-font, inherit);
+  font-size: 1.25rem;
+  font-variant-numeric: tabular-nums;
+}
+.hr-rating-close {
+  width: 24px;
+  height: 24px;
+  border: 1px solid color-mix(in srgb, var(--accent) 42%, var(--line));
+  border-radius: 4px;
+  background: rgba(8, 25, 40, 0.82);
+  color: var(--text);
+  cursor: pointer;
+}
+.hr-rating-title {
+  font-weight: 800;
+  color: var(--text);
+}
+.hr-rating-subtitle,
+.hr-rating-note {
+  margin: 2px 0 8px;
+  color: var(--muted);
+  font-size: 0.78rem;
+  line-height: 1.3;
+}
+.hr-rating-rows {
+  display: grid;
+  gap: 3px;
+}
+.hr-rating-row {
+  display: flex;
+  justify-content: space-between;
+  gap: 10px;
+  padding: 5px 7px;
+  border: 1px solid rgba(255,255,255,0.08);
+  border-radius: 4px;
+  background: rgba(255,255,255,0.035);
+}
+.hr-rating-row strong {
+  color: var(--accent);
+  font-variant-numeric: tabular-nums;
+}
+
+@keyframes hrWalkoffShimmer {
+  0% {
+    background-position: 120% 0;
+    opacity: 0.35;
+  }
+  42% {
+    opacity: 0.88;
+  }
+  100% {
+    background-position: -120% 0;
+    opacity: 0.35;
+  }
+}
+
+.play-by-play-modal {
+  width: min(820px, calc(100vw - 24px));
+}
+
+.pbp-text {
+  max-height: min(68vh, 720px);
+  overflow: auto;
+  margin: 0;
+  padding: 14px;
+  white-space: pre-wrap;
+  font: 0.92rem/1.4 var(--font);
+  color: var(--text);
+  background: rgba(3, 12, 22, 0.72);
 }
 
 .player-bet-menu {
@@ -6426,6 +6657,11 @@ body[data-theme="paper-scorebook"] .team {
   white-space: nowrap;
   overflow: hidden;
   text-overflow: ellipsis;
+}
+
+.lineup-list li.lineup-row-substitution {
+  grid-template-columns: 18px minmax(0, 1fr) 34px 56px;
+  grid-template-areas: "slot name pos avg";
 }
 
 .lineup-indicator {
