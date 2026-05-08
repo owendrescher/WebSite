@@ -1,0 +1,299 @@
+:root {
+  color-scheme: dark;
+  --bg: #07131d;
+  --panel: #0d1b27;
+  --panel-2: #102333;
+  --text: #edf7ff;
+  --muted: #9cb2c5;
+  --line: rgba(152, 194, 231, 0.24);
+  --accent: #78d7ff;
+  --good: #8df2a8;
+  --bad: #ff9b9b;
+  font-family: Inter, ui-sans-serif, system-ui, -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif;
+}
+
+* {
+  box-sizing: border-box;
+}
+
+body {
+  margin: 0;
+  min-height: 100vh;
+  background: linear-gradient(135deg, #06101a, #0b1721 55%, #08131d);
+  color: var(--text);
+}
+
+button,
+input {
+  font: inherit;
+}
+
+.app-shell {
+  min-height: 100vh;
+  display: grid;
+  grid-template-rows: auto minmax(0, 1fr);
+  padding: 12px;
+  gap: 12px;
+}
+
+.topbar {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 16px;
+  padding: 12px 14px;
+  border: 1px solid var(--line);
+  border-radius: 8px;
+  background: rgba(13, 27, 39, 0.86);
+}
+
+.topbar h1 {
+  margin: 0;
+  font-size: 1.15rem;
+  letter-spacing: 0;
+}
+
+.topbar p {
+  margin: 3px 0 0;
+  color: var(--muted);
+  font-size: 0.82rem;
+}
+
+.controls {
+  display: flex;
+  gap: 8px;
+  align-items: center;
+}
+
+.controls input,
+.controls button {
+  border: 1px solid var(--line);
+  border-radius: 6px;
+  background: #091723;
+  color: var(--text);
+  padding: 8px 10px;
+}
+
+.controls button {
+  cursor: pointer;
+  font-weight: 800;
+}
+
+.content-grid {
+  min-height: 0;
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) minmax(360px, 28vw);
+  gap: 12px;
+}
+
+.games-panel,
+.detail-panel {
+  min-width: 0;
+  min-height: 0;
+  border: 1px solid var(--line);
+  border-radius: 8px;
+  background: rgba(13, 27, 39, 0.78);
+  overflow: hidden;
+}
+
+.panel-heading {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  padding: 10px 12px;
+  border-bottom: 1px solid var(--line);
+  background: rgba(16, 35, 51, 0.74);
+}
+
+.panel-heading span {
+  color: var(--muted);
+  font-size: 0.78rem;
+}
+
+.games-grid {
+  height: 100%;
+  min-height: 0;
+  overflow: auto;
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(300px, 1fr));
+  align-content: start;
+  gap: 8px;
+  padding: 10px;
+}
+
+.game-card {
+  width: 100%;
+  border: 1px solid var(--line);
+  border-radius: 8px;
+  background: rgba(10, 23, 34, 0.92);
+  color: var(--text);
+  padding: 10px;
+  display: grid;
+  gap: 8px;
+  text-align: left;
+  cursor: pointer;
+}
+
+.game-card:hover,
+.game-card.active {
+  border-color: rgba(120, 215, 255, 0.86);
+}
+
+.team-row {
+  display: grid;
+  grid-template-columns: 34px minmax(0, 1fr) auto;
+  gap: 8px;
+  align-items: center;
+}
+
+.team-row img {
+  width: 30px;
+  height: 30px;
+  object-fit: contain;
+}
+
+.team-name {
+  min-width: 0;
+  display: flex;
+  align-items: baseline;
+  gap: 7px;
+  white-space: nowrap;
+  overflow: hidden;
+}
+
+.team-name strong {
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+
+.team-record {
+  color: var(--muted);
+  font-size: 0.72rem;
+}
+
+.score {
+  font-size: 1.3rem;
+  font-weight: 900;
+  font-variant-numeric: tabular-nums;
+}
+
+.game-meta {
+  color: var(--muted);
+  font-size: 0.78rem;
+  display: flex;
+  justify-content: space-between;
+  gap: 8px;
+}
+
+.detail-panel {
+  overflow: auto;
+}
+
+.detail-empty,
+.detail-loading,
+.detail-content {
+  padding: 14px;
+}
+
+.detail-empty {
+  height: 100%;
+  display: grid;
+  place-content: center;
+  gap: 4px;
+  text-align: center;
+  color: var(--muted);
+}
+
+.detail-empty strong {
+  color: var(--text);
+}
+
+.detail-content {
+  display: grid;
+  gap: 14px;
+}
+
+.detail-title {
+  display: flex;
+  align-items: baseline;
+  justify-content: space-between;
+  gap: 10px;
+}
+
+.detail-title h2 {
+  margin: 0;
+  font-size: 1.1rem;
+}
+
+.detail-title span {
+  color: var(--muted);
+  font-size: 0.86rem;
+}
+
+.split-section {
+  display: grid;
+  gap: 8px;
+}
+
+.split-section h3 {
+  margin: 0;
+  font-size: 0.9rem;
+  color: var(--accent);
+}
+
+.compact-table {
+  width: 100%;
+  border-collapse: collapse;
+  font-size: 0.84rem;
+}
+
+.compact-table th,
+.compact-table td {
+  border-bottom: 1px solid rgba(152, 194, 231, 0.16);
+  padding: 5px 4px;
+  text-align: left;
+  vertical-align: top;
+}
+
+.compact-table th {
+  color: var(--muted);
+  font-weight: 800;
+}
+
+.subtle {
+  color: var(--muted);
+}
+
+.pitching-history {
+  color: var(--muted);
+  font-size: 0.84rem;
+}
+
+.pitching-history summary {
+  cursor: pointer;
+  color: var(--text);
+  font-weight: 800;
+}
+
+.pitching-history ol,
+.home-run-list {
+  margin: 7px 0 0;
+  padding-left: 18px;
+  display: grid;
+  gap: 5px;
+}
+
+.home-run-list {
+  color: var(--muted);
+  font-size: 0.84rem;
+}
+
+@media (max-width: 900px) {
+  .content-grid {
+    grid-template-columns: minmax(0, 1fr);
+  }
+
+  .detail-panel {
+    min-height: 420px;
+  }
+}

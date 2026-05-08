@@ -10,8 +10,7 @@
     CHOICE_OPTION_COUNT: 4,
     MATCH_TILE_DROP_DISTANCE: 110,
     TRACE_SIZE: 200,
-    TRACE_POINTER_END_THRESHOLD: 0.34,
-    TRACE_POINTER_END_SPAN_THRESHOLD: 0.54,
+    TRACE_COMPLETION_THRESHOLD: 0.9,
     SVG_NS: "http://www.w3.org/2000/svg"
   });
 
@@ -147,6 +146,7 @@
     currentQuestion: null,
     selectedOptionId: "",
     pendingResult: "",
+    awaitingAdvance: false,
     revealed: false,
     clockStarted: false,
     startedAt: 0,

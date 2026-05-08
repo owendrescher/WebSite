@@ -260,6 +260,26 @@ summary {
   gap: 0.35rem;
 }
 
+.menu-pop--wide .menu-content {
+  width: min(520px, 88vw);
+}
+
+.tool-options-grid {
+  display: grid;
+  grid-template-columns: repeat(2, minmax(150px, 1fr));
+  gap: 0.55rem;
+}
+
+.option-check {
+  grid-template-columns: auto 1fr;
+  align-items: center;
+  color: var(--ink);
+}
+
+.option-check input {
+  width: auto;
+}
+
 .menu-note {
   margin: 0;
   font-size: 0.74rem;

@@ -27,14 +27,14 @@
     elements.choiceLeaderboardList.innerHTML = "";
     if (!choiceState.leaderboard.length) {
       const placeholder = document.createElement("li");
-      placeholder.textContent = "Finish one choice round to save your first speed run on this device.";
+      placeholder.textContent = "No runs yet.";
       elements.choiceLeaderboardList.append(placeholder);
       return;
     }
 
     choiceState.leaderboard.forEach((entry, index) => {
       const item = document.createElement("li");
-      item.textContent = `#${index + 1} ${runtime.formatElapsed(entry.elapsedMs || 0)} - ${entry.accuracy} - ${entry.correct}/${entry.attempts} correct - ${entry.date}`;
+      item.textContent = `#${index + 1} ${runtime.formatElapsed(entry.elapsedMs || 0)} | ${entry.accuracy} | ${entry.correct}/${entry.attempts}`;
       elements.choiceLeaderboardList.append(item);
     });
   };
@@ -110,7 +110,7 @@
 
       const placeholder = document.createElement("div");
       placeholder.className = "choice-placeholder";
-      placeholder.textContent = "Press Start Choice Round to begin.";
+      placeholder.textContent = "Press this board to begin.";
       elements.choiceOptions.append(placeholder);
       return;
     }
@@ -121,8 +121,8 @@
     if (question.revealed) {
       elements.choiceReveal.textContent = `${question.revealName} - ${question.soundLabel}`;
       elements.choiceCopy.textContent = question.selectedOptionId && choiceState.pendingResult === "correct"
-        ? "Nice hit. Keep moving for a faster total time."
-        : `The correct sound was ${question.soundLabel}.`;
+        ? "Nice hit. Tap the board or press Space to continue."
+        : `The correct sound was ${question.soundLabel}. Tap the board or press Space to continue.`;
     } else {
       elements.choiceReveal.textContent = "Pick the sound first. The romanized name stays hidden until you answer.";
       elements.choiceCopy.textContent = `Choose the sound that matches this ${script.name} ${script.unitSingular}.`;
@@ -155,6 +155,7 @@
     window.clearInterval(choiceState.intervalId);
     choiceState.intervalId = null;
     choiceState.clockStarted = false;
+    runtime.updateChoiceStats();
   };
 
   runtime.beginChoiceClockIfNeeded = () => {
@@ -168,12 +169,12 @@
       choiceState.elapsedMs = Date.now() - choiceState.startedAt;
       runtime.updateChoiceStats();
     }, 100);
-    runtime.setChoiceFeedback("Stopwatch live. Keep moving and trust your first recognition pass.", "info");
   };
 
   runtime.finishChoiceRound = () => {
     choiceState.active = false;
     choiceState.locked = false;
+    choiceState.awaitingAdvance = false;
     runtime.stopChoiceClock();
     runtime.updateChoiceStats();
     runtime.renderChoiceRound();
@@ -212,6 +213,7 @@
     choiceState.questionIndex = 0;
     choiceState.selectedOptionId = "";
     choiceState.pendingResult = "";
+    choiceState.awaitingAdvance = false;
     choiceState.revealed = false;
     choiceState.locked = false;
     choiceState.clockStarted = false;
@@ -221,7 +223,8 @@
     runtime.hideChoiceSummary();
     runtime.updateChoiceStats();
     runtime.renderChoiceRound();
-    runtime.setChoiceFeedback("Round ready. The stopwatch starts when you answer your first prompt.", "info");
+    runtime.beginChoiceClockIfNeeded();
+    runtime.setChoiceFeedback("Round ready.", "info");
   };
 
   runtime.resetChoiceRound = () => {
@@ -239,6 +242,7 @@
     choiceState.currentQuestion = null;
     choiceState.selectedOptionId = "";
     choiceState.pendingResult = "";
+    choiceState.awaitingAdvance = false;
     choiceState.revealed = false;
     choiceState.locked = false;
     choiceState.clockStarted = false;
@@ -247,11 +251,12 @@
     runtime.updateChoiceStats();
     runtime.renderChoiceRound();
     if (script) {
-      runtime.setChoiceFeedback(`Choose the matching sound for each ${script.name} ${script.unitSingular}. The stopwatch starts on your first answer.`, "info");
+      runtime.setChoiceFeedback(`Choose the matching sound for each ${script.name} ${script.unitSingular}.`, "info");
     }
   };
 
   runtime.onChoiceOptionClick = (event) => {
+    event.stopPropagation();
     if (!choiceState.active || choiceState.locked || !choiceState.currentQuestion) {
       return;
     }
@@ -263,9 +268,8 @@
       return;
     }
 
-    runtime.beginChoiceClockIfNeeded();
-
     choiceState.locked = true;
+    choiceState.awaitingAdvance = true;
     choiceState.attempts += 1;
     choiceState.selectedOptionId = optionId;
     choiceState.pendingResult = selectedOption.isCorrect ? "correct" : "wrong";
@@ -292,28 +296,32 @@
       );
     }
 
+    runtime.stopChoiceClock();
+    runtime.renderChoiceRound();
+  };
+
+  runtime.advanceChoiceRound = () => {
+    if (!choiceState.active || !choiceState.awaitingAdvance || !choiceState.currentQuestion) {
+      return;
+    }
+
+    const nextIndex = choiceState.questionIndex + 1;
+    if (nextIndex >= choiceState.totalQuestions) {
+      choiceState.awaitingAdvance = false;
+      runtime.finishChoiceRound();
+      return;
+    }
+
+    choiceState.questionIndex = nextIndex;
+    choiceState.currentQuestion = choiceState.questions[nextIndex];
+    choiceState.clockStarted = false;
+    choiceState.selectedOptionId = "";
+    choiceState.pendingResult = "";
+    choiceState.awaitingAdvance = false;
+    choiceState.revealed = false;
+    choiceState.locked = false;
     runtime.updateChoiceStats();
     runtime.renderChoiceRound();
-
-    window.setTimeout(() => {
-      if (!choiceState.active) {
-        return;
-      }
-
-      const nextIndex = choiceState.questionIndex + 1;
-      if (nextIndex >= choiceState.totalQuestions) {
-        runtime.finishChoiceRound();
-        return;
-      }
-
-      choiceState.questionIndex = nextIndex;
-      choiceState.currentQuestion = choiceState.questions[nextIndex];
-      choiceState.selectedOptionId = "";
-      choiceState.pendingResult = "";
-      choiceState.revealed = false;
-      choiceState.locked = false;
-      runtime.updateChoiceStats();
-      runtime.renderChoiceRound();
-    }, 750);
+    runtime.beginChoiceClockIfNeeded();
   };
 })();

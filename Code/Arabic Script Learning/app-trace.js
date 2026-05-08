@@ -337,6 +337,22 @@
     runtime.renderStrokeList();
     runtime.renderTraceGuide();
     runtime.updateMasteryChip();
+    runtime.updateTraceStatus();
+  };
+
+  runtime.updateTraceStatus = () => {
+    if (traceState.completed) {
+      elements.traceStatus.textContent = "Complete";
+      elements.traceCompleteBadge.classList.remove("is-hidden");
+      return;
+    }
+    if (!traceState.targetReady) {
+      elements.traceStatus.textContent = "Preparing";
+      elements.traceCompleteBadge.classList.add("is-hidden");
+      return;
+    }
+    elements.traceStatus.textContent = `Coverage ${Math.round(traceState.coverage * 100)}% | Span ${Math.round(traceState.spanCoverage * 100)}%`;
+    elements.traceCompleteBadge.classList.add("is-hidden");
   };
 
   runtime.resetTracingForCurrentLetter = () => {
@@ -412,6 +428,7 @@
     traceState.rowCoverage = traceState.targetRows.length ? coveredRows.size / traceState.targetRows.length : 0;
     traceState.colCoverage = traceState.targetCols.length ? coveredCols.size / traceState.targetCols.length : 0;
     traceState.spanCoverage = traceState.dominantAxis === "vertical" ? traceState.rowCoverage : traceState.dominantAxis === "horizontal" ? traceState.colCoverage : (traceState.rowCoverage + traceState.colCoverage) / 2;
+    runtime.updateTraceStatus();
   };
 
   runtime.finalizeTraceCompletion = () => {
@@ -452,6 +469,10 @@
     traceState.currentStrokePoints.push(point);
     runtime.drawToInkCanvas(previousPoint, point);
     runtime.updateTraceCoverage();
+    if (!traceState.completed && traceState.coverage >= runtime.TRACE_COMPLETION_THRESHOLD) {
+      runtime.finalizeTraceCompletion();
+      return;
+    }
     runtime.renderTraceGuide();
   };
 
@@ -469,11 +490,7 @@
       traceState.currentStrokePoints = [];
     }
     runtime.renderTraceGuide();
-    if (!traceState.completed && traceState.coverage >= runtime.TRACE_POINTER_END_THRESHOLD && traceState.spanCoverage >= runtime.TRACE_POINTER_END_SPAN_THRESHOLD) {
-      runtime.finalizeTraceCompletion();
-      return;
-    }
-    runtime.setTraceMessage(`Keep tracing. Coverage is ${Math.round(traceState.coverage * 100)}% and span is ${Math.round(traceState.spanCoverage * 100)}% of the target glyph.`, "info");
+    runtime.setTraceMessage("Keep tracing the highlighted shape.", "info");
   };
 
   runtime.replayStrokeOrder = () => {
@@ -587,6 +604,38 @@
     elements.matchReset.addEventListener("click", runtime.resetRound);
     elements.choiceStart.addEventListener("click", runtime.startChoiceRound);
     elements.choiceReset.addEventListener("click", runtime.resetChoiceRound);
+    elements.answerGrid.addEventListener("click", () => {
+      if (!runtime.matchState.active) {
+        runtime.startRound();
+      }
+    });
+    elements.choiceOptions.addEventListener("click", (event) => {
+      if (event.target.closest(".choice-option")) {
+        return;
+      }
+      if (runtime.choiceState.active && runtime.choiceState.awaitingAdvance) {
+        runtime.advanceChoiceRound();
+        return;
+      }
+      if (!runtime.choiceState.active) {
+        runtime.startChoiceRound();
+      }
+    });
+    elements.choicePanel.addEventListener("click", (event) => {
+      if (event.target.closest("button:not(.choice-option), a, input, select, textarea")) {
+        return;
+      }
+      if (runtime.choiceState.active && runtime.choiceState.awaitingAdvance) {
+        runtime.advanceChoiceRound();
+      }
+    });
+    document.addEventListener("keydown", (event) => {
+      if (event.code !== "Space" || runtime.uiState.stage !== "choice" || !runtime.choiceState.awaitingAdvance) {
+        return;
+      }
+      event.preventDefault();
+      runtime.advanceChoiceRound();
+    });
     elements.letterSelect.addEventListener("change", (event) => runtime.selectTraceLetter(event.target.value));
     elements.traceRandom.addEventListener("click", runtime.onRandomLetterClick);
     elements.tracePronounce.addEventListener("click", () => runtime.playLetterSound(runtime.getCurrentTraceLetter(), "trace"));

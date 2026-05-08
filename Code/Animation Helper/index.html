@@ -98,6 +98,76 @@
           </div>
         </details>
 
+        <details class="menu-pop menu-pop--wide">
+          <summary>Tool Options</summary>
+          <div class="menu-content tool-options-grid">
+            <label class="stacked-field" for="brushOpacityRange">
+              Opacity
+              <input id="brushOpacityRange" type="range" min="5" max="100" value="100">
+            </label>
+            <label class="stacked-field" for="brushHardnessRange">
+              Hardness
+              <input id="brushHardnessRange" type="range" min="10" max="100" value="90">
+            </label>
+            <label class="stacked-field" for="strokeCapSelect">
+              Stroke Cap
+              <select id="strokeCapSelect">
+                <option value="round">Round</option>
+                <option value="square">Square</option>
+                <option value="butt">Flat</option>
+              </select>
+            </label>
+            <label class="stacked-field" for="lineDashSelect">
+              Line Style
+              <select id="lineDashSelect">
+                <option value="solid">Solid</option>
+                <option value="dash">Dash</option>
+                <option value="dot">Dot</option>
+              </select>
+            </label>
+            <label class="stacked-field" for="fillToleranceRange">
+              Fill Tolerance
+              <input id="fillToleranceRange" type="range" min="0" max="80" value="0">
+            </label>
+            <label class="stacked-field" for="blurStrengthRange">
+              Blur Strength
+              <input id="blurStrengthRange" type="range" min="1" max="18" value="5">
+            </label>
+            <label class="stacked-field" for="gradientTypeSelect">
+              Gradient
+              <select id="gradientTypeSelect">
+                <option value="linear">Linear</option>
+                <option value="radial">Radial</option>
+              </select>
+            </label>
+            <label class="stacked-field" for="textFontSelect">
+              Text Font
+              <select id="textFontSelect">
+                <option value="Aptos, Trebuchet MS, sans-serif">Aptos</option>
+                <option value="Georgia, serif">Georgia</option>
+                <option value="Impact, sans-serif">Impact</option>
+                <option value="Consolas, monospace">Consolas</option>
+              </select>
+            </label>
+            <label class="stacked-field" for="panSpeedRange">
+              Pan Speed
+              <input id="panSpeedRange" type="range" min="50" max="200" value="100">
+            </label>
+            <label class="stacked-field" for="pickerSampleRange">
+              Picker Sample
+              <input id="pickerSampleRange" type="range" min="1" max="9" step="2" value="1">
+            </label>
+            <label class="stacked-field option-check" for="constrainShapeToggle">
+              <input id="constrainShapeToggle" type="checkbox">
+              Constrain shapes
+            </label>
+            <label class="stacked-field option-check" for="moveWrapToggle">
+              <input id="moveWrapToggle" type="checkbox">
+              Wrap moved pixels
+            </label>
+          </div>
+        </details>
+
         <details class="menu-pop">
           <summary>📐 Shape</summary>
           <div class="menu-content">

@@ -5,6 +5,7 @@
 <meta charset="utf-8"/>
 <meta content="width=device-width,initial-scale=1" name="viewport"/>
 <title>Daily Checklist v8.7</title>
+<link rel="icon" type="image/png" href="../favicon.png?v=2"/>
 <link href="https://fonts.googleapis.com" rel="preconnect"/>
 <link crossorigin="" href="https://fonts.gstatic.com" rel="preconnect"/>
 <link href="https://fonts.googleapis.com/css2?family=DM+Sans:wght@400;500;700&amp;family=Fira+Code:wght@400;500;700&amp;family=IBM+Plex+Mono:wght@400;500;700&amp;family=Inter:wght@400;600;700&amp;family=JetBrains+Mono:wght@500;700&amp;family=Lora:wght@400;600;700&amp;family=Manrope:wght@400;600;700&amp;family=Merriweather:wght@400;700&amp;family=Nunito:wght@400;600;700&amp;family=Outfit:wght@400;600;700&amp;family=Playfair+Display:wght@500;700&amp;family=Poppins:wght@400;600;700&amp;family=Quicksand:wght@400;600;700&amp;family=Rubik:wght@400;500;700&amp;family=Source+Code+Pro:wght@400;600;700&amp;family=Space+Grotesk:wght@400;500;600;700&amp;family=Work+Sans:wght@400;500;700&amp;display=swap" rel="stylesheet"/>
@@ -101,6 +102,28 @@
   body{
     margin:0; background:var(--bg); color:var(--text);
     font: 400 var(--font-size)/1.45 system-ui, -apple-system, "Segoe UI", Inter, Roboto, "Helvetica Neue", Arial, "Noto Sans", sans-serif;
+  }
+
+  .owentools-home-link{
+    position:fixed;
+    top:max(12px, env(safe-area-inset-top));
+    left:max(12px, env(safe-area-inset-left));
+    z-index:9999;
+    width:44px;
+    height:44px;
+    display:grid;
+    place-items:center;
+    padding:0;
+    border-radius:14px;
+    border:1px solid rgba(0,0,0,.12);
+    background:rgba(255,255,255,.88);
+    color:#111316;
+    text-decoration:none;
+    font:800 .82rem/1 system-ui, sans-serif;
+    text-transform:lowercase;
+    letter-spacing:.04em;
+    backdrop-filter:blur(12px);
+    box-shadow:0 12px 28px rgba(0,0,0,.16);
   }
 
   .wrap{max-width:980px; margin:0 auto; padding:16px;}
@@ -1539,6 +1562,7 @@ html[data-theme="light"] .group-title{
 </style>
 </head>
 <body>
+<a aria-label="Back to owentools" class="owentools-home-link" href="../index.html" title="Back to owentools">ot</a>
 <div id="viewportSwitcher" class="viewport-switcher" aria-label="View controls">
   <button class="btn icon" id="viewPrev" type="button" title="Previous view">‹</button>
   <button class="btn viewport-label" id="viewLabel" type="button" title="Click to toggle Auto / Manual">Auto</button>

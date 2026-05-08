@@ -1,0 +1,307 @@
+<!doctype html>
+<html lang="en">
+  <head>
+    <meta charset="utf-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1" />
+    <title>MLB Show Stream Overlay</title>
+    <link rel="stylesheet" href="styles.css" />
+  </head>
+  <body>
+    <section id="betInputPanel" class="utility-panel bet-input-panel">
+      <header><strong>Bet Input</strong></header>
+      <form id="betForm" class="bet-form">
+        <label>Bet Slip <textarea id="betDesc" rows="3" required placeholder="Build legs below or type a manual bet"></textarea></label>
+        <div class="bet-leg-builder">
+          <label>Player Search <input id="betPlayerSearch" list="betPlayerOptions" placeholder="Search player" autocomplete="off" /></label>
+          <label>Prop
+            <select id="betPropSelect">
+              <option value="hit">Hit</option>
+              <option value="hr">HR</option>
+              <option value="xbh">XBH</option>
+            </select>
+          </label>
+        </div>
+        <div class="bet-builder-actions">
+          <button id="betAddLegBtn" type="button">Add Leg</button>
+          <button id="betClearLegsBtn" type="button">Clear Legs</button>
+        </div>
+        <datalist id="betPlayerOptions"></datalist>
+        <label>Odds <input id="betOdds" required placeholder="+135 / -110" /></label>
+        <label>Amount <input id="betAmount" type="number" min="0" step="0.01" required /></label>
+        <button type="submit">Add</button>
+      </form>
+    </section>
+
+    <aside id="betDisplay" class="utility-panel retro-panel movable" data-panel="bet">
+      <header class="panel-header" data-drag-handle>
+        <strong>BET LOG</strong>
+        <div class="panel-header-actions">
+          <span class="hint">DAY: <span id="betDayLabel"></span></span>
+          <button id="clearBetsBtn" class="panel-action-btn" type="button">CLEAR</button>
+        </div>
+      </header>
+      <section id="betList" class="panel-list"></section>
+      <div class="panel-resize panel-resize-nw" data-resize-handle data-dir="nw"></div>
+      <div class="panel-resize panel-resize-ne" data-resize-handle data-dir="ne"></div>
+      <div class="panel-resize panel-resize-sw" data-resize-handle data-dir="sw"></div>
+      <div class="panel-resize panel-resize-se" data-resize-handle data-dir="se"></div>
+    </aside>
+
+    <aside id="hrDisplay" class="utility-panel retro-panel movable" data-panel="hr">
+      <header class="panel-header" data-drag-handle>
+        <strong>HOME RUN FEED</strong>
+        <span class="hint">latest first</span>
+      </header>
+      <section id="hrList" class="panel-list"></section>
+      <div class="panel-resize panel-resize-nw" data-resize-handle data-dir="nw"></div>
+      <div class="panel-resize panel-resize-ne" data-resize-handle data-dir="ne"></div>
+      <div class="panel-resize panel-resize-sw" data-resize-handle data-dir="sw"></div>
+      <div class="panel-resize panel-resize-se" data-resize-handle data-dir="se"></div>
+    </aside>
+
+    <aside id="goalDisplay" class="utility-panel retro-panel movable" data-panel="goal">
+      <header class="panel-header" data-drag-handle>
+        <strong>GOAL TRACKER</strong>
+        <div class="panel-header-actions">
+          <span class="hint">DAY: <span id="goalDayLabel"></span></span>
+        </div>
+      </header>
+      <section class="goal-panel-body">
+        <div class="goal-clock-wrap">
+          <div id="goalTimer" class="goal-timer">00:00:00</div>
+          <div class="goal-clock-actions">
+            <button id="goalStartPauseBtn" class="panel-action-btn goal-btn" type="button">START</button>
+            <button id="goalResetBtn" class="panel-action-btn goal-btn" type="button">RESET</button>
+          </div>
+        </div>
+        <section class="goal-active-section">
+          <div class="goal-history-head">
+            <strong>Current Goal</strong>
+          </div>
+          <div id="goalActiveText" class="goal-active-text">No active objective.</div>
+        </section>
+        <label class="goal-input-label">
+          <span>Set Goal</span>
+          <input id="goalCurrentInput" type="text" placeholder="Type goal and press Enter" />
+        </label>
+        <div class="goal-actions">
+          <button id="goalSaveBtn" class="panel-action-btn goal-save-btn" type="button">SET GOAL</button>
+          <button id="goalCompleteBtn" class="goal-complete-btn" type="button">COMPLETE</button>
+        </div>
+      </section>
+      <div class="panel-resize panel-resize-nw" data-resize-handle data-dir="nw"></div>
+      <div class="panel-resize panel-resize-ne" data-resize-handle data-dir="ne"></div>
+      <div class="panel-resize panel-resize-sw" data-resize-handle data-dir="sw"></div>
+      <div class="panel-resize panel-resize-se" data-resize-handle data-dir="se"></div>
+    </aside>
+
+    <aside id="goalHistoryDisplay" class="utility-panel retro-panel movable" data-panel="goal-history">
+      <header class="panel-header" data-drag-handle>
+        <strong>GOAL HISTORY</strong>
+        <div class="panel-header-actions">
+          <span class="hint">DAY: <span id="goalHistoryDayLabel"></span></span>
+          <button id="clearGoalsBtn" class="panel-action-btn" type="button">CLEAR</button>
+        </div>
+      </header>
+      <section class="goal-history-shell">
+        <div id="goalHistoryList" class="panel-list goal-history-list"></div>
+      </section>
+      <div class="panel-resize panel-resize-nw" data-resize-handle data-dir="nw"></div>
+      <div class="panel-resize panel-resize-ne" data-resize-handle data-dir="ne"></div>
+      <div class="panel-resize panel-resize-sw" data-resize-handle data-dir="sw"></div>
+      <div class="panel-resize panel-resize-se" data-resize-handle data-dir="se"></div>
+    </aside>
+
+    <main class="overlay" id="overlay">
+      <header class="topbar">
+        <div class="topbar-left">
+          <h1>MLB LIVE GRID</h1>
+          <label>
+            <span>Date</span>
+            <input id="dateInput" type="date" />
+          </label>
+        </div>
+        <label class="theme-label">
+          <span>Style</span>
+          <select id="themeSelect"></select>
+        </label>
+      </header>
+
+      <section id="games" class="games"></section>
+
+      <section id="lineupOverlay" class="lineup-overlay" hidden>
+        <div id="lineupBackdrop" class="lineup-backdrop"></div>
+        <article class="lineup-modal">
+          <header class="lineup-modal-header">
+            <div class="lineup-modal-title-wrap">
+              <strong>LINEUP CARD</strong>
+              <span id="lineupModalMatchup" class="lineup-modal-matchup"></span>
+            </div>
+            <button id="lineupCloseBtn" class="lineup-close-btn" type="button" aria-label="Close lineup card">×</button>
+          </header>
+          <div class="lineup-modal-state">
+            <div class="lineup-state-scoreboard">
+              <span id="lineupStateAwayCode" class="lineup-state-away-code"></span>
+              <span id="lineupStateAwayScore" class="lineup-state-score"></span>
+              <span id="lineupStateInning" class="lineup-state-inning"></span>
+              <span id="lineupStateHomeScore" class="lineup-state-score"></span>
+              <span id="lineupStateHomeCode" class="lineup-state-home-code"></span>
+            </div>
+            <div class="lineup-state-detail-row">
+              <div class="lineup-mini-diamond" aria-label="Base runners">
+                <span class="mini-base second"></span>
+                <span class="mini-base first"></span>
+                <span class="mini-base third"></span>
+                <span class="mini-base home"></span>
+              </div>
+              <span class="lineup-base-text">Bases empty</span>
+              <div class="lineup-count-strip">
+                <span>B <strong id="lineupStateBalls">0</strong></span>
+                <span>S <strong id="lineupStateStrikes">0</strong></span>
+                <span>O <strong id="lineupStateOuts">0</strong></span>
+              </div>
+            </div>
+          </div>
+          <div class="lineup-view-toggle" role="tablist" aria-label="Lineup card view">
+            <button type="button" class="lineup-view-btn active" data-lineup-view="lineups" aria-selected="true">Lineups</button>
+            <button type="button" class="lineup-view-btn" data-lineup-view="pitching" aria-selected="false">Pitching</button>
+          </div>
+          <div class="lineup-modal-body">
+            <div class="lineup-modal-columns" data-lineup-panel="lineups">
+              <section class="lineup-modal-team away-lineup">
+                <div class="lineup-team-header">
+                  <img class="lineup-logo away-lineup-logo" src="placeholder.png" alt="Away logo" />
+                  <span class="away-lineup-team"></span>
+                </div>
+                <ol class="lineup-list away-lineup-list"></ol>
+              </section>
+              <section class="lineup-modal-team home-lineup">
+                <div class="lineup-team-header">
+                  <img class="lineup-logo home-lineup-logo" src="placeholder.png" alt="Home logo" />
+                  <span class="home-lineup-team"></span>
+                </div>
+                <ol class="lineup-list home-lineup-list"></ol>
+              </section>
+            </div>
+            <div class="lineup-pitching-grid" data-lineup-panel="pitching" hidden>
+              <section class="lineup-pitching-panel away-pitching">
+                <div class="lineup-pitching-header">Pitching • <span class="lineup-pitching-team-code"></span></div>
+                <div class="current-pitcher-card"></div>
+                <div class="lineup-pitching-subhead">Bullpen</div>
+                <ul class="bullpen-list"></ul>
+              </section>
+              <section class="lineup-pitching-panel home-pitching">
+                <div class="lineup-pitching-header">Pitching • <span class="lineup-pitching-team-code"></span></div>
+                <div class="current-pitcher-card"></div>
+                <div class="lineup-pitching-subhead">Bullpen</div>
+                <ul class="bullpen-list"></ul>
+              </section>
+            </div>
+          </div>
+          <section class="lineup-live-details">
+            <section class="detail-col play-col">
+              <h4>Play</h4>
+              <ul id="lineupTicker" class="ticker"></ul>
+              <div id="lineupStatus" class="status"></div>
+            </section>
+            <section class="detail-col base-col">
+              <h4>Bases</h4>
+              <div class="diamond-wrap">
+                <div id="lineupDiamond" class="diamond" aria-label="Base runners">
+                  <span class="base second"></span>
+                  <span class="base first"></span>
+                  <span class="base third"></span>
+                  <span class="base home"></span>
+                </div>
+              </div>
+            </section>
+            <section class="detail-col count-col">
+              <h4>Count</h4>
+              <div class="count-row"><span>B</span><div id="lineupBallsDots" class="dots"></div></div>
+              <div class="count-row"><span>S</span><div id="lineupStrikesDots" class="dots"></div></div>
+              <div class="count-row"><span>O</span><div id="lineupOutsDots" class="dots"></div></div>
+            </section>
+          </section>
+        </article>
+      </section>
+      <section id="playerStatOverlay" class="player-stat-overlay" hidden>
+        <div id="playerStatBackdrop" class="player-stat-backdrop"></div>
+        <article class="player-stat-modal" role="dialog" aria-modal="true" aria-label="Player stat card">
+          <header class="player-stat-header">
+            <div class="player-stat-title">
+              <strong id="playerStatName">PLAYER</strong>
+              <span id="playerStatMeta">TEAM • POS</span>
+            </div>
+            <button id="playerStatCloseBtn" class="player-stat-close" type="button" aria-label="Close player card">×</button>
+          </header>
+          <div class="player-stat-body">
+            <section class="player-stat-left">
+              <img id="playerStatHeadshot" class="player-stat-headshot" src="placeholder.png" alt="Player headshot" />
+              <div id="playerStatBio" class="player-stat-bio"></div>
+            </section>
+            <section class="player-stat-right">
+              <div id="playerStatToday" class="player-stat-block"></div>
+              <div id="playerStatSeason" class="player-stat-block"></div>
+              <div id="playerStatExtra" class="player-stat-block"></div>
+            </section>
+          </div>
+          <footer class="player-stat-footer">Ctrl+Click lineup name to open</footer>
+        </article>
+      </section>
+      <footer>
+        <small>2x7 capacity • 15s refresh • EST • middle-click scoreboard for lineup card</small>
+      </footer>
+    </main>
+
+    <template id="gameTemplate">
+      <article class="game-card">
+        <div class="scoreboard">
+          <div class="scoreboard-main">
+            <div class="score-row away-row">
+              <div class="team-left">
+                <img class="team-logo away-logo" src="placeholder.png" alt="Away logo" />
+                <span class="team away"></span>
+                <div class="meta-block away-meta">
+                  <span class="matchup-line away-matchup"></span>
+                </div>
+              </div>
+            </div>
+
+            <div class="score-row home-row">
+              <div class="team-left">
+                <img class="team-logo home-logo" src="placeholder.png" alt="Home logo" />
+                <span class="team home"></span>
+                <div class="meta-block home-meta">
+                  <span class="matchup-line home-matchup"></span>
+                </div>
+              </div>
+            </div>
+
+            <div class="score-state-strip">
+              <div class="score-mini-diamond" aria-label="Base runners">
+                <span class="score-mini-base second"></span>
+                <span class="score-mini-base first"></span>
+                <span class="score-mini-base third"></span>
+              </div>
+              <span class="score-mini-count score-mini-balls">B <strong>0</strong></span>
+              <span class="score-mini-count score-mini-strikes">S <strong>0</strong></span>
+              <span class="score-mini-count score-mini-outs">O <strong>0</strong></span>
+              <div class="score-mini-context">
+                <span class="score-mini-inning"></span>
+                <span class="score-mini-last-play"></span>
+              </div>
+            </div>
+          </div>
+
+          <div class="scoreboard-side">
+            <span class="score away-score"></span>
+            <span class="score home-score"></span>
+          </div>
+        </div>
+
+      </article>
+    </template>
+
+    <script src="app.js"></script>
+  </body>
+</html>

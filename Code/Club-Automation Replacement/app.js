@@ -199,6 +199,7 @@ function render(searchValue = state.globalMemberQuery) {
   stopMemberCameraStream();
   const lookupResults = getMemberLookupResults(searchValue);
   app.innerHTML = `
+    <a class="owentools-home-link" href="../index.html" aria-label="Back to owentools" title="Back to owentools">ot</a>
     <div class="shell">
       <aside class="sidebar">
         <a class="brand__link" href="index.html" aria-label="Cedardale home">

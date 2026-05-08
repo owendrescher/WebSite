@@ -1,0 +1,147 @@
+<!doctype html>
+<html lang="en">
+  <head>
+    <meta charset="utf-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1" />
+    <meta name="color-scheme" content="dark" />
+    <title>NFL Game Center</title>
+    <meta name="description" content="Live NFL scoreboard, weekly matchups, team form, leaders, betting notes, and game detail dashboard." />
+    <link rel="stylesheet" href="styles.css?v=20260506-nfl-5" />
+  </head>
+  <body>
+    <div class="app-shell">
+      <header class="topbar">
+        <a class="home-link" href="../dashboard.html" title="Back to MLB Game Center">MLB</a>
+        <div class="brand">
+          <span>NFL GAME CENTER</span>
+          <strong id="slateLabel">Loading slate</strong>
+        </div>
+        <div class="date-tools" aria-label="Slate controls">
+          <button id="prevWeekBtn" type="button" title="Previous week">-W</button>
+          <button id="prevDayBtn" type="button" title="Previous day">-D</button>
+          <input id="dateInput" type="date" />
+          <button id="nextDayBtn" type="button" title="Next day">+D</button>
+          <button id="nextWeekBtn" type="button" title="Next week">+W</button>
+          <button id="todayBtn" type="button">Today</button>
+        </div>
+        <nav class="tabs" aria-label="NFL dashboard pages">
+          <button type="button" class="active" data-page="scoreboard">Scoreboard</button>
+          <button type="button" data-page="teams">Teams</button>
+          <button type="button" data-page="leaders">Leaders</button>
+          <button type="button" data-page="props">Props</button>
+        </nav>
+      </header>
+
+      <main class="workspace">
+        <section class="main-panel">
+          <div id="statusBar" class="status-bar">Loading NFL data...</div>
+          <section id="scoreboardPage" class="page active" aria-label="Scoreboard">
+            <div id="gamesGrid" class="games-grid"></div>
+          </section>
+          <section id="teamsPage" class="page" aria-label="Team stats">
+            <div class="section-head">
+              <div>
+                <span class="eyebrow">NFL Teams</span>
+                <strong>Records, scoring profile, and defensive profile</strong>
+              </div>
+              <button id="divisionToggle" type="button" class="soft-btn">Divisions On</button>
+            </div>
+            <div id="teamsTableWrap" class="table-wrap"></div>
+          </section>
+          <section id="leadersPage" class="page" aria-label="League leaders">
+            <div class="section-head">
+              <div>
+                <span class="eyebrow">League Leaders</span>
+                <strong>Passing, rushing, receiving, defense</strong>
+              </div>
+              <select id="leaderSeasonType">
+                <option value="2">Regular season</option>
+                <option value="3">Postseason</option>
+              </select>
+            </div>
+            <div id="leadersGrid" class="leaders-grid"></div>
+          </section>
+          <section id="propsPage" class="page" aria-label="Prop research">
+            <div class="props-layout">
+              <section class="tool-card">
+                <header>
+                  <span class="eyebrow">Quick Builder</span>
+                  <strong>Player or team prop note</strong>
+                </header>
+                <form id="propForm" class="prop-form">
+                  <label>Selection <input id="propSelection" list="propOptions" placeholder="Search games, teams, players" autocomplete="off" /></label>
+                  <datalist id="propOptions"></datalist>
+                  <label>Market
+                    <select id="propMarket">
+                      <option>Anytime TD</option>
+                      <option>Passing yards</option>
+                      <option>Passing TDs</option>
+                      <option>Rushing yards</option>
+                      <option>Receiving yards</option>
+                      <option>Receptions</option>
+                      <option>Team spread</option>
+                      <option>Moneyline</option>
+                      <option>Total points</option>
+                    </select>
+                  </label>
+                  <div class="two-col">
+                    <label>Target <input id="propTarget" placeholder="1+, 225.5, -3.5" /></label>
+                    <label>Odds <input id="propOdds" placeholder="+120 / -110" /></label>
+                  </div>
+                  <button type="submit">Add to slip</button>
+                </form>
+              </section>
+              <section class="tool-card">
+                <header>
+                  <span class="eyebrow">Watched Games</span>
+                  <strong>Click a team score or star a game</strong>
+                </header>
+                <div id="watchList" class="watch-list"></div>
+              </section>
+            </div>
+          </section>
+        </section>
+
+        <aside class="rail">
+          <section class="rail-card">
+            <header>
+              <span class="eyebrow">Bet Slip</span>
+              <button id="clearSlipBtn" type="button">Clear</button>
+            </header>
+            <div id="betSlip" class="bet-slip"></div>
+          </section>
+          <section class="rail-card">
+            <header>
+              <span class="eyebrow">Slate Notes</span>
+              <button id="refreshBtn" type="button">Refresh</button>
+            </header>
+            <div id="slateNotes" class="slate-notes"></div>
+          </section>
+          <section class="rail-card touchdown-card">
+            <header>
+              <span class="eyebrow">Touchdown Tracker</span>
+              <button id="refreshTdBtn" type="button">Refresh</button>
+            </header>
+            <div id="touchdownFeed" class="touchdown-feed"></div>
+          </section>
+        </aside>
+      </main>
+    </div>
+
+    <dialog id="gameDialog" class="game-dialog">
+      <div id="gameDialogBody" class="game-dialog-body"></div>
+    </dialog>
+
+    <template id="gameCardTemplate">
+      <article class="game-card">
+        <button class="watch-btn" type="button" title="Watch game">+</button>
+        <div class="game-meta"></div>
+        <div class="madden-scoreboard"></div>
+        <div class="game-state-strip"></div>
+        <div class="game-card-footer"></div>
+      </article>
+    </template>
+
+    <script src="app.js?v=20260506-nfl-5"></script>
+  </body>
+</html>

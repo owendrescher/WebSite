@@ -24,14 +24,14 @@
     elements.leaderboardList.innerHTML = "";
     if (!matchState.leaderboard.length) {
       const placeholder = document.createElement("li");
-      placeholder.textContent = "Clear one board to save your first speed run on this device.";
+      placeholder.textContent = "No runs yet.";
       elements.leaderboardList.append(placeholder);
       return;
     }
 
     matchState.leaderboard.forEach((entry, index) => {
       const item = document.createElement("li");
-      item.textContent = `#${index + 1} ${runtime.formatElapsed(entry.elapsedMs || 0)} - ${entry.accuracy} - ${entry.correct}/${entry.attempts} correct - ${entry.date}`;
+      item.textContent = `#${index + 1} ${runtime.formatElapsed(entry.elapsedMs || 0)} | ${entry.accuracy} | ${entry.correct}/${entry.attempts}`;
       elements.leaderboardList.append(item);
     });
   };
@@ -127,30 +127,30 @@
     if (!matchState.active) {
       elements.matchPromptLabel.textContent = "Warm-up";
       runtime.applyPromptValue("Pick a tile", false);
-      elements.matchLetterName.textContent = "Then match it to the right sound";
-      elements.matchCopy.textContent = `Start a round to clear one ${script.name} board as fast as you can. Romanized letter names stay hidden until each result resolves.`;
+      elements.matchLetterName.textContent = "";
+      elements.matchCopy.textContent = "";
     } else if (matchState.pendingResult && matchState.resultRevealName) {
       elements.matchPromptLabel.textContent = matchState.pendingResult === "correct" ? "Correct" : "Not Quite";
       runtime.applyPromptValue(matchState.resultRevealSymbol, true);
-      elements.matchLetterName.textContent = matchState.resultRevealName;
-      elements.matchCopy.textContent = matchState.resultRevealCopy;
+      elements.matchLetterName.textContent = "";
+      elements.matchCopy.textContent = "";
     } else if (selectedTile) {
       elements.matchPromptLabel.textContent = selectedTile.kind === "symbol" ? `${script.name} Tile Selected` : "Sound Tile Selected";
       runtime.applyPromptValue(selectedTile.primary, selectedTile.kind === "symbol");
-      elements.matchLetterName.textContent = selectedTile.kind === "symbol" ? "Choose the matching sound cue." : `Choose the matching ${script.name} ${script.unitSingular}.`;
-      elements.matchCopy.textContent = "Romanized letter names stay hidden until the answer resolves.";
+      elements.matchLetterName.textContent = "";
+      elements.matchCopy.textContent = "";
     } else {
       const remainingPairs = Math.ceil(runtime.getVisibleTiles().length / 2) || matchState.totalPairs || runtime.MATCH_PAIR_COUNT;
       elements.matchPromptLabel.textContent = "Board Live";
       runtime.applyPromptValue(`${remainingPairs} pairs left`, false);
-      elements.matchLetterName.textContent = `Match one ${script.name} symbol with one sound cue.`;
-      elements.matchCopy.textContent = "Clear the full board for your final speed time.";
+      elements.matchLetterName.textContent = "";
+      elements.matchCopy.textContent = "";
     }
 
     if (!matchState.active) {
       const placeholder = document.createElement("div");
       placeholder.className = "match-board-placeholder";
-      placeholder.innerHTML = "<strong>Board ready</strong><span>Press Start Speed Round, then drag one tile onto its partner.</span>";
+      placeholder.innerHTML = "<strong>Board ready</strong><span>Press the board, then drag one tile onto its partner.</span>";
       elements.answerGrid.append(placeholder);
       return;
     }
@@ -400,22 +400,42 @@
     matchState.currentTiles = matchState.currentTiles.map((tile) => (tile.tileId === tileId ? { ...tile, x, y } : tile));
   };
 
+  runtime.rectsTouch = (firstRect, secondRect) => (
+    firstRect.left <= secondRect.right &&
+    firstRect.right >= secondRect.left &&
+    firstRect.top <= secondRect.bottom &&
+    firstRect.bottom >= secondRect.top
+  );
+
+  runtime.getTileElement = (tileId) =>
+    Array.from(elements.answerGrid.querySelectorAll("[data-tile-id]"))
+      .find((element) => element.dataset.tileId === tileId) || null;
+
   runtime.findDropTarget = (sourceTileId) => {
     const sourceTile = runtime.getTileById(sourceTileId);
     if (!sourceTile) {
       return null;
     }
-    const boardRect = elements.answerGrid.getBoundingClientRect();
+    const sourceElement = runtime.getTileElement(sourceTileId);
+    const sourceRect = sourceElement?.getBoundingClientRect();
+    if (!sourceRect) {
+      return null;
+    }
     let bestTarget = null;
     let bestDistance = Number.POSITIVE_INFINITY;
     runtime.getVisibleTiles().forEach((tile) => {
       if (tile.tileId === sourceTile.tileId || tile.kind === sourceTile.kind) {
         return;
       }
-      const dx = ((tile.x - sourceTile.x) / 100) * boardRect.width;
-      const dy = ((tile.y - sourceTile.y) / 100) * boardRect.height;
+      const targetElement = runtime.getTileElement(tile.tileId);
+      const targetRect = targetElement?.getBoundingClientRect();
+      if (!targetRect || !runtime.rectsTouch(sourceRect, targetRect)) {
+        return;
+      }
+      const dx = (targetRect.left + targetRect.width / 2) - (sourceRect.left + sourceRect.width / 2);
+      const dy = (targetRect.top + targetRect.height / 2) - (sourceRect.top + sourceRect.height / 2);
       const distanceBetween = Math.hypot(dx, dy);
-      if (distanceBetween < runtime.MATCH_TILE_DROP_DISTANCE && distanceBetween < bestDistance) {
+      if (distanceBetween < bestDistance) {
         bestDistance = distanceBetween;
         bestTarget = tile;
       }

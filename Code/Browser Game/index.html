@@ -1,0 +1,239 @@
+<!doctype html>
+<html lang="en">
+  <head>
+    <meta charset="utf-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1">
+    <title>Waymark Vale</title>
+    <link rel="stylesheet" href="styles.css">
+  </head>
+  <body>
+    <canvas id="game" aria-label="Waymark Vale game world"></canvas>
+
+    <aside class="hud character-panel" aria-label="Character sheet">
+      <header>
+        <div>
+          <p class="eyebrow">Adventurer</p>
+          <h1 id="heroName">Mira Thorn</h1>
+          <div class="hero-meta">
+            <span id="heroClass">Fighter</span>
+            <span>PB <strong id="proficiencyBonus">+2</strong></span>
+            <span><strong id="heroSpeed">30</strong> ft</span>
+          </div>
+        </div>
+        <div class="level-badge">Lv <span id="heroLevel">1</span></div>
+      </header>
+
+      <section class="vitals" aria-label="Vitals">
+        <div class="vital-row">
+          <span>HP</span>
+          <strong><span id="hpNow">12</span>/<span id="hpMax">12</span></strong>
+        </div>
+        <div class="health-shell">
+          <div id="healthFill" class="health-fill"></div>
+        </div>
+        <div class="quick-stats">
+          <span>AC <strong id="armorClass">14</strong></span>
+          <span>Gold <strong id="gold">18</strong></span>
+          <span>XP <strong id="xp">0</strong></span>
+          <span>Next <strong id="xpNext">300</strong></span>
+        </div>
+      </section>
+
+      <section class="abilities" aria-label="Ability scores">
+        <div><span>STR</span><strong id="statStr">10</strong><small id="modStr">+0</small></div>
+        <div><span>DEX</span><strong id="statDex">15</strong><small id="modDex">+2</small></div>
+        <div><span>CON</span><strong id="statCon">13</strong><small id="modCon">+1</small></div>
+        <div><span>INT</span><strong id="statInt">12</strong><small id="modInt">+1</small></div>
+        <div><span>WIS</span><strong id="statWis">14</strong><small id="modWis">+2</small></div>
+        <div><span>CHA</span><strong id="statCha">11</strong><small id="modCha">+0</small></div>
+      </section>
+
+      <section class="location" aria-label="Location">
+        <span id="regionName">Waymark Vale</span>
+        <strong id="areaName">Village Green</strong>
+        <div class="location-meta">
+          <span id="timeOfDay">Early Morning</span>
+          <span>Threat <strong id="localThreat">Low</strong></span>
+        </div>
+      </section>
+
+      <section class="quest-tracker" aria-label="Active quests">
+        <span>Quests</span>
+        <ol id="questTracker"></ol>
+      </section>
+    </aside>
+
+    <div id="kitBackdrop" class="overlay-backdrop hidden" aria-hidden="true"></div>
+
+    <aside id="kitPanel" class="hud kit-panel hidden" aria-label="Equipment and inventory">
+      <header>
+        <div>
+          <p class="eyebrow">Kit</p>
+          <h2>Inventory</h2>
+        </div>
+        <button id="toggleKitButton" type="button" title="Toggle kit" aria-label="Toggle kit">x</button>
+      </header>
+      <section class="kit-summary" aria-label="Carry summary">
+        <span>Load <strong id="carryWeight">0</strong></span>
+        <span>Value <strong id="carryValue">0</strong> g</span>
+        <span>Potions <strong id="potionCount">0</strong></span>
+      </section>
+      <section id="equipmentGrid" class="equipment-grid" aria-label="Equipped items"></section>
+      <section class="inventory-wrap" aria-label="Inventory">
+        <span>Inventory</span>
+        <div id="inventoryList" class="inventory-list"></div>
+      </section>
+    </aside>
+
+    <aside class="hud world-panel" aria-label="Settlement state">
+      <header>
+        <div>
+          <p class="eyebrow">Vale</p>
+          <h2 id="settlementName">Waymark Vale</h2>
+        </div>
+        <div class="settlement-badge" id="settlementMood">Stable</div>
+      </header>
+      <section class="settlement-metrics" aria-label="Settlement metrics">
+        <div><span>People</span><strong id="populationCount">0</strong></div>
+        <div><span>Homes</span><strong id="homeCount">0</strong></div>
+        <div><span>Worksites</span><strong id="worksiteCount">0</strong></div>
+        <div><span>Prosperity</span><strong id="prosperityScore">0</strong></div>
+      </section>
+      <section class="settlement-services-wrap" aria-label="Services">
+        <span>Services</span>
+        <div id="serviceList" class="settlement-services"></div>
+      </section>
+      <section class="settlement-nearby" aria-label="Nearby activity">
+        <span>Nearby</span>
+        <ol id="nearbyList"></ol>
+      </section>
+    </aside>
+
+    <aside class="hud log-panel" aria-label="Adventure log">
+      <header>
+        <p class="eyebrow">Log</p>
+        <div class="log-actions">
+          <button id="inventoryToggleButton" type="button" title="Toggle inventory" aria-label="Toggle inventory">I</button>
+          <button id="zoomOutButton" type="button" title="Zoom out" aria-label="Zoom out">-</button>
+          <button id="zoomInButton" type="button" title="Zoom in" aria-label="Zoom in">+</button>
+          <button id="resetMapButton" type="button" title="Generate a new map" aria-label="Generate a new map">R</button>
+          <button id="restButton" type="button" title="Short rest" aria-label="Short rest">*</button>
+        </div>
+      </header>
+      <ol id="eventLog"></ol>
+    </aside>
+
+    <nav class="hud action-bar" aria-label="World actions">
+      <button id="worldObserveButton" type="button" title="Observe the area" aria-label="Observe the area">Observe</button>
+      <button id="worldSearchButton" type="button" title="Search for useful details" aria-label="Search for useful details">Search</button>
+      <button id="worldAttackButton" type="button" title="Challenge a nearby threat" aria-label="Challenge a nearby threat">Attack</button>
+      <button id="worldCampButton" type="button" title="Take a field rest" aria-label="Take a field rest">Rest</button>
+      <button id="worldRollButton" type="button" title="Make a free skill check" aria-label="Make a free skill check">Roll</button>
+    </nav>
+
+    <section id="npcPanel" class="hud npc-panel hidden" aria-label="Encounter">
+      <header>
+        <div>
+          <p id="npcRole" class="eyebrow">Villager</p>
+          <h2 id="npcName">Name</h2>
+        </div>
+        <button id="closeNpc" type="button" title="Close" aria-label="Close">x</button>
+      </header>
+      <p id="npcText"></p>
+      <div class="npc-stats">
+        <span>Ancestry <strong id="npcAncestry">Human</strong></span>
+        <span>Gender <strong id="npcGender">Woman</strong></span>
+        <span>DC <strong id="npcDc">10</strong></span>
+        <span>Mood <strong id="npcMood">Wary</strong></span>
+      </div>
+      <div class="npc-stats secondary">
+        <span>Home <strong id="npcHome">Green Cottage</strong></span>
+        <span>Work <strong id="npcWork">Village Green</strong></span>
+        <span>Trust <strong id="npcTrust">0</strong></span>
+      </div>
+      <div class="choices">
+        <button id="talkButton" type="button">Talk</button>
+        <button id="rumorButton" type="button">Rumor</button>
+        <button id="tradeButton" type="button">Trade</button>
+        <button id="trainButton" type="button">Train</button>
+        <button id="insightButton" type="button">Insight</button>
+        <button id="aidButton" type="button">Aid</button>
+      </div>
+      <div id="npcServicePanel" class="npc-service-panel"></div>
+    </section>
+
+    <section id="questPanel" class="hud quest-panel hidden" aria-label="Tavern quests">
+      <header>
+        <div>
+          <p class="eyebrow">Hearth & Harrow</p>
+          <h2>Tavernkeep's Work</h2>
+        </div>
+        <button id="closeQuest" type="button" title="Close" aria-label="Close">x</button>
+      </header>
+      <p id="questIntro"></p>
+      <div id="questList" class="quest-list"></div>
+    </section>
+
+    <section id="minigamePanel" class="hud minigame-panel hidden" aria-label="Quest challenge">
+      <header>
+        <div>
+          <p id="minigameType" class="eyebrow">Challenge</p>
+          <h2 id="minigameTitle">Task</h2>
+        </div>
+        <button id="closeMinigame" type="button" title="Close" aria-label="Close">x</button>
+      </header>
+      <p id="minigameText"></p>
+      <div id="minigameStage" class="minigame-stage"></div>
+    </section>
+
+    <section id="combatPanel" class="hud combat-panel hidden" aria-label="Combat">
+      <header>
+        <div>
+          <p class="eyebrow">Combat</p>
+          <h2 id="combatTitle">Skirmish</h2>
+        </div>
+        <button id="closeCombat" type="button" title="Close" aria-label="Close">x</button>
+      </header>
+      <div class="combat-overview">
+        <article class="combat-card player">
+          <h3 id="combatHeroName">Mira Thorn</h3>
+          <p><span>HP</span> <strong id="combatHeroHp">12/12</strong></p>
+          <p><span>AC</span> <strong id="combatHeroAc">14</strong></p>
+          <p><span>State</span> <strong id="combatHeroState">Ready</strong></p>
+        </article>
+        <article class="combat-card enemy">
+          <h3 id="combatEnemyName">Threat</h3>
+          <p><span>HP</span> <strong id="combatEnemyHp">10/10</strong></p>
+          <p><span>AC</span> <strong id="combatEnemyAc">12</strong></p>
+          <p><span>Intent</span> <strong id="combatEnemyIntent">Watching</strong></p>
+        </article>
+      </div>
+      <p id="combatStatus">Steel rings in the road.</p>
+      <div class="combat-actions">
+        <button id="combatStrikeButton" type="button">Strike</button>
+        <button id="combatShotButton" type="button">Shot</button>
+        <button id="combatBraceButton" type="button">Brace</button>
+        <button id="combatSurgeButton" type="button">Wind</button>
+        <button id="combatItemButton" type="button">Potion</button>
+        <button id="combatFleeButton" type="button">Flee</button>
+      </div>
+      <ol id="combatLog" class="combat-log"></ol>
+    </section>
+
+    <section id="dicePanel" class="hud dice-panel hidden" aria-label="Dice roll">
+      <div class="dice-face">
+        <span class="dice-type" id="diceType">d20</span>
+        <strong id="diceRollValue">17</strong>
+      </div>
+      <div class="dice-copy">
+        <p class="eyebrow" id="diceReason">Dexterity Check</p>
+        <h2 id="diceOutcome">Success</h2>
+        <p id="diceBreakdown">17 + 2 = 19 vs DC 14</p>
+      </div>
+    </section>
+
+    <div id="prompt" class="prompt hidden" aria-live="polite"></div>
+
+    <script src="app.js"></script>
+  </body>
+</html>

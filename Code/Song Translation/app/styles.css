@@ -263,6 +263,8 @@ body {
   display: flex;
   align-items: center;
   gap: 10px;
+  flex-wrap: wrap;
+  justify-content: flex-end;
 }
 
 .panel-head h2 {
@@ -320,6 +322,73 @@ body {
   border-color: rgba(106, 242, 174, 0.32);
   background: rgba(106, 242, 174, 0.12);
   box-shadow: 0 0 0 1px rgba(106, 242, 174, 0.12) inset;
+}
+
+.manual-panel {
+  padding: 18px 28px 22px;
+  border-bottom: 1px solid rgba(255,255,255,0.06);
+  background: rgba(255,255,255,0.025);
+}
+
+.manual-grid {
+  display: grid;
+  grid-template-columns: repeat(3, minmax(0, 1fr));
+  gap: 12px;
+  margin-bottom: 12px;
+}
+
+.manual-panel label {
+  display: grid;
+  gap: 6px;
+  color: var(--muted);
+  font-size: 0.78rem;
+  text-transform: uppercase;
+  letter-spacing: 0.1em;
+}
+
+.manual-panel input[type="text"],
+.manual-panel select,
+.manual-panel textarea {
+  width: 100%;
+  border: 1px solid rgba(255,255,255,0.1);
+  border-radius: 16px;
+  background: rgba(3, 7, 6, 0.52);
+  color: var(--text);
+  font: inherit;
+  outline: none;
+}
+
+.manual-panel input[type="text"],
+.manual-panel select {
+  min-height: 44px;
+  padding: 0 12px;
+}
+
+.manual-panel option {
+  color: #08110f;
+  background: #f3f8f4;
+}
+
+.manual-panel textarea {
+  min-height: 150px;
+  resize: vertical;
+  padding: 13px 14px;
+  line-height: 1.5;
+}
+
+.manual-actions {
+  display: flex;
+  gap: 12px;
+  align-items: center;
+  justify-content: space-between;
+  flex-wrap: wrap;
+  margin-top: 12px;
+}
+
+.manual-note {
+  margin: 10px 0 0;
+  color: var(--soft);
+  font-size: 0.86rem;
 }
 
 .lyrics-scroll {
@@ -557,6 +626,81 @@ body.fullscreen-lyrics .empty-state {
   .panel-head {
     padding: 22px 18px 16px;
     align-items: start;
+  }
+
+  .manual-panel {
+    padding: 16px 18px 18px;
+  }
+
+  .manual-grid {
+    grid-template-columns: 1fr;
+  }
+}
+
+@media (orientation: portrait), (max-aspect-ratio: 10 / 11) {
+  html,
+  body {
+    height: auto;
+    min-height: 100%;
+  }
+
+  body {
+    overflow-y: auto;
+  }
+
+  .app-shell {
+    height: auto;
+    min-height: 100svh;
+    grid-template-columns: 1fr;
+    padding: max(62px, env(safe-area-inset-top)) 14px 18px;
+  }
+
+  .hero-card {
+    min-height: auto;
+    gap: 20px;
+    padding: 20px;
+  }
+
+  .cover-frame {
+    width: min(62vw, 220px);
+  }
+
+  .hero-top {
+    gap: 14px;
+  }
+
+  .chip-stack,
+  .panel-actions,
+  .manual-actions {
+    width: 100%;
+  }
+
+  .lyrics-panel {
+    min-height: 68svh;
+  }
+
+  .panel-head {
+    align-items: start;
+    flex-direction: column;
+    padding: 20px 16px 14px;
+  }
+
+  .manual-panel {
+    padding: 14px 16px 16px;
+  }
+
+  .manual-grid {
+    grid-template-columns: 1fr;
+  }
+
+  .lyrics-scroll {
+    min-height: 58svh;
+    padding: 16px 16px 22vh;
+  }
+
+  .lyric-line {
+    border-radius: 18px;
+    padding: 15px 16px;
   }
 }
 

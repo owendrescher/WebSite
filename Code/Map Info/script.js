@@ -5,7 +5,7 @@ const MAP_URLS = [
 ];
 
 const COUNTRY_URLS = [
-  "https://restcountries.com/v3.1/all?fields=name,cca2,cca3,ccn3,ccn,capital,population,area,region,subregion,languages,currencies,timezones,flags,flag,independent,startOfWeek,unMember,continents,idd",
+  "https://restcountries.com/v3.1/all?fields=name,cca2,cca3,ccn3,ccn,capital,population,area,region,subregion,languages,currencies,timezones,flags,flag,independent,startOfWeek,unMember,continents",
   "https://restcountries.com/v3.1/all",
   "https://raw.githubusercontent.com/mledoze/countries/master/countries.json"
 ];
@@ -33,6 +33,13 @@ const LIB_URLS = {
 const WIKIDATA_ENDPOINT = "https://query.wikidata.org/sparql";
 const BASE_STROKE_WIDTH = 0.65;
 const DEFAULT_COUNTRY_FILL = "#d6dfd0";
+const COUNTRY_COLOR_PALETTE = [
+  "#9ecae1", "#a1d99b", "#fdd0a2", "#c7b9e8", "#fdaeae",
+  "#bdbdbd", "#b2dfdb", "#f6e8a9", "#b3cde3", "#f4b6c2"
+];
+const UNSAFE_NAME_PARTS = [
+  "fag", "nig", "cunt", "kike", "spic", "chink", "gook", "tard", "tranny"
+];
 
 const tooltip = document.getElementById("tooltip");
 const panelTitle = document.getElementById("country-title");
@@ -44,6 +51,7 @@ const clearSelectionBtn = document.getElementById("clear-selection");
 const zoomInBtn = document.getElementById("zoom-in");
 const zoomOutBtn = document.getElementById("zoom-out");
 const zoomResetBtn = document.getElementById("zoom-reset");
+const comboColorInput = document.getElementById("combo-color");
 
 let svg;
 let g;
@@ -55,9 +63,11 @@ let worldTopology;
 let selectedIds = new Set();
 let countryByNumeric = new Map();
 let geometryByNumeric = new Map();
+let colorByNumeric = new Map();
 let leaderCache = new Map();
 let selectionVersion = 0;
 let currentZoom = 1;
+let selectedComboColor = "#24758e";
 
 const fmtInt = new Intl.NumberFormat("en-US");
 
@@ -94,6 +104,7 @@ async function initMap() {
   worldTopology = topology;
   const countries = normalizeCountries(rawCountries, populationLookup, gdpLookup);
   hydrateCountryMaps(countries, topology.objects.countries.geometries);
+  buildCountryColorMap(topology.objects.countries.geometries);
 
   svg = d3.select("#world-map");
   const defs = svg.append("defs");
@@ -139,6 +150,13 @@ async function initMap() {
 
   if (clearSelectionBtn) {
     clearSelectionBtn.addEventListener("click", clearSelection);
+  }
+  if (comboColorInput) {
+    selectedComboColor = comboColorInput.value || selectedComboColor;
+    comboColorInput.addEventListener("input", () => {
+      selectedComboColor = comboColorInput.value || selectedComboColor;
+      renderSelectionState();
+    });
   }
 
   setupZoom();
@@ -327,8 +345,7 @@ function normalizeCountries(data, populationLookup, gdpLookup) {
       independent: c.independent,
       startOfWeek: toText(c.startOfWeek) || "N/A",
       unMember: c.unMember,
-      continents: normalizeContinents(c.continents, c.region),
-      idd: normalizeIdd(c.idd)
+      continents: normalizeContinents(c.continents, c.region)
     };
   });
 }
@@ -378,11 +395,6 @@ function normalizeContinents(continents, region) {
   return [];
 }
 
-function normalizeIdd(idd) {
-  if (idd) return idd;
-  return {};
-}
-
 function hydrateCountryMaps(countries, geometries) {
   countryByNumeric = new Map();
   geometryByNumeric = new Map();
@@ -401,42 +413,7 @@ function hydrateCountryMaps(countries, geometries) {
 }
 
 function createFlagPatterns(defs, countries) {
-  countries.forEach((country) => {
-    const emoji = country.flags?.emoji;
-    const patternId = getPatternId(country);
-    if (!emoji || !patternId) {
-      return;
-    }
-
-    const pattern = defs.append("pattern")
-      .attr("id", patternId)
-      .attr("patternUnits", "userSpaceOnUse")
-      .attr("width", 72)
-      .attr("height", 72)
-      .attr("patternTransform", "rotate(-18)");
-
-    pattern.append("rect")
-      .attr("width", 72)
-      .attr("height", 72)
-      .attr("fill", "#dce5d6")
-      .attr("opacity", 0.9);
-
-    [
-      [14, 22],
-      [48, 22],
-      [14, 58],
-      [48, 58]
-    ].forEach(([x, y]) => {
-      pattern.append("text")
-        .attr("x", x)
-        .attr("y", y)
-        .attr("font-size", 26)
-        .attr("text-anchor", "middle")
-        .attr("dominant-baseline", "middle")
-        .attr("opacity", 0.28)
-        .text(emoji);
-    });
-  });
+  // Kept as a no-op so the setup path remains stable while countries use solid pastel flag colors.
 }
 
 function getPatternId(country) {
@@ -445,9 +422,72 @@ function getPatternId(country) {
 }
 
 function getCountryFill(id) {
-  const country = getCountryData(id);
-  const patternId = getPatternId(country);
-  return patternId && country?.flags?.emoji ? `url(#${patternId})` : DEFAULT_COUNTRY_FILL;
+  const key = normalizeFeatureId(id);
+  if (selectedIds.has(key)) {
+    return selectedComboColor;
+  }
+  return colorByNumeric.get(key) || DEFAULT_COUNTRY_FILL;
+}
+
+function buildCountryColorMap(geometries) {
+  colorByNumeric = new Map();
+  const neighbors = topojson.neighbors(geometries);
+  const order = geometries
+    .map((geometry, index) => ({ index, key: normalizeFeatureId(geometry.id), degree: neighbors[index]?.length || 0 }))
+    .filter((entry) => entry.key)
+    .sort((a, b) => b.degree - a.degree);
+
+  order.forEach(({ index, key }) => {
+    const usedColors = new Set((neighbors[index] || [])
+      .map((neighborIndex) => colorByNumeric.get(normalizeFeatureId(geometries[neighborIndex]?.id)))
+      .filter(Boolean));
+    const color = COUNTRY_COLOR_PALETTE.find((candidate) => !usedColors.has(candidate)) ||
+      COUNTRY_COLOR_PALETTE[index % COUNTRY_COLOR_PALETTE.length];
+    colorByNumeric.set(key, color);
+  });
+}
+
+const FLAG_COLOR_GROUPS = {
+  red: ["AL","AT","BH","BM","CA","CH","CN","CZ","DK","ES","GE","GI","HK","ID","IM","JP","KG","LV","MA","MC","ME","NO","NP","PE","PL","PT","QA","SG","TN","TR","TW","US"],
+  blue: ["AR","AU","BA","BB","BZ","CL","CU","EE","EU","FI","FM","GR","GT","HN","IS","IL","KZ","LI","LU","NI","NZ","PA","PY","SE","SO","SV","UY","VE"],
+  green: ["BD","BJ","BR","CG","CM","DZ","ET","GH","GN","GW","GY","IE","IR","JM","JO","KE","KW","LY","ML","MR","NG","PK","PS","SA","SN","ST","SY","TJ","TM","TZ","ZM","ZW"],
+  yellow: ["AD","BE","BN","BT","CO","DE","EC","ER","LT","MD","MK","MY","RO","RW","SC","TD","UA","VA","VN"],
+  white: ["CY","KR","MT"],
+  black: ["AO","BW","EE","MW","PG","SS","SZ","TT"],
+  orange: ["AM","CI","IN","LK","NE"]
+};
+
+const PASTEL_FLAG_COLORS = {
+  red: "#efb3ad",
+  blue: "#adc9ee",
+  green: "#b7d9bd",
+  yellow: "#f2df9b",
+  white: "#edf0e8",
+  black: "#bec3c4",
+  orange: "#edc49f"
+};
+
+function getPastelFlagColor(country) {
+  const code = toText(country?.cca2).toUpperCase();
+  if (!code) return DEFAULT_COUNTRY_FILL;
+
+  const matches = Object.entries(FLAG_COLOR_GROUPS)
+    .filter(([, codes]) => codes.includes(code))
+    .map(([color]) => color);
+
+  if (matches.length) {
+    return PASTEL_FLAG_COLORS[matches[matches.length - 1]] || DEFAULT_COUNTRY_FILL;
+  }
+
+  const regionFallback = {
+    Africa: "green",
+    Americas: "blue",
+    Asia: "red",
+    Europe: "blue",
+    Oceania: "blue",
+    Antarctic: "white"
+  };
+  return PASTEL_FLAG_COLORS[regionFallback[country?.region] || "white"] || DEFAULT_COUNTRY_FILL;
 }
 
 function getCountryData(id) {
@@ -505,45 +545,17 @@ function renderSelectionState() {
 
   const combined = combineCountries(selectedCountries);
   panelTitle.textContent = buildComboTitle(selectedCountries);
-  panelSubtitle.textContent = `${selectedCountries.length} countries selected. Borders merge where the landmasses connect.`;
+  panelSubtitle.textContent = "Borders merge where the landmasses connect.";
   renderDetailPairs(buildCombinedDetailPairs(combined));
   hydrateLeaderDetails(selectedCountries);
 }
 
 function updateSelectionVisuals() {
   countryLayer.selectAll("path.country")
-    .classed("is-selected", (d) => selectedIds.has(normalizeFeatureId(d.id)));
-
-  const selectedGeometry = [...selectedIds]
-    .map((id) => geometryByNumeric.get(id))
-    .filter(Boolean);
-
-  if (!selectedGeometry.length) {
-    selectionLayer.select(".combo-fill").attr("d", null);
-    selectionLayer.select(".combo-border").attr("d", null);
-    return;
-  }
-
-  const merged = topojson.merge(worldTopology, selectedGeometry);
-  const outline = topojson.mesh(
-    worldTopology,
-    worldTopology.objects.countries,
-    (a, b) => {
-      const aSelected = a && selectedIds.has(normalizeFeatureId(a.id));
-      if (!aSelected) {
-        return false;
-      }
-
-      if (!b) {
-        return true;
-      }
-
-      return !selectedIds.has(normalizeFeatureId(b.id));
-    }
-  );
-
-  selectionLayer.select(".combo-fill").attr("d", path(merged));
-  selectionLayer.select(".combo-border").attr("d", outline ? path(outline) : null);
+    .classed("is-selected", (d) => selectedIds.has(normalizeFeatureId(d.id)))
+    .attr("fill", (d) => getCountryFill(d.id));
+  selectionLayer.select(".combo-fill").attr("d", null);
+  selectionLayer.select(".combo-border").attr("d", null);
 }
 
 function getSelectedCountries() {
@@ -580,7 +592,6 @@ function buildCountryDetailPairs(country) {
     ["Languages", formatValues(Object.values(country.languages || {}))],
     ["Currencies", formatCurrencies(country.currencies)],
     ["Time Zones", formatValues(country.timezones)],
-    ["Calling Code", formatCallingCode(country.idd)],
     ["UN Member", yesNo(country.unMember)],
     ["Independent", yesNo(country.independent)],
     ["Week Starts", country.startOfWeek || "N/A"],
@@ -606,7 +617,6 @@ function combineCountries(countries) {
     languages: uniqueValues(countries.flatMap((country) => Object.values(country.languages || {})).filter(isPresent)),
     currencies: uniqueValues(countries.flatMap((country) => formatCurrencyList(country.currencies)).filter(isPresent)),
     timezones: uniqueValues(countries.flatMap((country) => country.timezones || []).filter(isPresent)),
-    callingCodes: uniqueValues(countries.map((country) => formatCallingCode(country.idd)).filter(isMeaningful)),
     unMembers: countTrue(countries.map((country) => country.unMember)),
     independents: countTrue(countries.map((country) => country.independent)),
     weekStarts: uniqueValues(countries.map((country) => country.startOfWeek).filter(isMeaningful)),
@@ -633,7 +643,6 @@ function buildCombinedDetailPairs(combined) {
     ["Languages", formatValues(combined.languages)],
     ["Currencies", formatValues(combined.currencies)],
     ["Time Zones", formatValues(combined.timezones)],
-    ["Calling Codes", formatValues(combined.callingCodes)],
     ["UN Members", `${combined.unMembers} of ${combined.countries.length}`],
     ["Independent States", `${combined.independents} of ${combined.countries.length}`],
     ["Week Starts", formatValues(combined.weekStarts)],
@@ -675,11 +684,83 @@ async function hydrateLeaderDetails(countries) {
 }
 
 function buildComboTitle(countries) {
-  if (countries.length <= 3) {
-    return countries.map((country) => country.name.common).join(" + ");
+  return buildBlendedCountryName(countries);
+}
+
+function buildBlendedCountryName(countries) {
+  const sourceNames = countries
+    .map((country) => country.name.common.replace(/\(.+?\)/g, ""))
+    .map((name) => name.replace(/[^A-Za-z]/g, ""))
+    .filter((name) => name.length >= 3);
+
+  if (!sourceNames.length) {
+    return "Newland";
   }
 
-  return `${countries[0].name.common} + ${countries.length - 1} more`;
+  const fragmentSize = sourceNames.length <= 3 ? 5 : sourceNames.length <= 8 ? 3 : 2;
+  const fragments = sourceNames.map((name, index) => {
+    if (index === 0) {
+      return chooseSafeNameFragment(name, Math.min(fragmentSize, name.length), 0);
+    }
+    if (index === sourceNames.length - 1) {
+      const suffixSize = name.toLowerCase().endsWith("stan") ? 4 : fragmentSize;
+      return chooseSafeNameFragment(name, suffixSize, Math.max(0, name.length - suffixSize));
+    }
+    const middle = Math.max(0, Math.floor((name.length - fragmentSize) / 2));
+    return chooseSafeNameFragment(name, fragmentSize, middle);
+  });
+
+  const candidates = [
+    joinNameFragments(fragments),
+    joinNameFragments(fragments, "a"),
+    joinNameFragments(fragments.map((fragment, index) => index % 2 ? fragment.split("").reverse().join("") : fragment))
+  ];
+
+  const clean = candidates.find((candidate) => isSafeGeneratedName(candidate)) || fragments.join("land");
+  return clean.charAt(0).toUpperCase() + clean.slice(1).toLowerCase();
+}
+
+function joinNameFragments(fragments, fallbackVowel = "a") {
+  return fragments.reduce((name, fragment, index) => {
+    if (!index) {
+      return fragment;
+    }
+    const previous = name.charAt(name.length - 1);
+    const next = fragment.charAt(0);
+    const joiner = previous && next && isConsonant(previous) && isConsonant(next) ? fallbackVowel : "";
+    return `${name}${joiner}${fragment}`;
+  }, "");
+}
+
+function isConsonant(letter) {
+  return /^[bcdfghjklmnpqrstvwxyz]$/i.test(letter);
+}
+
+function isSafeGeneratedName(value) {
+  const normalized = value.toLowerCase().replace(/[^a-z]/g, "");
+  return normalized.length >= 5 && !UNSAFE_NAME_PARTS.some((part) => normalized.includes(part));
+}
+
+function chooseSafeNameFragment(name, size, preferredStart) {
+  const clean = name.replace(/[^A-Za-z]/g, "");
+  const starts = [
+    preferredStart,
+    0,
+    Math.max(0, clean.length - size),
+    Math.max(0, Math.floor((clean.length - size) / 2))
+  ];
+
+  for (const length of [size, Math.max(2, size - 1), 1]) {
+    for (let start of starts) {
+      start = Math.max(0, Math.min(clean.length - length, start));
+      const fragment = clean.slice(start, start + length);
+      if (fragment && !UNSAFE_NAME_PARTS.some((part) => fragment.toLowerCase().includes(part))) {
+        return fragment;
+      }
+    }
+  }
+
+  return clean.charAt(0) || "x";
 }
 
 function addDetail(label, value) {
@@ -730,16 +811,6 @@ function formatCurrencyList(currencies = {}) {
       return symbol ? `${name || "Currency"} (${symbol})` : name;
     })
     .filter(Boolean);
-}
-
-function formatCallingCode(idd = {}) {
-  const root = toText(idd.root);
-  const suffixes = Array.isArray(idd.suffixes) && idd.suffixes.length ? idd.suffixes : [""];
-  const codes = suffixes
-    .map((suffix) => `${root}${toText(suffix)}`.trim())
-    .filter(Boolean);
-
-  return codes.length ? uniqueValues(codes).join(", ") : "N/A";
 }
 
 function yesNo(value) {

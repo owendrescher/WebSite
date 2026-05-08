@@ -9,6 +9,18 @@ const sizeRange = document.getElementById("sizeRange");
 const sizeNumber = document.getElementById("sizeNumber");
 const textSizeInput = document.getElementById("textSizeInput");
 const shapeModeSelect = document.getElementById("shapeModeSelect");
+const brushOpacityRange = document.getElementById("brushOpacityRange");
+const brushHardnessRange = document.getElementById("brushHardnessRange");
+const strokeCapSelect = document.getElementById("strokeCapSelect");
+const lineDashSelect = document.getElementById("lineDashSelect");
+const fillToleranceRange = document.getElementById("fillToleranceRange");
+const blurStrengthRange = document.getElementById("blurStrengthRange");
+const gradientTypeSelect = document.getElementById("gradientTypeSelect");
+const textFontSelect = document.getElementById("textFontSelect");
+const panSpeedRange = document.getElementById("panSpeedRange");
+const pickerSampleRange = document.getElementById("pickerSampleRange");
+const constrainShapeToggle = document.getElementById("constrainShapeToggle");
+const moveWrapToggle = document.getElementById("moveWrapToggle");
 const primaryColorInput = document.getElementById("primaryColorInput");
 const secondaryColorInput = document.getElementById("secondaryColorInput");
 const primaryColorChip = document.getElementById("primaryColorChip");
@@ -62,6 +74,18 @@ const state = {
   tool: "move",
   size: 8,
   textSize: 30,
+  brushOpacity: 1,
+  brushHardness: 0.9,
+  strokeCap: "round",
+  lineDash: "solid",
+  fillTolerance: 0,
+  blurStrength: 5,
+  gradientType: "linear",
+  textFont: "Aptos, Trebuchet MS, sans-serif",
+  panSpeed: 1,
+  pickerSampleSize: 1,
+  constrainShape: false,
+  moveWrap: false,
   primaryColor: "#111111",
   secondaryColor: "#ffffff",
   shapeMode: "stroke",
@@ -378,7 +402,7 @@ function updateStatus() {
   const layer = activeLayer();
   toolSummary.textContent = toolName;
   statusTool.textContent = `Tool: ${toolName}`;
-  statusSize.textContent = `Brush: ${state.size} px`;
+  statusSize.textContent = `Brush: ${state.size} px / ${Math.round(state.brushOpacity * 100)}%`;
   statusLayer.textContent = `Layer: ${layer ? layer.name : "--"}`;
   zoomReadout.textContent = `${Math.round(state.zoom * 100)}%`;
 }
@@ -674,9 +698,9 @@ function newProject() {
 }
 
 function getCanvasPoint(event) {
-  const rect = previewCanvas.getBoundingClientRect();
-  const x = Math.floor((event.clientX - rect.left) * (previewCanvas.width / rect.width));
-  const y = Math.floor((event.clientY - rect.top) * (previewCanvas.height / rect.height));
+  const rect = canvasWrapper.getBoundingClientRect();
+  const x = Math.floor((event.clientX - rect.left) / state.zoom);
+  const y = Math.floor((event.clientY - rect.top) / state.zoom);
   return {
     x: Math.max(0, Math.min(state.projectWidth - 1, x)),
     y: Math.max(0, Math.min(state.projectHeight - 1, y)),
@@ -697,6 +721,19 @@ function normalizeRect(x1, y1, x2, y2) {
   const width = Math.abs(x2 - x1);
   const height = Math.abs(y2 - y1);
   return { x: left, y: top, width, height };
+}
+
+function getConstrainedEndpoint(x1, y1, x2, y2) {
+  if (!state.constrainShape) {
+    return { x: x2, y: y2 };
+  }
+  const widthDelta = x2 - x1;
+  const heightDelta = y2 - y1;
+  const size = Math.max(Math.abs(widthDelta), Math.abs(heightDelta));
+  return {
+    x: x1 + Math.sign(widthDelta || 1) * size,
+    y: y1 + Math.sign(heightDelta || 1) * size,
+  };
 }
 
 function hasSelection() {
@@ -734,9 +771,14 @@ function getSelectionRectOrCanvas() {
 
 function drawStrokeSegment(ctx, fromX, fromY, toX, toY, tool, button) {
   ctx.save();
-  ctx.lineCap = tool === "pencil" ? "square" : "round";
+  ctx.lineCap = tool === "pencil" ? state.strokeCap : state.strokeCap;
   ctx.lineJoin = tool === "pencil" ? "miter" : "round";
   ctx.lineWidth = tool === "pencil" ? Math.max(1, Math.round(state.size / 2)) : state.size;
+  ctx.globalAlpha = state.brushOpacity;
+  if (tool === "brush" && state.brushHardness < 0.75) {
+    ctx.shadowColor = activeColor(button);
+    ctx.shadowBlur = Math.round(state.size * (1 - state.brushHardness));
+  }
 
   if (tool === "eraser") {
     ctx.globalCompositeOperation = "destination-out";
@@ -754,6 +796,13 @@ function drawStrokeSegment(ctx, fromX, fromY, toX, toY, tool, button) {
 }
 
 function drawShape(ctx, tool, x1, y1, x2, y2) {
+  if (state.constrainShape && (tool === "rectangle" || tool === "ellipse" || tool === "line")) {
+    const widthDelta = x2 - x1;
+    const heightDelta = y2 - y1;
+    const size = Math.max(Math.abs(widthDelta), Math.abs(heightDelta));
+    x2 = x1 + Math.sign(widthDelta || 1) * size;
+    y2 = y1 + Math.sign(heightDelta || 1) * size;
+  }
   const width = x2 - x1;
   const height = y2 - y1;
 
@@ -762,6 +811,13 @@ function drawShape(ctx, tool, x1, y1, x2, y2) {
   ctx.strokeStyle = state.primaryColor;
   ctx.fillStyle = state.secondaryColor;
   ctx.lineJoin = "round";
+  ctx.globalAlpha = state.brushOpacity;
+  if (state.lineDash === "dash") {
+    ctx.setLineDash([state.size * 2.5, state.size * 1.5]);
+  } else if (state.lineDash === "dot") {
+    ctx.setLineDash([1, state.size * 1.8]);
+    ctx.lineCap = "round";
+  }
 
   if (tool === "line") {
     ctx.beginPath();
@@ -795,11 +851,12 @@ function drawShape(ctx, tool, x1, y1, x2, y2) {
 }
 
 function colorsMatch(data, offset, target) {
+  const tolerance = state.fillTolerance;
   return (
-    data[offset] === target[0] &&
-    data[offset + 1] === target[1] &&
-    data[offset + 2] === target[2] &&
-    data[offset + 3] === target[3]
+    Math.abs(data[offset] - target[0]) <= tolerance &&
+    Math.abs(data[offset + 1] - target[1]) <= tolerance &&
+    Math.abs(data[offset + 2] - target[2]) <= tolerance &&
+    Math.abs(data[offset + 3] - target[3]) <= tolerance
   );
 }
 
@@ -864,8 +921,9 @@ function placeTextOnLayer(layer, x, y, button) {
   }
 
   layer.ctx.save();
+  layer.ctx.globalAlpha = state.brushOpacity;
   layer.ctx.fillStyle = activeColor(button);
-  layer.ctx.font = `${state.textSize}px "Aptos", "Trebuchet MS", sans-serif`;
+  layer.ctx.font = `${state.textSize}px ${state.textFont}`;
   layer.ctx.textBaseline = "top";
   layer.ctx.fillText(text, x, y);
   layer.ctx.restore();
@@ -890,8 +948,19 @@ function composeVisibleLayers() {
 
 function pickColorFromComposite(x, y, button) {
   const composite = composeVisibleLayers();
-  const pixel = composite.getContext("2d", { willReadFrequently: true }).getImageData(x, y, 1, 1).data;
-  const hex = `#${[pixel[0], pixel[1], pixel[2]]
+  const sampleSize = state.pickerSampleSize;
+  const half = Math.floor(sampleSize / 2);
+  const sampleX = Math.max(0, Math.min(state.projectWidth - sampleSize, x - half));
+  const sampleY = Math.max(0, Math.min(state.projectHeight - sampleSize, y - half));
+  const pixels = composite.getContext("2d", { willReadFrequently: true }).getImageData(sampleX, sampleY, sampleSize, sampleSize).data;
+  const totals = [0, 0, 0];
+  const count = sampleSize * sampleSize;
+  for (let index = 0; index < pixels.length; index += 4) {
+    totals[0] += pixels[index];
+    totals[1] += pixels[index + 1];
+    totals[2] += pixels[index + 2];
+  }
+  const hex = `#${totals.map((value) => Math.round(value / count))
     .map((value) => value.toString(16).padStart(2, "0"))
     .join("")}`;
 
@@ -907,6 +976,11 @@ function translateLayerPixels(layer, dx, dy) {
   const temp = cloneCanvas(layer.canvas);
   layer.ctx.clearRect(0, 0, state.projectWidth, state.projectHeight);
   layer.ctx.drawImage(temp, dx, dy);
+  if (state.moveWrap) {
+    layer.ctx.drawImage(temp, dx - Math.sign(dx || 1) * state.projectWidth, dy);
+    layer.ctx.drawImage(temp, dx, dy - Math.sign(dy || 1) * state.projectHeight);
+    layer.ctx.drawImage(temp, dx - Math.sign(dx || 1) * state.projectWidth, dy - Math.sign(dy || 1) * state.projectHeight);
+  }
 }
 
 function applyLayerFilter(layer, filterString) {
@@ -969,7 +1043,7 @@ function applyBlurBrush(layer, centerX, centerY, radius) {
   temp.width = width;
   temp.height = height;
   const tempCtx = temp.getContext("2d");
-  tempCtx.filter = "blur(5px)";
+  tempCtx.filter = `blur(${state.blurStrength}px)`;
   tempCtx.drawImage(layer.canvas, sourceX, sourceY, width, height, 0, 0, width, height);
 
   layer.ctx.save();
@@ -981,10 +1055,14 @@ function applyBlurBrush(layer, centerX, centerY, radius) {
 }
 
 function applyGradient(layer, x1, y1, x2, y2, button) {
-  const gradient = layer.ctx.createLinearGradient(x1, y1, x2, y2);
+  const distance = Math.max(1, Math.hypot(x2 - x1, y2 - y1));
+  const gradient = state.gradientType === "radial"
+    ? layer.ctx.createRadialGradient(x1, y1, 0, x1, y1, distance)
+    : layer.ctx.createLinearGradient(x1, y1, x2, y2);
   gradient.addColorStop(0, activeColor(button));
   gradient.addColorStop(1, button === 2 ? state.primaryColor : state.secondaryColor);
   layer.ctx.save();
+  layer.ctx.globalAlpha = state.brushOpacity;
   layer.ctx.fillStyle = gradient;
   const target = getSelectionRectOrCanvas();
   layer.ctx.fillRect(target.x, target.y, target.width, target.height);
@@ -1192,7 +1270,8 @@ function movePointer(event) {
 
   if (state.tool === "select") {
     clearPreview();
-    const rect = normalizeRect(state.startX, state.startY, x, y);
+    const end = getConstrainedEndpoint(state.startX, state.startY, x, y);
+    const rect = normalizeRect(state.startX, state.startY, end.x, end.y);
     previewCtx.save();
     previewCtx.setLineDash([8, 4]);
     previewCtx.lineWidth = 1;
@@ -1210,8 +1289,8 @@ function movePointer(event) {
   }
 
   if (state.tool === "hand") {
-    canvasScroll.scrollLeft = state.handStartScrollLeft - (x - state.startX) * state.zoom;
-    canvasScroll.scrollTop = state.handStartScrollTop - (y - state.startY) * state.zoom;
+    canvasScroll.scrollLeft = state.handStartScrollLeft - (x - state.startX) * state.zoom * state.panSpeed;
+    canvasScroll.scrollTop = state.handStartScrollTop - (y - state.startY) * state.zoom * state.panSpeed;
     return;
   }
 
@@ -1258,7 +1337,8 @@ function finishPointer(event) {
   const { x, y } = getCanvasPoint(event);
 
   if (state.tool === "select") {
-    state.selection = normalizeRect(state.startX, state.startY, x, y);
+    const end = getConstrainedEndpoint(state.startX, state.startY, x, y);
+    state.selection = normalizeRect(state.startX, state.startY, end.x, end.y);
     clearPreviewAndSelectionOverlay();
   } else if (state.tool === "move") {
     layer.canvas.style.transform = "";
@@ -1554,6 +1634,55 @@ textSizeInput.addEventListener("input", () => {
 
 shapeModeSelect.addEventListener("change", () => {
   state.shapeMode = shapeModeSelect.value;
+});
+
+brushOpacityRange.addEventListener("input", () => {
+  state.brushOpacity = Number(brushOpacityRange.value) / 100;
+  updateStatus();
+});
+
+brushHardnessRange.addEventListener("input", () => {
+  state.brushHardness = Number(brushHardnessRange.value) / 100;
+});
+
+strokeCapSelect.addEventListener("change", () => {
+  state.strokeCap = strokeCapSelect.value;
+});
+
+lineDashSelect.addEventListener("change", () => {
+  state.lineDash = lineDashSelect.value;
+});
+
+fillToleranceRange.addEventListener("input", () => {
+  state.fillTolerance = Number(fillToleranceRange.value);
+});
+
+blurStrengthRange.addEventListener("input", () => {
+  state.blurStrength = Number(blurStrengthRange.value);
+});
+
+gradientTypeSelect.addEventListener("change", () => {
+  state.gradientType = gradientTypeSelect.value;
+});
+
+textFontSelect.addEventListener("change", () => {
+  state.textFont = textFontSelect.value;
+});
+
+panSpeedRange.addEventListener("input", () => {
+  state.panSpeed = Number(panSpeedRange.value) / 100;
+});
+
+pickerSampleRange.addEventListener("input", () => {
+  state.pickerSampleSize = Number(pickerSampleRange.value);
+});
+
+constrainShapeToggle.addEventListener("change", () => {
+  state.constrainShape = constrainShapeToggle.checked;
+});
+
+moveWrapToggle.addEventListener("change", () => {
+  state.moveWrap = moveWrapToggle.checked;
 });
 
 primaryColorInput.addEventListener("input", () => {

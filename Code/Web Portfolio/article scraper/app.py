@@ -16,6 +16,15 @@ BASE_DIR = Path(__file__).resolve().parent
 OUTPUT_DIR = BASE_DIR / "output"
 OUTPUT_DIR.mkdir(parents=True, exist_ok=True)
 
+
+@app.after_request
+def add_cors_headers(response):
+    response.headers["Access-Control-Allow-Origin"] = "*"
+    response.headers["Access-Control-Allow-Methods"] = "GET, POST, OPTIONS"
+    response.headers["Access-Control-Allow-Headers"] = "Content-Type"
+    response.headers["Access-Control-Max-Age"] = "600"
+    return response
+
 ACCEPT_TEXTS = [
     # English
     "accept", "accept all", "agree", "i agree", "allow all", "ok", "got it",
@@ -124,7 +133,60 @@ def try_accept_cookies(page) -> bool:
     return clicked_any
 
 
-def screenshot_one(page, url: str, out_path: Path, max_height: int = 3000):
+def warm_page_for_capture(page, cap_height: int):
+    try:
+        page.evaluate(
+            """
+            async (limit) => {
+              const wait = (ms) => new Promise((resolve) => setTimeout(resolve, ms));
+              const images = Array.from(document.images || []).slice(0, 160);
+              await Promise.all(images.map((img) => {
+                if (!img) return Promise.resolve();
+                if (typeof img.decode === "function") {
+                  return img.decode().catch(() => null);
+                }
+                if (img.complete) return Promise.resolve();
+                return new Promise((resolve) => {
+                  img.addEventListener("load", resolve, { once: true });
+                  img.addEventListener("error", resolve, { once: true });
+                  setTimeout(resolve, 900);
+                });
+              }));
+
+              const maxScroll = Math.min(
+                Math.max(
+                  document.body.scrollHeight,
+                  document.documentElement.scrollHeight,
+                  limit
+                ),
+                limit
+              );
+
+              const step = Math.max(420, Math.round(window.innerHeight * 0.72));
+              for (let y = 0; y < maxScroll; y += step) {
+                window.scrollTo(0, y);
+                await wait(180);
+              }
+
+              window.scrollTo(0, 0);
+              await wait(180);
+            }
+            """,
+            int(cap_height),
+        )
+    except Exception:
+        pass
+
+
+def screenshot_one(
+    page,
+    url: str,
+    out_path: Path,
+    max_height: int = 3000,
+    viewport_width: int = 1440,
+    viewport_height: int = 920,
+):
+    page.set_viewport_size({"width": int(viewport_width), "height": int(viewport_height)})
     page.goto(url, wait_until="domcontentloaded", timeout=60000)
     page.wait_for_timeout(900)
 
@@ -140,6 +202,7 @@ def screenshot_one(page, url: str, out_path: Path, max_height: int = 3000):
     except PWTimeoutError:
         pass
 
+    warm_page_for_capture(page, max_height)
     page.wait_for_timeout(400)
 
     # cap screenshot height
@@ -179,6 +242,15 @@ def index():
     return send_from_directory(str(BASE_DIR), "index.html")
 
 
+@app.route("/api/health", methods=["GET"])
+def health():
+    return jsonify({
+        "ok": True,
+        "service": "article-screenshotter",
+        "output_dir": str(OUTPUT_DIR)
+    })
+
+
 @app.route("/output/<path:filename>")
 def output_files(filename):
     return send_from_directory(str(OUTPUT_DIR), filename)
@@ -189,6 +261,11 @@ def run():
     data = request.get_json(silent=True) or {}
     urls_raw = data.get("urls", "")
     headful = bool(data.get("headful", False))
+    viewport_width = int(data.get("viewport_width") or 1440)
+    max_height = int(data.get("max_height") or 3000)
+
+    viewport_width = max(1100, min(viewport_width, 2200))
+    max_height = max(1800, min(max_height, 5000))
 
     # parse URLs from textarea
     if isinstance(urls_raw, str):
@@ -218,7 +295,8 @@ def run():
     with sync_playwright() as p:
         browser = p.chromium.launch(headless=(not headful))
         context = browser.new_context(
-            viewport={"width": 1400, "height": 900},
+            viewport={"width": viewport_width, "height": 920},
+            device_scale_factor=1.15,
             locale="en-US",
         )
         context.set_default_timeout(60000)
@@ -236,7 +314,14 @@ def run():
             raw_path = OUTPUT_DIR / raw_rel
 
             try:
-                screenshot_one(page, url, raw_path, max_height=3000)
+                screenshot_one(
+                    page,
+                    url,
+                    raw_path,
+                    max_height=max_height,
+                    viewport_width=viewport_width,
+                    viewport_height=920,
+                )
                 results.append({
                     "url": url,
                     "domain": dom,

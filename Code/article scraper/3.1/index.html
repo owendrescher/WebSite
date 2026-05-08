@@ -51,7 +51,10 @@
     html,body{ height:100%; }
     body{
       margin:0;
-      background: radial-gradient(1200px 800px at 20% 0%, #122548 0%, var(--bg) 55%);
+      background:
+        radial-gradient(900px 640px at 12% -8%, rgba(96,165,250,.24), transparent 58%),
+        radial-gradient(700px 520px at 88% 6%, rgba(52,211,153,.16), transparent 56%),
+        linear-gradient(145deg, #070d19 0%, var(--bg) 48%, #10192c 100%);
       color:var(--text);
       font-family: ui-sans-serif, system-ui, -apple-system, Segoe UI, Roboto, Arial, sans-serif;
     }
@@ -60,7 +63,7 @@
 
     .header{ display:flex; justify-content:space-between; gap:14px; align-items:flex-end; flex-wrap:wrap; margin-bottom: 14px; }
     .title{ display:flex; flex-direction:column; gap:6px; }
-    .title h1{ margin:0; font-size: 26px; letter-spacing:.2px; }
+    .title h1{ margin:0; font-size: clamp(30px, 4vw, 56px); line-height:.92; letter-spacing:-.04em; }
     .title p{ margin:0; color:var(--muted); font-size: 14px; }
 
     .panel{
@@ -69,6 +72,7 @@
       border-radius: var(--radius);
       box-shadow: var(--shadow);
       overflow:hidden;
+      backdrop-filter: blur(18px);
     }
 
     .controls{
@@ -115,6 +119,7 @@
       font-weight: 650;
       cursor:pointer;
       transition: transform .06s ease, background .2s ease, border-color .2s ease;
+      box-shadow: inset 0 1px 0 rgba(255,255,255,.08);
     }
     button:hover{ background: rgba(96,165,250,.20); border-color: rgba(96,165,250,.35); }
     button:active{ transform: translateY(1px); }
@@ -148,6 +153,7 @@
       border-radius: 16px;
       overflow:hidden;
       background: linear-gradient(180deg, rgba(255,255,255,.04), rgba(255,255,255,.02));
+      box-shadow: 0 16px 36px rgba(0,0,0,.24);
     }
     .cardHead{
       padding: 10px 12px;
@@ -289,6 +295,21 @@
       .modalBtns{ flex-direction:column; align-items:stretch; }
       .leftBtns, .rightBtns{ justify-content:stretch; }
     }
+
+    @media (orientation: portrait), (max-aspect-ratio: 10 / 11){
+      html, body{ height:auto; min-height:100%; }
+      .wrap{ width:100%; padding: max(62px, env(safe-area-inset-top)) 12px 28px; }
+      .header{ align-items:flex-start; }
+      .title h1{ font-size: clamp(2.2rem, 12vw, 4.4rem); }
+      .controls{ grid-template-columns:1fr; padding:12px; }
+      .row, .right{ align-items:stretch; }
+      .row > *, button, select, textarea{ width:100%; }
+      .thumbs{ grid-template-columns:1fr; gap:12px; }
+      .modalBack{ align-items:stretch; padding:8px; }
+      .modal{ width:100%; max-height:calc(100svh - 16px); overflow:auto; }
+      .modalTop, .modalBtns, .rightBtns{ align-items:stretch; flex-direction:column; }
+      .cropArea img{ max-height:58vh; }
+    }
   </style>
 </head>
 
@@ -378,6 +399,7 @@
   </div>
 
   <script src="https://cdn.jsdelivr.net/npm/cropperjs@1.6.2/dist/cropper.min.js"></script>
+  <script src="https://cdn.jsdelivr.net/npm/jszip@3.10.1/dist/jszip.min.js"></script>
   <script>
     const $ = (id) => document.getElementById(id);
 
@@ -392,6 +414,8 @@
     let queue = [];
     let idx = 0;
     let apiBase = "";
+    let backendMode = true;
+    let clientZip = null;
 
     const LOCAL_API_BASE = "http://localhost:5000";
     const LOOPBACK_API_BASE = "http://127.0.0.1:5000";
@@ -471,6 +495,25 @@
     }
 
     function setStatus(s){ $("status").textContent = s; }
+
+    function screenshotServiceUrl(url){
+      return `https://image.thum.io/get/width/${Number($("viewportWidth").value || 1440)}/crop/${Number($("captureHeight").value || 3000)}/noanimate/${url}`;
+    }
+
+    function domainFromUrl(url){
+      try {
+        return new URL(url).hostname.replace(/^www\./, "").toLowerCase();
+      } catch {
+        return "site";
+      }
+    }
+
+    function getValidUrls(raw){
+      return String(raw || "")
+        .split(/\r?\n/)
+        .map((url) => url.trim())
+        .filter((url) => /^https?:\/\//i.test(url));
+    }
 
     function nextFinalName(domain){
       const cur = (finalCounts.get(domain) || 0) + 1;
@@ -566,6 +609,12 @@
       const dataUrl = await toBase64PNG(blob);
       const finalName = nextFinalName(item.domain);
 
+      if (!backendMode) {
+        if (!clientZip) clientZip = new JSZip();
+        clientZip.file(finalName, blob);
+        return finalName;
+      }
+
       // save crop to server
       const saveRes = await apiFetch("/api/save_crop", {
         method: "POST",
@@ -600,6 +649,12 @@
     }
 
     async function finishBatchZip(){
+      if (!backendMode) {
+        if (!clientZip) throw new Error("No browser crops were saved");
+        const zipBlob = await clientZip.generateAsync({ type: "blob" });
+        return URL.createObjectURL(zipBlob);
+      }
+
       const res = await apiFetch("/api/zip_final", {
         method: "POST",
         headers: {"Content-Type":"application/json"},
@@ -608,6 +663,55 @@
       const data = await res.json();
       if (!res.ok) throw new Error(data.error || "zip_final failed");
       return resolveToolUrl(data.zip_url);
+    }
+
+    function renderClientSideCards(urls){
+      backendMode = false;
+      clientZip = new JSZip();
+      batch = `browser_${Date.now()}`;
+      queue = urls.map((url) => ({
+        url,
+        domain: domainFromUrl(url),
+        raw_file: "",
+        raw_url: screenshotServiceUrl(url)
+      }));
+
+      $("thumbs").innerHTML = "";
+      queue.forEach((it) => {
+        const card = document.createElement("div");
+        card.className = "card";
+        const siteLabel = (() => {
+          try {
+            const parsed = new URL(it.url);
+            return `${parsed.hostname}${parsed.pathname === "/" ? "" : parsed.pathname}`;
+          } catch {
+            return it.url;
+          }
+        })();
+        card.innerHTML = `
+          <div class="cardHead">
+            <a href="${it.raw_url}" target="_blank" rel="noopener">${it.domain}</a>
+            <span class="chip">browser mode</span>
+          </div>
+          <div class="cardMeta">
+            <span>Remote screenshot preview</span>
+            <span>Crop locally</span>
+          </div>
+          <div class="imgWrap">
+            <div class="previewFrame">
+              <div class="previewBar">
+                <div class="previewDots"><span></span><span></span><span></span></div>
+                <div class="previewSite">${siteLabel}</div>
+              </div>
+              <img class="preview" src="${it.raw_url}" alt="Website screenshot preview" crossorigin="anonymous">
+            </div>
+          </div>
+        `;
+        $("thumbs").appendChild(card);
+      });
+
+      setStatus("Local server unavailable, so browser mode is active.\nScreenshots are loaded through a web capture service, then cropped and zipped in this page.");
+      processQueue();
     }
 
     $("closeModal").addEventListener("click", () => {
@@ -622,6 +726,7 @@
         try {
           const zipUrl = await finishBatchZip();
           $("zipLink").href = zipUrl;
+          $("zipLink").download = backendMode ? "" : "article-screenshots-final.zip";
           $("zipLink").style.display = "inline";
           setStatus(`Done cropping.\nFinal ZIP: ${zipUrl}`);
         } catch(e){
@@ -657,6 +762,7 @@
         try {
           const zipUrl = await finishBatchZip();
           $("zipLink").href = zipUrl;
+          $("zipLink").download = backendMode ? "" : "article-screenshots-final.zip";
           $("zipLink").style.display = "inline";
           setStatus(`All done.\nFinal ZIP: ${zipUrl}`);
         } catch(e){
@@ -678,6 +784,8 @@
       queue = [];
       idx = 0;
       finalCounts.clear();
+      backendMode = true;
+      clientZip = null;
       setStatus("Cleared.");
     });
 
@@ -690,6 +798,8 @@
       queue = [];
       idx = 0;
       finalCounts.clear();
+      backendMode = true;
+      clientZip = null;
 
       const urls = $("urls").value;
       if (!urls.trim()) {
@@ -714,7 +824,12 @@
         });
         data = await res.json();
       } catch (error) {
-        showConnectionHelp(error);
+        const validUrls = getValidUrls(urls);
+        if (validUrls.length && window.JSZip) {
+          renderClientSideCards(validUrls);
+        } else {
+          showConnectionHelp(error);
+        }
         return;
       }
 
