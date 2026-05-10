@@ -211,7 +211,11 @@
         <p class="owentools-sync__copy"></p>
         <form class="owentools-sync__form">
           <input class="owentools-sync__email" type="email" autocomplete="email" placeholder="email@example.com" />
-          <button type="submit">Send link</button>
+          <input class="owentools-sync__password" type="password" autocomplete="current-password" placeholder="Password" />
+          <div class="owentools-sync__actions">
+            <button class="owentools-sync__signin" type="submit">Sign in</button>
+            <button class="owentools-sync__signup" type="button">Create account</button>
+          </div>
         </form>
         <button class="owentools-sync__signout" type="button" hidden>Sign out</button>
       </div>
@@ -228,9 +232,11 @@
       .owentools-sync__menu{position:absolute;right:0;top:48px;width:min(300px,calc(100vw - 28px));padding:14px;border:1px solid rgba(0,0,0,.14);border-radius:14px;background:rgba(255,255,255,.96);box-shadow:0 18px 44px rgba(0,0,0,.22);backdrop-filter:blur(18px)}
       .owentools-sync__title{margin:0 0 6px;font-weight:800}
       .owentools-sync__copy{margin:0 0 12px;color:#52525b}
-      .owentools-sync__form{display:grid;grid-template-columns:1fr auto;gap:8px}
+      .owentools-sync__form{display:grid;gap:8px}
       .owentools-sync input{min-width:0;padding:9px 10px;border:1px solid #d4d4d8;border-radius:10px;font:inherit}
+      .owentools-sync__actions{display:grid;grid-template-columns:1fr 1fr;gap:8px}
       .owentools-sync__form button,.owentools-sync__signout{padding:9px 10px;border:0;border-radius:10px;background:#111827;color:white;font:700 13px/1 system-ui;cursor:pointer}
+      .owentools-sync__signup{background:#3f3f46!important}
       .owentools-sync__signout{width:100%;margin-top:6px;background:#27272a}
       @media (max-width: 700px){.owentools-sync{top:auto;bottom:max(14px,env(safe-area-inset-bottom))}.owentools-sync__menu{top:auto;bottom:48px}}
     `;
@@ -244,6 +250,8 @@
     const copy = root.querySelector(".owentools-sync__copy");
     const form = root.querySelector(".owentools-sync__form");
     const email = root.querySelector(".owentools-sync__email");
+    const password = root.querySelector(".owentools-sync__password");
+    const signUp = root.querySelector(".owentools-sync__signup");
     const signOut = root.querySelector(".owentools-sync__signout");
 
     button.addEventListener("click", () => {
@@ -254,11 +262,11 @@
 
     form.addEventListener("submit", async (event) => {
       event.preventDefault();
-      if (!client || !email.value) return;
-      setStatus("Sending...");
-      const { error } = await client.auth.signInWithOtp({
+      if (!client || !email.value || !password.value) return;
+      setStatus("Signing in...");
+      const { error } = await client.auth.signInWithPassword({
         email: email.value,
-        options: { emailRedirectTo: window.location.href.split("#")[0] }
+        password: password.value
       });
       if (error) {
         copy.textContent = error.message;
@@ -266,8 +274,30 @@
         setStatus("Try again");
         return;
       }
-      copy.textContent = "Check your email for the sign-in link.";
-      setStatus("Link sent");
+      password.value = "";
+    });
+
+    signUp.addEventListener("click", async () => {
+      if (!client || !email.value || !password.value) return;
+      setStatus("Creating...");
+      const { data, error } = await client.auth.signUp({
+        email: email.value,
+        password: password.value
+      });
+      if (error) {
+        copy.textContent = error.message;
+        setState("error");
+        setStatus("Try again");
+        return;
+      }
+      password.value = "";
+      if (data.session) {
+        copy.textContent = "Account created. Sync is turning on.";
+        setStatus("Syncing...");
+        return;
+      }
+      copy.textContent = "Account created. Check your email to confirm it, then sign in here.";
+      setStatus("Confirm email");
     });
 
     signOut.addEventListener("click", async () => {
@@ -291,7 +321,7 @@
         setStatus("Synced");
         return;
       }
-      copy.textContent = `Sign in to sync ${pageConfig.label} across your devices. You can keep using it locally without an account.`;
+      copy.textContent = `Sign in once to sync ${pageConfig.label}. This browser will stay signed in unless you sign out or clear site data.`;
       form.hidden = false;
       signOut.hidden = true;
       setState("signed-out");

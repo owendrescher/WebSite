@@ -42,18 +42,31 @@ Set **Site URL** to the deployed owentools URL.
 
 Add your deployed URLs to **Redirect URLs**, for example:
 
-```txt
+```text
 https://your-domain.com/**
 http://localhost:*/**
 ```
 
-Magic-link login works best from a hosted URL. A `file://` page can display the sync UI, but email redirects usually need an allowed web URL.
+Password login does not need a magic-link redirect for normal sign-in, but Supabase may still send confirmation or recovery emails depending on your auth settings.
 
-## 5. Test
+## 5. Configure password auth
+
+In Supabase, go to **Authentication > Providers > Email**.
+
+Make sure **Email provider** is enabled.
+
+For the simplest personal owentools setup, you can turn off **Confirm email**. Then creating an account signs in immediately.
+
+If you leave **Confirm email** on, the first account creation will send a confirmation email. After confirming once, future sign-ins use email + password.
+
+The sync code uses Supabase's persistent browser session. That means a device should stay signed in until you click **Sign out**, clear site data, or the browser blocks persistent storage.
+
+## 6. Test
 
 1. Open `index.html` through your deployed site or a local web server.
 2. Click the sync button.
-3. Enter your email and open the magic link.
+3. Enter your email and password.
+4. Click **Create account** the first time, then **Sign in** on other devices.
 4. Change data in a synced tool.
 5. Open the same tool in another browser/device and sign in.
 
