@@ -61,6 +61,12 @@ If you leave **Confirm email** on, the first account creation will send a confir
 
 The sync code uses Supabase's persistent browser session. That means a device should stay signed in until you click **Sign out**, clear site data, or the browser blocks persistent storage.
 
+If the widget says the account is waiting on email confirmation and password sign-in says invalid credentials:
+
+- Turn off **Confirm email** for the simplest setup, then delete/recreate the test user in **Authentication > Users**.
+- Or open **Authentication > Users**, click the user, and confirm the email manually if Supabase shows it as unconfirmed.
+- If the account was first created with magic-link testing, use **Reset password** in the widget to add/set a password for that existing account.
+
 ## 6. Test
 
 1. Open `index.html` through your deployed site or a local web server.

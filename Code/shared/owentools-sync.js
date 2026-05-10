@@ -2,6 +2,7 @@
   "use strict";
 
   const SUPABASE_CDN = "https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2";
+  const REQUEST_TIMEOUT_MS = 12000;
   const DEFAULT_SYNC = {
     toolId: "owentools",
     label: "owentools",
@@ -122,6 +123,16 @@
     };
   }
 
+  function withTimeout(promise, label) {
+    let timeoutId = 0;
+    const timeout = new Promise((_, reject) => {
+      timeoutId = window.setTimeout(() => reject(new Error(`${label} timed out`)), REQUEST_TIMEOUT_MS);
+    });
+    return Promise.race([Promise.resolve(promise), timeout]).finally(() => {
+      window.clearTimeout(timeoutId);
+    });
+  }
+
   function queueUpload(key, value) {
     if (suppressUpload || !shouldSyncKey(key)) return;
     markLocalUpdated(key);
@@ -142,12 +153,25 @@
     }));
     pendingUploads.clear();
 
-    const { error } = await client
-      .from("tool_state")
-      .upsert(rows, { onConflict: "user_id,tool_id,state_key" });
+    let result;
+    try {
+      result = await withTimeout(
+        client.from("tool_state").upsert(rows, { onConflict: "user_id,tool_id,state_key" }),
+        "Sync upload"
+      );
+    } catch (error) {
+      rows.forEach((row) => pendingUploads.set(row.state_key, row.data.value));
+      setState("error");
+      setStatus("Sync failed");
+      console.warn("owentools sync upload timed out", error);
+      return;
+    }
+
+    const { error } = result;
 
     if (error) {
       rows.forEach((row) => pendingUploads.set(row.state_key, row.data.value));
+      setState("error");
       setStatus("Sync paused");
       console.warn("owentools sync upload failed", error);
       return;
@@ -158,14 +182,28 @@
 
   async function loadCloudState() {
     if (!client || !session || pageConfig.loginOnly) return false;
-    const { data, error } = await client
-      .from("tool_state")
-      .select("state_key,data,updated_at")
-      .eq("user_id", session.user.id)
-      .eq("tool_id", pageConfig.toolId);
+    let result;
+    try {
+      result = await withTimeout(
+        client
+          .from("tool_state")
+          .select("state_key,data,updated_at")
+          .eq("user_id", session.user.id)
+          .eq("tool_id", pageConfig.toolId),
+        "Sync download"
+      );
+    } catch (error) {
+      console.warn("owentools sync download timed out", error);
+      setState("error");
+      setStatus("Sync failed");
+      return false;
+    }
+
+    const { data, error } = result;
 
     if (error) {
       console.warn("owentools sync download failed", error);
+      setState("error");
       setStatus("Sync paused");
       return false;
     }
@@ -197,15 +235,24 @@
   }
 
   async function reconcileAfterSignIn() {
-    setStatus("Syncing...");
-    const changed = await loadCloudState();
-    syncReady = true;
-    await uploadLocalState();
-    setStatus(session?.user?.email || "Synced");
+    try {
+      setState("working");
+      setStatus("Syncing...");
+      const changed = await loadCloudState();
+      syncReady = true;
+      await uploadLocalState();
+      setState("signed-in");
+      setStatus(session?.user?.email || "Synced");
 
-    if (changed && !sessionStorage.getItem(`owentools-sync-reloaded:${pageConfig.toolId}`)) {
-      sessionStorage.setItem(`owentools-sync-reloaded:${pageConfig.toolId}`, "1");
-      window.location.reload();
+      if (changed && !sessionStorage.getItem(`owentools-sync-reloaded:${pageConfig.toolId}`)) {
+        sessionStorage.setItem(`owentools-sync-reloaded:${pageConfig.toolId}`, "1");
+        window.location.reload();
+      }
+    } catch (error) {
+      syncReady = Boolean(session);
+      setState("error");
+      setStatus("Sync failed");
+      console.warn("owentools sync reconcile failed", error);
     }
   }
 
@@ -316,7 +363,16 @@
       if (!client || !password.value) return;
       if (recoveryMode) {
         setStatus("Saving...");
-        const { error } = await client.auth.updateUser({ password: password.value });
+        let result;
+        try {
+          result = await withTimeout(client.auth.updateUser({ password: password.value }), "Password update");
+        } catch (error) {
+          copy.textContent = error.message;
+          setState("error");
+          setStatus("Try again");
+          return;
+        }
+        const { error } = result;
         if (error) {
           copy.textContent = error.message;
           setState("error");
@@ -332,10 +388,22 @@
       }
       if (!email.value) return;
       setStatus("Signing in...");
-      const { data, error } = await client.auth.signInWithPassword({
-        email: email.value,
-        password: password.value
-      });
+      let result;
+      try {
+        result = await withTimeout(
+          client.auth.signInWithPassword({
+            email: email.value,
+            password: password.value
+          }),
+          "Sign in"
+        );
+      } catch (error) {
+        copy.textContent = error.message;
+        setState("error");
+        setStatus("Try again");
+        return;
+      }
+      const { data, error } = result;
       if (error) {
         copy.textContent = error.message;
         setState("error");
@@ -353,10 +421,22 @@
     signUp.addEventListener("click", async () => {
       if (!client || !email.value || !password.value) return;
       setStatus("Creating...");
-      const { data, error } = await client.auth.signUp({
-        email: email.value,
-        password: password.value
-      });
+      let result;
+      try {
+        result = await withTimeout(
+          client.auth.signUp({
+            email: email.value,
+            password: password.value
+          }),
+          "Create account"
+        );
+      } catch (error) {
+        copy.textContent = error.message;
+        setState("error");
+        setStatus("Try again");
+        return;
+      }
+      const { data, error } = result;
       if (error) {
         copy.textContent = error.message;
         setState("error");
@@ -379,9 +459,21 @@
     reset.addEventListener("click", async () => {
       if (!client || !email.value) return;
       setStatus("Sending...");
-      const { error } = await client.auth.resetPasswordForEmail(email.value, {
-        redirectTo: window.location.href.split("#")[0]
-      });
+      let result;
+      try {
+        result = await withTimeout(
+          client.auth.resetPasswordForEmail(email.value, {
+            redirectTo: window.location.href.split("#")[0]
+          }),
+          "Password reset"
+        );
+      } catch (error) {
+        copy.textContent = error.message;
+        setState("error");
+        setStatus("Try again");
+        return;
+      }
+      const { error } = result;
       if (error) {
         copy.textContent = error.message;
         setState("error");
@@ -399,8 +491,8 @@
     manualSyncButton.addEventListener("click", async () => {
       if (!session) return;
       setStatus("Syncing...");
-      await uploadLocalState();
       const changed = await loadCloudState();
+      await uploadLocalState();
       setStatus("Synced");
       if (changed) window.location.reload();
     });
@@ -480,7 +572,7 @@
         storageKey: AUTH_STORAGE_KEY
       }
     });
-    const result = await client.auth.getSession();
+    const result = await withTimeout(client.auth.getSession(), "Session restore");
     session = result.data.session;
     refreshWidget();
     if (session) await reconcileAfterSignIn();
