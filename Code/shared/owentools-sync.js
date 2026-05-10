@@ -28,6 +28,10 @@
   let statusEl = null;
   let menuEl = null;
   let recoveryMode = false;
+  let manualSyncButton = null;
+
+  const META_KEY = `owentools-sync-meta:${pageConfig.toolId}`;
+  const AUTH_STORAGE_KEY = "owentools-auth-session";
 
   const originalSetItem = Storage.prototype.setItem;
   const originalRemoveItem = Storage.prototype.removeItem;
@@ -44,9 +48,39 @@
 
   function shouldSyncKey(key) {
     if (pageConfig.loginOnly) return false;
+    if (String(key).startsWith("owentools-sync-")) return false;
     if (!key || matchesAny(key, pageConfig.exclude)) return false;
     if (!pageConfig.include || pageConfig.include.length === 0) return true;
     return matchesAny(key, pageConfig.include);
+  }
+
+  function readMeta() {
+    try {
+      return JSON.parse(window.localStorage.getItem(META_KEY) || "{}");
+    } catch {
+      return {};
+    }
+  }
+
+  function writeMeta(meta) {
+    try {
+      originalSetItem.call(window.localStorage, META_KEY, JSON.stringify(meta || {}));
+    } catch {
+      // ignore metadata failures
+    }
+  }
+
+  function markLocalUpdated(key) {
+    if (!shouldSyncKey(key)) return;
+    const meta = readMeta();
+    meta[key] = new Date().toISOString();
+    writeMeta(meta);
+  }
+
+  function localUpdatedAt(key) {
+    const value = readMeta()[key];
+    const time = value ? Date.parse(value) : 0;
+    return Number.isFinite(time) ? time : 0;
   }
 
   function readLocalValue(key) {
@@ -89,7 +123,9 @@
   }
 
   function queueUpload(key, value) {
-    if (!syncReady || suppressUpload || !session || !shouldSyncKey(key)) return;
+    if (suppressUpload || !shouldSyncKey(key)) return;
+    markLocalUpdated(key);
+    if (!syncReady || !session) return;
     pendingUploads.set(key, value);
     window.clearTimeout(flushTimer);
     flushTimer = window.setTimeout(flushUploads, 650);
@@ -102,7 +138,7 @@
       tool_id: pageConfig.toolId,
       state_key: key,
       data: encodeValue(value),
-      updated_at: new Date().toISOString()
+      updated_at: new Date(localUpdatedAt(key) || Date.now()).toISOString()
     }));
     pendingUploads.clear();
 
@@ -140,6 +176,12 @@
       if (!shouldSyncKey(key)) return;
       const value = row.data?.deleted ? null : String(row.data?.value ?? "");
       const localValue = readLocalValue(key);
+      const cloudTime = Date.parse(row.updated_at || "") || 0;
+      const localTime = localUpdatedAt(key);
+      if (localTime > cloudTime) {
+        pendingUploads.set(key, localValue);
+        return;
+      }
       if (localValue !== value) {
         writeLocalValue(key, value);
         changed = true;
@@ -157,8 +199,8 @@
   async function reconcileAfterSignIn() {
     setStatus("Syncing...");
     const changed = await loadCloudState();
-    await uploadLocalState();
     syncReady = true;
+    await uploadLocalState();
     setStatus(session?.user?.email || "Synced");
 
     if (changed && !sessionStorage.getItem(`owentools-sync-reloaded:${pageConfig.toolId}`)) {
@@ -219,6 +261,7 @@
           </div>
           <button class="owentools-sync__reset" type="button">Reset password</button>
         </form>
+        <button class="owentools-sync__manual" type="button" hidden>Sync now</button>
         <button class="owentools-sync__signout" type="button" hidden>Sign out</button>
       </div>
     `;
@@ -237,10 +280,12 @@
       .owentools-sync__form{display:grid;gap:8px}
       .owentools-sync input{min-width:0;padding:9px 10px;border:1px solid #d4d4d8;border-radius:10px;font:inherit}
       .owentools-sync__actions{display:grid;grid-template-columns:1fr 1fr;gap:8px}
-      .owentools-sync__form button,.owentools-sync__signout{padding:9px 10px;border:0;border-radius:10px;background:#111827;color:white;font:700 13px/1 system-ui;cursor:pointer}
+      .owentools-sync__form button,.owentools-sync__manual,.owentools-sync__signout{padding:9px 10px;border:0;border-radius:10px;background:#111827;color:white;font:700 13px/1 system-ui;cursor:pointer}
       .owentools-sync__signup{background:#3f3f46!important}
       .owentools-sync__reset{background:transparent!important;color:#3f3f46!important;border:1px solid #d4d4d8!important}
-      .owentools-sync__signout{width:100%;margin-top:6px;background:#27272a}
+      .owentools-sync__manual,.owentools-sync__signout{width:100%;margin-top:6px}
+      .owentools-sync__manual{background:#0f766e!important}
+      .owentools-sync__signout{background:#27272a}
       @media (max-width: 700px){.owentools-sync{top:auto;bottom:max(14px,env(safe-area-inset-bottom))}.owentools-sync__menu{top:auto;bottom:48px}}
     `;
 
@@ -257,6 +302,7 @@
     const signIn = root.querySelector(".owentools-sync__signin");
     const signUp = root.querySelector(".owentools-sync__signup");
     const reset = root.querySelector(".owentools-sync__reset");
+    manualSyncButton = root.querySelector(".owentools-sync__manual");
     const signOut = root.querySelector(".owentools-sync__signout");
 
     button.addEventListener("click", () => {
@@ -286,7 +332,7 @@
       }
       if (!email.value) return;
       setStatus("Signing in...");
-      const { error } = await client.auth.signInWithPassword({
+      const { data, error } = await client.auth.signInWithPassword({
         email: email.value,
         password: password.value
       });
@@ -297,6 +343,11 @@
         return;
       }
       password.value = "";
+      if (data.session) {
+        session = data.session;
+        refreshWidget();
+        await reconcileAfterSignIn();
+      }
     });
 
     signUp.addEventListener("click", async () => {
@@ -314,6 +365,9 @@
       }
       password.value = "";
       if (data.session) {
+        session = data.session;
+        refreshWidget();
+        await reconcileAfterSignIn();
         copy.textContent = "Account created. Sync is turning on.";
         setStatus("Syncing...");
         return;
@@ -342,10 +396,20 @@
       if (client) await client.auth.signOut();
     });
 
+    manualSyncButton.addEventListener("click", async () => {
+      if (!session) return;
+      setStatus("Syncing...");
+      await uploadLocalState();
+      const changed = await loadCloudState();
+      setStatus("Synced");
+      if (changed) window.location.reload();
+    });
+
     root.__refresh = () => {
       if (!configured) {
         copy.textContent = "Add your Supabase URL and anon key to shared/supabase-config.js to enable cross-device sync.";
         form.hidden = true;
+        manualSyncButton.hidden = true;
         signOut.hidden = true;
         setState("error");
         setStatus("Sync setup");
@@ -354,6 +418,7 @@
       if (session) {
         copy.textContent = `${pageConfig.label} is syncing through ${session.user.email || "your account"}.`;
         form.hidden = true;
+        manualSyncButton.hidden = pageConfig.loginOnly;
         signOut.hidden = false;
         setState("signed-in");
         setStatus("Synced");
@@ -367,6 +432,7 @@
         password.placeholder = "New password";
         copy.textContent = "Enter a new password for this account.";
         form.hidden = false;
+        manualSyncButton.hidden = true;
         signOut.hidden = true;
         setState("signed-out");
         setStatus("Set password");
@@ -379,6 +445,7 @@
       password.placeholder = "Password";
       copy.textContent = `Sign in once to sync ${pageConfig.label}. This browser will stay signed in unless you sign out or clear site data.`;
       form.hidden = false;
+      manualSyncButton.hidden = true;
       signOut.hidden = true;
       setState("signed-out");
       setStatus("Sign in");
@@ -409,7 +476,8 @@
       auth: {
         persistSession: true,
         autoRefreshToken: true,
-        detectSessionInUrl: true
+        detectSessionInUrl: true,
+        storageKey: AUTH_STORAGE_KEY
       }
     });
     const result = await client.auth.getSession();
@@ -436,6 +504,16 @@
     flushUploads,
     getSession: () => session
   };
+
+  document.addEventListener("visibilitychange", () => {
+    if (document.visibilityState === "hidden") {
+      void flushUploads();
+    }
+  });
+
+  window.addEventListener("pagehide", () => {
+    void flushUploads();
+  });
 
   patchLocalStorage();
 
