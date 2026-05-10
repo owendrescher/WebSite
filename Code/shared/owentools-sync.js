@@ -27,6 +27,7 @@
   let flushTimer = 0;
   let statusEl = null;
   let menuEl = null;
+  let recoveryMode = false;
 
   const originalSetItem = Storage.prototype.setItem;
   const originalRemoveItem = Storage.prototype.removeItem;
@@ -216,6 +217,7 @@
             <button class="owentools-sync__signin" type="submit">Sign in</button>
             <button class="owentools-sync__signup" type="button">Create account</button>
           </div>
+          <button class="owentools-sync__reset" type="button">Reset password</button>
         </form>
         <button class="owentools-sync__signout" type="button" hidden>Sign out</button>
       </div>
@@ -237,6 +239,7 @@
       .owentools-sync__actions{display:grid;grid-template-columns:1fr 1fr;gap:8px}
       .owentools-sync__form button,.owentools-sync__signout{padding:9px 10px;border:0;border-radius:10px;background:#111827;color:white;font:700 13px/1 system-ui;cursor:pointer}
       .owentools-sync__signup{background:#3f3f46!important}
+      .owentools-sync__reset{background:transparent!important;color:#3f3f46!important;border:1px solid #d4d4d8!important}
       .owentools-sync__signout{width:100%;margin-top:6px;background:#27272a}
       @media (max-width: 700px){.owentools-sync{top:auto;bottom:max(14px,env(safe-area-inset-bottom))}.owentools-sync__menu{top:auto;bottom:48px}}
     `;
@@ -251,7 +254,9 @@
     const form = root.querySelector(".owentools-sync__form");
     const email = root.querySelector(".owentools-sync__email");
     const password = root.querySelector(".owentools-sync__password");
+    const signIn = root.querySelector(".owentools-sync__signin");
     const signUp = root.querySelector(".owentools-sync__signup");
+    const reset = root.querySelector(".owentools-sync__reset");
     const signOut = root.querySelector(".owentools-sync__signout");
 
     button.addEventListener("click", () => {
@@ -262,7 +267,24 @@
 
     form.addEventListener("submit", async (event) => {
       event.preventDefault();
-      if (!client || !email.value || !password.value) return;
+      if (!client || !password.value) return;
+      if (recoveryMode) {
+        setStatus("Saving...");
+        const { error } = await client.auth.updateUser({ password: password.value });
+        if (error) {
+          copy.textContent = error.message;
+          setState("error");
+          setStatus("Try again");
+          return;
+        }
+        password.value = "";
+        recoveryMode = false;
+        copy.textContent = "Password updated. This browser is signed in.";
+        setStatus("Synced");
+        refreshWidget();
+        return;
+      }
+      if (!email.value) return;
       setStatus("Signing in...");
       const { error } = await client.auth.signInWithPassword({
         email: email.value,
@@ -300,6 +322,22 @@
       setStatus("Confirm email");
     });
 
+    reset.addEventListener("click", async () => {
+      if (!client || !email.value) return;
+      setStatus("Sending...");
+      const { error } = await client.auth.resetPasswordForEmail(email.value, {
+        redirectTo: window.location.href.split("#")[0]
+      });
+      if (error) {
+        copy.textContent = error.message;
+        setState("error");
+        setStatus("Try again");
+        return;
+      }
+      copy.textContent = "Check your email for the password reset link.";
+      setStatus("Reset sent");
+    });
+
     signOut.addEventListener("click", async () => {
       if (client) await client.auth.signOut();
     });
@@ -321,6 +359,24 @@
         setStatus("Synced");
         return;
       }
+      if (recoveryMode) {
+        email.hidden = true;
+        signUp.hidden = true;
+        reset.hidden = true;
+        signIn.textContent = "Set password";
+        password.placeholder = "New password";
+        copy.textContent = "Enter a new password for this account.";
+        form.hidden = false;
+        signOut.hidden = true;
+        setState("signed-out");
+        setStatus("Set password");
+        return;
+      }
+      email.hidden = false;
+      signUp.hidden = false;
+      reset.hidden = false;
+      signIn.textContent = "Sign in";
+      password.placeholder = "Password";
       copy.textContent = `Sign in once to sync ${pageConfig.label}. This browser will stay signed in unless you sign out or clear site data.`;
       form.hidden = false;
       signOut.hidden = true;
@@ -363,6 +419,7 @@
 
     client.auth.onAuthStateChange(async (_event, nextSession) => {
       session = nextSession;
+      recoveryMode = _event === "PASSWORD_RECOVERY";
       syncReady = false;
       refreshWidget();
       if (session) await reconcileAfterSignIn();
