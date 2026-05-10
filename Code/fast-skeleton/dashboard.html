@@ -398,6 +398,34 @@
       </article>
     </template>
 
+    <script src="../shared/supabase-config.js"></script>
+    <script>
+      window.OWENTOOLS_SYNC = {
+        toolId: "baseball-dashboard",
+        label: "Baseball dashboard",
+        include: [
+          "panel-layout",
+          "overlay-dock",
+          "overlay-size",
+          "scoreboard-columns",
+          "overlay-theme",
+          "overlay-page",
+          "lineup-open",
+          "lineup-view",
+          "scoreboard-width",
+          "bets:",
+          "player-tracker",
+          "pending-game-picks",
+          "dashboard-date",
+          "games:",
+          "games-archive:",
+          "analytics-day:",
+          "goal-state",
+          "hrs:"
+        ]
+      };
+    </script>
+    <script src="../shared/owentools-sync.js"></script>
     <script src="app.js?v=20260505-pitcher-priority"></script>
   </body>
 </html>

@@ -95,6 +95,15 @@
 
   </div>
 
+  <script src="../shared/supabase-config.js"></script>
+  <script>
+    window.OWENTOOLS_SYNC = {
+      toolId: "converted-lang-game",
+      label: "Lang Game scores",
+      include: ["highscore-list-"]
+    };
+  </script>
+  <script src="../shared/owentools-sync.js"></script>
   <script src="https://cdn.jsdelivr.net/npm/papaparse@5.4.1/papaparse.min.js"></script>
   <script src="main.js?v=<%= Date.now() %>"></script>
 

@@ -2023,6 +2023,15 @@ html[data-theme="light"] .group-title{
   </div>
 </dialog>
 
+<script src="../shared/supabase-config.js"></script>
+<script>
+window.OWENTOOLS_SYNC = {
+  toolId: "daily-task-list",
+  label: "Daily Tasks",
+  include: ["daily_checklist_state_"]
+};
+</script>
+<script src="../shared/owentools-sync.js"></script>
 <script>
 
 const APP_VERSION = "8.7";

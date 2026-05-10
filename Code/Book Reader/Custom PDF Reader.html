@@ -663,6 +663,24 @@
   </div>
 
   <!-- PDF.js -->
+  <script src="../shared/supabase-config.js"></script>
+  <script>
+    window.OWENTOOLS_SYNC = {
+      toolId: "book-reader",
+      label: "Reader notes",
+      include: [
+        "pdfBookmark_",
+        "pdfBookmarksNamed_",
+        "pdfNotes_",
+        "pdfHighlights_",
+        "pdfDrawings_",
+        "pdfStats_",
+        "pdfSettings_",
+        "pdfStoredDocs"
+      ]
+    };
+  </script>
+  <script src="../shared/owentools-sync.js"></script>
   <script src="https://cdnjs.cloudflare.com/ajax/libs/pdf.js/2.16.105/pdf.min.js"></script>
   <script>
     // Configure worker
