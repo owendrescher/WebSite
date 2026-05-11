@@ -28,11 +28,19 @@
   let flushTimer = 0;
   let statusEl = null;
   let menuEl = null;
+  let copyEl = null;
   let recoveryMode = false;
   let manualSyncButton = null;
 
   const META_KEY = `owentools-sync-meta:${pageConfig.toolId}`;
   const AUTH_STORAGE_KEY = "owentools-auth-session";
+  const POSITION_KEY = "owentools-sync-position";
+  const HARD_DENY_PATTERNS = [
+    "games:",
+    "games-archive:",
+    "analytics-day:",
+    "hrs:"
+  ];
 
   const originalSetItem = Storage.prototype.setItem;
   const originalRemoveItem = Storage.prototype.removeItem;
@@ -50,9 +58,28 @@
   function shouldSyncKey(key) {
     if (pageConfig.loginOnly) return false;
     if (String(key).startsWith("owentools-sync-")) return false;
+    if (isHardDeniedKey(key)) return false;
     if (!key || matchesAny(key, pageConfig.exclude)) return false;
     if (!pageConfig.include || pageConfig.include.length === 0) return true;
     return matchesAny(key, pageConfig.include);
+  }
+
+  function isHardDeniedKey(key) {
+    return matchesAny(String(key || ""), HARD_DENY_PATTERNS);
+  }
+
+  function cleanupLocalDeniedKeys() {
+    try {
+      const keys = [];
+      for (let index = 0; index < window.localStorage.length; index += 1) {
+        const key = window.localStorage.key(index);
+        if (isHardDeniedKey(key)) keys.push(key);
+      }
+      keys.forEach((key) => originalRemoveItem.call(window.localStorage, key));
+      if (keys.length) console.info("owentools sync removed local cache keys", keys);
+    } catch (error) {
+      console.warn("owentools sync local cache cleanup failed", error);
+    }
   }
 
   function readMeta() {
@@ -84,6 +111,43 @@
     return Number.isFinite(time) ? time : 0;
   }
 
+  function dataWeight(value) {
+    if (value == null) return -1;
+    const text = String(value);
+    const trimmed = text.trim();
+    if (!trimmed || trimmed === "[]" || trimmed === "{}" || trimmed === "null") return 0;
+    try {
+      return structuredWeight(JSON.parse(trimmed));
+    } catch {
+      return Math.min(1000000, trimmed.length);
+    }
+  }
+
+  function structuredWeight(value) {
+    if (value == null) return 0;
+    if (Array.isArray(value)) {
+      return value.reduce((sum, item) => sum + 2 + structuredWeight(item), value.length);
+    }
+    if (typeof value === "object") {
+      return Object.entries(value).reduce((sum, [key, item]) => {
+        if (item == null || item === "" || (Array.isArray(item) && item.length === 0)) return sum;
+        return sum + 2 + String(key).length * 0.05 + structuredWeight(item);
+      }, Object.keys(value).length);
+    }
+    if (typeof value === "string") return value.trim() ? Math.min(10000, value.trim().length) : 0;
+    if (typeof value === "number") return Number.isFinite(value) ? 1 : 0;
+    if (typeof value === "boolean") return value ? 1 : 0;
+    return 0;
+  }
+
+  function shouldUseCloudValue(localValue, cloudValue, localTime, cloudTime) {
+    const localWeight = dataWeight(localValue);
+    const cloudWeight = dataWeight(cloudValue);
+    if (cloudWeight > localWeight) return true;
+    if (localWeight > cloudWeight) return false;
+    return cloudTime > localTime;
+  }
+
   function readLocalValue(key) {
     try {
       return window.localStorage.getItem(key);
@@ -97,6 +161,19 @@
     try {
       if (value == null) originalRemoveItem.call(window.localStorage, key);
       else originalSetItem.call(window.localStorage, key, value);
+    } catch (error) {
+      if (error?.name === "QuotaExceededError") {
+        cleanupLocalDeniedKeys();
+        try {
+          if (value == null) originalRemoveItem.call(window.localStorage, key);
+          else originalSetItem.call(window.localStorage, key, value);
+          return;
+        } catch (retryError) {
+          setErrorStatus(retryError, `Could not restore ${key}`);
+          return;
+        }
+      }
+      setErrorStatus(error, `Could not restore ${key}`);
     } finally {
       suppressUpload = false;
     }
@@ -133,6 +210,21 @@
     });
   }
 
+  function describeError(error, fallback = "Sync failed") {
+    if (!error) return fallback;
+    return error.message || error.error_description || error.details || error.hint || String(error);
+  }
+
+  function setErrorStatus(error, fallback = "Sync failed") {
+    const message = describeError(error, fallback);
+    setState("error");
+    setStatus("Sync failed");
+    if (copyEl) {
+      copyEl.textContent = message;
+    }
+    return message;
+  }
+
   function queueUpload(key, value) {
     if (suppressUpload || !shouldSyncKey(key)) return;
     markLocalUpdated(key);
@@ -161,27 +253,26 @@
       );
     } catch (error) {
       rows.forEach((row) => pendingUploads.set(row.state_key, row.data.value));
-      setState("error");
-      setStatus("Sync failed");
+      setErrorStatus(error, "Sync upload timed out");
       console.warn("owentools sync upload timed out", error);
-      return;
+      return false;
     }
 
     const { error } = result;
 
     if (error) {
       rows.forEach((row) => pendingUploads.set(row.state_key, row.data.value));
-      setState("error");
-      setStatus("Sync paused");
+      setErrorStatus(error, "Sync upload failed");
       console.warn("owentools sync upload failed", error);
-      return;
+      return false;
     }
 
     setStatus("Synced");
+    return true;
   }
 
   async function loadCloudState() {
-    if (!client || !session || pageConfig.loginOnly) return false;
+    if (!client || !session || pageConfig.loginOnly) return { ok: true, changed: false };
     let result;
     try {
       result = await withTimeout(
@@ -194,29 +285,43 @@
       );
     } catch (error) {
       console.warn("owentools sync download timed out", error);
-      setState("error");
-      setStatus("Sync failed");
-      return false;
+      setErrorStatus(error, "Sync download timed out");
+      return { ok: false, changed: false };
     }
 
     const { data, error } = result;
 
     if (error) {
       console.warn("owentools sync download failed", error);
-      setState("error");
-      setStatus("Sync paused");
-      return false;
+      setErrorStatus(error, "Sync download failed");
+      return { ok: false, changed: false };
     }
 
     let changed = false;
-    (data || []).forEach((row) => {
+    const rows = data || [];
+    const deniedCloudKeys = rows
+      .map((row) => row.state_key)
+      .filter((key) => isHardDeniedKey(key));
+    if (deniedCloudKeys.length) {
+      void withTimeout(
+        client
+          .from("tool_state")
+          .delete()
+          .eq("user_id", session.user.id)
+          .eq("tool_id", pageConfig.toolId)
+          .in("state_key", deniedCloudKeys),
+        "Cloud cache cleanup"
+      ).catch((cleanupError) => console.warn("owentools sync cloud cache cleanup failed", cleanupError));
+    }
+
+    rows.forEach((row) => {
       const key = row.state_key;
       if (!shouldSyncKey(key)) return;
       const value = row.data?.deleted ? null : String(row.data?.value ?? "");
       const localValue = readLocalValue(key);
       const cloudTime = Date.parse(row.updated_at || "") || 0;
       const localTime = localUpdatedAt(key);
-      if (localTime > cloudTime) {
+      if (!shouldUseCloudValue(localValue, value, localTime, cloudTime)) {
         pendingUploads.set(key, localValue);
         return;
       }
@@ -225,33 +330,37 @@
         changed = true;
       }
     });
-    return changed;
+    return { ok: true, changed };
   }
 
   async function uploadLocalState() {
-    if (!client || !session || pageConfig.loginOnly) return;
+    if (!client || !session || pageConfig.loginOnly) return true;
     listSyncableLocalKeys().forEach((key) => pendingUploads.set(key, readLocalValue(key)));
-    await flushUploads();
+    return flushUploads();
   }
 
   async function reconcileAfterSignIn() {
     try {
       setState("working");
       setStatus("Syncing...");
-      const changed = await loadCloudState();
+      const download = await loadCloudState();
+      if (!download.ok) {
+        syncReady = Boolean(session);
+        return;
+      }
       syncReady = true;
-      await uploadLocalState();
+      const uploaded = await uploadLocalState();
+      if (!uploaded) return;
       setState("signed-in");
       setStatus(session?.user?.email || "Synced");
 
-      if (changed && !sessionStorage.getItem(`owentools-sync-reloaded:${pageConfig.toolId}`)) {
+      if (download.changed && !sessionStorage.getItem(`owentools-sync-reloaded:${pageConfig.toolId}`)) {
         sessionStorage.setItem(`owentools-sync-reloaded:${pageConfig.toolId}`, "1");
         window.location.reload();
       }
     } catch (error) {
       syncReady = Boolean(session);
-      setState("error");
-      setStatus("Sync failed");
+      setErrorStatus(error);
       console.warn("owentools sync reconcile failed", error);
     }
   }
@@ -291,6 +400,9 @@
   function createWidget() {
     const root = document.createElement("div");
     root.className = "owentools-sync";
+    if (window.localStorage.getItem(POSITION_KEY) === "bottom-right") {
+      root.classList.add("is-bottom-right");
+    }
     root.innerHTML = `
       <button class="owentools-sync__button" type="button" aria-expanded="false">
         <span class="owentools-sync__dot"></span>
@@ -316,6 +428,7 @@
     const style = document.createElement("style");
     style.textContent = `
       .owentools-sync{position:fixed;right:max(14px,env(safe-area-inset-right));top:max(14px,env(safe-area-inset-top));z-index:2147483647;font:500 14px/1.35 system-ui,-apple-system,Segoe UI,sans-serif;color:#111}
+      .owentools-sync.is-bottom-right{top:auto;bottom:max(14px,env(safe-area-inset-bottom))}
       .owentools-sync__button{display:inline-flex;align-items:center;gap:8px;min-height:38px;padding:8px 12px;border:1px solid rgba(0,0,0,.14);border-radius:999px;background:rgba(255,255,255,.92);box-shadow:0 12px 28px rgba(0,0,0,.16);backdrop-filter:blur(14px);cursor:pointer;color:#111}
       .owentools-sync__dot{width:8px;height:8px;border-radius:50%;background:#a1a1aa}
       .owentools-sync[data-state="signed-in"] .owentools-sync__dot{background:#16a34a}
@@ -333,6 +446,7 @@
       .owentools-sync__manual,.owentools-sync__signout{width:100%;margin-top:6px}
       .owentools-sync__manual{background:#0f766e!important}
       .owentools-sync__signout{background:#27272a}
+      .owentools-sync.is-bottom-right .owentools-sync__menu{top:auto;bottom:48px}
       @media (max-width: 700px){.owentools-sync{top:auto;bottom:max(14px,env(safe-area-inset-bottom))}.owentools-sync__menu{top:auto;bottom:48px}}
     `;
 
@@ -343,6 +457,7 @@
     menuEl = root.querySelector(".owentools-sync__menu");
     const button = root.querySelector(".owentools-sync__button");
     const copy = root.querySelector(".owentools-sync__copy");
+    copyEl = copy;
     const form = root.querySelector(".owentools-sync__form");
     const email = root.querySelector(".owentools-sync__email");
     const password = root.querySelector(".owentools-sync__password");
@@ -352,7 +467,18 @@
     manualSyncButton = root.querySelector(".owentools-sync__manual");
     const signOut = root.querySelector(".owentools-sync__signout");
 
-    button.addEventListener("click", () => {
+    button.addEventListener("click", (event) => {
+      if (event?.shiftKey) {
+        const bottom = !root.classList.contains("is-bottom-right");
+        root.classList.toggle("is-bottom-right", bottom);
+        try {
+          if (bottom) window.localStorage.setItem(POSITION_KEY, "bottom-right");
+          else window.localStorage.removeItem(POSITION_KEY);
+        } catch {
+          // ignore
+        }
+        return;
+      }
       const next = menuEl.hidden;
       menuEl.hidden = !next;
       button.setAttribute("aria-expanded", String(next));
@@ -491,10 +617,13 @@
     manualSyncButton.addEventListener("click", async () => {
       if (!session) return;
       setStatus("Syncing...");
-      const changed = await loadCloudState();
-      await uploadLocalState();
+      const download = await loadCloudState();
+      if (!download.ok) return;
+      const uploaded = await uploadLocalState();
+      if (!uploaded) return;
+      setState("signed-in");
       setStatus("Synced");
-      if (changed) window.location.reload();
+      if (download.changed) window.location.reload();
     });
 
     root.__refresh = () => {
@@ -608,6 +737,7 @@
   });
 
   patchLocalStorage();
+  cleanupLocalDeniedKeys();
 
   if (document.readyState === "loading") {
     document.addEventListener("DOMContentLoaded", () => {

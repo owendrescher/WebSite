@@ -2585,6 +2585,17 @@ body[data-overlay-dock='bottom'] .player-stat-overlay {
   gap: 4px;
   min-width: 30px;
 }
+.player-stat-source {
+  color: var(--muted);
+  font-size: 0.62rem;
+  font-weight: 700;
+  letter-spacing: 0.08em;
+  margin-left: 6px;
+}
+.pitcher-opponent-hand-table th,
+.pitcher-opponent-hand-table td {
+  white-space: nowrap;
+}
 
 .player-stat-footer {
   padding: 7px 14px 8px;
@@ -3615,10 +3626,11 @@ body[data-overlay-dock='bottom'] .score {
 }
 
 .lineup-list li.lineup-row-atbat {
-  outline: 1px solid color-mix(in srgb, var(--accent) 68%, white 18%);
+  background: linear-gradient(90deg, rgba(255, 221, 111, 0.16), rgba(255, 221, 111, 0.05) 68%, transparent);
+  outline: 2px solid color-mix(in srgb, var(--accent) 78%, white 20%);
   outline-offset: -1px;
   border-radius: 4px;
-  box-shadow: inset 0 0 0 1px rgba(255, 233, 163, 0.28), 0 0 10px rgba(255, 210, 108, 0.22);
+  box-shadow: inset 0 0 0 1px rgba(255, 245, 181, 0.38), 0 0 16px rgba(255, 210, 108, 0.34);
 }
 
 .lineup-list li.lineup-row-ondeck {
@@ -3626,6 +3638,14 @@ body[data-overlay-dock='bottom'] .score {
   outline-offset: -1px;
   border-radius: 4px;
   box-shadow: inset 0 0 0 1px rgba(167, 202, 255, 0.2), 0 0 8px rgba(148, 190, 255, 0.14);
+}
+
+.lineup-list li.lineup-row-nextup {
+  background: linear-gradient(90deg, rgba(121, 196, 255, 0.13), rgba(121, 196, 255, 0.04) 62%, transparent);
+  outline: 1px solid color-mix(in srgb, #7fc6ff 62%, transparent);
+  outline-offset: -1px;
+  border-radius: 4px;
+  box-shadow: inset 0 0 0 1px rgba(155, 212, 255, 0.2), 0 0 10px rgba(107, 187, 255, 0.15);
 }
 
 .lineup-list li.lineup-row-hot::before {
@@ -3641,6 +3661,18 @@ body[data-overlay-dock='bottom'] .score {
     linear-gradient(90deg, rgba(255, 94, 32, 0.18), rgba(255, 162, 58, 0.16) 38%, rgba(255, 80, 25, 0.08) 72%, transparent 100%);
   box-shadow: inset 0 0 0 1px rgba(255, 148, 68, 0.3), 0 0 14px rgba(255, 119, 28, 0.18);
   animation: lineupFireGlow 2.2s ease-in-out infinite alternate;
+}
+
+.lineup-list li.lineup-row-elite-matchup::after {
+  content: '';
+  position: absolute;
+  inset: 0 -90%;
+  z-index: 0;
+  pointer-events: none;
+  border-radius: inherit;
+  background: linear-gradient(115deg, transparent 0%, transparent 43%, rgba(255, 238, 166, 0.34) 50%, transparent 57%, transparent 100%);
+  transform: translateX(-38%);
+  animation: hrWalkoffShimmer 3.2s linear infinite;
 }
 
 .lineup-list li.lineup-row-cold::before {
@@ -3845,6 +3877,40 @@ body[data-overlay-dock='bottom'] .score {
   white-space: nowrap;
   font-variant-numeric: tabular-nums;
 }
+
+.lineup-nextup-badge {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  height: 16px;
+  padding: 0 4px;
+  border-radius: 999px;
+  border: 1px solid rgba(127, 198, 255, 0.66);
+  background: rgba(19, 62, 108, 0.68);
+  color: #d8ecff;
+  font-size: 0.56rem;
+  font-weight: 900;
+  line-height: 1;
+  letter-spacing: 0;
+  box-shadow: 0 0 10px rgba(107, 187, 255, 0.16);
+}
+
+.lineup-elite-matchup-badge {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  min-width: 16px;
+  height: 16px;
+  border-radius: 999px;
+  border: 1px solid rgba(248, 212, 106, 0.74);
+  color: #ffe88f;
+  background: rgba(92, 64, 10, 0.68);
+  font-size: 0.68rem;
+  font-weight: 900;
+  line-height: 1;
+  text-shadow: 0 0 10px rgba(255, 215, 101, 0.58);
+  box-shadow: 0 0 14px rgba(255, 209, 82, 0.2);
+}
 .lineup-split-flag {
   flex: 0 1 auto;
   min-width: 0;
@@ -3975,6 +4041,8 @@ body[data-overlay-dock='bottom'] .score {
 .pitcher-priority-name .pitcher-used-yesterday,
 .pitcher-priority-name .pitcher-fire-streak,
 .pitcher-priority-name .pitcher-cold-streak,
+.pitcher-priority-name .pitcher-last-start-hr,
+.pitcher-priority-name .pitcher-hand-markers,
 .pitcher-priority-name .pitcher-hr-risk,
 .pitcher-priority-name .pitcher-whip-risk {
   flex: 0 3 auto;
@@ -5150,6 +5218,38 @@ body[data-overlay-dock='bottom'] .score-state-strip,
   font-size: 0.74rem;
   line-height: 1.25;
 }
+.player-track-meta {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  min-width: 0;
+}
+.player-track-meta > span {
+  min-width: 0;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+.player-track-confidence {
+  display: inline-flex;
+  align-items: center;
+  gap: 4px;
+  margin-left: auto;
+  color: color-mix(in srgb, var(--text) 70%, var(--muted) 30%);
+  font-size: 0.68rem;
+  line-height: 1;
+}
+.player-track-confidence select {
+  width: 38px;
+  min-width: 38px;
+  height: 22px;
+  padding: 0 4px;
+  border: 1px solid color-mix(in srgb, var(--tracker-team-color, var(--accent)) 38%, var(--line));
+  border-radius: 4px;
+  background: rgba(5, 16, 28, 0.74);
+  color: var(--text);
+  font: 700 0.72rem/1 system-ui, sans-serif;
+}
 .player-track-remove {
   width: 24px;
   height: 24px;
@@ -5719,6 +5819,8 @@ body[data-overlay-dock='bottom'] .score-state-strip,
   grid-template-columns: 40px minmax(0, 1fr) 64px;
   gap: 8px;
   align-items: start;
+  overflow-x: clip;
+  overflow-y: visible;
   border-color: color-mix(in srgb, var(--hr-team-color, var(--accent)) 46%, var(--line));
   background:
     linear-gradient(90deg, rgba(var(--hr-team-rgb, 102, 217, 255), 0.24), transparent 52%),
@@ -6086,10 +6188,44 @@ body[data-overlay-dock='bottom'] .score-state-strip,
   overflow: auto;
   margin: 0;
   padding: 14px;
-  white-space: pre-wrap;
   font: 0.92rem/1.4 var(--font);
   color: var(--text);
   background: rgba(3, 12, 22, 0.72);
+}
+
+.pbp-half {
+  margin: 0 0 14px;
+  padding: 10px 12px;
+  border-left: 3px solid var(--pbp-team-color, var(--accent));
+  border-radius: 8px;
+  background: color-mix(in srgb, var(--pbp-team-color, var(--accent)) 12%, transparent);
+}
+
+.pbp-half:last-child {
+  margin-bottom: 0;
+}
+
+.pbp-half h3 {
+  margin: 0 0 5px;
+  color: var(--pbp-team-color, var(--accent));
+  font-size: 0.8rem;
+  letter-spacing: 0.06em;
+  text-transform: uppercase;
+}
+
+.pbp-half p {
+  margin: 0;
+  color: color-mix(in srgb, var(--text) 86%, var(--pbp-team-color, var(--accent)) 14%);
+}
+
+.pbp-half strong {
+  color: color-mix(in srgb, var(--pbp-team-color, var(--accent)) 62%, white 38%);
+  font-weight: 900;
+}
+
+.pbp-empty {
+  margin: 0;
+  color: var(--muted);
 }
 
 .player-bet-menu {
@@ -6155,8 +6291,15 @@ body[data-overlay-dock='bottom'] .score-state-strip,
   grid-template-columns: repeat(2, minmax(0, 1fr));
   gap: 6px;
 }
+.player-confidence-options {
+  display: grid;
+  grid-template-columns: repeat(5, minmax(0, 1fr));
+  gap: 6px;
+  margin: 9px 0 8px;
+}
 
-.player-bet-menu-options button {
+.player-bet-menu-options button,
+.player-confidence-options button {
   min-height: 30px;
   border: 1px solid color-mix(in srgb, var(--accent) 38%, transparent);
   border-radius: 7px;
@@ -6171,7 +6314,9 @@ body[data-overlay-dock='bottom'] .score-state-strip,
 }
 
 .player-bet-menu-options button:hover,
-.player-bet-menu-options button:focus-visible {
+.player-bet-menu-options button:focus-visible,
+.player-confidence-options button:hover,
+.player-confidence-options button:focus-visible {
   outline: none;
   border-color: color-mix(in srgb, var(--accent) 72%, transparent);
   filter: brightness(1.08);
@@ -7027,6 +7172,56 @@ body[data-theme="paper-scorebook"] .team {
   line-height: 1;
   white-space: nowrap;
   vertical-align: 0.04em;
+}
+
+.pitcher-last-start-hr {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  min-width: 1.65em;
+  height: 1.08em;
+  margin-left: 4px;
+  border-radius: 999px;
+  border: 1px solid color-mix(in srgb, #ff6b6b 78%, transparent);
+  background: color-mix(in srgb, #7a1111 72%, transparent);
+  color: #ffd4d4;
+  font-size: 0.64em;
+  font-weight: 900;
+  line-height: 1;
+  vertical-align: 0.08em;
+}
+
+.pitcher-hand-markers {
+  display: inline-flex;
+  align-items: center;
+  gap: 2px;
+  margin-left: 4px;
+  white-space: nowrap;
+  vertical-align: 0.04em;
+}
+
+.pitcher-hand-avg-marker {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  min-width: 1.05em;
+  height: 1.05em;
+  border-radius: 999px;
+  font-size: 0.64em;
+  font-weight: 900;
+  line-height: 1;
+}
+
+.pitcher-hand-avg-marker.is-low {
+  border: 1px solid color-mix(in srgb, #ff6161 78%, transparent);
+  background: color-mix(in srgb, #751111 74%, transparent);
+  color: #ffd1d1;
+}
+
+.pitcher-hand-avg-marker.is-high {
+  border: 1px solid color-mix(in srgb, #69a8ff 78%, transparent);
+  background: color-mix(in srgb, #123a80 74%, transparent);
+  color: #d8e8ff;
 }
 
 .pitcher-hr-risk,

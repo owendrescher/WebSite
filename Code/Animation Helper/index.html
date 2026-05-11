@@ -30,6 +30,41 @@
 </head>
 <body>
   <a class="owentools-home-link" href="../index.html" aria-label="Back to owentools" title="Back to owentools">ot</a>
+  <dialog id="projectStartDialog" class="project-start-dialog">
+    <form method="dialog" class="project-start-form">
+      <div class="project-start-head">
+        <p class="project-start-kicker">Animation Helper</p>
+        <h2>Open Project</h2>
+      </div>
+      <div class="project-start-actions">
+        <button id="continueProjectChoice" class="action-btn action-btn--primary" type="button">Continue Project</button>
+        <button id="newProjectChoice" class="action-btn" type="button">Start New</button>
+      </div>
+      <div id="projectChoices" class="project-choice-list" aria-label="Saved projects"></div>
+      <section id="newProjectOptions" class="project-start-options" hidden>
+        <label class="stacked-field" for="startProjectName">
+          Name
+          <input id="startProjectName" type="text" maxlength="80" value="Untitled Project">
+        </label>
+        <label class="stacked-field" for="startCanvasWidth">
+          Width
+          <input id="startCanvasWidth" type="number" min="64" max="4096" value="960">
+        </label>
+        <label class="stacked-field" for="startCanvasHeight">
+          Height
+          <input id="startCanvasHeight" type="number" min="64" max="4096" value="540">
+        </label>
+        <label class="stacked-field" for="startCanvasBackground">
+          Background
+          <select id="startCanvasBackground">
+            <option value="transparent">Transparent</option>
+            <option value="white">White</option>
+          </select>
+        </label>
+        <button id="createProjectChoice" class="action-btn action-btn--primary" type="button">Create</button>
+      </section>
+    </form>
+  </dialog>
   <div class="app-shell">
     <header class="topbar">
       <div class="brand-inline">
@@ -335,6 +370,15 @@
   <script src="https://cdn.jsdelivr.net/npm/@tensorflow/tfjs-converter@4.22.0/dist/tf-converter.min.js"></script>
   <script src="https://cdn.jsdelivr.net/npm/@tensorflow/tfjs-backend-webgl@4.22.0/dist/tf-backend-webgl.min.js"></script>
   <script src="https://cdn.jsdelivr.net/npm/@tensorflow-models/body-pix@2.2.1/dist/body-pix.min.js"></script>
-  <script src="app.js"></script>
+  <script src="../shared/supabase-config.js?v=20260510f"></script>
+  <script>
+    window.OWENTOOLS_SYNC = {
+      toolId: "animation-helper",
+      label: "Animation Helper project",
+      include: ["animation-helper-project:", "animation-helper-autosave"]
+    };
+  </script>
+  <script src="../shared/owentools-sync.js?v=20260511a"></script>
+  <script src="app.js?v=20260511b"></script>
 </body>
 </html>

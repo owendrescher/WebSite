@@ -57,10 +57,25 @@ const statusSize = document.getElementById("statusSize");
 const statusCanvas = document.getElementById("statusCanvas");
 const statusLayer = document.getElementById("statusLayer");
 const fileInput = document.getElementById("fileInput");
+const projectStartDialog = document.getElementById("projectStartDialog");
+const continueProjectChoice = document.getElementById("continueProjectChoice");
+const newProjectChoice = document.getElementById("newProjectChoice");
+const projectChoices = document.getElementById("projectChoices");
+const newProjectOptions = document.getElementById("newProjectOptions");
+const startProjectName = document.getElementById("startProjectName");
+const startCanvasWidth = document.getElementById("startCanvasWidth");
+const startCanvasHeight = document.getElementById("startCanvasHeight");
+const startCanvasBackground = document.getElementById("startCanvasBackground");
+const createProjectChoice = document.getElementById("createProjectChoice");
 
 const AUTOSAVE_DB_NAME = "animation-helper-db";
 const AUTOSAVE_STORE_NAME = "projects";
 const AUTOSAVE_KEY = "autosave";
+const SYNC_AUTOSAVE_KEY = "animation-helper-autosave";
+const PROJECT_KEY_PREFIX = "animation-helper-project:";
+
+let currentProjectId = "";
+let currentProjectName = "";
 
 const COLORS = [
   "#111111", "#666666", "#9ca3af", "#ffffff",
@@ -171,6 +186,25 @@ function openAutosaveDatabase() {
 }
 
 async function persistAutosave(snapshot) {
+  const projectId = snapshot.projectId || currentProjectId || createProjectId();
+  const projectName = String(snapshot.projectName || currentProjectName || defaultProjectName()).trim() || "Untitled Project";
+  const storedSnapshot = {
+    ...snapshot,
+    projectId,
+    projectName,
+    updatedAt: new Date().toISOString(),
+  };
+  currentProjectId = projectId;
+  currentProjectName = projectName;
+
+  try {
+    const serialized = JSON.stringify(storedSnapshot);
+    window.localStorage.setItem(projectStorageKey(projectId), serialized);
+    window.localStorage.setItem(SYNC_AUTOSAVE_KEY, serialized);
+  } catch {
+    // Large projects may not fit in localStorage; IndexedDB remains the local source of truth.
+  }
+
   if (!window.indexedDB) {
     return;
   }
@@ -180,7 +214,8 @@ async function persistAutosave(snapshot) {
     await new Promise((resolve, reject) => {
       const transaction = db.transaction(AUTOSAVE_STORE_NAME, "readwrite");
       const store = transaction.objectStore(AUTOSAVE_STORE_NAME);
-      store.put(snapshot, AUTOSAVE_KEY);
+      store.put(storedSnapshot, projectStorageKey(projectId));
+      store.put(storedSnapshot, AUTOSAVE_KEY);
       transaction.oncomplete = () => resolve();
       transaction.onerror = () => reject(transaction.error);
     });
@@ -190,25 +225,198 @@ async function persistAutosave(snapshot) {
   }
 }
 
-async function loadAutosave() {
-  if (!window.indexedDB) {
+function createProjectId() {
+  if (window.crypto?.randomUUID) {
+    return window.crypto.randomUUID();
+  }
+  return `project-${Date.now().toString(36)}-${Math.random().toString(36).slice(2, 8)}`;
+}
+
+function projectStorageKey(projectId) {
+  return `${PROJECT_KEY_PREFIX}${projectId}`;
+}
+
+function defaultProjectName() {
+  return `Project ${new Date().toLocaleString([], { month: "short", day: "numeric", hour: "numeric", minute: "2-digit" })}`;
+}
+
+function projectDisplayName(snapshot, index = 0) {
+  const named = String(snapshot?.projectName || "").trim();
+  if (named) return named;
+  if (snapshot?.projectWidth && snapshot?.projectHeight) {
+    return `Project ${snapshot.projectWidth}x${snapshot.projectHeight}`;
+  }
+  return `Project ${index + 1}`;
+}
+
+function normalizeProjectSnapshot(snapshot, fallbackId, index = 0) {
+  if (!snapshot || !Array.isArray(snapshot.layers) || !snapshot.layers.length) {
     return null;
+  }
+  const projectId = String(snapshot.projectId || fallbackId || createProjectId());
+  return {
+    ...snapshot,
+    projectId,
+    projectName: projectDisplayName(snapshot, index),
+    updatedAt: snapshot.updatedAt || snapshot.savedAt || snapshot.createdAt || "",
+  };
+}
+
+function compareProjectSnapshots(a, b) {
+  const weightDelta = projectSnapshotWeight(b) - projectSnapshotWeight(a);
+  if (Math.abs(weightDelta) > 1000) return weightDelta;
+  return Date.parse(b.updatedAt || 0) - Date.parse(a.updatedAt || 0);
+}
+
+function collectLocalStorageProjects() {
+  const projects = [];
+  try {
+    for (let index = 0; index < window.localStorage.length; index += 1) {
+      const key = window.localStorage.key(index);
+      if (!key || !key.startsWith(PROJECT_KEY_PREFIX)) continue;
+      const projectId = key.slice(PROJECT_KEY_PREFIX.length);
+      const snapshot = JSON.parse(window.localStorage.getItem(key) || "null");
+      const normalized = normalizeProjectSnapshot(snapshot, projectId, projects.length);
+      if (normalized) projects.push(normalized);
+    }
+  } catch {
+    // Ignore malformed local project records.
+  }
+
+  try {
+    const legacySnapshot = JSON.parse(window.localStorage.getItem(SYNC_AUTOSAVE_KEY) || "null");
+    const normalizedLegacy = normalizeProjectSnapshot(legacySnapshot, legacySnapshot?.projectId || "autosave", projects.length);
+    if (normalizedLegacy) projects.push(normalizedLegacy);
+  } catch {
+    // Ignore malformed legacy autosave.
+  }
+
+  return projects;
+}
+
+async function loadIndexedProjects() {
+  if (!window.indexedDB) {
+    return [];
   }
 
   try {
     const db = await openAutosaveDatabase();
-    const result = await new Promise((resolve, reject) => {
+    const records = await new Promise((resolve, reject) => {
       const transaction = db.transaction(AUTOSAVE_STORE_NAME, "readonly");
       const store = transaction.objectStore(AUTOSAVE_STORE_NAME);
-      const request = store.get(AUTOSAVE_KEY);
-      request.onsuccess = () => resolve(request.result || null);
-      request.onerror = () => reject(request.error);
+      const snapshotsRequest = store.getAll();
+      const keysRequest = store.getAllKeys();
+      transaction.oncomplete = () => resolve({
+        snapshots: snapshotsRequest.result || [],
+        keys: keysRequest.result || [],
+      });
+      transaction.onerror = () => reject(transaction.error);
     });
     db.close();
-    return result;
+    return records.snapshots
+      .map((snapshot, index) => {
+        const key = String(records.keys[index] || "");
+        const fallbackId = key.startsWith(PROJECT_KEY_PREFIX)
+          ? key.slice(PROJECT_KEY_PREFIX.length)
+          : key || `indexed-${index}`;
+        return normalizeProjectSnapshot(snapshot, snapshot?.projectId || fallbackId, index);
+      })
+      .filter(Boolean);
   } catch (error) {
+    return [];
+  }
+}
+
+async function loadProjectOptions() {
+  const byId = new Map();
+  const allProjects = [
+    ...collectLocalStorageProjects(),
+    ...await loadIndexedProjects(),
+  ];
+
+  allProjects.forEach((project, index) => {
+    const normalized = normalizeProjectSnapshot(project, project.projectId, index);
+    if (!normalized) return;
+    const existing = byId.get(normalized.projectId);
+    if (!existing || compareProjectSnapshots(normalized, existing) < 0) {
+      byId.set(normalized.projectId, normalized);
+    }
+  });
+
+  return Array.from(byId.values()).sort(compareProjectSnapshots);
+}
+
+function projectPreviewUrl(snapshot) {
+  const visibleLayers = Array.isArray(snapshot?.layers)
+    ? snapshot.layers.filter((layer) => layer?.visible !== false && layer?.dataUrl)
+    : [];
+  const fallbackLayers = Array.isArray(snapshot?.layers)
+    ? snapshot.layers.filter((layer) => layer?.dataUrl)
+    : [];
+  return (visibleLayers[visibleLayers.length - 1] || fallbackLayers[fallbackLayers.length - 1] || {}).dataUrl || "";
+}
+
+function projectMetaText(snapshot) {
+  const dimensions = `${Number(snapshot?.projectWidth) || 960} x ${Number(snapshot?.projectHeight) || 540}`;
+  const layerCount = Array.isArray(snapshot?.layers) ? snapshot.layers.length : 0;
+  const updated = snapshot?.updatedAt ? new Date(snapshot.updatedAt) : null;
+  const updatedText = updated && !Number.isNaN(updated.getTime())
+    ? updated.toLocaleString([], { month: "short", day: "numeric", hour: "numeric", minute: "2-digit" })
+    : "Saved project";
+  return `${dimensions} | ${layerCount} layer${layerCount === 1 ? "" : "s"} | ${updatedText}`;
+}
+
+function renderProjectChoices(projects, resolveAndClose) {
+  if (!projectChoices) return;
+  projectChoices.replaceChildren();
+  projectChoices.hidden = !projects.length;
+
+  projects.forEach((project, index) => {
+    const button = document.createElement("button");
+    button.type = "button";
+    button.className = "project-choice-card";
+
+    const preview = document.createElement("span");
+    preview.className = "project-choice-preview";
+    const previewUrl = projectPreviewUrl(project);
+    if (previewUrl) {
+      const image = document.createElement("img");
+      image.alt = "";
+      image.src = previewUrl;
+      preview.appendChild(image);
+    }
+
+    const text = document.createElement("span");
+    text.className = "project-choice-text";
+    const name = document.createElement("strong");
+    name.textContent = projectDisplayName(project, index);
+    const meta = document.createElement("span");
+    meta.textContent = projectMetaText(project);
+    text.append(name, meta);
+
+    button.append(preview, text);
+    button.addEventListener("click", () => resolveAndClose({ mode: "continue", projectId: project.projectId }));
+    projectChoices.appendChild(button);
+  });
+}
+
+async function loadAutosave() {
+  const projects = await loadProjectOptions();
+  if (!projects.length) {
     return null;
   }
+  return projects[0];
+}
+
+function projectSnapshotWeight(snapshot) {
+  if (!snapshot || !Array.isArray(snapshot.layers)) return 0;
+  return snapshot.layers.reduce((sum, layer) => (
+    sum
+    + 10
+    + String(layer?.name || "").length
+    + String(layer?.dataUrl || "").length
+    + (layer?.visible ? 1 : 0)
+  ), Number(snapshot.projectWidth || 0) + Number(snapshot.projectHeight || 0));
 }
 
 function syncLayerCanvasPresentation(layer) {
@@ -549,6 +757,9 @@ function removeLayerById(layerId) {
 
 function serializeProject() {
   return {
+    projectId: currentProjectId || createProjectId(),
+    projectName: currentProjectName || defaultProjectName(),
+    updatedAt: new Date().toISOString(),
     projectWidth: state.projectWidth,
     projectHeight: state.projectHeight,
     activeLayerId: state.activeLayerId,
@@ -577,6 +788,8 @@ function loadImage(url) {
 
 async function restoreProject(snapshot) {
   state.restoring = true;
+  currentProjectId = snapshot.projectId || currentProjectId || createProjectId();
+  currentProjectName = projectDisplayName(snapshot);
   state.projectWidth = snapshot.projectWidth;
   state.projectHeight = snapshot.projectHeight;
   state.activeLayerId = snapshot.activeLayerId;
@@ -677,7 +890,9 @@ function resizeProject(width, height, preserve = true) {
   clearPreview();
 }
 
-function newProject() {
+function newProject(options = {}) {
+  currentProjectId = options.projectId || createProjectId();
+  currentProjectName = String(options.name || options.projectName || defaultProjectName()).trim() || "Untitled Project";
   state.layers.forEach((layer) => layer.canvas.remove());
   state.layers = [];
   state.history = [];
@@ -685,16 +900,89 @@ function newProject() {
   state.nextLayerId = 1;
   state.cutoutMode = "remove";
   state.selection = null;
-  state.projectWidth = 960;
-  state.projectHeight = 540;
-  canvasWidthInput.value = "960";
-  canvasHeightInput.value = "540";
+  const width = Math.max(64, Math.min(4096, Number(options.width) || 960));
+  const height = Math.max(64, Math.min(4096, Number(options.height) || 540));
+  state.projectWidth = width;
+  state.projectHeight = height;
+  canvasWidthInput.value = String(width);
+  canvasHeightInput.value = String(height);
   zoomRange.value = "100";
   state.zoom = 1;
   cutoutModeSelect.value = "remove";
   syncCanvasWrapper();
-  addLayer({ name: "Layer 1" });
+  const layer = addLayer({ name: "Layer 1" });
+  if (options.background === "white") {
+    layer.ctx.save();
+    layer.ctx.fillStyle = "#ffffff";
+    layer.ctx.fillRect(0, 0, state.projectWidth, state.projectHeight);
+    layer.ctx.restore();
+  }
   commitHistory();
+}
+
+function chooseStartupProject(projects = []) {
+  return new Promise((resolve) => {
+    if (!projectStartDialog) {
+      resolve({ mode: projects.length ? "continue" : "new", width: 960, height: 540, background: "transparent" });
+      return;
+    }
+
+    const hasProject = projects.length > 0;
+    continueProjectChoice.hidden = !hasProject;
+    if (projectChoices) projectChoices.hidden = !hasProject;
+    newProjectOptions.hidden = true;
+    startProjectName.value = defaultProjectName();
+    startCanvasWidth.value = String(projects[0]?.projectWidth || 960);
+    startCanvasHeight.value = String(projects[0]?.projectHeight || 540);
+    startCanvasBackground.value = "transparent";
+
+    const resolveAndClose = (choice) => {
+      cleanup();
+      closeDialog();
+      resolve(choice);
+    };
+    const cleanup = () => {
+      continueProjectChoice.removeEventListener("click", continueHandler);
+      newProjectChoice.removeEventListener("click", newHandler);
+      createProjectChoice.removeEventListener("click", createHandler);
+      projectStartDialog.removeEventListener("cancel", cancelHandler);
+    };
+    const closeDialog = () => {
+      if (typeof projectStartDialog.close === "function") projectStartDialog.close();
+      projectStartDialog.removeAttribute("open");
+    };
+    const continueHandler = () => {
+      if (projects[0]) {
+        resolveAndClose({ mode: "continue", projectId: projects[0].projectId });
+      }
+    };
+    const newHandler = () => {
+      newProjectOptions.hidden = false;
+      if (projectChoices) projectChoices.hidden = true;
+      startProjectName.focus();
+      startProjectName.select();
+    };
+    const createHandler = () => {
+      resolveAndClose({
+        mode: "new",
+        name: startProjectName.value,
+        width: startCanvasWidth.value,
+        height: startCanvasHeight.value,
+        background: startCanvasBackground.value,
+      });
+    };
+    const cancelHandler = (event) => {
+      event.preventDefault();
+    };
+
+    continueProjectChoice.addEventListener("click", continueHandler);
+    newProjectChoice.addEventListener("click", newHandler);
+    createProjectChoice.addEventListener("click", createHandler);
+    projectStartDialog.addEventListener("cancel", cancelHandler);
+    renderProjectChoices(projects, resolveAndClose);
+    if (typeof projectStartDialog.showModal === "function") projectStartDialog.showModal();
+    else projectStartDialog.setAttribute("open", "");
+  });
 }
 
 function getCanvasPoint(event) {
@@ -1741,7 +2029,10 @@ blendModeSelect.addEventListener("change", () => {
   commitHistory();
 });
 
-document.getElementById("newProjectBtn").addEventListener("click", newProject);
+document.getElementById("newProjectBtn").addEventListener("click", async () => {
+  const choice = await chooseStartupProject([]);
+  newProject(choice);
+});
 document.getElementById("openImageBtn").addEventListener("click", () => fileInput.click());
 document.getElementById("saveImageBtn").addEventListener("click", exportCompositePng);
 document.getElementById("undoBtn").addEventListener("click", () => {
@@ -1846,14 +2137,17 @@ window.addEventListener("visibilitychange", () => {
 async function initializeApp() {
   updateColorChips();
   syncCanvasWrapper();
-  const savedProject = await loadAutosave();
+  const savedProjects = await loadProjectOptions();
+  const startupChoice = await chooseStartupProject(savedProjects);
 
-  if (savedProject && savedProject.layers && savedProject.layers.length) {
+  const savedProject = savedProjects.find((project) => project.projectId === startupChoice.projectId) || savedProjects[0];
+  if (startupChoice.mode === "continue" && savedProject && savedProject.layers && savedProject.layers.length) {
     await restoreProject(savedProject);
     state.history = [serializeProject()];
     state.redoStack = [];
+    void persistAutosave(serializeProject());
   } else {
-    newProject();
+    newProject(startupChoice);
   }
 
   updateToolButtons();

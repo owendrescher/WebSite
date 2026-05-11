@@ -17,7 +17,7 @@
     <meta name="twitter:description" content="Live MLB scoreboard, lineups, pitcher trends, hot players, and betting stat tools." />
     <link rel="icon" type="image/png" href="baseball.png" />
     <link rel="apple-touch-icon" href="baseball.png" />
-    <link rel="stylesheet" href="styles.css?v=20260505-pitcher-priority" />
+    <link rel="stylesheet" href="styles.css?v=20260511d" />
     <link rel="stylesheet" href="dashboard.css?v=20260505-pitcher-priority" />
   </head>
   <body class="dashboard-page">
@@ -398,34 +398,18 @@
       </article>
     </template>
 
-    <script src="../shared/supabase-config.js?v=20260510b"></script>
+    <script src="../shared/supabase-config.js?v=20260510f"></script>
     <script>
       window.OWENTOOLS_SYNC = {
         toolId: "baseball-dashboard",
         label: "Baseball dashboard",
         include: [
-          "panel-layout",
-          "overlay-dock",
-          "overlay-size",
-          "scoreboard-columns",
-          "overlay-theme",
-          "overlay-page",
-          "lineup-open",
-          "lineup-view",
-          "scoreboard-width",
-          "bets:",
           "player-tracker",
-          "pending-game-picks",
-          "dashboard-date",
-          "games:",
-          "games-archive:",
-          "analytics-day:",
-          "goal-state",
-          "hrs:"
+          "pending-game-picks"
         ]
       };
     </script>
-    <script src="../shared/owentools-sync.js?v=20260510b"></script>
-    <script src="app.js?v=20260505-pitcher-priority"></script>
+    <script src="../shared/owentools-sync.js?v=20260511a"></script>
+    <script src="app.js?v=20260511b"></script>
   </body>
 </html>

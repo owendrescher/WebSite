@@ -4,7 +4,7 @@ The codebase is wired for optional login and cross-device sync. It stays local-f
 
 - Signed out: tools keep using browser `localStorage`.
 - Signed in: matching `localStorage` keys are mirrored to Supabase.
-- On page load/sign-in: cloud state downloads, updates local storage, and reloads once if newer cloud data was applied.
+- On page load/sign-in: cloud state downloads, but conflict handling prefers the copy with more real data before using timestamps. This is meant to prevent a fresh/default browser from wiping an older device.
 
 ## 1. Create a Supabase project
 
@@ -79,12 +79,16 @@ If the widget says the account is waiting on email confirmation and password sig
 ## Currently Wired Tools
 
 - Launcher login button
-- Daily Task List
-- Notepad To-Do List
-- Book Reader notes/bookmarks/settings metadata
-- Nutrition and Cost Analysis
-- Arabic Script Learning progress
+- Daily Task List tasks, completions, Theme Studio, weekly tasks, quests, and archives
+- Arabic Script Learning leaderboards only
 - Converted Lang Game scores
-- Baseball dashboard state
+- Baseball dashboard player tracker and pending team-win selections only
+- Animation Helper autosaved project
 
-Large binary/autosave data, like local PDF files stored in IndexedDB, is intentionally not uploaded by this first pass.
+Book Reader, Nutrition, and the simple Notepad To-Do page now expose the sign-in widget only; they do not upload page state.
+
+## Cache Cleanup
+
+If older Baseball sync builds uploaded bulky MLB cache rows, run `supabase/cleanup-cache-state.sql` once in Supabase SQL Editor. Those rows are not user-created state and can fill browser storage on other devices.
+
+After the May 2026 narrowing pass, you can also run `supabase/cleanup-narrow-sync.sql` once to delete old cloud rows that the current site no longer downloads, such as Baseball layout/cache preferences, Script Learning mastery rows, and disabled Book/Nutrition/Notepad sync rows. This is optional; the current client ignores those rows.
