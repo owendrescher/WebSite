@@ -1,0 +1,145 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Ping Pong Editor</title>
+  <link rel="stylesheet" href="styles.css">
+  <style>
+    .owentools-home-link {
+      position: fixed;
+      top: max(12px, env(safe-area-inset-top));
+      left: max(12px, env(safe-area-inset-left));
+      z-index: 30;
+      width: 44px;
+      height: 44px;
+      display: grid;
+      place-items: center;
+      border-radius: 12px;
+      border: 1px solid rgba(255, 255, 255, 0.14);
+      background: rgba(12, 18, 24, 0.82);
+      color: #f7fbff;
+      text-decoration: none;
+      font: 800 0.8rem/1 system-ui, sans-serif;
+      letter-spacing: 0.04em;
+      backdrop-filter: blur(14px);
+      box-shadow: 0 14px 32px rgba(0, 0, 0, 0.28);
+    }
+  </style>
+</head>
+<body>
+  <a class="owentools-home-link" href="../index.html" aria-label="Back to owentools" title="Back to owentools">ot</a>
+
+  <main class="editor-shell">
+    <header class="topbar">
+      <div class="brand">
+        <p>Ping Pong Editor</p>
+        <h1>Rally Cut Studio</h1>
+      </div>
+      <div class="top-actions">
+        <label class="file-btn">
+          <input id="videoInput" type="file" accept="video/*">
+          Import Video
+        </label>
+        <button id="analyzeBtn" type="button" disabled>Analyze Audio</button>
+      </div>
+    </header>
+
+    <section class="workspace">
+      <section class="viewer-panel">
+        <div class="video-frame">
+          <video id="video" controls playsinline></video>
+          <div id="scoreboard" class="scoreboard" hidden>
+            <span id="playerAName">Player A</span>
+            <strong id="playerAScore">0</strong>
+            <span id="playerBName">Player B</span>
+            <strong id="playerBScore">0</strong>
+          </div>
+          <div id="emptyState" class="empty-state">
+            <strong>Drop in a match video.</strong>
+            <span>The first pass listens for sharp table hits and groups them into rallies.</span>
+          </div>
+        </div>
+
+        <div class="transport">
+          <button id="prevRallyBtn" type="button" disabled>Previous Rally</button>
+          <button id="playRallyBtn" type="button" disabled>Play Rally</button>
+          <button id="nextRallyBtn" type="button" disabled>Next Rally</button>
+          <span id="timeReadout">00:00.00</span>
+        </div>
+      </section>
+
+      <aside class="settings-panel">
+        <section class="panel-section">
+          <h2>Detection</h2>
+          <label>
+            Sensitivity
+            <input id="sensitivityRange" type="range" min="1" max="10" value="6">
+          </label>
+          <label>
+            Minimum hit spacing
+            <input id="spacingRange" type="range" min="80" max="700" step="20" value="220">
+            <span id="spacingValue">220 ms</span>
+          </label>
+          <label>
+            Rally gap
+            <input id="rallyGapRange" type="range" min="1.2" max="7" step="0.2" value="3.2">
+            <span id="rallyGapValue">3.2 s</span>
+          </label>
+          <label>
+            Cut padding
+            <input id="paddingRange" type="range" min="0.2" max="4" step="0.1" value="1.2">
+            <span id="paddingValue">1.2 s</span>
+          </label>
+        </section>
+
+        <section class="panel-section">
+          <h2>Scoreboard</h2>
+          <div class="name-grid">
+            <label>
+              Left
+              <input id="nameAInput" type="text" value="Player A">
+            </label>
+            <label>
+              Right
+              <input id="nameBInput" type="text" value="Player B">
+            </label>
+          </div>
+          <div class="score-grid">
+            <input id="scoreAInput" type="number" min="0" value="0" aria-label="Left score">
+            <input id="scoreBInput" type="number" min="0" value="0" aria-label="Right score">
+            <button id="addScoreEventBtn" type="button" disabled>Add At Playhead</button>
+          </div>
+          <textarea id="scoreTextInput" rows="4" placeholder="Paste score notes, one per line:&#10;00:42 5-3&#10;01:16 seven five"></textarea>
+          <button id="parseScoresBtn" type="button">Parse Score Notes</button>
+        </section>
+      </aside>
+    </section>
+
+    <section class="timeline-panel">
+      <div class="timeline-head">
+        <div>
+          <h2>Timeline</h2>
+          <p id="analysisSummary">No video analyzed yet.</p>
+        </div>
+        <button id="exportPlanBtn" type="button" disabled>Copy Edit Plan</button>
+      </div>
+      <div id="timeline" class="timeline" aria-label="Video timeline">
+        <div id="playhead" class="playhead"></div>
+      </div>
+      <div class="lists">
+        <section>
+          <h3>Suggested Rally Cuts</h3>
+          <div id="rallyList" class="list empty-list">No rallies yet.</div>
+        </section>
+        <section>
+          <h3>Score Events</h3>
+          <div id="scoreEventList" class="list empty-list">No score events yet.</div>
+        </section>
+      </div>
+    </section>
+  </main>
+
+  <script src="app.js"></script>
+</body>
+</html>

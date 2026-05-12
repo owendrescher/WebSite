@@ -1,0 +1,187 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Math Quiz</title>
+  <link rel="stylesheet" href="styles.css">
+  <style>
+    .owentools-home-link {
+      position: fixed;
+      top: max(12px, env(safe-area-inset-top));
+      left: max(12px, env(safe-area-inset-left));
+      z-index: 30;
+      width: 44px;
+      height: 44px;
+      display: grid;
+      place-items: center;
+      border-radius: 12px;
+      border: 1px solid rgba(255, 255, 255, 0.14);
+      background: rgba(10, 15, 22, 0.84);
+      color: #f8fbff;
+      text-decoration: none;
+      font: 800 0.8rem/1 system-ui, sans-serif;
+      letter-spacing: 0.04em;
+      backdrop-filter: blur(14px);
+      box-shadow: 0 14px 32px rgba(0, 0, 0, 0.28);
+    }
+  </style>
+</head>
+<body>
+  <a class="owentools-home-link" href="../index.html" aria-label="Back to owentools" title="Back to owentools">ot</a>
+
+  <main class="app-shell">
+    <header class="topbar">
+      <div class="brand">
+        <p>Math Quiz</p>
+        <h1>Practice Engine</h1>
+      </div>
+      <div class="status-strip" aria-label="Quiz status">
+        <span><strong id="scoreReadout">0/0</strong> Score</span>
+        <span><strong id="streakReadout">0</strong> Streak</span>
+        <span><strong id="timerReadout">00:00</strong> Time</span>
+      </div>
+    </header>
+
+    <section class="layout">
+      <aside class="settings-panel" aria-label="Quiz settings">
+        <details class="settings-group" open>
+          <summary>Subjects</summary>
+          <div class="subject-actions">
+            <button id="checkAllBtn" type="button">Check All</button>
+            <button id="uncheckAllBtn" type="button">Uncheck All</button>
+          </div>
+          <div id="subjectList" class="check-list"></div>
+        </details>
+
+        <details class="settings-group" open>
+          <summary>Tuning</summary>
+          <label>
+            Level
+            <select id="levelSelect">
+              <option value="1">1 - arithmetic basics</option>
+              <option value="2">2 - fractions and signed numbers</option>
+              <option value="3">3 - algebra foundations</option>
+              <option value="4">4 - functions and trig</option>
+              <option value="5">5 - calculus</option>
+              <option value="6">6 - linear algebra</option>
+              <option value="7">7 - multivariable calculus</option>
+            </select>
+          </label>
+
+          <label>
+            Question count
+            <input id="questionCountInput" type="number" min="1" max="100" value="5">
+          </label>
+
+          <label>
+            Timer mode
+            <select id="timerModeSelect">
+              <option value="elapsed">Elapsed time</option>
+              <option value="per-question">Per question limit</option>
+              <option value="quiz-limit">Whole quiz limit</option>
+            </select>
+          </label>
+
+          <label>
+            Seconds
+            <input id="secondsInput" type="number" min="5" max="3600" value="60">
+          </label>
+
+          <label>
+            Answer tolerance
+            <select id="toleranceSelect">
+              <option value="strict">Strict</option>
+              <option value="decimal">Decimal friendly</option>
+              <option value="loose">Loose numeric</option>
+            </select>
+          </label>
+        </details>
+
+        <details class="settings-group">
+          <summary>Question Types</summary>
+          <label class="toggle-row">
+            <input id="allowFractionsInput" type="checkbox" checked>
+            Allow fractions
+          </label>
+          <label class="toggle-row">
+            <input id="allowNegativesInput" type="checkbox" checked>
+            Allow negatives
+          </label>
+          <label class="toggle-row">
+            <input id="instantFeedbackInput" type="checkbox" checked>
+            Show correction after answer
+          </label>
+        </details>
+
+        <details class="settings-group">
+          <summary>Answer Formats</summary>
+          <div class="format-help">
+            <p>Fractions: <code>3/4</code></p>
+            <p>Powers: <code>x^2</code></p>
+            <p>Square roots: <code>sqrt(8)</code></p>
+            <p>Points/vectors: <code>2,-5</code></p>
+            <p>Matrix answers: enter each row separated by semicolons, like <code>1,2;3,4</code>.</p>
+          </div>
+        </details>
+
+        <div class="settings-actions">
+          <button id="startBtn" type="button">Start Quiz</button>
+          <button id="resetBtn" type="button">Reset</button>
+        </div>
+      </aside>
+
+      <section class="quiz-panel" aria-live="polite">
+        <div id="startState" class="start-state">
+          <h2>Choose a range and start.</h2>
+          <p>Questions appear one at a time. The checker accepts exact values, simplified fractions, and decimals where appropriate.</p>
+        </div>
+
+        <article id="questionCard" class="question-card" hidden>
+          <div class="question-meta">
+            <span id="questionNumber">Question 1 of 10</span>
+            <span id="topicLabel">Arithmetic</span>
+          </div>
+          <div id="questionText" class="question-text"></div>
+          <form id="answerForm" class="answer-form">
+            <input id="answerInput" type="text" autocomplete="off" inputmode="decimal" placeholder="Type your answer">
+            <button id="submitBtn" type="submit">Check</button>
+          </form>
+          <div class="answer-preview-wrap" aria-label="Formatted answer preview">
+            <span>Preview</span>
+          <div id="answerPreview" class="answer-preview"></div>
+          </div>
+          <div id="feedback" class="feedback" hidden></div>
+          <div class="question-actions">
+            <button id="explainBtn" type="button">Explain</button>
+            <button id="nextBtn" type="button" hidden>Next Question</button>
+          </div>
+          <div id="explanationBox" class="explanation-box" hidden></div>
+        </article>
+
+        <article id="summaryCard" class="summary-card" hidden>
+          <h2>Quiz Complete</h2>
+          <div id="summaryStats" class="summary-stats"></div>
+          <div id="reviewList" class="review-list"></div>
+          <button id="restartBtn" type="button">Practice Again</button>
+        </article>
+      </section>
+    </section>
+  </main>
+
+  <script>
+    window.MathJax = {
+      tex: {
+        inlineMath: [["\\(", "\\)"], ["$", "$"]],
+        displayMath: [["\\[", "\\]"]],
+        processEscapes: true
+      },
+      startup: {
+        typeset: false
+      }
+    };
+  </script>
+  <script src="https://cdn.jsdelivr.net/npm/mathjax@3/es5/tex-chtml.js"></script>
+  <script src="app.js"></script>
+</body>
+</html>
