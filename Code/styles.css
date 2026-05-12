@@ -382,23 +382,24 @@ body::before {
   filter: saturate(1.04) contrast(1.02);
 }
 
-.slot-a { --panel-fill: linear-gradient(155deg, #0f2742, #143459); clip-path: polygon(50% 50%, 0 0, 33% 0); }
-.slot-b { --panel-fill: linear-gradient(155deg, #12325a, #17416f); clip-path: polygon(50% 50%, 33% 0, 66% 0); }
-.slot-c { --panel-fill: linear-gradient(155deg, #173d71, #1d4a84); clip-path: polygon(50% 50%, 66% 0, 100% 0); }
-.slot-d { --panel-fill: linear-gradient(155deg, #1a4a84, #205691); clip-path: polygon(50% 50%, 100% 0, 100% 34%); }
-.slot-e { --panel-fill: linear-gradient(155deg, #1c578f, #22639c); clip-path: polygon(50% 50%, 100% 34%, 100% 67%); }
-.slot-f { --panel-fill: linear-gradient(155deg, #1b4d80, #173f69); clip-path: polygon(50% 50%, 100% 67%, 100% 100%); }
-.slot-g { --panel-fill: linear-gradient(155deg, #153760, #112c4d); clip-path: polygon(50% 50%, 100% 100%, 67% 100%); }
-.slot-h { --panel-fill: linear-gradient(155deg, #112b4b, #0d223a); clip-path: polygon(50% 50%, 67% 100%, 34% 100%); }
-.slot-i { --panel-fill: linear-gradient(155deg, #10253f, #0d1f36); clip-path: polygon(50% 50%, 34% 100%, 0 100%); }
-.slot-j { --panel-fill: linear-gradient(155deg, #0f2138, #0d1c30); clip-path: polygon(50% 50%, 0 100%, 0 75%); }
-.slot-k { --panel-fill: linear-gradient(155deg, #10263f, #133052); clip-path: polygon(50% 50%, 0 75%, 0 50%); }
-.slot-l { --panel-fill: linear-gradient(155deg, #14345b, #19406e); clip-path: polygon(50% 50%, 0 50%, 0 25%); }
-.slot-m { --panel-fill: linear-gradient(155deg, #173d6d, #113155); clip-path: polygon(50% 50%, 0 25%, 0 0); }
+.slot-a { --panel-fill: linear-gradient(155deg, #276399, #235b8d); clip-path: polygon(50% 50%, 0 0, 37% 0); }
+.slot-b { --panel-fill: linear-gradient(155deg, #255c8f, #225584); clip-path: polygon(50% 50%, 37% 0, 63% 0); }
+.slot-c { --panel-fill: linear-gradient(155deg, #235684, #204f7a); clip-path: polygon(50% 50%, 63% 0, 100% 0); }
+.slot-d { --panel-fill: linear-gradient(155deg, #214f7a, #1e4970); clip-path: polygon(50% 50%, 100% 0, 100% 25%); }
+.slot-e { --panel-fill: linear-gradient(155deg, #1f4970, #1c4367); clip-path: polygon(50% 50%, 100% 25%, 100% 50%); }
+.slot-f { --panel-fill: linear-gradient(155deg, #1d4266, #1a3c5d); clip-path: polygon(50% 50%, 100% 50%, 100% 75%); }
+.slot-n { --panel-fill: linear-gradient(155deg, #1b3c5c, #183653); clip-path: polygon(50% 50%, 100% 75%, 100% 100%); }
+.slot-g { --panel-fill: linear-gradient(155deg, #193552, #172f49); clip-path: polygon(50% 50%, 100% 100%, 66% 100%); }
+.slot-h { --panel-fill: linear-gradient(155deg, #172f48, #152a40); clip-path: polygon(50% 48%, 66% 100%, 34% 100%); }
+.slot-i { --panel-fill: linear-gradient(155deg, #15283e, #14263a); clip-path: polygon(50% 50%, 34% 100%, 0 100%); }
+.slot-j { --panel-fill: linear-gradient(155deg, #14263b, #132438); clip-path: polygon(50% 50%, 0 100%, 0 75%); }
+.slot-k { --panel-fill: linear-gradient(155deg, #132438, #122337); clip-path: polygon(50% 50%, 0 75%, 0 50%); }
+.slot-l { --panel-fill: linear-gradient(155deg, #122337, #122236); clip-path: polygon(50% 50%, 0 50%, 0 25%); }
+.slot-m { --panel-fill: linear-gradient(155deg, #122236, #102032); clip-path: polygon(50% 50%, 0 25%, 0 0); }
 
 .slot-a .edge-content {
   top: 16.7%;
-  left: 27.7%;
+  left: 28.8%;
 }
 
 .slot-b .edge-content {
@@ -408,21 +409,26 @@ body::before {
 
 .slot-c .edge-content {
   top: 16.7%;
-  left: 72%;
+  left: 71.5%;
 }
 
 .slot-d .edge-content {
-  top: 28%;
+  top: 25%;
   left: 83.33%;
 }
 
 .slot-e .edge-content {
-  top: 50.33%;
+  top: 41.67%;
   left: 83.33%;
 }
 
 .slot-f .edge-content {
-  top: 72.33%;
+  top: 58.33%;
+  left: 83.33%;
+}
+
+.slot-n .edge-content {
+  top: 75%;
   left: 83.33%;
 }
 
@@ -432,7 +438,7 @@ body::before {
 }
 
 .slot-h .edge-content {
-  top: 83.33%;
+  top: 80%;
   left: 50.33%;
 }
 

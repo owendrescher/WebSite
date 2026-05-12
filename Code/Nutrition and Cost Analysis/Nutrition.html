@@ -769,6 +769,9 @@
           <p class="subtle">Saved menu items are listed here with their nutrition and cost totals.</p>
           <div class="actions" style="margin-bottom: 14px;">
             <button id="exportMealsBtn" type="button" class="secondary">Export meals CSV</button>
+            <button id="exportMealsJsonBtn" type="button" class="secondary">Export editable meals</button>
+            <button id="importMealsJsonBtn" type="button" class="secondary">Import editable meals</button>
+            <input id="importMealsJsonFile" type="file" accept="application/json,.json" hidden>
           </div>
           <div id="mealSheet"></div>
         </section>
@@ -1871,6 +1874,16 @@ Chicken Wings,3 oz (84 g),240,15,n/a,5,0,6,7,105,410,2,0,0,0,0.1,0,0.5,240,,,`;
       URL.revokeObjectURL(url);
     }
 
+    function downloadJson(filename, data) {
+      const blob = new Blob([JSON.stringify(data, null, 2)], { type: "application/json" });
+      const url = URL.createObjectURL(blob);
+      const link = document.createElement("a");
+      link.href = url;
+      link.download = filename;
+      link.click();
+      URL.revokeObjectURL(url);
+    }
+
     function exportIngredientsCsv() {
       const rows = [[
         "Ingredient", "Price Value", "Price Amount", "Price Unit", "Serving Amount", "Serving Unit", "Servings Per Container",
@@ -1897,6 +1910,89 @@ Chicken Wings,3 oz (84 g),240,15,n/a,5,0,6,7,105,410,2,0,0,0,0.1,0,0.5,240,,,`;
         ]);
       });
       downloadCsv("meal-sheet.csv", rows);
+    }
+
+    function exportEditableMeals() {
+      const referencedIds = new Set();
+      state.meals.forEach((meal) => {
+        (meal.lineItems || []).forEach((item) => {
+          if (item.ingredientId) referencedIds.add(String(item.ingredientId));
+        });
+      });
+      downloadJson(`editable-meals-${new Date().toISOString().slice(0, 10)}.json`, {
+        type: "owentools-nutrition-editable-meals",
+        version: 1,
+        exportedAt: new Date().toISOString(),
+        meals: state.meals,
+        ingredients: state.ingredients.filter((ingredient) => referencedIds.has(String(ingredient.id))),
+      });
+    }
+
+    function normalizeImportedMeal(meal) {
+      if (!meal || typeof meal !== "object") return null;
+      const originalItems = Array.isArray(meal.lineItems) ? meal.lineItems.map((item) => ({
+        ingredientId: item.ingredientId || "",
+        ingredientName: item.ingredientName || "",
+        amount: item.amount ?? "",
+        unit: item.unit || "",
+        missing: Boolean(item.missing),
+        cost: Number(item.cost) || 0,
+        nutrition: item.nutrition && typeof item.nutrition === "object" ? item.nutrition : {},
+      })) : [];
+      if (!originalItems.length) return null;
+      const hydrated = hydrateMealLineItems(originalItems);
+      return {
+        id: meal.id || makeId(),
+        name: String(meal.name || "Imported Meal").trim() || "Imported Meal",
+        totals: hydrated.lineItems.some((item) => !item.missing) ? hydrated.totals : (meal.totals || hydrated.totals),
+        lineItems: hydrated.lineItems.map((item, index) => item.missing ? { ...originalItems[index], missing: true } : item),
+      };
+    }
+
+    async function importEditableMealsFile(file) {
+      try {
+        const payload = JSON.parse(await file.text());
+        const importedMeals = Array.isArray(payload?.meals) ? payload.meals : (Array.isArray(payload) ? payload : []);
+        const importedIngredients = Array.isArray(payload?.ingredients) ? payload.ingredients : [];
+        if (!importedMeals.length) {
+          alert("No editable meals were found in that file.");
+          return;
+        }
+        pushHistorySnapshot();
+        const ingredientIds = new Set(state.ingredients.map((ingredient) => String(ingredient.id)));
+        const ingredientByName = new Map(state.ingredients.map((ingredient) => [String(ingredient.name || "").trim().toLowerCase(), ingredient]).filter(([name]) => Boolean(name)));
+        const ingredientIdRemap = new Map();
+        importedIngredients.forEach((ingredient) => {
+          const id = String(ingredient?.id || "");
+          const name = String(ingredient?.name || "").trim().toLowerCase();
+          if (id && ingredientIds.has(id)) return;
+          if (name && ingredientByName.has(name)) {
+            if (id) ingredientIdRemap.set(id, ingredientByName.get(name).id);
+            return;
+          }
+          state.ingredients.push(ingredient);
+          if (id) ingredientIds.add(id);
+          if (name) ingredientByName.set(name, ingredient);
+        });
+        const existingMealIds = new Set(state.meals.map((meal) => String(meal.id)));
+        const normalizedMeals = importedMeals
+          .map((meal) => ({
+            ...meal,
+            lineItems: Array.isArray(meal?.lineItems)
+              ? meal.lineItems.map((item) => ingredientIdRemap.has(String(item?.ingredientId || "")) ? { ...item, ingredientId: ingredientIdRemap.get(String(item.ingredientId)) } : item)
+              : meal?.lineItems,
+          }))
+          .map(normalizeImportedMeal)
+          .filter(Boolean)
+          .map((meal) => existingMealIds.has(String(meal.id)) ? { ...meal, id: makeId() } : meal);
+        state.meals = [...normalizedMeals, ...state.meals];
+        saveState();
+        renderIngredientSheet();
+        renderMealSheet();
+        alert(`Imported ${normalizedMeals.length} editable meal${normalizedMeals.length === 1 ? "" : "s"}.`);
+      } catch (error) {
+        alert("That meal file could not be imported.");
+      }
     }
 
     function handleMealRowEdit(event) {
@@ -2118,6 +2214,16 @@ Chicken Wings,3 oz (84 g),240,15,n/a,5,0,6,7,105,410,2,0,0,0,0.1,0,0.5,240,,,`;
         }
         const lines = [`Imported ${result.added} recipes.`, ...result.flags];
         setBulkMealStatus(lines.join("\n"), true);
+      });
+
+      document.getElementById("exportMealsJsonBtn").addEventListener("click", exportEditableMeals);
+      document.getElementById("importMealsJsonBtn").addEventListener("click", () => {
+        document.getElementById("importMealsJsonFile").click();
+      });
+      document.getElementById("importMealsJsonFile").addEventListener("change", async (event) => {
+        const file = event.target.files?.[0];
+        if (file) await importEditableMealsFile(file);
+        event.target.value = "";
       });
 
       document.getElementById("importCsvBtn").addEventListener("click", async () => {

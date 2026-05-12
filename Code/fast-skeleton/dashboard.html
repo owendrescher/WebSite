@@ -17,7 +17,7 @@
     <meta name="twitter:description" content="Live MLB scoreboard, lineups, pitcher trends, hot players, and betting stat tools." />
     <link rel="icon" type="image/png" href="baseball.png" />
     <link rel="apple-touch-icon" href="baseball.png" />
-    <link rel="stylesheet" href="styles.css?v=20260511d" />
+    <link rel="stylesheet" href="styles.css?v=20260511e" />
     <link rel="stylesheet" href="dashboard.css?v=20260505-pitcher-priority" />
   </head>
   <body class="dashboard-page">
@@ -160,6 +160,7 @@
                 </div>
                 <div class="lineup-view-toggle" role="tablist" aria-label="Lineup card view">
                   <button type="button" class="lineup-view-btn active" data-lineup-view="lineups" aria-selected="true">Lineups</button>
+                  <button type="button" class="lineup-view-btn" data-lineup-view="roster" aria-selected="false">Roster</button>
                   <button type="button" class="lineup-view-btn" data-lineup-view="pitching" aria-selected="false">Pitching</button>
                 </div>
                 <button id="lineupCloseBtn" class="lineup-close-btn" type="button" aria-label="Close lineup card">x</button>
@@ -210,6 +211,26 @@
                     <ul class="rotation-list"></ul>
                     <div class="lineup-pitching-subhead">Relief</div>
                     <ul class="bullpen-list"></ul>
+                  </section>
+                </div>
+                <div class="lineup-roster-grid" data-lineup-panel="roster" hidden>
+                  <section class="lineup-roster-panel away-roster">
+                    <div class="lineup-pitching-header">Roster | <span class="lineup-roster-team-code"></span></div>
+                    <div class="lineup-pitching-subhead">Sitting Today</div>
+                    <ul class="sitting-list roster-status-list"></ul>
+                    <div class="lineup-pitching-subhead">Injured List</div>
+                    <ul class="injury-list roster-status-list"></ul>
+                    <div class="lineup-pitching-subhead">Top Prospects</div>
+                    <ul class="prospect-list roster-status-list"></ul>
+                  </section>
+                  <section class="lineup-roster-panel home-roster">
+                    <div class="lineup-pitching-header">Roster | <span class="lineup-roster-team-code"></span></div>
+                    <div class="lineup-pitching-subhead">Sitting Today</div>
+                    <ul class="sitting-list roster-status-list"></ul>
+                    <div class="lineup-pitching-subhead">Injured List</div>
+                    <ul class="injury-list roster-status-list"></ul>
+                    <div class="lineup-pitching-subhead">Top Prospects</div>
+                    <ul class="prospect-list roster-status-list"></ul>
                   </section>
                 </div>
               </div>
@@ -410,6 +431,6 @@
       };
     </script>
     <script src="../shared/owentools-sync.js?v=20260511a"></script>
-    <script src="app.js?v=20260511b"></script>
+    <script src="app.js?v=20260511e"></script>
   </body>
 </html>
