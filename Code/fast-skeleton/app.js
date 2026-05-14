@@ -158,6 +158,7 @@ const ANALYTICS_DAY_INDEX_PREFIX = 'analytics-day:v1';
 const BETS_STORAGE_KEY = 'bets:v2:all';
 const PLAYER_TRACKER_STORAGE_KEY = 'player-tracker:v1';
 const PENDING_GAME_PICKS_STORAGE_KEY = 'pending-game-picks:v1';
+const TOSSUP_SCOREBOARD_STORAGE_KEY = 'tossup-scoreboards:v1';
 const PITCHER_START_MEMORY_KEY = 'pitcher-start-memory:v1';
 const LEGACY_BET_PREFIX = 'bets:';
 const MLB_API_BASE = 'https://statsapi.mlb.com/api/v1';
@@ -7008,6 +7009,30 @@ function restorePendingGamePicks() {
   );
 }
 
+function tossupScoreboardStorageKey(date = dateInput.value || formatDate(new Date())) {
+  return `${TOSSUP_SCOREBOARD_STORAGE_KEY}:${date || formatDate(new Date())}`;
+}
+
+function readTossupScoreboardStore(date = dateInput.value || formatDate(new Date())) {
+  try {
+    const parsed = JSON.parse(localStorage.getItem(tossupScoreboardStorageKey(date)) || '[]');
+    return Array.isArray(parsed) ? parsed.map((gamePk) => String(gamePk)).filter(Boolean) : [];
+  } catch {
+    return [];
+  }
+}
+
+function saveTossupScoreboards(date = dateInput.value || formatDate(new Date())) {
+  try {
+    localStorage.setItem(tossupScoreboardStorageKey(date), JSON.stringify([...tossupScoreboardGamePks]));
+  } catch {}
+}
+
+function restoreTossupScoreboards(date = dateInput.value || formatDate(new Date())) {
+  tossupScoreboardGamePks.clear();
+  readTossupScoreboardStore(date).forEach((gamePk) => tossupScoreboardGamePks.add(String(gamePk)));
+}
+
 function clearCompletedPendingGamePicks(games = latestRenderedGames) {
   if (!pendingGamePickSelections.size || !Array.isArray(games) || !games.length) return false;
   const selectedGamePks = [...pendingGamePickSelections.keys()];
@@ -8488,17 +8513,17 @@ function openBetContextMenu(player, x, y) {
     const target = event.target instanceof Element ? event.target : null;
     const propBtn = target?.closest?.('[data-prop-type]');
     const trackBtn = target?.closest?.('[data-menu-action="track-player"]');
-    const confidenceBtn = target?.closest?.('[data-confidence-level]');
-    if (!propBtn && !trackBtn && !confidenceBtn) return;
+    const expectationBtn = target?.closest?.('[data-expectation-value]');
+    if (!propBtn && !trackBtn && !expectationBtn) return;
     event.preventDefault();
     event.stopPropagation();
     if (trackBtn) {
-      showTrackConfidenceStep(menu, player);
+      showTrackExpectationStep(menu, player);
       return;
     }
     try {
-      if (confidenceBtn) {
-        addPlayerToTracker(player, { confidence: confidenceBtn.dataset.confidenceLevel });
+      if (expectationBtn) {
+        addPlayerToTracker(player, { expectation: expectationBtn.dataset.expectationValue });
       } else {
         quickAddBetLeg(player, propBtn.dataset.propType, menu.querySelector('input')?.value || 1);
       }
@@ -8525,14 +8550,14 @@ function openBetContextMenu(player, x, y) {
   menu.style.top = `${Math.min(Math.max(8, y), window.innerHeight - rect.height - 8)}px`;
 }
 
-function showTrackConfidenceStep(menu, player) {
+function showTrackExpectationStep(menu, player) {
   menu.innerHTML = `
     <div class="player-bet-menu-head">
       <strong>${escapeHtml(player.playerName)}</strong>
-      <span>Choose confidence level</span>
+      <span>What do you expect?</span>
     </div>
-    <div class="player-confidence-options" aria-label="Confidence level">
-      ${[1, 2, 3, 4, 5].map((level) => `<button type="button" data-confidence-level="${level}">${level}</button>`).join('')}
+    <div class="player-confidence-options" aria-label="Expected outcome">
+      ${PLAYER_EXPECTATION_OPTIONS.map(([value, label]) => `<button type="button" data-expectation-value="${value}">${label}</button>`).join('')}
     </div>
     <button class="player-bet-menu-track player-bet-menu-cancel" type="button" data-menu-action="cancel-track">Cancel</button>
   `;
@@ -8867,6 +8892,20 @@ function normalizePlayerConfidence(value) {
   return Number.isFinite(n) ? clamp(n, 1, 5) : 3;
 }
 
+const PLAYER_EXPECTATION_OPTIONS = [
+  ['H', 'H'],
+  ['XBH', 'XBH'],
+  ['HR', 'HR'],
+  ['2+TB', '2+TB'],
+];
+
+function normalizePlayerExpectation(value) {
+  const text = String(value || '').trim().toUpperCase().replace(/\s+/g, '');
+  if (text === '2TB' || text === '2+TB' || text === 'TB2+') return '2+TB';
+  if (['H', 'XBH', 'HR'].includes(text)) return text;
+  return 'H';
+}
+
 function getTrackedPlayers(date = dateInput.value || formatDate(new Date())) {
   const key = trackedPlayersStorageKey(date);
   if (trackedPlayersMemoryByDate.has(key)) {
@@ -8877,7 +8916,7 @@ function getTrackedPlayers(date = dateInput.value || formatDate(new Date())) {
     if (Array.isArray(parsed)) {
       const filtered = parsed
         .filter((entry) => Number.isFinite(Number(entry?.playerId)))
-        .map((entry) => ({ ...entry, confidence: normalizePlayerConfidence(entry?.confidence) }));
+        .map((entry) => ({ ...entry, expectation: normalizePlayerExpectation(entry?.expectation || entry?.expected || '') }));
       trackedPlayersMemoryByDate.set(key, filtered);
       return filtered;
     }
@@ -8900,7 +8939,7 @@ function saveTrackedPlayers(players = [], date = dateInput.value || formatDate(n
       playerName: entry?.playerName || entry?.fullName || entry?.name || 'Unknown',
       teamAbbrev: entry?.teamAbbrev || '',
       position: entry?.position || '',
-      confidence: normalizePlayerConfidence(entry?.confidence),
+      expectation: normalizePlayerExpectation(entry?.expectation || entry?.expected || ''),
     });
   }
   trackedPlayersMemoryByDate.set(key, deduped);
@@ -9017,9 +9056,9 @@ function renderPlayerTrackerList(games = latestRenderedGames) {
         <div class="player-track-meta">
           <span>${escapeHtml([displayTeamAbbrev(teamAbbrev), position].filter(Boolean).join(' | '))}</span>
           <label class="player-track-confidence">
-            <span>Confidence</span>
-            <select data-tracked-confidence-id="${playerId}" aria-label="Confidence for ${escapeHtml(profile?.fullName || entry.playerName || 'tracked player')}">
-              ${[1, 2, 3, 4, 5].map((level) => `<option value="${level}"${normalizePlayerConfidence(entry.confidence) === level ? ' selected' : ''}>${level}</option>`).join('')}
+            <span>Expect</span>
+            <select data-tracked-expectation-id="${playerId}" aria-label="Expected outcome for ${escapeHtml(profile?.fullName || entry.playerName || 'tracked player')}">
+              ${PLAYER_EXPECTATION_OPTIONS.map(([value, label]) => `<option value="${value}"${normalizePlayerExpectation(entry.expectation) === value ? ' selected' : ''}>${label}</option>`).join('')}
             </select>
           </label>
         </div>
@@ -9050,7 +9089,7 @@ function addSelectedPlayerToTracker() {
     ? [...(trackedPlayersMemoryByDate.get(key) || [])]
     : getTrackedPlayers();
   if (!tracked.some((entry) => String(entry.playerId) === String(player.playerId))) {
-    tracked.push({ ...player, confidence: normalizePlayerConfidence(player.confidence) });
+    tracked.push({ ...player, expectation: normalizePlayerExpectation(player.expectation) });
   }
   saveTrackedPlayers(tracked);
   if (betPlayerSearchEl) betPlayerSearchEl.value = '';
@@ -9069,11 +9108,11 @@ function addPlayerToTracker(player, options = {}) {
     ? [...(trackedPlayersMemoryByDate.get(key) || [])]
     : getTrackedPlayers();
   const existingIndex = tracked.findIndex((entry) => String(entry.playerId) === String(player.playerId));
-  const confidence = normalizePlayerConfidence(options.confidence ?? player.confidence);
+  const expectation = normalizePlayerExpectation(options.expectation ?? player.expectation);
   if (existingIndex >= 0) {
-    tracked[existingIndex] = { ...tracked[existingIndex], confidence };
+    tracked[existingIndex] = { ...tracked[existingIndex], expectation };
   } else {
-    tracked.push({ ...player, confidence });
+    tracked.push({ ...player, expectation });
   }
   saveTrackedPlayers(tracked);
   setBetPanelMode('players');
@@ -9416,12 +9455,12 @@ function initBetInput() {
         renderPlayerTrackerList(latestRenderedGames);
         return;
       }
-      const confidenceSelect = e.target.closest('[data-tracked-confidence-id]');
-      if (confidenceSelect) {
-        const playerId = String(confidenceSelect.dataset.trackedConfidenceId || '');
+      const expectationSelect = e.target.closest('[data-tracked-expectation-id]');
+      if (expectationSelect) {
+        const playerId = String(expectationSelect.dataset.trackedExpectationId || '');
         saveTrackedPlayers(getTrackedPlayers().map((entry) => (
           String(entry.playerId) === playerId
-            ? { ...entry, confidence: normalizePlayerConfidence(confidenceSelect.value) }
+            ? { ...entry, expectation: normalizePlayerExpectation(expectationSelect.value) }
             : entry
         )));
         renderPlayerTrackerList(latestRenderedGames);
@@ -9456,12 +9495,12 @@ function initBetInput() {
     if (Number.isFinite(playerId) && game) openPlayerStatOverlay(playerId, game);
   });
   playerTrackerListEl?.addEventListener('change', (e) => {
-    const confidenceSelect = e.target.closest('[data-tracked-confidence-id]');
-    if (!confidenceSelect) return;
-    const playerId = String(confidenceSelect.dataset.trackedConfidenceId || '');
+    const expectationSelect = e.target.closest('[data-tracked-expectation-id]');
+    if (!expectationSelect) return;
+    const playerId = String(expectationSelect.dataset.trackedExpectationId || '');
     saveTrackedPlayers(getTrackedPlayers().map((entry) => (
       String(entry.playerId) === playerId
-        ? { ...entry, confidence: normalizePlayerConfidence(confidenceSelect.value) }
+        ? { ...entry, expectation: normalizePlayerExpectation(expectationSelect.value) }
         : entry
     )));
     renderPlayerTrackerList(latestRenderedGames);
@@ -15115,6 +15154,7 @@ function setTossupScoreboardMarked(gamePk, marked) {
   if (!key) return false;
   if (marked) tossupScoreboardGamePks.add(key);
   else tossupScoreboardGamePks.delete(key);
+  saveTossupScoreboards();
   const card = cardForGamePk(key);
   card?.querySelector('.scoreboard')?.classList.toggle('is-tossup-marked', tossupScoreboardGamePks.has(key));
   lineupOverlayEl?.querySelector('.lineup-state-inning.is-pregame-toggle')
@@ -16601,6 +16641,7 @@ async function finalizeRenderedGames(cards, homeRuns = []) {
   const dedupedCards = await hydrateTeamLastSevenRecords(dedupeGameCards(cards, selectedDate), selectedDate);
   latestRenderedGames = dedupedCards;
   restorePendingGamePicks();
+  restoreTossupScoreboards(selectedDate);
   clearCompletedPendingGamePicks(dedupedCards);
   updateDashboardSummary(dedupedCards);
   gamesEl.querySelectorAll('.empty, .games-loading').forEach((el) => el.remove());
