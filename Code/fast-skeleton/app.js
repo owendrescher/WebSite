@@ -3,6 +3,7 @@ const template = document.getElementById('gameTemplate');
 const dateInput = document.getElementById('dateInput');
 const datePrevBtnEl = document.getElementById('datePrevBtn');
 const dateNextBtnEl = document.getElementById('dateNextBtn');
+const dateRefreshBtnEl = document.getElementById('dateRefreshBtn');
 const overlayEl = document.getElementById('overlay');
 const overlayResizeHandleEl = document.getElementById('overlayResizeHandle');
 const overlayDockToggleBtnEl = document.getElementById('overlayDockToggleBtn');
@@ -2119,7 +2120,8 @@ function isReusablePreviewProbableForSide(pitcher, game, side) {
   const team = side === 'away' ? game?.away : game?.home;
   const pitcherTeam = probablePitcherTeamAbbrev(pitcher, game);
   if (pitcherTeam && team && !sameTeamAbbrev(pitcherTeam, team)) return false;
-  if (pitcher?.source === 'rotation-memory' || pitcher?.source === 'statsapi-team-schedule') return true;
+  if (pitcher?.source === 'rotation-memory') return true;
+  if (pitcher?.source === 'statsapi-team-schedule') return Boolean(pitcher.teamVerified);
   return Number.isFinite(Number(pitcher?.id ?? pitcher?.person?.id)) && Boolean(pitcherTeam);
 }
 
@@ -2745,7 +2747,22 @@ function formatBatterLine(player, fallbackName) {
 
 function canonicalTeamAbbrev(abbrev) {
   const normalized = String(abbrev || '').trim().toUpperCase();
-  return TEAM_ABBREV_CANONICAL[normalized] || normalized;
+  if (!normalized) return '';
+  const direct = TEAM_ABBREV_CANONICAL[normalized] || normalized;
+  if (TEAM_IDS[direct]) return direct;
+  const nameKey = normalizeNameKey(normalized);
+  if (nameKey) {
+    const matched = Object.entries(TEAM_SEARCH_NAMES).find(([team, searchText]) => {
+      const searchKey = normalizeNameKey(searchText);
+      const nicknameKey = normalizeNameKey(TEAM_NICKNAMES[team] || '');
+      return searchKey === nameKey
+        || nicknameKey === nameKey
+        || (nameKey.length > 4 && searchKey.includes(nameKey))
+        || (searchKey.length > 4 && nameKey.includes(searchKey));
+    })?.[0];
+    if (matched) return matched;
+  }
+  return direct;
 }
 
 function displayTeamAbbrev(abbrev) {
@@ -2796,12 +2813,15 @@ function normalizeProbablePitcher(pitcher, teamAbbrev = '') {
 
 function isOfficialProbableSource(pitcher) {
   const source = String(pitcher?.source || '');
-  return source === 'mlb-probable-page' || source === 'baseball-savant-probables' || source === 'rotation-memory';
+  return source === 'mlb-probable-page'
+    || source === 'baseball-savant-probables'
+    || source === 'statsapi-team-schedule'
+    || source === 'rotation-memory';
 }
 
 function isAuthoritativeProbableSource(pitcher) {
   const source = String(pitcher?.source || '');
-  return source === 'mlb-probable-page' || source === 'baseball-savant-probables';
+  return source === 'mlb-probable-page' || source === 'baseball-savant-probables' || source === 'statsapi-team-schedule';
 }
 
 function isTrustedPreviewProbable(pitcher, game) {
@@ -2809,12 +2829,22 @@ function isTrustedPreviewProbable(pitcher, game) {
   return String(pitcher.sourceDate || '') === String(officialDateForGame(game));
 }
 
+function isVerifiedSameTeamProbable(pitcher, game, side) {
+  if (!pitcher || probablePitcherIsTbd(pitcher)) return false;
+  const team = side === 'away' ? game?.away : game?.home;
+  const pitcherTeam = probablePitcherTeamAbbrev(pitcher, game);
+  if (!pitcherTeam || !team || !sameTeamAbbrev(pitcherTeam, team)) return false;
+  if (pitcher?.source === 'statsapi-team-schedule') return Boolean(pitcher.teamVerified);
+  return true;
+}
+
 function previewProbableForSide(game, side) {
   const probable = game?.probablePitchers?.[side] || null;
   const team = side === 'away' ? game?.away : game?.home;
   const pitcherTeam = probablePitcherTeamAbbrev(probable, game);
   if (pitcherTeam && team && !sameTeamAbbrev(pitcherTeam, team)) return null;
-  return isTrustedPreviewProbable(probable, game) ? probable : null;
+  if (isTrustedPreviewProbable(probable, game) && (probable?.source !== 'statsapi-team-schedule' || probable?.teamVerified)) return probable;
+  return isVerifiedSameTeamProbable(probable, game, side) ? probable : null;
 }
 
 function isValidProbablePitcherName(name) {
@@ -3158,6 +3188,16 @@ function sanitizeProbablePitcherForTeam(pitcher, teamAbbrev, game) {
   const id = Number(pitcher?.id ?? pitcher?.person?.id);
   if (game && (source === 'mlb-probable-page' || source === 'baseball-savant-probables') && !Number.isFinite(id) && !pitcherTeam) return null;
   const normalized = normalizeProbablePitcher(pitcher);
+  if (!normalized) return null;
+  if (!source || source === 'statsapi-team-schedule') {
+    return {
+      ...normalized,
+      source: source || 'statsapi-team-schedule',
+      sourceDate: normalized.sourceDate || officialDateForGame(game),
+      teamAbbrev: pitcherTeam || canonicalTeamAbbrev(teamAbbrev),
+      teamVerified: true,
+    };
+  }
   return normalized;
 }
 
@@ -3206,16 +3246,16 @@ async function fetchOfficialProbablePitcherForSide(teamAbbrev, opponentAbbrev, t
       : sameTeamAbbrev(scheduleTeamAbbrev(matched?.teams?.home?.team), team)
         ? 'home'
         : '';
-    const probable = normalizeProbablePitcher(side ? matched?.teams?.[side]?.probablePitcher : null, team);
+    const probable = normalizeProbablePitcher(side ? matched?.teams?.[side]?.probablePitcher : null);
     if (!probable) return null;
     const probableTeam = probablePitcherTeamAbbrev(probable, null);
     if (probableTeam && !sameTeamAbbrev(probableTeam, team)) return null;
     if (!probableTeam && probable.fullName) {
-      const verified = await searchMlbPlayerByName(probable.fullName, team);
-      if (!verified) return null;
-      return { ...probable, ...verified, source: 'statsapi-team-schedule' };
+      const verified = await searchMlbPlayerByName(probable.fullName, team).catch(() => null);
+      if (verified) return { ...probable, ...verified, teamAbbrev: team, teamVerified: true, source: 'statsapi-team-schedule', sourceDate: targetDate };
+      return { ...probable, teamAbbrev: team, teamVerified: true, source: 'statsapi-team-schedule', sourceDate: targetDate };
     }
-    return { ...probable, source: 'statsapi-team-schedule' };
+    return { ...probable, teamAbbrev: team, teamVerified: true, source: 'statsapi-team-schedule', sourceDate: targetDate };
   })().catch(() => {
     officialProbablePitcherCache.delete(cacheKey);
     return null;
@@ -3492,20 +3532,27 @@ async function fetchMlbStartingLineupFallback(game, side) {
 
 async function fetchOfficialProbablePitchersForGame(game, awayAbbrev, homeAbbrev, targetDate) {
   let probables = null;
-  if (shouldPreferProbablePitcher(game)) {
-    const [startingLineupProbables, pageProbables] = await Promise.all([
-      fetchMlbStartingLineupPitchersForGame(game, awayAbbrev, homeAbbrev, targetDate).catch(() => null),
-      fetchMlbProbablePitchersFromPage(game, awayAbbrev, homeAbbrev, targetDate).catch(() => null),
-    ]);
-    probables = mergeProbablePitchers(startingLineupProbables || {}, pageProbables || {}, game, awayAbbrev, homeAbbrev);
-    return fillPotentialStartersForTbdProbables(probables, game, awayAbbrev, homeAbbrev, targetDate);
-  }
-  const pageProbables = await fetchMlbProbablePitchersFromPage(game, awayAbbrev, homeAbbrev, targetDate).catch(() => null);
-  const [away, home] = await Promise.all([
+  const scheduleProbablesPromise = Promise.all([
     fetchOfficialProbablePitcherForSide(awayAbbrev, homeAbbrev, targetDate, game?.gamePk),
     fetchOfficialProbablePitcherForSide(homeAbbrev, awayAbbrev, targetDate, game?.gamePk),
+  ]).catch(() => [null, null]);
+  if (shouldPreferProbablePitcher(game)) {
+    const [startingLineupProbables, pageProbables, scheduleProbableResults] = await Promise.all([
+      fetchMlbStartingLineupPitchersForGame(game, awayAbbrev, homeAbbrev, targetDate).catch(() => null),
+      fetchMlbProbablePitchersFromPage(game, awayAbbrev, homeAbbrev, targetDate).catch(() => null),
+      scheduleProbablesPromise,
+    ]);
+    const [awaySchedule, homeSchedule] = scheduleProbableResults || [];
+    const pageMerged = mergeProbablePitchers(startingLineupProbables || {}, pageProbables || {}, game, awayAbbrev, homeAbbrev);
+    probables = mergeProbablePitchers(pageMerged, { away: awaySchedule, home: homeSchedule }, game, awayAbbrev, homeAbbrev);
+    return fillPotentialStartersForTbdProbables(probables, game, awayAbbrev, homeAbbrev, targetDate);
+  }
+  const [pageProbables, scheduleProbableResults] = await Promise.all([
+    fetchMlbProbablePitchersFromPage(game, awayAbbrev, homeAbbrev, targetDate).catch(() => null),
+    scheduleProbablesPromise,
   ]);
-  probables = mergeProbablePitchers({ away, home }, pageProbables, game, awayAbbrev, homeAbbrev);
+  const [away, home] = scheduleProbableResults || [];
+  probables = mergeProbablePitchers(pageProbables || {}, { away, home }, game, awayAbbrev, homeAbbrev);
   return fillPotentialStartersForTbdProbables(probables, game, awayAbbrev, homeAbbrev, targetDate);
 }
 
@@ -3616,10 +3663,10 @@ async function potentialStarterFromRotationMemory(teamAbbrev, game, targetDate, 
     return { profile, memory };
   });
   const ranked = memories
-    .filter((entry) => Number.isFinite(Number(entry?.memory?.daysSinceStarterWorkload ?? entry?.memory?.daysSinceLastPitched)))
+    .filter((entry) => Number.isFinite(Number(entry?.memory?.daysSinceLastPitched ?? entry?.memory?.daysSinceStarterWorkload)))
     .sort((a, b) => {
-      const bRest = Number(b.memory.daysSinceStarterWorkload ?? b.memory.daysSinceLastPitched);
-      const aRest = Number(a.memory.daysSinceStarterWorkload ?? a.memory.daysSinceLastPitched);
+      const bRest = Number(b.memory.daysSinceLastPitched ?? b.memory.daysSinceStarterWorkload);
+      const aRest = Number(a.memory.daysSinceLastPitched ?? a.memory.daysSinceStarterWorkload);
       const dayDiff = bRest - aRest;
       if (dayDiff) return dayDiff;
       return pitcherGamesStarted(b.profile) - pitcherGamesStarted(a.profile)
@@ -3648,23 +3695,14 @@ async function potentialStarterFromRotationMemory(teamAbbrev, game, targetDate, 
 
 async function fillPotentialStartersForTbdProbables(probables, game, awayAbbrev, homeAbbrev, targetDate) {
   const sanitized = sanitizeProbablePitchers(probables || {}, game, awayAbbrev, homeAbbrev);
-  const date = calendarDateOnly(targetDate || officialDateForGame(game));
-  const [yesterday] = recentCalendarDateWindow(date, 2);
   const sides = [
     ['away', awayAbbrev],
     ['home', homeAbbrev],
   ];
   const replacements = await Promise.all(sides.map(async ([side, team]) => {
     const pitcher = sanitized?.[side] || null;
-    const pitcherId = Number(pitcher?.id);
-    const usedYesterday = !probablePitcherIsTbd(pitcher)
-      && yesterday
-      && yesterday !== date
-      && Number.isFinite(pitcherId)
-      && await pitcherUsedOnDate(pitcherId, yesterday, game).catch(() => false);
-    if (pitcher && !probablePitcherIsTbd(pitcher) && !usedYesterday) return pitcher;
-    const excludedIds = usedYesterday && Number.isFinite(pitcherId) ? new Set([pitcherId]) : new Set();
-    const potential = await potentialStarterFromRotationMemory(team, game, targetDate, excludedIds).catch(() => null);
+    if (pitcher && !probablePitcherIsTbd(pitcher)) return pitcher;
+    const potential = await potentialStarterFromRotationMemory(team, game, targetDate).catch(() => null);
     return potential || sanitized?.[side] || null;
   }));
   return sanitizeProbablePitchers({ away: replacements[0], home: replacements[1] }, game, awayAbbrev, homeAbbrev);
@@ -5823,8 +5861,14 @@ function shouldPreferProbablePitcher(game) {
   if (game?.status?.abstractGameState === 'Preview') return true;
   const inningShort = String(game?.inningShort || '').toUpperCase();
   if (inningShort === 'PRE') return true;
-  const status = String(game?.status || '').toLowerCase();
-  return status.includes('not started') || status.includes('scheduled') || status.includes('pre-game');
+  const status = String(game?.status?.detailedState || game?.status || '').toLowerCase();
+  const coded = String(game?.status?.codedGameState || game?.status?.statusCode || '').toUpperCase();
+  return status.includes('not started')
+    || status.includes('scheduled')
+    || status.includes('pre-game')
+    || status.includes('warmup')
+    || coded === 'P'
+    || coded === 'PW';
 }
 
 function normalizeHalfInning(value) {
@@ -5909,16 +5953,26 @@ function currentPeople(activePlay, linescore, game, awayPlayers, homePlayers) {
   const livePitcher = linescorePitcherSnapshot(linescore);
   const currentPitcherId = livePitcher.pitcherId || activePitcher?.id;
   const currentPitcherName = livePitcher.pitcher?.fullName || activePitcher?.fullName || '';
+  const currentPitcherRosterSide = playerById(awayPlayers, currentPitcherId)
+    ? 'away'
+    : playerById(homePlayers, currentPitcherId)
+      ? 'home'
+      : '';
+  const battingSide = currentPitcherRosterSide === 'away'
+    ? 'home'
+    : currentPitcherRosterSide === 'home'
+      ? 'away'
+      : side.battingSide;
 
-  if (side.battingSide === 'away') {
+  if (battingSide === 'away') {
     awayHitter = formatBatterLine(playerById(awayPlayers, activeBatter?.id), activeBatter?.fullName || '');
     homePitcher = formatPitcherLine(playerById(homePlayers, currentPitcherId), currentPitcherName);
-  } else if (side.battingSide === 'home') {
+  } else if (battingSide === 'home') {
     homeHitter = formatBatterLine(playerById(homePlayers, activeBatter?.id), activeBatter?.fullName || '');
     awayPitcher = formatPitcherLine(playerById(awayPlayers, currentPitcherId), currentPitcherName);
   }
 
-  return { awayPitcher, homePitcher, awayHitter, homeHitter, battingSide: side.battingSide, currentPitcherId };
+  return { awayPitcher, homePitcher, awayHitter, homeHitter, battingSide, currentPitcherId };
 }
 
 function scoreboardHitterForSide(game, side) {
@@ -9911,7 +9965,7 @@ async function fetchGamesAndHomeRuns(date) {
           homeAbbrev,
           gameOfficialDate,
         ).catch(() => null);
-        probablePitchers = sanitizeProbablePitchers(officialProbables || probablePitchers, game, awayAbbrev, homeAbbrev);
+        probablePitchers = mergeProbablePitchers(probablePitchers, officialProbables || {}, game, awayAbbrev, homeAbbrev);
       }
       if (shouldPreferProbablePitcher(game)) {
         probablePitchers = await fillPotentialStartersForTbdProbables(probablePitchers, game, awayAbbrev, homeAbbrev, gameOfficialDate);
@@ -9976,16 +10030,16 @@ async function fetchGamesAndHomeRuns(date) {
         away: live?.gameData?.teams?.away?.probablePitcher || game?.teams?.away?.probablePitcher || null,
         home: live?.gameData?.teams?.home?.probablePitcher || game?.teams?.home?.probablePitcher || null,
       }, game, awayAbbrev, homeAbbrev);
-      if (shouldPreferProbablePitcher(game) && probablePitchersNeedFallback(probablePitchers)) {
+      if (probablePitchersNeedFallback(probablePitchers)) {
         const officialProbables = await fetchOfficialProbablePitchersForGame(
           game,
           awayAbbrev,
           homeAbbrev,
           officialDateForGame(game, date),
         );
-        probablePitchers = sanitizeProbablePitchers(officialProbables || {}, game, awayAbbrev, homeAbbrev);
+        probablePitchers = mergeProbablePitchers(probablePitchers, officialProbables || {}, game, awayAbbrev, homeAbbrev);
       }
-      if (shouldPreferProbablePitcher(game)) {
+      if (shouldPreferProbablePitcher(game) || probablePitchersNeedFallback(probablePitchers)) {
         probablePitchers = await fillPotentialStartersForTbdProbables(probablePitchers, game, awayAbbrev, homeAbbrev, officialDateForGame(game, date));
       }
       const awayColor = getTeamColor(awayAbbrev);
@@ -10209,16 +10263,16 @@ async function fetchGamesAndHomeRuns(date) {
         away: game?.teams?.away?.probablePitcher || cached?.probablePitchers?.away || null,
         home: game?.teams?.home?.probablePitcher || cached?.probablePitchers?.home || null,
       }, { ...game, playerLookup: derivedLookup }, awayFromSchedule, homeFromSchedule);
-      if (shouldPreferProbablePitcher(game) && probablePitchersNeedFallback(fallbackProbablePitchers)) {
+      if (probablePitchersNeedFallback(fallbackProbablePitchers)) {
         const officialProbables = await fetchOfficialProbablePitchersForGame(
           { ...game, playerLookup: derivedLookup },
           awayFromSchedule,
           homeFromSchedule,
           officialDateForGame(game, date),
         );
-        fallbackProbablePitchers = sanitizeProbablePitchers(officialProbables || {}, { ...game, playerLookup: derivedLookup }, awayFromSchedule, homeFromSchedule);
+        fallbackProbablePitchers = mergeProbablePitchers(fallbackProbablePitchers, officialProbables || {}, { ...game, playerLookup: derivedLookup }, awayFromSchedule, homeFromSchedule);
       }
-      if (shouldPreferProbablePitcher(game)) {
+      if (shouldPreferProbablePitcher(game) || probablePitchersNeedFallback(fallbackProbablePitchers)) {
         fallbackProbablePitchers = await fillPotentialStartersForTbdProbables(fallbackProbablePitchers, { ...game, playerLookup: derivedLookup }, awayFromSchedule, homeFromSchedule, officialDateForGame(game, date));
       }
       if (cached) {
@@ -10339,16 +10393,16 @@ async function fetchMlbFallbackCards(date, cachedCards) {
         away: game?.teams?.away?.probablePitcher || cached?.probablePitchers?.away || null,
         home: game?.teams?.home?.probablePitcher || cached?.probablePitchers?.home || null,
       }, { ...game, playerLookup: derivedLookup }, awayAbbrev, homeAbbrev);
-      if (shouldPreferProbablePitcher(game) && probablePitchersNeedFallback(probablePitchers)) {
+      if (probablePitchersNeedFallback(probablePitchers)) {
         const officialProbables = await fetchOfficialProbablePitchersForGame(
           { ...game, playerLookup: derivedLookup },
           awayAbbrev,
           homeAbbrev,
           officialDateForGame(game, date),
         );
-        probablePitchers = sanitizeProbablePitchers(officialProbables || {}, { ...game, playerLookup: derivedLookup }, awayAbbrev, homeAbbrev);
+        probablePitchers = mergeProbablePitchers(probablePitchers, officialProbables || {}, { ...game, playerLookup: derivedLookup }, awayAbbrev, homeAbbrev);
       }
-      if (shouldPreferProbablePitcher(game)) {
+      if (shouldPreferProbablePitcher(game) || probablePitchersNeedFallback(probablePitchers)) {
         probablePitchers = await fillPotentialStartersForTbdProbables(probablePitchers, { ...game, playerLookup: derivedLookup }, awayAbbrev, homeAbbrev, officialDateForGame(game, date));
       }
 
@@ -14200,7 +14254,11 @@ async function resolveFreshLineupPitchers(game) {
       homeAbbrev,
       officialDateForGame(game),
     );
-    game.probablePitchers = sanitizeProbablePitchers(officialProbables || {}, game, awayAbbrev, homeAbbrev);
+    const existingProbables = sanitizeProbablePitchers({
+      away: game?.probablePitchers?.away || game?.teams?.away?.probablePitcher || null,
+      home: game?.probablePitchers?.home || game?.teams?.home?.probablePitcher || null,
+    }, game, awayAbbrev, homeAbbrev);
+    game.probablePitchers = mergeProbablePitchers(existingProbables, officialProbables || {}, game, awayAbbrev, homeAbbrev);
     if (probablePitchersNeedFallback(game.probablePitchers)) {
       game.probablePitchers = await fillPotentialStartersForTbdProbables(game.probablePitchers, game, awayAbbrev, homeAbbrev, officialDateForGame(game));
     }
@@ -14220,6 +14278,20 @@ async function resolveFreshLineupPitchers(game) {
       away: awayTeam?.probablePitcher || game?.probablePitchers?.away || null,
       home: homeTeam?.probablePitcher || game?.probablePitchers?.home || null,
     }, game, awayAbbrev, homeAbbrev);
+    if (probablePitchersNeedFallback(probablePitchers)) {
+      const officialProbables = await fetchOfficialProbablePitchersForGame(
+        game,
+        awayAbbrev,
+        homeAbbrev,
+        officialDateForGame(game),
+      ).catch(() => null);
+      game.probablePitchers = mergeProbablePitchers(probablePitchers, officialProbables || {}, game, awayAbbrev, homeAbbrev);
+      if (probablePitchersNeedFallback(game.probablePitchers)) {
+        game.probablePitchers = await fillPotentialStartersForTbdProbables(game.probablePitchers, game, awayAbbrev, homeAbbrev, officialDateForGame(game));
+      }
+    } else {
+      game.probablePitchers = probablePitchers;
+    }
     const awayPlayers = live?.liveData?.boxscore?.teams?.away?.players || {};
     const homePlayers = live?.liveData?.boxscore?.teams?.home?.players || {};
     const liveLookup = {
@@ -14227,8 +14299,6 @@ async function resolveFreshLineupPitchers(game) {
       ...buildPlayerLookup(homePlayers, live?.gameData?.players || {}, homeAbbrev, game?.homeColor || getTeamColor(homeAbbrev), game?.homeLogo || getLogoPath(homeAbbrev)),
     };
     if (Object.keys(liveLookup).length) persistPlayerLookupForGame(game, liveLookup);
-    game.probablePitchers = probablePitchers;
-
     const livePitcher = resolveLivePitcherSnapshot(live);
     const liveAllPlays = live?.liveData?.plays?.allPlays || [];
     const sidePlayers = {
@@ -14236,9 +14306,9 @@ async function resolveFreshLineupPitchers(game) {
       home: homePlayers,
     };
     const livePitcherId = Number(livePitcher.currentPitcher?.id);
-    const currentPitchingSide = livePitcher.currentPitchingSide
-      || (Number.isFinite(livePitcherId) && awayPlayers[`ID${livePitcherId}`] ? 'away' : '')
+    const currentPitchingRosterSide = (Number.isFinite(livePitcherId) && awayPlayers[`ID${livePitcherId}`] ? 'away' : '')
       || (Number.isFinite(livePitcherId) && homePlayers[`ID${livePitcherId}`] ? 'home' : '');
+    const currentPitchingSide = currentPitchingRosterSide || livePitcher.currentPitchingSide || '';
     const sidePitcherOrder = {
       away: live?.liveData?.boxscore?.teams?.away?.pitchers || [],
       home: live?.liveData?.boxscore?.teams?.home?.pitchers || [],
@@ -14262,7 +14332,7 @@ async function resolveFreshLineupPitchers(game) {
     };
 
     const buildSide = async (side) => {
-      const probable = probablePitchers?.[side] || null;
+      const probable = game?.probablePitchers?.[side] || probablePitchers?.[side] || null;
       const players = sidePlayers[side] || {};
       const starterCandidate = starterCandidateFromPitchers(
         Object.values(players).filter(isPitcherPlayer),
@@ -14410,8 +14480,9 @@ function resolveLineupPitcherForDisplay(game, side) {
     ? previewProbableForSide(game, side)
     : game?.probablePitchers?.[side] || game?.teams?.[side]?.probablePitcher || null;
   const probableProfile = probable?.id ? game?.playerLookup?.[String(probable.id)] || null : null;
-  const historyStarter = shouldPreferProbablePitcher(game) ? null : starterFromPitchingHistory(game, side);
-  const starter = historyStarter || normalizePitcherDisplayEntry(probableProfile || probable, 'starter');
+  const historyStarter = starterFromPitchingHistory(game, side);
+  const pitchingStarter = normalizePitcherDisplayEntry(game?.pitching?.[side]?.current, game?.pitching?.[side]?.current?.role || 'starter');
+  const starter = normalizePitcherDisplayEntry(probableProfile || probable, 'starter') || historyStarter || pitchingStarter;
   if (shouldDisplayStarterOnly(game)) {
     return {
       starter,
@@ -14496,6 +14567,12 @@ function isDateShortcutTypingTarget(target) {
 function initDateKeyboardShortcuts() {
   datePrevBtnEl?.addEventListener('click', () => shiftSelectedDate(-1));
   dateNextBtnEl?.addEventListener('click', () => shiftSelectedDate(1));
+  dateRefreshBtnEl?.addEventListener('click', () => {
+    refreshForSelectedDate({ fallbackToToday: true, force: true });
+    requestAnimationFrame(() => {
+      if (isTextEntryTarget(document.activeElement)) document.activeElement.blur();
+    });
+  });
   document.addEventListener('keydown', (e) => {
     if (e.defaultPrevented || e.ctrlKey || e.metaKey || e.altKey || e.shiftKey) return;
     if (isDateShortcutTypingTarget(e.target)) return;
@@ -16139,6 +16216,11 @@ function preserveLineupTextDuringRefresh(listEl, teamCode = '', renderFallback) 
   renderFallback?.();
 }
 
+function lineupListNeedsInterimPaint(listEl, teamCode = '') {
+  const sameTeam = !teamCode || String(listEl?.dataset?.teamCode || '') === String(teamCode || '');
+  return !sameTeam || !lineupListHasRows(listEl);
+}
+
 async function syncLineupOverlay(game, options = {}) {
   const open = Boolean(game && (options.forceOpen || isLineupOpen(game.gamePk)));
   lineupOverlayEl.hidden = !open;
@@ -16269,8 +16351,16 @@ async function syncLineupOverlay(game, options = {}) {
     game.previewLineupFallback = { ...(game.previewLineupFallback || {}), home: homeDisplayLineup };
   }
   const recentBattingStatsPromise = getLineupRecentBattingStatsMap(game, [awayDisplayLineup, homeDisplayLineup], lineupStatGameWindow).catch(() => new Map());
-  renderLineupList(awayLineupListEl, awayDisplayLineup, game.awayColor, game.away, new Set(), new Set(), new Map(), new Map(), new Map(), new Map(), new Map(), new Map());
-  renderLineupList(homeLineupListEl, homeDisplayLineup, game.homeColor, game.home, new Set(), new Set(), new Map(), new Map(), new Map(), new Map(), new Map(), new Map());
+  if (lineupListNeedsInterimPaint(awayLineupListEl, game.away)) {
+    renderLineupList(awayLineupListEl, awayDisplayLineup, game.awayColor, game.away, new Set(), new Set(), new Map(), new Map(), new Map(), new Map(), new Map(), new Map());
+  } else {
+    setLineupListRefreshing(awayLineupListEl, true);
+  }
+  if (lineupListNeedsInterimPaint(homeLineupListEl, game.home)) {
+    renderLineupList(homeLineupListEl, homeDisplayLineup, game.homeColor, game.home, new Set(), new Set(), new Map(), new Map(), new Map(), new Map(), new Map(), new Map());
+  } else {
+    setLineupListRefreshing(homeLineupListEl, true);
+  }
   renderPitchingSide(lineupOverlayEl.querySelector('.away-pitching'), game.away, game.awayColor, awayPitchingDisplay, game);
   renderPitchingSide(lineupOverlayEl.querySelector('.home-pitching'), game.home, game.homeColor, homePitchingDisplay, game);
   Promise.all([

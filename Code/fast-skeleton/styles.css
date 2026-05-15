@@ -485,6 +485,10 @@ label {
   color: #fff;
 }
 
+.date-refresh-btn {
+  margin-left: 8px;
+}
+
 body[data-overlay-dock='right'] .topbar label {
   gap: 4px;
   font-size: 0.44rem;
@@ -3870,10 +3874,6 @@ body[data-overlay-dock='bottom'] .score {
   list-style: none;
   display: grid;
   gap: 2px;
-}
-
-.lineup-list.is-refreshing {
-  padding-bottom: 8px;
 }
 
 .lineup-refresh-bar {
@@ -8007,8 +8007,8 @@ body[data-theme="paper-scorebook"] .team {
   .topbar-left > label {
     width: 100%;
     display: grid;
-    grid-template-columns: 1fr auto 1fr;
-    grid-template-areas: "prev date next";
+    grid-template-columns: minmax(0, 1fr) 38px minmax(112px, 132px) 38px 38px minmax(0, 1fr);
+    grid-template-areas: ". prev date next refresh .";
     align-items: center;
     gap: 8px;
   }
@@ -8034,7 +8034,7 @@ body[data-theme="paper-scorebook"] .team {
 
   #dateInput {
     grid-area: date;
-    width: 132px;
+    width: min(132px, 100%);
     text-align: center;
     justify-self: center;
   }
@@ -8047,6 +8047,14 @@ body[data-theme="paper-scorebook"] .team {
   #dateNextBtn {
     grid-area: next;
     justify-self: start;
+  }
+
+  #dateRefreshBtn {
+    grid-area: refresh;
+    justify-self: start;
+    width: 38px;
+    min-width: 38px;
+    margin-left: 0;
   }
 
   #datePrevBtn,

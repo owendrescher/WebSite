@@ -1007,8 +1007,8 @@ body.dashboard-page .lineup-pos {
   body.dashboard-page .topbar-left label {
     width: 100%;
     display: grid;
-    grid-template-columns: 1fr auto 1fr;
-    grid-template-areas: "prev date next";
+    grid-template-columns: minmax(0, 1fr) 38px minmax(112px, 132px) 38px 38px minmax(0, 1fr);
+    grid-template-areas: ". prev date next refresh .";
     align-items: center;
     gap: 8px;
   }
@@ -1019,7 +1019,7 @@ body.dashboard-page .lineup-pos {
 
   body.dashboard-page #dateInput {
     grid-area: date;
-    width: 132px;
+    width: min(132px, 100%);
     justify-self: center;
     text-align: center;
   }
@@ -1034,10 +1034,23 @@ body.dashboard-page .lineup-pos {
     justify-self: start;
   }
 
+  body.dashboard-page #dateRefreshBtn {
+    grid-area: refresh;
+    justify-self: start;
+    margin-left: 0;
+  }
+
   body.dashboard-page #datePrevBtn,
-  body.dashboard-page #dateNextBtn {
+  body.dashboard-page #dateNextBtn,
+  body.dashboard-page #dateRefreshBtn {
     width: 38px;
     min-width: 38px;
+    min-height: 34px;
+    height: 34px;
+  }
+
+  body.dashboard-page #datePrevBtn,
+  body.dashboard-page #dateNextBtn {
     overflow: hidden;
     color: transparent;
     position: relative;
