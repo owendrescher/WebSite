@@ -17,8 +17,8 @@
     <meta name="twitter:description" content="Live MLB scoreboard, lineups, pitcher trends, hot players, and betting stat tools." />
     <link rel="icon" type="image/png" href="baseball.png" />
     <link rel="apple-touch-icon" href="baseball.png" />
-    <link rel="stylesheet" href="styles.css?v=20260514d" />
-    <link rel="stylesheet" href="dashboard.css?v=20260505-pitcher-priority" />
+    <link rel="stylesheet" href="styles.css?v=20260515b" />
+    <link rel="stylesheet" href="dashboard.css?v=20260514b" />
   </head>
   <body class="dashboard-page">
     <a class="owentools-home-link" href="../index.html" aria-label="Back to owentools" title="Back to owentools">ot</a>
@@ -85,6 +85,10 @@
               <label>
                 <span>Date</span>
                 <input id="dateInput" type="text" inputmode="numeric" autocomplete="off" placeholder="YYYY-MM-DD" />
+                <span class="date-step-row">
+                  <button id="datePrevBtn" class="date-step-btn" type="button" aria-label="Back day">&lsaquo;</button>
+                  <button id="dateNextBtn" class="date-step-btn" type="button" aria-label="Forward day">&rsaquo;</button>
+                </span>
               </label>
             </div>
             <div class="topbar-actions">
@@ -104,6 +108,12 @@
                 <select id="themeSelect"></select>
               </label>
             </div>
+            <nav class="dashboard-page-tabs mobile-page-tabs" role="tablist" aria-label="Mobile pages">
+              <button type="button" data-page-nav="scoreboard" aria-selected="true">Scoreboard</button>
+              <button type="button" data-page-nav="leaders" aria-selected="false">League Leaders</button>
+              <button type="button" data-page-nav="hot" aria-selected="false">Hot Players</button>
+              <button type="button" data-page-nav="hrLeaderboard" aria-selected="false">HR Leaderboard</button>
+            </nav>
             <div id="leadersToolbar" class="leaders-toolbar" hidden>
               <label class="leaders-filter">
                 <span>Team</span>
@@ -121,6 +131,7 @@
                   <option value="2B">2B</option>
                   <option value="3B">3B</option>
                   <option value="SS">SS</option>
+                  <option value="MIF">Middle IF</option>
                   <option value="OF">OF</option>
                   <option value="LF">LF</option>
                   <option value="CF">CF</option>
@@ -270,15 +281,16 @@
                   <strong id="playerStatName">PLAYER</strong>
                   <span id="playerStatMeta">TEAM | POS</span>
                 </div>
+                <div id="playerStatLeaderBadges" class="player-stat-leader-badges" hidden></div>
                 <button id="playerStatCloseBtn" class="player-stat-close" type="button" aria-label="Close player card">x</button>
               </header>
               <div class="player-stat-body">
                 <section class="player-stat-left">
                   <img id="playerStatHeadshot" class="player-stat-headshot" src="placeholder.png" alt="Player headshot" />
                   <div id="playerStatBio" class="player-stat-bio"></div>
+                  <div id="playerStatToday" class="player-stat-block"></div>
                 </section>
                 <section class="player-stat-right">
-                  <div id="playerStatToday" class="player-stat-block"></div>
                   <div id="playerStatSeason" class="player-stat-block"></div>
                   <div id="playerStatExtra" class="player-stat-block"></div>
                   <div id="playerStatMatchup" class="player-stat-block"></div>
@@ -433,6 +445,6 @@
       };
     </script>
     <script src="../shared/owentools-sync.js?v=20260511a"></script>
-    <script src="app.js?v=20260514a"></script>
+    <script src="app.js?v=20260515g"></script>
   </body>
 </html>

@@ -163,6 +163,10 @@ body.dashboard-page .dashboard-page-tabs {
   background: color-mix(in srgb, var(--panel-bg) 72%, #0a100f 28%);
 }
 
+body.dashboard-page .dashboard-page-tabs.mobile-page-tabs {
+  display: none;
+}
+
 body.dashboard-page .dashboard-page-tabs button {
   border: 0;
   border-radius: 4px;
@@ -953,12 +957,7 @@ body.dashboard-page .lineup-pos {
   }
 
   body.dashboard-page .owentools-home-link {
-    width: 34px;
-    height: 34px;
-    top: max(6px, env(safe-area-inset-top));
-    left: max(6px, env(safe-area-inset-left));
-    border-radius: 10px;
-    font-size: 0.7rem;
+    display: none;
   }
 
   body.dashboard-page .dashboard-shell {
@@ -995,21 +994,71 @@ body.dashboard-page .lineup-pos {
   }
 
   body.dashboard-page .topbar-left {
+    display: flex;
+    justify-content: center;
+    width: 100%;
+  }
+
+  body.dashboard-page .topbar-left h1,
+  body.dashboard-page .topbar-left label > span:first-child {
+    display: none;
+  }
+
+  body.dashboard-page .topbar-left label {
+    width: 100%;
     display: grid;
-    grid-template-columns: minmax(0, 1fr) auto;
+    grid-template-columns: 1fr auto 1fr;
+    grid-template-areas: "prev date next";
     align-items: center;
     gap: 8px;
   }
 
-  body.dashboard-page .topbar-left h1 {
-    margin-left: 40px;
-    font-size: 1rem;
-    letter-spacing: 0.08em;
-    white-space: nowrap;
+  body.dashboard-page .date-step-row {
+    display: contents;
   }
 
-  body.dashboard-page .topbar-left label {
-    min-width: 0;
+  body.dashboard-page #dateInput {
+    grid-area: date;
+    width: 132px;
+    justify-self: center;
+    text-align: center;
+  }
+
+  body.dashboard-page #datePrevBtn {
+    grid-area: prev;
+    justify-self: end;
+  }
+
+  body.dashboard-page #dateNextBtn {
+    grid-area: next;
+    justify-self: start;
+  }
+
+  body.dashboard-page #datePrevBtn,
+  body.dashboard-page #dateNextBtn {
+    width: 38px;
+    min-width: 38px;
+    overflow: hidden;
+    color: transparent;
+    position: relative;
+  }
+
+  body.dashboard-page #datePrevBtn::before,
+  body.dashboard-page #dateNextBtn::before {
+    color: var(--text);
+    position: absolute;
+    inset: 0;
+    display: grid;
+    place-items: center;
+    font-size: 1rem;
+  }
+
+  body.dashboard-page #datePrevBtn::before {
+    content: "<";
+  }
+
+  body.dashboard-page #dateNextBtn::before {
+    content: ">";
   }
 
   body.dashboard-page .topbar input,
@@ -1019,17 +1068,11 @@ body.dashboard-page .lineup-pos {
   }
 
   body.dashboard-page .topbar-actions {
-    display: grid;
-    grid-template-columns: auto auto 1fr;
-    align-items: center;
-    gap: 6px;
+    display: none;
   }
 
   body.dashboard-page .dashboard-summary {
-    grid-column: 1 / -1;
-    order: -1;
-    max-width: none;
-    font-size: 0.74rem;
+    display: none;
   }
 
   body.dashboard-page .clear-picks-btn {
@@ -1045,15 +1088,21 @@ body.dashboard-page .lineup-pos {
     scrollbar-width: none;
   }
 
+  body.dashboard-page .dashboard-page-tabs.mobile-page-tabs {
+    display: grid;
+    grid-template-columns: repeat(4, minmax(0, 1fr));
+    order: 2;
+  }
+
   body.dashboard-page .dashboard-page-tabs::-webkit-scrollbar {
     display: none;
   }
 
   body.dashboard-page .dashboard-page-tabs button {
-    flex: 0 0 auto;
+    flex: 1 1 0;
     min-height: 34px;
-    padding: 6px 10px;
-    font-size: 0.76rem;
+    padding: 6px 4px;
+    font-size: 0.64rem;
   }
 
   body.dashboard-page .theme-label {
@@ -1061,9 +1110,19 @@ body.dashboard-page .lineup-pos {
   }
 
   body.dashboard-page .leaders-toolbar {
-    grid-template-columns: 1fr;
+    order: 3;
+    grid-template-columns: minmax(0, 1fr) minmax(74px, 0.42fr);
     gap: 6px;
     padding: 8px;
+  }
+
+  body.dashboard-page .leaders-toolbar[hidden] {
+    display: none !important;
+  }
+
+  body.dashboard-page .leaders-toolbar .leaders-opponents-btn,
+  body.dashboard-page .leaders-toolbar .leaders-context {
+    grid-column: 1 / -1;
   }
 
   body.dashboard-page .leaders-filter select,
