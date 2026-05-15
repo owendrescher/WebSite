@@ -14290,9 +14290,10 @@ async function resolveFreshLineupPitchers(game) {
         }
       }
 
+      const liveCurrentPitcherId = Number(livePitcher.currentPitcher?.id);
       const latestPitcherId = latestPitcherIdForSide(side);
       const currentPitcherId = currentPitchingSide === side
-        ? (Number.isFinite(latestPitcherId) ? latestPitcherId : Number(livePitcher.currentPitcher?.id))
+        ? (Number.isFinite(liveCurrentPitcherId) && liveCurrentPitcherId > 0 ? liveCurrentPitcherId : latestPitcherId)
         : NaN;
       let currentSource = Number.isFinite(currentPitcherId)
         ? game?.playerLookup?.[String(currentPitcherId)] || players[`ID${currentPitcherId}`] || livePitcher.currentPitcher
@@ -14345,6 +14346,7 @@ async function ensurePitcherProfiles(game, entries = []) {
 
 function resolvePitchingSideForDisplay(game, side) {
   const rawStaff = game?.pitching?.[side] || { current: null, bullpen: [] };
+  const activePitchingSide = game?.battingSide === 'home' ? 'away' : game?.battingSide === 'away' ? 'home' : '';
   const usedYesterdayIds = pitcherUsedYesterdayIdsForTeam(game, side === 'away' ? game?.away : game?.home);
   const enrichPitcher = (entry) => {
     const profile = Number.isFinite(Number(entry?.id)) ? game?.playerLookup?.[String(entry.id)] || null : null;
@@ -14368,14 +14370,16 @@ function resolvePitchingSideForDisplay(game, side) {
     ? previewProbableForSide(game, side)
     : game?.probablePitchers?.[side] || game?.teams?.[side]?.probablePitcher || null;
   const probableProfile = probable?.id ? game?.playerLookup?.[String(probable.id)] || null : null;
-  const historyStarter = shouldDisplayStarterOnly(game) ? starterFromPitchingHistory(game, side) : null;
+  const historyStarter = starterFromPitchingHistory(game, side);
   const fallback = historyStarter || normalizePitcherDisplayEntry(enrichPitcher(probableProfile || probable), 'starter');
   if (historyStarter) {
-    return {
-      current: historyStarter,
-      bullpen,
-      history,
-    };
+    if (shouldDisplayStarterOnly(game) || shouldPreferProbablePitcher(game) || side !== activePitchingSide) {
+      return {
+        current: historyStarter,
+        bullpen,
+        history,
+      };
+    }
   }
   if (shouldPreferProbablePitcher(game) && fallback) {
     return {
@@ -14388,7 +14392,9 @@ function resolvePitchingSideForDisplay(game, side) {
     return { current: null, bullpen, history };
   }
 
-  const current = normalizePitcherDisplayEntry(enrichPitcher(rawStaff?.current), rawStaff?.current?.role || 'current');
+  const current = side === activePitchingSide
+    ? normalizePitcherDisplayEntry(enrichPitcher(rawStaff?.current), rawStaff?.current?.role || 'current')
+    : null;
   if (current) return { current, bullpen, history };
 
   return {
@@ -14399,11 +14405,12 @@ function resolvePitchingSideForDisplay(game, side) {
 }
 
 function resolveLineupPitcherForDisplay(game, side) {
+  const activePitchingSide = game?.battingSide === 'home' ? 'away' : game?.battingSide === 'away' ? 'home' : '';
   const probable = shouldPreferProbablePitcher(game)
     ? previewProbableForSide(game, side)
     : game?.probablePitchers?.[side] || game?.teams?.[side]?.probablePitcher || null;
   const probableProfile = probable?.id ? game?.playerLookup?.[String(probable.id)] || null : null;
-  const historyStarter = shouldDisplayStarterOnly(game) ? starterFromPitchingHistory(game, side) : null;
+  const historyStarter = shouldPreferProbablePitcher(game) ? null : starterFromPitchingHistory(game, side);
   const starter = historyStarter || normalizePitcherDisplayEntry(probableProfile || probable, 'starter');
   if (shouldDisplayStarterOnly(game)) {
     return {
@@ -14421,12 +14428,13 @@ function resolveLineupPitcherForDisplay(game, side) {
   }
   const currentSource = game?.pitching?.[side]?.current;
   const currentProfile = currentSource?.id ? game?.playerLookup?.[String(currentSource.id)] || null : null;
-  const current = normalizePitcherDisplayEntry(currentProfile ? { ...currentSource, ...currentProfile, role: currentSource?.role || currentProfile?.role } : currentSource, 'current');
-  const activeSide = game?.battingSide === 'home' ? 'away' : game?.battingSide === 'away' ? 'home' : '';
+  const current = side === activePitchingSide
+    ? normalizePitcherDisplayEntry(currentProfile ? { ...currentSource, ...currentProfile, role: currentSource?.role || currentProfile?.role } : currentSource, 'current')
+    : null;
   return {
     starter: starter || current,
     current,
-    active: side === activeSide,
+    active: side === activePitchingSide,
   };
 }
 
