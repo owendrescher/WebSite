@@ -17,7 +17,7 @@
     <meta name="twitter:description" content="Live MLB scoreboard, lineups, pitcher trends, hot players, and betting stat tools." />
     <link rel="icon" type="image/png" href="baseball.png" />
     <link rel="apple-touch-icon" href="baseball.png" />
-    <link rel="stylesheet" href="styles.css?v=20260515d" />
+    <link rel="stylesheet" href="styles.css?v=20260516e" />
   </head>
   <body>
     <section id="betInputPanel" class="utility-panel bet-input-panel">
@@ -225,6 +225,8 @@
           <button type="button" data-page-nav="scoreboard" aria-selected="true">Scoreboard</button>
           <button type="button" data-page-nav="leaders" aria-selected="false">League Leaders</button>
           <button type="button" data-page-nav="hot" aria-selected="false">Hot Players</button>
+          <button type="button" data-page-nav="teamStats" aria-selected="false">Team Stats</button>
+          <button type="button" data-page-nav="predictions" aria-selected="false">Predictions</button>
           <button type="button" data-page-nav="hrLeaderboard" aria-selected="false">HR Leaderboard</button>
         </nav>
         <div id="leadersToolbar" class="leaders-toolbar" hidden>
@@ -267,6 +269,12 @@
       </section>
       <section id="teamStatsPage" class="leaders-page team-stats-page" hidden>
         <div class="leaders-empty">Loading team stats...</div>
+      </section>
+      <section id="predictionsPage" class="leaders-page predictions-page" hidden>
+        <div class="leaders-empty">Loading predictions...</div>
+      </section>
+      <section id="hrLeaderboardPage" class="leaders-page hr-leaderboard-page" hidden>
+        <div class="leaders-empty">Loading home run leaderboard...</div>
       </section>
       <button id="overlayResizeHandle" class="overlay-resize-handle" type="button" aria-label="Resize scoreboard area"></button>
 
@@ -492,6 +500,6 @@
       };
     </script>
     <script src="../shared/owentools-sync.js?v=20260511a"></script>
-    <script src="app.js?v=20260515q"></script>
+    <script src="app.js?v=20260516e"></script>
   </body>
 </html>

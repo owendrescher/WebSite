@@ -17,8 +17,8 @@
     <meta name="twitter:description" content="Live MLB scoreboard, lineups, pitcher trends, hot players, and betting stat tools." />
     <link rel="icon" type="image/png" href="baseball.png" />
     <link rel="apple-touch-icon" href="baseball.png" />
-    <link rel="stylesheet" href="styles.css?v=20260515d" />
-    <link rel="stylesheet" href="dashboard.css?v=20260515a" />
+    <link rel="stylesheet" href="styles.css?v=20260516e" />
+    <link rel="stylesheet" href="dashboard.css?v=20260516e" />
   </head>
   <body class="dashboard-page">
     <a class="owentools-home-link" href="../index.html" aria-label="Back to owentools" title="Back to owentools">ot</a>
@@ -102,6 +102,7 @@
                 <button type="button" data-page-nav="leaders" aria-selected="false">Leaders</button>
                 <button type="button" data-page-nav="hot" aria-selected="false">Hot Players</button>
                 <button type="button" data-page-nav="teamStats" aria-selected="false">Team Stats</button>
+                <button type="button" data-page-nav="predictions" aria-selected="false">Predictions</button>
                 <button type="button" data-page-nav="hrLeaderboard" aria-selected="false">HR Leaderboard</button>
               </div>
               <label class="theme-label">
@@ -113,6 +114,8 @@
               <button type="button" data-page-nav="scoreboard" aria-selected="true">Scoreboard</button>
               <button type="button" data-page-nav="leaders" aria-selected="false">League Leaders</button>
               <button type="button" data-page-nav="hot" aria-selected="false">Hot Players</button>
+              <button type="button" data-page-nav="teamStats" aria-selected="false">Team Stats</button>
+              <button type="button" data-page-nav="predictions" aria-selected="false">Predictions</button>
               <button type="button" data-page-nav="hrLeaderboard" aria-selected="false">HR Leaderboard</button>
             </nav>
             <div id="leadersToolbar" class="leaders-toolbar" hidden>
@@ -154,6 +157,9 @@
           </section>
           <section id="teamStatsPage" class="leaders-page team-stats-page" hidden>
             <div class="leaders-empty">Loading team stats...</div>
+          </section>
+          <section id="predictionsPage" class="leaders-page predictions-page" hidden>
+            <div class="leaders-empty">Loading predictions...</div>
           </section>
           <section id="hrLeaderboardPage" class="leaders-page hr-leaderboard-page" hidden>
             <div class="leaders-empty">Loading home run leaderboard...</div>
@@ -446,6 +452,6 @@
       };
     </script>
     <script src="../shared/owentools-sync.js?v=20260511a"></script>
-    <script src="app.js?v=20260515q"></script>
+    <script src="app.js?v=20260516e"></script>
   </body>
 </html>

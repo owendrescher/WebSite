@@ -17,6 +17,7 @@ const leadersToolbarEl = document.getElementById('leadersToolbar');
 const leadersPageEl = document.getElementById('leadersPage');
 const hotPageEl = document.getElementById('hotPage');
 const teamStatsPageEl = document.getElementById('teamStatsPage');
+const predictionsPageEl = document.getElementById('predictionsPage');
 const hrLeaderboardPageEl = document.getElementById('hrLeaderboardPage');
 const leadersTeamSelectEl = document.getElementById('leadersTeamSelect');
 const leadersPositionSelectEl = document.getElementById('leadersPositionSelect');
@@ -167,6 +168,8 @@ const MLB_API_BASE = 'https://statsapi.mlb.com/api/v1';
 const MLB_API_BASE_LIVE = 'https://statsapi.mlb.com/api/v1.1';
 const REQUEST_TIMEOUT_MS = 9000;
 const REQUEST_RETRY_COUNT = 2;
+const LINEUP_PAGE_FAST_TIMEOUT_MS = 1800;
+const LINEUP_READER_FAST_TIMEOUT_MS = 2400;
 const PANEL_GAP = 8;
 const PANEL_SNAP_THRESHOLD = 10;
 const OVERLAY_RAIL_MIN = 420;
@@ -181,6 +184,11 @@ const RECENT_FORM_DAY_WINDOW = 7;
 const LINEUP_TREND_GAME_WINDOW = 7;
 const LINEUP_HOT_OPS_THRESHOLD = 0.950;
 const LINEUP_COLD_OPS_THRESHOLD = 0.500;
+const PREDICTION_PAGE_TABS = ['hitting', 'pitching', 'moneylines'];
+const PREDICTION_HOT_AVG_THRESHOLD = 0.300;
+const PREDICTION_HOT_SLG_THRESHOLD = 0.500;
+const PREDICTION_COLD_LINEUP_AVG_THRESHOLD = 0.230;
+const PREDICTION_STARTER_K9_THRESHOLD = 8;
 const MIN_HOT_HITTERS_PER_TEAM = 2;
 const MIN_COLD_HITTERS_PER_TEAM = 2;
 const SLUG_BURST_THRESHOLD = 0.75;
@@ -230,8 +238,11 @@ const leaderCardPayloads = new WeakMap();
 const leaderCardPages = new Map();
 let hotRenderSequence = 0;
 let teamStatsRenderSequence = 0;
+let predictionsRenderSequence = 0;
+let currentPredictionTab = 'hitting';
 let teamStatsSortState = { key: 'record', dir: 'desc' };
 let teamStatsGroupByDivision = true;
+const predictionDetailPayloads = new Map();
 const leadersSeasonCache = new Map();
 const leadersTeamsCache = new Map();
 const teamStatsCache = new Map();
@@ -262,6 +273,7 @@ const teamStreakCache = new Map();
 const teamLastSevenRecordCache = new Map();
 const teamRecentFormCache = new Map();
 const teamBullpenRanksCache = new Map();
+const teamRecentBullpenCache = new Map();
 const teamStandingRecordCache = new Map();
 const lineupRecentBattingCache = new Map();
 const fireworkControllers = new WeakMap();
@@ -450,7 +462,7 @@ function seasonForDate(date) {
 }
 
 function normalizeOverlayPage(value) {
-  return ['scoreboard', 'leaders', 'hot', 'teamStats', 'hrLeaderboard'].includes(value) ? value : 'scoreboard';
+  return ['scoreboard', 'leaders', 'hot', 'teamStats', 'predictions', 'hrLeaderboard'].includes(value) ? value : 'scoreboard';
 }
 
 function listify(value) {
@@ -1907,7 +1919,7 @@ function handednessCode(value) {
   if (!text || text === '-') return '';
   if (text === 'L' || text.startsWith('LEFT')) return 'L';
   if (text === 'R' || text.startsWith('RIGHT')) return 'R';
-  if (text === 'S' || text.startsWith('SWITCH')) return 'S';
+  if (text === 'S' || text === 'B' || text.startsWith('SWITCH') || text.startsWith('BOTH')) return 'S';
   return /^[LRS]$/.test(text) ? text : '';
 }
 
@@ -3130,7 +3142,7 @@ function parseStartingLineupBattersFromPage(rawText, teamAbbrev) {
       .map(parseStartingLineupBatterLine)
       .filter(Boolean)
       .map((entry, index) => ({ ...entry, slot: index + 1 }));
-    if (entries.length >= 7) return entries.slice(0, 9);
+    if (entries.length >= 9) return entries.slice(0, 9);
   }
   return [];
 }
@@ -3443,6 +3455,20 @@ function enrichMlbStartingLineupEntries(game, teamAbbrev, entries = []) {
   });
 }
 
+function fetchMlbStartingLineupFromPage(game, team, sourceUrl) {
+  const parseUrl = async (url) => {
+    const text = await fetchMlbProbablePageText(url);
+    const parsed = parseStartingLineupBattersFromPage(text, team);
+    return isUsableLineupCandidate(parsed)
+      ? enrichMlbStartingLineupEntries(game, team, parsed)
+      : [];
+  };
+  return firstUsableLineup([
+    parseUrl(sourceUrl),
+    withTimeoutValue(parseUrl(`https://r.jina.ai/${sourceUrl}`), LINEUP_READER_FAST_TIMEOUT_MS, []),
+  ]);
+}
+
 async function fetchPreviousCompletedLineupFromStatsApi(game, side) {
   if (!game || !shouldPreferProbablePitcher(game)) return [];
   const team = canonicalTeamAbbrev(side === 'away' ? game.away : game.home);
@@ -3472,20 +3498,22 @@ async function fetchPreviousCompletedLineupFromStatsApi(game, side) {
         return /final|game over|completed/i.test(state) || String(candidate?.status?.abstractGameState || '').toLowerCase() === 'final';
       })
       .sort((a, b) => String(b?.gameDate || '').localeCompare(String(a?.gameDate || '')));
-    for (const previousGame of games) {
+    const candidates = await Promise.all(games.slice(0, 8).map(async (previousGame) => {
       const previousSide = sameTeamAbbrev(scheduleTeamAbbrev(previousGame?.teams?.away?.team), team)
         ? 'away'
         : sameTeamAbbrev(scheduleTeamAbbrev(previousGame?.teams?.home?.team), team)
           ? 'home'
           : '';
-      if (!previousSide) continue;
+      if (!previousSide) return [];
       const boxscore = await getGameBoxscore(previousGame.gamePk).catch(() => null);
       const teamBox = boxscore?.teams?.[previousSide] || {};
       const lineup = buildStartingLineupFromBoxscore(teamBox.players || {}, teamBox.battingOrder || teamBox.batters || []);
-      if (lineup.length >= 7 && !lineupLooksAlphabetical(lineup)) {
-        return enrichMlbStartingLineupEntries(game, team, lineup);
-      }
-    }
+      return isUsableLineupCandidate(lineup)
+        ? enrichMlbStartingLineupEntries(game, team, lineup)
+        : [];
+    }));
+    const first = candidates.find((lineup) => isUsableLineupCandidate(lineup));
+    if (first) return first;
     return [];
   })().catch(() => {
     mlbPreviousLineupCache.delete(key);
@@ -3498,29 +3526,24 @@ async function fetchPreviousCompletedLineupFromStatsApi(game, side) {
 
 async function fetchMlbStartingLineupFallback(game, side) {
   if (!game || !shouldPreferProbablePitcher(game)) return [];
-  if (isFutureGameDate(game)) return fetchPreviousCompletedLineupFromStatsApi(game, side);
+  const previousLineupPromise = fetchPreviousCompletedLineupFromStatsApi(game, side).catch(() => []);
+  if (isFutureGameDate(game)) return previousLineupPromise;
   const team = canonicalTeamAbbrev(side === 'away' ? game.away : game.home);
   const slug = TEAM_MLB_SLUGS[team];
-  if (!slug) return [];
+  if (!slug) return previousLineupPromise;
   const date = officialDateForGame(game);
   const key = `batters:${date}:${team}:${game?.gamePk || ''}`;
   if (mlbStartingLineupPageCache.has(key)) return mlbStartingLineupPageCache.get(key);
 
   const promise = (async () => {
     const sourceUrl = `https://www.mlb.com/${slug}/roster/starting-lineups`;
-    const pageUrls = [
-      sourceUrl,
-      `https://r.jina.ai/${sourceUrl}`,
-    ];
-    const texts = await Promise.allSettled(pageUrls.map((url) => fetchMlbProbablePageText(url)));
-    for (const result of texts) {
-      if (result.status !== 'fulfilled') continue;
-      const parsed = parseStartingLineupBattersFromPage(result.value, team);
-      if (parsed.length >= 7 && !lineupLooksAlphabetical(parsed)) {
-        return enrichMlbStartingLineupEntries(game, team, parsed);
-      }
-    }
-    return fetchPreviousCompletedLineupFromStatsApi(game, side);
+    const pageLineupPromise = fetchMlbStartingLineupFromPage(game, team, sourceUrl).catch(() => []);
+    const fast = await firstUsableLineup([
+      previousLineupPromise,
+      withTimeoutValue(pageLineupPromise, LINEUP_PAGE_FAST_TIMEOUT_MS, []),
+    ]);
+    if (fast.length) return fast;
+    return firstUsableLineup([previousLineupPromise, pageLineupPromise]);
   })().catch(() => {
     mlbStartingLineupPageCache.delete(key);
     return [];
@@ -3926,6 +3949,14 @@ function aggregateRecentTeamBoxStats(aggregate, teamBox = {}) {
   const pitching = teamBox?.teamStats?.pitching || {};
   aggregate.atBats += statNumber(batting.atBats);
   aggregate.hits += statNumber(batting.hits);
+  aggregate.walks += statNumber(batting.baseOnBalls ?? batting.walks);
+  const totalBases = statNumber(batting.totalBases);
+  aggregate.totalBases += totalBases || Math.max(0,
+    statNumber(batting.hits)
+      + statNumber(batting.doubles)
+      + (statNumber(batting.triples) * 2)
+      + (statNumber(batting.homeRuns) * 3)
+  );
   aggregate.pitchingOuts += inningsToOuts(pitching.inningsPitched);
   aggregate.earnedRuns += statNumber(pitching.earnedRuns);
 }
@@ -3936,7 +3967,7 @@ async function getLineupTeamRecentStats(teamAbbrev, date, gameLimit = 7) {
   const selectedDate = String(date || dateInput.value || formatDate(new Date()));
   const limit = normalizeLineupStatWindow(gameLimit);
   if (!teamId || !selectedDate) return { recordText: '', avg: '', era: '' };
-  const cacheKey = `${team}:${selectedDate}:recent-form:${limit}:v2`;
+  const cacheKey = `${team}:${selectedDate}:recent-form:${limit}:v3`;
   if (teamRecentFormCache.has(cacheKey)) return teamRecentFormCache.get(cacheKey);
 
   const promise = (async () => {
@@ -3968,7 +3999,7 @@ async function getLineupTeamRecentStats(teamAbbrev, date, gameLimit = 7) {
       .slice(0, limit);
     const summarySource = finished.length ? finished : [...localGamesByPk.values()];
     const summary = recentTeamSummaryFromGames(summarySource, team, limit);
-    const aggregate = { atBats: 0, hits: 0, pitchingOuts: 0, earnedRuns: 0 };
+    const aggregate = { atBats: 0, hits: 0, walks: 0, totalBases: 0, pitchingOuts: 0, earnedRuns: 0 };
 
     await mapWithConcurrency(finished, 3, async (game) => {
       const side = teamBoxSideForGame(game, team);
@@ -3980,6 +4011,10 @@ async function getLineupTeamRecentStats(teamAbbrev, date, gameLimit = 7) {
     return {
       recordText: summary ? formatRecentTeamSummary(summary, { gameLimit: limit, lockLabel: true }) : '',
       avg: aggregate.atBats > 0 ? formatRateValue(aggregate.hits / aggregate.atBats, 3, true) : '',
+      slg: aggregate.atBats > 0 ? formatRateValue(aggregate.totalBases / aggregate.atBats, 3, true) : '',
+      ops: aggregate.atBats + aggregate.walks > 0 && aggregate.atBats > 0
+        ? formatRateValue(((aggregate.hits + aggregate.walks) / (aggregate.atBats + aggregate.walks)) + (aggregate.totalBases / aggregate.atBats), 3, false)
+        : '',
       era: aggregate.pitchingOuts > 0 ? formatRateValue((aggregate.earnedRuns * 27) / aggregate.pitchingOuts, 2, false) : '',
     };
   })().catch(async () => {
@@ -4318,6 +4353,26 @@ async function getText(url) {
     }
   }
   throw lastError;
+}
+
+function withTimeoutValue(promise, timeoutMs, fallbackValue = null) {
+  let timeoutId = null;
+  const timeout = new Promise((resolve) => {
+    timeoutId = setTimeout(() => resolve(fallbackValue), timeoutMs);
+  });
+  return Promise.race([
+    Promise.resolve(promise).then(
+      (value) => {
+        clearTimeout(timeoutId);
+        return value;
+      },
+      () => {
+        clearTimeout(timeoutId);
+        return fallbackValue;
+      },
+    ),
+    timeout,
+  ]);
 }
 
 async function getSchedule(date) {
@@ -7772,6 +7827,24 @@ function summarizeLastFivePitchingAppearancesDetails(splits = [], game = null) {
         lastPitches ? `P ${lastPitches}` : 'P --',
       ],
     },
+    lastGame: {
+      date: formatLeadersDateLabel(lastSplit?.date || selectedDate),
+      opponent: lastOpponent,
+      outs: inningsToOuts(lastStat.inningsPitched),
+      inningsPitched: cleanSummary(lastStat.inningsPitched) || '0.0',
+      strikeOuts: statNumber(lastStat.strikeOuts),
+      walks: statNumber(lastStat.baseOnBalls ?? lastStat.walks),
+      hits: statNumber(lastStat.hits),
+      earnedRuns: statNumber(lastStat.earnedRuns),
+      homeRuns: statNumber(lastStat.homeRuns ?? lastStat.hrAllowed ?? lastStat.hr),
+      pitches: lastPitches,
+    },
+    totals,
+    metrics: {
+      era,
+      whip,
+      k9: totals.outs > 0 ? (totals.k * 27) / totals.outs : null,
+    },
     totalsRows: [
       [`L${totals.games} G`, `${outsToInnings(totals.outs)} IP`],
       ['GS', totals.starts],
@@ -9246,6 +9319,10 @@ function renderPlayerTrackerList(games = latestRenderedGames) {
   });
   if (playerTrackerListEl.dataset.renderFingerprint === fingerprint) return;
   const scrollTop = playerTrackerListEl.scrollTop;
+  const previousLines = new Map(
+    Array.from(playerTrackerListEl.querySelectorAll('.player-track-item[data-player-id]'))
+      .map((item) => [String(item.dataset.playerId || ''), item.dataset.todayLine || '']),
+  );
   playerTrackerListEl.dataset.renderFingerprint = fingerprint;
   playerTrackerListEl.replaceChildren();
   if (!tracked.length) {
@@ -9260,10 +9337,12 @@ function renderPlayerTrackerList(games = latestRenderedGames) {
     const teamAbbrev = profile?.teamAbbrev || entry.teamAbbrev || '';
     const position = profile?.position || entry.position || '';
     const teamColor = profile?.teamColor || game?.awayColor || game?.homeColor || '#66d9ff';
+    const todayLine = trackedPlayerTodayLine(profile);
     const el = document.createElement('div');
     el.className = 'panel-item player-track-item';
     el.dataset.playerId = String(playerId);
     el.dataset.gamePk = String(game?.gamePk || '');
+    el.dataset.todayLine = todayLine;
     el.draggable = true;
     el.style.setProperty('--tracker-team-color', teamColor);
     el.style.setProperty('--tracker-team-rgb', hexToRgb(teamColor));
@@ -9281,7 +9360,7 @@ function renderPlayerTrackerList(games = latestRenderedGames) {
             </select>
           </label>
         </div>
-        <div>${escapeHtml(trackedPlayerTodayLine(profile))}</div>
+        <div>${escapeHtml(todayLine)}</div>
       </div>
       <button class="player-track-remove" type="button" data-tracked-player-id="${playerId}" aria-label="Remove tracked player">X</button>
     `;
@@ -9293,6 +9372,9 @@ function renderPlayerTrackerList(games = latestRenderedGames) {
       };
     }
     playerTrackerListEl.appendChild(el);
+    if (previousLines.has(String(playerId)) && previousLines.get(String(playerId)) !== todayLine) {
+      markPanelItemUpdated(el, teamColor);
+    }
   }
   playerTrackerListEl.scrollTop = scrollTop;
 }
@@ -10512,6 +10594,15 @@ function currentHomeRunFeedItems(homeRuns = []) {
   return cachedHomeRunsForSelectedDate();
 }
 
+function markPanelItemUpdated(item, color = '#66d9ff') {
+  if (!item) return;
+  item.style.setProperty('--panel-update-rgb', hexToRgb(color || '#66d9ff'));
+  item.classList.remove('panel-item-updated');
+  void item.offsetWidth;
+  item.classList.add('panel-item-updated');
+  window.setTimeout(() => item.classList.remove('panel-item-updated'), 1200);
+}
+
 function refreshHomeRunFeedAfterControlChange() {
   if (hrRatingDialogEl) hrRatingDialogEl.hidden = true;
   renderHomeRunFeed(latestRenderedHomeRuns);
@@ -10525,6 +10616,7 @@ function renderHomeRunFeed(homeRuns) {
   if (hrGradeToggleBtnEl) hrGradeToggleBtnEl.textContent = homeRunRatingDisplayMode === 'letter' ? 'letter' : 'number';
   const list = sortHomeRunFeedItems(currentHomeRunFeedItems(homeRuns));
   const seen = new Set();
+  const hadHrItems = Boolean(hrListEl.querySelector('.hr-item[data-hr-key]'));
   for (const hr of list) {
     const key = [
       hr.gamePk ?? '',
@@ -10534,6 +10626,7 @@ function renderHomeRunFeed(homeRuns) {
     ].join(':');
     seen.add(key);
     let item = hrListEl.querySelector(`.hr-item[data-hr-key="${cssEscape(key)}"]`);
+    const existed = Boolean(item);
     if (!item) {
       item = document.createElement('div');
       item.className = 'panel-item hr-item';
@@ -10552,6 +10645,18 @@ function renderHomeRunFeed(homeRuns) {
         img.src = 'placeholder.png';
       };
     }
+    const renderFingerprint = JSON.stringify([
+      hr.batter || '',
+      hr.resultLabel || '',
+      hr.rating ?? hr.ratingBreakdown?.score ?? '',
+      hr.distance || '',
+      hr.eventTimeEt || '',
+      hr.inningText || '',
+      hr.pitcherName || '',
+    ]);
+    const changed = (existed && item.dataset.renderFingerprint && item.dataset.renderFingerprint !== renderFingerprint)
+      || (!existed && hadHrItems);
+    item.dataset.renderFingerprint = renderFingerprint;
     item.dataset.gamePk = String(hr.gamePk ?? '');
     item.dataset.playerId = String(hr.batterId ?? '');
     const isWalkOff = Number(hr?.ratingBreakdown?.walkOff || 0) > 0;
@@ -10598,6 +10703,7 @@ function renderHomeRunFeed(homeRuns) {
       ratingEl.textContent = homeRunRatingDisplayLabel(rating);
       ratingEl.title = 'Click for Home Run Rating breakdown';
     }
+    if (changed) markPanelItemUpdated(item, hr.teamColor || '#66d9ff');
     hrListEl.appendChild(item);
   }
   for (const item of Array.from(hrListEl.querySelectorAll('.hr-item[data-hr-key]'))) {
@@ -10671,6 +10777,12 @@ function leaderContextSummary() {
     if (teamAbbrev) return `${displayTeamAbbrev(teamAbbrev)} team stats | ${season}`;
     return `MLB team stats | ${season}`;
   }
+  if (currentOverlayPage === 'predictions') {
+    const tab = currentPredictionTab === 'moneylines' ? 'moneylines' : `${currentPredictionTab} predictions`;
+    if (currentLeadersOpponentMode && matchup) return `${displayTeamAbbrev(matchup.away)} vs ${displayTeamAbbrev(matchup.home)} ${tab} | ${formatLeadersDateLabel(date)}`;
+    if (teamAbbrev) return `${displayTeamAbbrev(teamAbbrev)} ${tab} | ${formatLeadersDateLabel(date)}`;
+    return `MLB ${tab} | ${formatLeadersDateLabel(date)}`;
+  }
   if (currentOverlayPage === 'hrLeaderboard') {
     return `Home run rating leaderboard | ${season}`;
   }
@@ -10690,6 +10802,7 @@ function overlayPageLabel(page) {
     case 'leaders': return 'Leaders';
     case 'hot': return 'Hot Players';
     case 'teamStats': return 'Team Stats';
+    case 'predictions': return 'Predictions';
     case 'hrLeaderboard': return 'HR Leaderboard';
     default: return 'Scoreboard';
   }
@@ -11080,6 +11193,10 @@ function setOverlayPage(page, options = {}) {
     teamStatsPageEl.hidden = currentOverlayPage !== 'teamStats';
     teamStatsPageEl.style.display = currentOverlayPage === 'teamStats' ? '' : 'none';
   }
+  if (predictionsPageEl) {
+    predictionsPageEl.hidden = currentOverlayPage !== 'predictions';
+    predictionsPageEl.style.display = currentOverlayPage === 'predictions' ? '' : 'none';
+  }
   if (hrLeaderboardPageEl) {
     hrLeaderboardPageEl.hidden = currentOverlayPage !== 'hrLeaderboard';
     hrLeaderboardPageEl.style.display = currentOverlayPage === 'hrLeaderboard' ? '' : 'none';
@@ -11097,13 +11214,14 @@ function setOverlayPage(page, options = {}) {
   if (refresh && currentOverlayPage === 'leaders') refreshLeadersView();
   if (refresh && currentOverlayPage === 'hot') refreshHotView();
   if (refresh && currentOverlayPage === 'teamStats') refreshTeamStatsView();
+  if (refresh && currentOverlayPage === 'predictions') refreshPredictionsView();
   if (refresh && currentOverlayPage === 'hrLeaderboard') refreshHrLeaderboardView();
 }
 
 function initOverlayPageControl() {
   const saved = normalizeOverlayPage(localStorage.getItem(OVERLAY_PAGE_KEY) || 'scoreboard');
   pageToggleBtnEl?.addEventListener('click', () => {
-    const pages = ['scoreboard', 'leaders', 'hot', 'teamStats', 'hrLeaderboard'];
+    const pages = ['scoreboard', 'leaders', 'hot', 'teamStats', 'predictions', 'hrLeaderboard'];
     const next = pages[(Math.max(0, pages.indexOf(currentOverlayPage)) + 1) % pages.length];
     setOverlayPage(next);
   });
@@ -11167,6 +11285,11 @@ function currentOverlayScrollTarget() {
   if (currentOverlayPage === 'teamStats') {
     return firstScrollableElement([teamStatsPageEl?.querySelector('.leaders-shell'), teamStatsPageEl]);
   }
+
+  if (currentOverlayPage === 'predictions') {
+    return firstScrollableElement([predictionsPageEl?.querySelector('.leaders-shell'), predictionsPageEl]);
+  }
+
   if (currentOverlayPage === 'hrLeaderboard') {
     return firstScrollableElement([hrLeaderboardPageEl?.querySelector('.leaders-shell'), hrLeaderboardPageEl]);
   }
@@ -11183,7 +11306,7 @@ function scrollCurrentOverlay(direction) {
 }
 
 function shiftOverlayPage(direction) {
-  const pages = ['scoreboard', 'leaders', 'hot', 'teamStats', 'hrLeaderboard'];
+  const pages = ['scoreboard', 'leaders', 'hot', 'teamStats', 'predictions', 'hrLeaderboard'];
   const index = Math.max(0, pages.indexOf(currentOverlayPage));
   const nextIndex = (index + direction + pages.length) % pages.length;
   setOverlayPage(pages[nextIndex]);
@@ -11656,6 +11779,923 @@ async function refreshTeamStatsView(options = {}) {
   } catch (error) {
     if (renderId !== teamStatsRenderSequence) return;
     teamStatsPageEl.replaceChildren(createLeaderEmpty(`Could not load team stats (${error.message}).`));
+  }
+}
+
+function normalizePredictionTab(value) {
+  return PREDICTION_PAGE_TABS.includes(value) ? value : 'hitting';
+}
+
+function predictionGames(games = latestRenderedGames) {
+  return (Array.isArray(games) ? games : []).filter((game) => gameMatchesCurrentFilter(game, games));
+}
+
+function predictionRateValue(value) {
+  if (value === null || value === undefined) return null;
+  const text = String(value).trim();
+  if (!text || text === '---' || text === '--') return null;
+  const parsed = rateNumber(value);
+  return Number.isFinite(parsed) ? parsed : null;
+}
+
+function predictionPoints(value, low, high, maxPoints, options = {}) {
+  if (value === null || value === undefined || value === '') return Number(options.fallbackPoints) || 0;
+  const numeric = Number(value);
+  if (!Number.isFinite(numeric)) return Number(options.fallbackPoints) || 0;
+  const span = Math.max(0.0001, high - low);
+  const normalized = clamp((numeric - low) / span, 0, 1);
+  return Math.round((options.invert ? 1 - normalized : normalized) * maxPoints);
+}
+
+function predictionScoreLabel(score, max = 1000) {
+  const numeric = Math.round(Number(score) || 0);
+  return `${clamp(numeric, 0, max)}/${max}`;
+}
+
+function starterSeasonK9(pitcher = null) {
+  const strikeOuts = statNumber(pitcher?.pitching?.so ?? pitcher?.pitching?.strikeOuts ?? pitcher?.so ?? pitcher?.strikeOuts);
+  const outs = inningsToOuts(pitcher?.pitching?.ip || pitcher?.ip || pitcher?.inningsPitched || pitcher?.innings);
+  return outs > 0 ? (strikeOuts * 27) / outs : null;
+}
+
+function pitcherSeasonRunMetrics(pitcher = null) {
+  const rawEra = pitcher?.pitching?.era ?? pitcher?.seasonStats?.pitching?.era ?? pitcher?.era ?? pitcher?.stats?.pitching?.era;
+  const rawWhip = pitcher?.pitching?.whip
+    ?? pitcher?.pitching?.walksAndHitsPerInningPitched
+    ?? pitcher?.seasonStats?.pitching?.whip
+    ?? pitcher?.seasonStats?.pitching?.walksAndHitsPerInningPitched
+    ?? pitcher?.whip
+    ?? pitcher?.stats?.pitching?.whip
+    ?? pitcher?.stats?.pitching?.walksAndHitsPerInningPitched;
+  return {
+    era: predictionRateValue(rawEra),
+    whip: predictionRateValue(rawWhip),
+    k9: starterSeasonK9(pitcher),
+  };
+}
+
+function predictionOpponentPitcher(game, battingSide) {
+  return resolveFocusedOpponentPitcher(game, battingSide)
+    || matchupPitcherForLineup(game, battingSide)
+    || null;
+}
+
+function predictionStarterForSide(game, side) {
+  const summary = resolveLineupPitcherForDisplay(game, side);
+  const display = resolvePitchingSideForDisplay(game, side);
+  const currentRole = String(display?.current?.role || '').toLowerCase();
+  return summary?.starter
+    || (currentRole.includes('starter') ? display?.current : null)
+    || summary?.current
+    || display?.current
+    || null;
+}
+
+function teamSideInfo(game, side) {
+  return {
+    side,
+    team: side === 'away' ? game?.away : game?.home,
+    opponent: side === 'away' ? game?.home : game?.away,
+    color: side === 'away' ? game?.awayColor : game?.homeColor,
+    logo: side === 'away' ? game?.awayLogo : game?.homeLogo,
+  };
+}
+
+function predictionLineupForSide(game, side) {
+  return activeLineupForRecognition(game, side)
+    .filter((entry) => Number.isFinite(Number(entry?.id)) && Number(entry.id) > 0)
+    .filter((entry) => String(entry?.position || '').toUpperCase() !== 'P')
+    .slice(0, 9);
+}
+
+async function predictionTeamRecentHeatFallback(game, side, gameLimit = 5) {
+  const info = teamSideInfo(game, side);
+  const recent = await getLineupTeamRecentStats(info.team, officialDateForGame(game), gameLimit).catch(() => null);
+  if (!recent) return null;
+  const avg = predictionRateValue(recent.avg);
+  const slg = predictionRateValue(recent.slg);
+  const ops = predictionRateValue(recent.ops);
+  if (![avg, slg, ops].some((value) => Number.isFinite(Number(value)))) return null;
+  return {
+    avg,
+    slg,
+    ops,
+    recordText: recent.recordText || '',
+    source: `team-l${gameLimit}`,
+    sourceLabel: `Team L${gameLimit} boxscores`,
+  };
+}
+
+async function predictionLineupHeat(game, side) {
+  let lineup = predictionLineupForSide(game, side);
+  if (lineupNeedsCompletion(lineup)) {
+    lineup = await completeLineupToNine(game, side, lineup).catch(() => lineup);
+  }
+  if (!lineup.length) {
+    const teamFallback = await predictionTeamRecentHeatFallback(game, side, 5);
+    return {
+      lineup,
+      avg: teamFallback?.avg ?? null,
+      slg: teamFallback?.slg ?? null,
+      ops: teamFallback?.ops ?? null,
+      atBats: 0,
+      hits: 0,
+      totalBases: 0,
+      walks: 0,
+      games: 0,
+      lineupCount: 0,
+      source: teamFallback?.source || 'missing-lineup',
+      sourceLabel: teamFallback?.sourceLabel || 'Lineup unavailable',
+      teamFallback,
+    };
+  }
+  const details = await mapWithConcurrency(lineup, 5, async (entry) => {
+    const playerId = Number(entry?.id);
+    const recent = await getPlayerRecentBattingDetails(playerId, game, 5).catch(() => null);
+    if (recent?.totals) return recent;
+    const fallback = buildLineupHotCandidate(game, side, entry, dateInput.value || formatDate(new Date()));
+    if (!fallback?.metrics) return null;
+    return {
+      totals: {
+        games: Math.max(1, statNumber(fallback.games)),
+        atBats: statNumber(fallback.batting?.atBats),
+        hits: statNumber(fallback.batting?.hits),
+        walks: statNumber(fallback.batting?.walks),
+        totalBases: statNumber(fallback.batting?.totalBases),
+        homeRuns: statNumber(fallback.batting?.homeRuns),
+        xbh: Math.max(0, statNumber(fallback.batting?.totalBases) - statNumber(fallback.batting?.hits)),
+      },
+      metrics: fallback.metrics,
+    };
+  });
+  const totals = details.filter(Boolean).reduce((sum, entry) => {
+    const t = entry?.totals || {};
+    sum.games += statNumber(t.games);
+    sum.atBats += statNumber(t.atBats);
+    sum.hits += statNumber(t.hits);
+    sum.walks += statNumber(t.walks);
+    sum.totalBases += statNumber(t.totalBases);
+    sum.homeRuns += statNumber(t.homeRuns);
+    sum.xbh += statNumber(t.xbh);
+    return sum;
+  }, { games: 0, atBats: 0, hits: 0, walks: 0, totalBases: 0, homeRuns: 0, xbh: 0 });
+  const avg = totals.atBats > 0 ? totals.hits / totals.atBats : null;
+  const slg = totals.atBats > 0 ? totals.totalBases / totals.atBats : null;
+  const obp = totals.atBats + totals.walks > 0 ? (totals.hits + totals.walks) / (totals.atBats + totals.walks) : null;
+  const lineupHeat = {
+    lineup,
+    ...totals,
+    avg,
+    slg,
+    ops: Number.isFinite(obp) && Number.isFinite(slg) ? obp + slg : null,
+    lineupCount: lineup.length,
+    source: 'lineup-l5',
+    sourceLabel: `${lineup.length}/9 projected hitters L5`,
+  };
+  if (lineup.length < 9 || totals.atBats < 10) {
+    const teamFallback = await predictionTeamRecentHeatFallback(game, side, 5);
+    if (teamFallback) {
+      return {
+        ...lineupHeat,
+        avg: teamFallback.avg ?? lineupHeat.avg,
+        slg: teamFallback.slg ?? lineupHeat.slg,
+        ops: teamFallback.ops ?? lineupHeat.ops,
+        source: teamFallback.source,
+        sourceLabel: `${teamFallback.sourceLabel} (lineup ${lineup.length}/9)`,
+        teamFallback,
+      };
+    }
+  }
+  return {
+    ...lineupHeat,
+  };
+}
+
+function predictionHandSplitForPitcher(pitcherSplits, batterHand, pitcherHand) {
+  const effective = effectiveBatterHandForPitcher(batterHand, pitcherHand);
+  if (effective === 'L') return pitcherSplits?.vsLeft || null;
+  if (effective === 'R') return pitcherSplits?.vsRight || null;
+  return null;
+}
+
+function predictionPitcherWeakness(pitcher, pitcherSplits = null, batterHand = '', pitcherHand = '') {
+  const metrics = pitcherSeasonRunMetrics(pitcher);
+  const handSplit = predictionHandSplitForPitcher(pitcherSplits, batterHand, pitcherHand);
+  const handAvg = predictionRateValue(handSplit?.avg);
+  const handSlg = predictionRateValue(handSplit?.slg);
+  const ipRaw = pitcher?.pitching?.ip
+    ?? pitcher?.pitching?.inningsPitched
+    ?? pitcher?.seasonStats?.pitching?.inningsPitched
+    ?? pitcher?.ip
+    ?? pitcher?.stats?.pitching?.inningsPitched;
+  const outs = inningsToOuts(ipRaw);
+  const hrRaw = pitcher?.pitching?.hrAllowed
+    ?? pitcher?.pitching?.homeRuns
+    ?? pitcher?.hrAllowed
+    ?? pitcher?.homeRuns
+    ?? pitcher?.seasonStats?.pitching?.homeRuns
+    ?? pitcher?.stats?.pitching?.homeRuns;
+  const hrAllowed = hrRaw === null || hrRaw === undefined || hrRaw === '' ? null : statNumber(hrRaw);
+  const hr9 = outs > 0 ? (hrAllowed * 27) / outs : null;
+  const score = clamp(
+    predictionPoints(metrics.era, 3.65, 5.75, 28, { fallbackPoints: 12 })
+      + predictionPoints(metrics.whip, 1.15, 1.55, 26, { fallbackPoints: 12 })
+      + predictionPoints(hr9, 0.9, 1.8, 14, { fallbackPoints: 5 })
+      + predictionPoints(handAvg, 0.245, 0.320, 16, { fallbackPoints: 4 })
+      + predictionPoints(handSlg, 0.390, 0.600, 16, { fallbackPoints: 4 }),
+    0,
+    100,
+  );
+  return {
+    score,
+    era: metrics.era,
+    whip: metrics.whip,
+    k9: metrics.k9,
+    hr9,
+    handAvg,
+    handSlg,
+    handSplit,
+    pitcherHand,
+    isWeak: score >= 52 || isBadPitcherOpponentHandSplit(handSplit),
+  };
+}
+
+function predictionBatterHot(metrics = {}) {
+  const avg = Number(metrics.avg);
+  const slg = Number(metrics.slg);
+  const ops = Number(metrics.ops);
+  return (
+    (Number.isFinite(avg) && avg >= PREDICTION_HOT_AVG_THRESHOLD)
+    || (Number.isFinite(slg) && slg >= PREDICTION_HOT_SLG_THRESHOLD)
+    || (Number.isFinite(ops) && ops >= LINEUP_HOT_OPS_THRESHOLD)
+  );
+}
+
+function predictionSeasonBatterMetrics(profile = null) {
+  const batting = profile?.batting || {};
+  const avg = predictionRateValue(batting.avg);
+  const slg = predictionRateValue(batting.slg);
+  const ops = predictionRateValue(batting.ops);
+  return { avg, slg, ops };
+}
+
+function predictionHitterScore(metrics = {}, seasonMetrics = {}, weakness = {}, duePayload = null, handStrong = false) {
+  return clamp(
+    predictionPoints(metrics.avg, 0.230, 0.380, 165, { fallbackPoints: 44 })
+      + predictionPoints(metrics.slg, 0.340, 0.700, 165, { fallbackPoints: 50 })
+      + predictionPoints(metrics.ops, 0.650, 1.100, 110, { fallbackPoints: 34 })
+      + predictionPoints(seasonMetrics.avg, 0.225, 0.320, 105, { fallbackPoints: 30 })
+      + predictionPoints(seasonMetrics.slg, 0.340, 0.560, 115, { fallbackPoints: 34 })
+      + predictionPoints(seasonMetrics.ops, 0.650, 0.900, 60, { fallbackPoints: 18 })
+      + Math.round((Number(weakness?.score) || 0) * 1.7)
+      + (duePayload?.hr ? 70 : 0)
+      + (duePayload?.xbh ? 45 : 0)
+      + (handStrong ? 75 : 0),
+    0,
+    1000,
+  );
+}
+
+function predictionTagHtml(tags = []) {
+  return tags.filter(Boolean).map((tag) => `<span>${tag}</span>`).join('');
+}
+
+function predictionMetricHtml(label, value) {
+  return `<div class="hot-card-stat prediction-stat"><span>${escapeHtml(label)}</span><strong>${escapeHtml(value)}</strong></div>`;
+}
+
+function predictionMetricValue(value, digits = 2, trimLeadingZero = false) {
+  return value === null || value === undefined || value === ''
+    ? '---'
+    : formatRateValue(value, digits, trimLeadingZero);
+}
+
+function predictionSourceRowsHtml(rows = []) {
+  return rows
+    .filter((row) => Array.isArray(row) && row.length >= 2)
+    .map(([label, value]) => `
+      <div class="prediction-source-row">
+        <span>${escapeHtml(label)}</span>
+        <strong>${escapeHtml(value ?? '--')}</strong>
+      </div>
+    `).join('');
+}
+
+function predictionSourceDetailsHtml(rows = []) {
+  return `
+    <details class="prediction-source-details" open>
+      <summary>Numbers</summary>
+      <div class="prediction-source-grid">
+        ${predictionSourceRowsHtml(rows)}
+      </div>
+    </details>
+  `;
+}
+
+function predictionDetailDialogShellHtml(title = 'Prediction Details', subtitle = '') {
+  return `
+    <div class="player-card-head prediction-detail-head">
+      <div>
+        <span class="eyebrow">Prediction Details</span>
+        <h2>${escapeHtml(title)}</h2>
+        ${subtitle ? `<p>${escapeHtml(subtitle)}</p>` : ''}
+      </div>
+      <button type="button" data-prediction-detail-close aria-label="Close prediction details">x</button>
+    </div>
+    <div class="prediction-detail-body"></div>
+  `;
+}
+
+function ensurePredictionDetailDialog() {
+  let dialog = document.getElementById('predictionDetailDialog');
+  if (!dialog) {
+    dialog = document.createElement('dialog');
+    dialog.id = 'predictionDetailDialog';
+    dialog.className = 'player-stat-modal prediction-detail-dialog';
+    dialog.addEventListener('click', (e) => {
+      if (e.target === dialog || e.target.closest('[data-prediction-detail-close]')) dialog.close();
+    });
+    document.body.appendChild(dialog);
+  }
+  return dialog;
+}
+
+function openPredictionDetailDialog(payload = null) {
+  if (!payload) return;
+  const dialog = ensurePredictionDetailDialog();
+  dialog.innerHTML = predictionDetailDialogShellHtml(payload.title, payload.subtitle);
+  const body = dialog.querySelector('.prediction-detail-body');
+  if (body) {
+    body.innerHTML = `
+      <div class="prediction-detail-grid">
+        ${predictionSourceRowsHtml(payload.rows || [])}
+      </div>
+    `;
+  }
+  if (dialog.open) dialog.close();
+  dialog.showModal();
+}
+
+async function buildHittingPredictionForEntry(game, side, entry, pitcher, pitcherSplits) {
+  const playerId = Number(entry?.id);
+  if (!Number.isFinite(playerId) || playerId <= 0 || !pitcher) return null;
+  const pitcherId = Number(pitcher?.id);
+  let pitcherProfile = pitcher;
+  if (Number.isFinite(pitcherId) && pitcherId > 0) {
+    await ensurePitcherProfiles(game, [pitcher]).catch(() => {});
+    pitcherProfile = game?.playerLookup?.[String(pitcherId)] || pitcher;
+  }
+  let profile = game?.playerLookup?.[String(playerId)] || entry || null;
+  if (!profile?.batting) {
+    const fetched = await fetchMlbPlayerProfile(playerId, game).catch(() => null);
+    if (fetched) {
+      persistPlayerLookupForGame(game, { [String(playerId)]: fetched });
+      profile = fetched;
+    }
+  }
+  const pitcherHand = pitcherProfile?.throws || pitcherProfile?.pitchHand?.code || pitcherProfile?.pitchHand?.description || '';
+  const pitcherHandCode = handednessCode(pitcherHand);
+  const batterSplitPromise = pitcherHandCode
+    ? getPlayerHandedBattingSplit(playerId, pitcherHandCode === 'L' ? 'vl' : 'vr').catch(() => null)
+    : Promise.resolve(null);
+  const [details, batterSplit] = await Promise.all([
+    getPlayerRecentBattingDetails(playerId, game, 5).catch(() => null),
+    batterSplitPromise,
+  ]);
+  const fallback = buildLineupHotCandidate(game, side, entry, dateInput.value || formatDate(new Date()));
+  const metrics = details?.metrics || fallback?.metrics || {};
+  const seasonMetrics = predictionSeasonBatterMetrics(profile);
+  const duePayload = dueBadgePayload(profile, game, details);
+  const batterHand = entry?.bats || profile?.bats || '';
+  const matchupBatterHand = effectiveBatterHandForPitcher(batterHand, pitcherHand);
+  const weakness = predictionPitcherWeakness(pitcherProfile, pitcherSplits, batterHand, pitcherHand);
+  const handStrong = isGoodHitterHandedSplit(batterSplit) || isBadPitcherOpponentHandSplit(weakness.handSplit);
+  const hot = predictionBatterHot(metrics);
+  const due = Boolean(duePayload.hr || duePayload.xbh);
+  if (!((hot && weakness.isWeak) || (due && weakness.isWeak && handStrong))) return null;
+  const info = teamSideInfo(game, side);
+  const score = predictionHitterScore(metrics, seasonMetrics, weakness, duePayload, handStrong);
+  return {
+    type: due && !hot ? 'due' : 'hot',
+    score,
+    playerId,
+    gamePk: game?.gamePk || null,
+    fullName: profile?.fullName || entry?.fullName || entry?.name || 'Unknown',
+    teamAbbrev: info.team,
+    teamColor: info.color || getTeamColor(info.team),
+    teamLogo: info.logo || getLogoPath(info.team),
+    opponentAbbrev: info.opponent,
+    pitcherId: pitcherProfile?.id || pitcher?.id || null,
+    pitcherTeamAbbrev: info.opponent,
+    pitcherTeamColor: side === 'away' ? game?.homeColor : game?.awayColor,
+    pitcherTeamLogo: side === 'away' ? game?.homeLogo : game?.awayLogo,
+    pitcherName: pitcherProfile?.fullName || pitcher?.fullName || pitcher?.name || 'Opposing pitcher',
+    metrics,
+    seasonMetrics,
+    details,
+    duePayload,
+    weakness,
+    batterSplit,
+    matchupBatterHand,
+    handStrong,
+    handedEmoji: handedSplitEmojiHtml(batterSplit, pitcherHandCode, pitcherHand),
+    summary: `${displayTeamAbbrev(info.team)} vs ${displayTeamAbbrev(info.opponent)} | ${pitcherProfile?.fullName || pitcher?.fullName || pitcher?.name || 'Pitcher'} | Weakness ${Math.round(weakness.score)}/100`,
+  };
+}
+
+async function collectHittingPredictions(games = latestRenderedGames) {
+  const tasks = [];
+  for (const game of predictionGames(games)) {
+    for (const side of ['away', 'home']) {
+      const pitcher = predictionOpponentPitcher(game, side);
+      const pitcherSplitsPromise = pitcher?.id ? getPitcherOpponentHandSplits(pitcher).catch(() => null) : Promise.resolve(null);
+      let lineup = predictionLineupForSide(game, side);
+      if (lineupNeedsCompletion(lineup)) {
+        lineup = await completeLineupToNine(game, side, lineup).catch(() => lineup);
+      }
+      for (const entry of lineup) {
+        tasks.push(async () => buildHittingPredictionForEntry(game, side, entry, pitcher, await pitcherSplitsPromise));
+      }
+    }
+  }
+  const predictions = await mapWithConcurrency(tasks, 5, (task) => task());
+  return predictions
+    .filter(Boolean)
+    .sort((a, b) => Number(b.score) - Number(a.score) || String(a.fullName || '').localeCompare(String(b.fullName || '')));
+}
+
+function predictionPitcherStarterMetrics(starter, details = null) {
+  const season = pitcherSeasonRunMetrics(starter);
+  const recent = details?.metrics || {};
+  const last = details?.lastGame || null;
+  const lastEra = last?.outs > 0 ? (statNumber(last.earnedRuns) * 27) / last.outs : null;
+  const lastWhip = last?.outs > 0 ? ((statNumber(last.hits) + statNumber(last.walks)) * 3) / last.outs : null;
+  return {
+    seasonEra: season.era,
+    seasonWhip: season.whip,
+    seasonK9: season.k9,
+    recentEra: Number.isFinite(Number(recent.era)) ? Number(recent.era) : null,
+    recentWhip: Number.isFinite(Number(recent.whip)) ? Number(recent.whip) : null,
+    recentK9: Number.isFinite(Number(recent.k9)) ? Number(recent.k9) : null,
+    lastEra,
+    lastWhip,
+    last,
+  };
+}
+
+function predictionPitcherScore(metrics = {}, opponentHeat = {}) {
+  const k9 = Math.max(Number(metrics.seasonK9) || 0, Number(metrics.recentK9) || 0);
+  return clamp(
+    predictionPoints(k9, 7.0, 11.5, 250, { fallbackPoints: 50 })
+      + predictionPoints(metrics.seasonEra, 2.65, 4.50, 170, { invert: true, fallbackPoints: 70 })
+      + predictionPoints(metrics.seasonWhip, 0.95, 1.35, 160, { invert: true, fallbackPoints: 65 })
+      + predictionPoints(metrics.recentEra, 2.50, 5.25, 120, { invert: true, fallbackPoints: 50 })
+      + predictionPoints(metrics.recentWhip, 0.95, 1.50, 110, { invert: true, fallbackPoints: 45 })
+      + predictionPoints(opponentHeat.avg, 0.210, 0.275, 120, { invert: true, fallbackPoints: 45 })
+      + predictionPoints(opponentHeat.ops, 0.560, 0.760, 70, { invert: true, fallbackPoints: 25 }),
+    0,
+    1000,
+  );
+}
+
+async function buildPitchingPrediction(game, side) {
+  const starter = predictionStarterForSide(game, side);
+  const playerId = Number(starter?.id);
+  if (!Number.isFinite(playerId) || playerId <= 0) return null;
+  await ensurePitcherProfiles(game, [starter]).catch(() => {});
+  const profile = game?.playerLookup?.[String(playerId)] || starter;
+  const details = await getPlayerRecentPitchingDetails(playerId, game).catch(() => null);
+  const opponentSide = side === 'away' ? 'home' : 'away';
+  const opponentHeat = await predictionLineupHeat(game, opponentSide);
+  const metrics = predictionPitcherStarterMetrics(profile, details);
+  const k9 = Math.max(Number(metrics.seasonK9) || 0, Number(metrics.recentK9) || 0);
+  const opponentAvg = Number(opponentHeat.avg);
+  const opponentOps = Number(opponentHeat.ops);
+  const coldLineup = (
+    (Number.isFinite(opponentAvg) && opponentAvg <= PREDICTION_COLD_LINEUP_AVG_THRESHOLD)
+    || (Number.isFinite(opponentOps) && opponentOps <= 0.650)
+  );
+  const seasonEra = Number(metrics.seasonEra);
+  const recentEra = Number(metrics.recentEra);
+  const seasonWhip = Number(metrics.seasonWhip);
+  const recentWhip = Number(metrics.recentWhip);
+  const solidStarter = (
+    ((Number.isFinite(seasonEra) && seasonEra <= 4.10) || (Number.isFinite(recentEra) && recentEra <= 3.85))
+    && ((Number.isFinite(seasonWhip) && seasonWhip <= 1.35) || (Number.isFinite(recentWhip) && recentWhip <= 1.28))
+  );
+  if (!(k9 >= PREDICTION_STARTER_K9_THRESHOLD && solidStarter && coldLineup)) return null;
+  const info = teamSideInfo(game, side);
+  const score = predictionPitcherScore(metrics, opponentHeat);
+  return {
+    score,
+    playerId,
+    gamePk: game?.gamePk || null,
+    fullName: profile?.fullName || starter?.fullName || starter?.name || 'Starter',
+    teamAbbrev: info.team,
+    teamColor: info.color || getTeamColor(info.team),
+    teamLogo: info.logo || getLogoPath(info.team),
+    opponentAbbrev: info.opponent,
+    metrics,
+    opponentHeat,
+    summary: `${displayTeamAbbrev(info.team)} starter vs cold ${displayTeamAbbrev(info.opponent)} bats | L5 AVG ${formatRateValue(opponentHeat.avg, 3, true)}`,
+  };
+}
+
+async function collectPitchingPredictions(games = latestRenderedGames) {
+  const tasks = [];
+  for (const game of predictionGames(games)) {
+    tasks.push(() => buildPitchingPrediction(game, 'away'));
+    tasks.push(() => buildPitchingPrediction(game, 'home'));
+  }
+  const predictions = await mapWithConcurrency(tasks, 4, (task) => task());
+  return predictions
+    .filter(Boolean)
+    .sort((a, b) => Number(b.score) - Number(a.score) || String(a.fullName || '').localeCompare(String(b.fullName || '')));
+}
+
+function aggregateBullpenBoxStats(aggregate, teamBox = {}) {
+  for (const player of Object.values(teamBox?.players || {})) {
+    const pitching = player?.stats?.pitching || player?.gameStats?.pitching || {};
+    const outs = inningsToOuts(pitching.inningsPitched);
+    if (outs <= 0) continue;
+    const starts = statNumber(pitching.gamesStarted ?? pitching.gameStarted ?? pitching.starts);
+    if (starts > 0) continue;
+    aggregate.outs += outs;
+    aggregate.earnedRuns += statNumber(pitching.earnedRuns);
+    aggregate.hits += statNumber(pitching.hits);
+    aggregate.walks += statNumber(pitching.baseOnBalls ?? pitching.walks);
+    aggregate.homeRuns += statNumber(pitching.homeRuns ?? pitching.hrAllowed ?? pitching.hr);
+    aggregate.pitchers += 1;
+  }
+}
+
+async function getTeamRecentBullpenStats(teamAbbrev, date, gameLimit = 10) {
+  const team = canonicalTeamAbbrev(teamAbbrev);
+  const teamId = TEAM_IDS[team];
+  const selectedDate = String(date || dateInput.value || formatDate(new Date()));
+  const limit = Math.max(1, Math.min(15, Math.floor(Number(gameLimit)) || 10));
+  if (!teamId || !selectedDate) return null;
+  const cacheKey = `${team}:${selectedDate}:bullpen-l${limit}:v1`;
+  if (teamRecentBullpenCache.has(cacheKey)) return teamRecentBullpenCache.get(cacheKey);
+  const promise = (async () => {
+    const url = new URL(`${MLB_API_BASE}/schedule`);
+    url.searchParams.set('sportId', '1');
+    url.searchParams.set('teamId', String(teamId));
+    url.searchParams.set('startDate', addDaysToDateValue(selectedDate, -45));
+    url.searchParams.set('endDate', selectedDate);
+    url.searchParams.set('gameTypes', 'S,E,R');
+    const response = await getJson(url.toString());
+    const games = listify(response?.dates)
+      .flatMap((day) => listify(day?.games))
+      .filter(gameIsFinalForTeamRecord)
+      .sort((a, b) => String(b?.gameDate || '').localeCompare(String(a?.gameDate || '')))
+      .slice(0, limit);
+    const aggregate = { games: games.length, pitchers: 0, outs: 0, earnedRuns: 0, hits: 0, walks: 0, homeRuns: 0 };
+    await mapWithConcurrency(games, 3, async (game) => {
+      const side = teamBoxSideForGame(game, team);
+      if (!side || !game?.gamePk) return;
+      const boxscore = await getGameBoxscore(game.gamePk).catch(() => null);
+      aggregateBullpenBoxStats(aggregate, boxscore?.teams?.[side] || {});
+    });
+    if (aggregate.outs <= 0) return null;
+    return {
+      ...aggregate,
+      era: (aggregate.earnedRuns * 27) / aggregate.outs,
+      whip: ((aggregate.hits + aggregate.walks) * 3) / aggregate.outs,
+      ip: outsToInnings(aggregate.outs),
+    };
+  })().catch((error) => {
+    teamRecentBullpenCache.delete(cacheKey);
+    throw error;
+  });
+  teamRecentBullpenCache.set(cacheKey, promise);
+  return promise;
+}
+
+function parseStreakValue(streak = '') {
+  const match = String(streak || '').trim().match(/^([WL])\s*(\d+)/i);
+  if (!match) return 0;
+  const value = Number(match[2]) || 0;
+  return match[1].toUpperCase() === 'W' ? value : -value;
+}
+
+function moneylineMomentumPoints(recordText = '', streak = '') {
+  const parsed = parseRecordValue(recordText);
+  const games = parsed.wins + parsed.losses;
+  const winRate = games > 0 ? parsed.wins / games : 0.5;
+  const streakValue = parseStreakValue(streak);
+  return clamp(Math.round((winRate * 270) + 32 + clamp(streakValue, -5, 5) * 6), 0, 334);
+}
+
+function moneylineHittingPoints(heat = {}) {
+  return clamp(
+    predictionPoints(heat.avg, 0.215, 0.315, 166, { fallbackPoints: 72 })
+      + predictionPoints(heat.slg, 0.340, 0.520, 167, { fallbackPoints: 72 }),
+    0,
+    333,
+  );
+}
+
+function moneylinePitchingPoints(starterMetrics = {}, bullpen = null, fallbackBullpen = null) {
+  const bullpenEra = Number.isFinite(Number(bullpen?.era)) ? Number(bullpen.era) : Number(fallbackBullpen?.era);
+  const bullpenWhip = Number.isFinite(Number(bullpen?.whip)) ? Number(bullpen.whip) : Number(fallbackBullpen?.whip);
+  const starterEra = Number.isFinite(Number(starterMetrics.recentEra)) ? starterMetrics.recentEra : starterMetrics.seasonEra;
+  const starterWhip = Number.isFinite(Number(starterMetrics.recentWhip)) ? starterMetrics.recentWhip : starterMetrics.seasonWhip;
+  const lastEra = Number.isFinite(Number(starterMetrics.lastEra)) ? starterMetrics.lastEra : starterEra;
+  const lastWhip = Number.isFinite(Number(starterMetrics.lastWhip)) ? starterMetrics.lastWhip : starterWhip;
+  return clamp(
+    predictionPoints(starterEra, 2.75, 5.25, 86, { invert: true, fallbackPoints: 36 })
+      + predictionPoints(starterWhip, 0.98, 1.55, 82, { invert: true, fallbackPoints: 34 })
+      + predictionPoints(lastEra, 2.00, 6.00, 42, { invert: true, fallbackPoints: 18 })
+      + predictionPoints(lastWhip, 0.85, 1.65, 40, { invert: true, fallbackPoints: 16 })
+      + predictionPoints(bullpenEra, 3.00, 5.75, 43, { invert: true, fallbackPoints: 18 })
+      + predictionPoints(bullpenWhip, 1.08, 1.55, 40, { invert: true, fallbackPoints: 16 }),
+    0,
+    333,
+  );
+}
+
+async function buildMoneylineTeamScore(game, side) {
+  const info = teamSideInfo(game, side);
+  const starter = predictionStarterForSide(game, side);
+  if (starter?.id) await ensurePitcherProfiles(game, [starter]).catch(() => {});
+  const starterProfile = starter?.id ? game?.playerLookup?.[String(starter.id)] || starter : starter;
+  const [heat, recentPitching, bullpenRecent, recentTeam] = await Promise.all([
+    predictionLineupHeat(game, side).catch(() => null),
+    starterProfile?.id ? getPlayerRecentPitchingDetails(starterProfile.id, game).catch(() => null) : Promise.resolve(null),
+    getTeamRecentBullpenStats(info.team, officialDateForGame(game), 10).catch(() => null),
+    getLineupTeamRecentStats(info.team, officialDateForGame(game), 10).catch(() => null),
+  ]);
+  const staff = resolvePitchingSideForDisplay(game, side);
+  const bullpenFallback = bullpenSummaryValues(staff?.bullpen || []);
+  const starterMetrics = predictionPitcherStarterMetrics(starterProfile, recentPitching);
+  const hitting = moneylineHittingPoints(heat || {});
+  const pitching = moneylinePitchingPoints(starterMetrics, bullpenRecent, bullpenFallback);
+  const streak = side === 'away' ? game?.awayStreak : game?.homeStreak;
+  const momentum = moneylineMomentumPoints(recentTeam?.recordText || (side === 'away' ? game?.awayLastSevenRecord : game?.homeLastSevenRecord) || '', streak);
+  return {
+    side,
+    team: info.team,
+    opponent: info.opponent,
+    color: info.color || getTeamColor(info.team),
+    logo: info.logo || getLogoPath(info.team),
+    total: clamp(hitting + pitching + momentum, 0, 1000),
+    hitting,
+    pitching,
+    momentum,
+    heat,
+    starter: starterProfile,
+    starterMetrics,
+    bullpen: bullpenRecent || bullpenFallback,
+    recentTeam,
+    streak,
+  };
+}
+
+async function collectMoneylinePredictions(games = latestRenderedGames) {
+  const rows = await mapWithConcurrency(predictionGames(games), 3, async (game) => {
+    const [away, home] = await Promise.all([
+      buildMoneylineTeamScore(game, 'away'),
+      buildMoneylineTeamScore(game, 'home'),
+    ]);
+    const total = Math.max(1, away.total + home.total);
+    away.winPct = away.total / total;
+    home.winPct = home.total / total;
+    return { game, away, home, edge: Math.abs(away.total - home.total) };
+  });
+  return rows.sort((a, b) => Number(b.edge) - Number(a.edge));
+}
+
+async function collectPredictionsPayload(games = latestRenderedGames) {
+  if (currentPredictionTab === 'pitching') {
+    return { tab: 'pitching', entries: await collectPitchingPredictions(games) };
+  }
+  if (currentPredictionTab === 'moneylines') {
+    return { tab: 'moneylines', entries: await collectMoneylinePredictions(games) };
+  }
+  return { tab: 'hitting', entries: await collectHittingPredictions(games) };
+}
+
+function renderPredictionTabs() {
+  return `
+    <div class="prediction-tabs" role="tablist" aria-label="Prediction sections">
+      ${PREDICTION_PAGE_TABS.map((tab) => `<button type="button" data-prediction-tab="${tab}" class="${currentPredictionTab === tab ? 'active' : ''}" aria-selected="${currentPredictionTab === tab ? 'true' : 'false'}">${tab === 'moneylines' ? 'Moneylines' : tab[0].toUpperCase() + tab.slice(1)}</button>`).join('')}
+    </div>
+  `;
+}
+
+function renderPredictionPlayerCard(entry, mode = 'hitting') {
+  const metrics = entry.metrics || {};
+  const isPitcher = mode === 'pitching';
+  const k9Value = Math.max(Number(entry.metrics?.seasonK9) || 0, Number(entry.metrics?.recentK9) || 0);
+  const tags = isPitcher
+    ? [
+        `<b>${predictionScoreLabel(entry.score)}</b>`,
+        `K/9 ${formatRateValue(k9Value, 1, false)}`,
+        `Cold lineup`,
+      ]
+    : [
+        `<b>${predictionScoreLabel(entry.score)}</b>`,
+        entry.type === 'due' ? 'Due' : 'Hot bat',
+        entry.duePayload?.hr ? 'HR due' : '',
+        entry.duePayload?.xbh ? 'XBH due' : '',
+        entry.handStrong ? 'Hand edge' : '',
+      ];
+  const statHtml = isPitcher
+    ? [
+        predictionMetricHtml('K/9', formatRateValue(k9Value, 1, false)),
+        predictionMetricHtml('ERA', predictionMetricValue(entry.metrics?.seasonEra, 2, false)),
+        predictionMetricHtml('WHIP', predictionMetricValue(entry.metrics?.seasonWhip, 2, false)),
+        predictionMetricHtml('Opp AVG', formatRateValue(entry.opponentHeat?.avg, 3, true)),
+        predictionMetricHtml('Opp OPS', formatRateValue(entry.opponentHeat?.ops, 3, false)),
+      ].join('')
+    : [
+        predictionMetricHtml('AVG', formatRateValue(metrics.avg, 3, true)),
+        predictionMetricHtml('OPS', formatRateValue(metrics.ops, 3, false)),
+        predictionMetricHtml('SLG', formatRateValue(metrics.slg, 3, true)),
+        predictionMetricHtml('Weak', `${Math.round(entry.weakness?.score || 0)}`),
+        predictionMetricHtml('P ERA', predictionMetricValue(entry.weakness?.era, 2, false)),
+        predictionMetricHtml('P WHIP', predictionMetricValue(entry.weakness?.whip, 2, false)),
+      ].join('');
+  const badgeHtml = isPitcher ? '' : `${entry.handedEmoji || ''}${entry.duePayload?.hr ? `<span class="lineup-due-badge lineup-due-badge-hr" title="${escapeHtml(entry.duePayload.hr)}">HR</span>` : ''}${entry.duePayload?.xbh ? `<span class="lineup-due-badge lineup-due-badge-xbh" title="${escapeHtml(entry.duePayload.xbh)}">XBH</span>` : ''}`;
+  const pitcherButtonHtml = !isPitcher && Number.isFinite(Number(entry.pitcherId)) && Number(entry.pitcherId) > 0
+    ? `<button type="button" class="prediction-pitcher-link" data-pitcher-id="${Number(entry.pitcherId)}" data-team-abbrev="${escapeHtml(entry.pitcherTeamAbbrev || entry.opponentAbbrev || '')}" data-game-pk="${escapeHtml(entry.gamePk || '')}" title="Open ${escapeHtml(entry.pitcherName || 'pitcher')} card">${escapeHtml(entry.pitcherName || 'Opposing pitcher')}</button>`
+    : `<span>${escapeHtml(entry.pitcherName || 'Opposing pitcher')}</span>`;
+  const sourceRows = isPitcher
+    ? [
+        ['Score', predictionScoreLabel(entry.score)],
+        ['Starter K/9', formatRateValue(k9Value, 1, false)],
+        ['Starter ERA/WHIP', `${predictionMetricValue(entry.metrics?.seasonEra, 2, false)} / ${predictionMetricValue(entry.metrics?.seasonWhip, 2, false)}`],
+        ['Recent ERA/WHIP', `${predictionMetricValue(entry.metrics?.recentEra, 2, false)} / ${predictionMetricValue(entry.metrics?.recentWhip, 2, false)}`],
+        ['Last Start', entry.metrics?.last ? `${entry.metrics.last.inningsPitched} IP, ${entry.metrics.last.earnedRuns} ER, ${entry.metrics.last.strikeOuts} K` : '--'],
+        ['Opp Heat Source', entry.opponentHeat?.sourceLabel || 'Projected lineup L5'],
+        ['Opp L5 AVG/OPS', `${formatRateValue(entry.opponentHeat?.avg, 3, true)} / ${formatRateValue(entry.opponentHeat?.ops, 3, false)}`],
+      ]
+    : [
+        ['Score', predictionScoreLabel(entry.score)],
+        ['Batter L5 AVG/SLG/OPS', `${formatRateValue(metrics.avg, 3, true)} / ${formatRateValue(metrics.slg, 3, true)} / ${formatRateValue(metrics.ops, 3, false)}`],
+        ['Season AVG/SLG/OPS', `${predictionMetricValue(entry.seasonMetrics?.avg, 3, true)} / ${predictionMetricValue(entry.seasonMetrics?.slg, 3, true)} / ${predictionMetricValue(entry.seasonMetrics?.ops, 3, false)}`],
+        ['Opp Pitcher', entry.pitcherName || 'Opposing pitcher'],
+        ['Pitcher ERA/WHIP', `${predictionMetricValue(entry.weakness?.era, 2, false)} / ${predictionMetricValue(entry.weakness?.whip, 2, false)}`],
+        ['Pitcher HR/9', predictionMetricValue(entry.weakness?.hr9, 1, false)],
+        ['Matchup Hand', entry.matchupBatterHand ? `${entry.matchupBatterHand} vs ${handednessCode(entry.weakness?.pitcherHand || '') || 'P'}` : 'Unavailable'],
+        ['Hand Split', entry.weakness?.handSplit ? `${cleanSummary(entry.weakness.handSplit.avg) || '---'} AVG / ${cleanSummary(entry.weakness.handSplit.slg) || '---'} SLG` : 'Unavailable'],
+        ['Due Flags', [entry.duePayload?.hr ? 'HR' : '', entry.duePayload?.xbh ? 'XBH' : ''].filter(Boolean).join(', ') || '--'],
+      ];
+  return `
+    <article class="hot-card prediction-card is-clickable" data-player-id="${Number(entry.playerId) || ''}" data-team-abbrev="${escapeHtml(entry.teamAbbrev || '')}" data-game-pk="${escapeHtml(entry.gamePk || '')}" style="--team-color:${escapeHtml(entry.teamColor || getTeamColor(entry.teamAbbrev) || '#66d9ff')}">
+      <div class="hot-card-main">
+        <div class="hot-card-media">
+          <img class="hot-card-avatar" src="${playerHeadshotUrl(entry.playerId)}" alt="${escapeHtml(entry.fullName || 'Player')} headshot" />
+          <img class="hot-card-logo" src="${escapeHtml(entry.teamLogo || getLogoPath(entry.teamAbbrev) || 'placeholder.png')}" alt="" />
+        </div>
+        <div class="hot-card-copy">
+          <div class="hot-card-kicker">${isPitcher ? 'Pitching prediction' : 'Hitting prediction'}</div>
+          <div class="hot-card-name-row">
+            <span class="hot-card-team">${escapeHtml(displayTeamAbbrev(entry.teamAbbrev))}</span>
+            <span class="hot-card-name">${escapeHtml(entry.fullName || 'Unknown')}</span>${badgeHtml}
+          </div>
+          <div class="hot-card-summary">${escapeHtml(entry.summary || '')}</div>
+          ${isPitcher ? '' : `<div class="prediction-matchup-line">vs ${pitcherButtonHtml}</div>`}
+          <div class="prediction-tags">${predictionTagHtml(tags)}</div>
+        </div>
+      </div>
+      <div class="hot-card-stats prediction-stat-grid">${statHtml}</div>
+      ${predictionSourceDetailsHtml(sourceRows)}
+    </article>
+  `;
+}
+
+function registerPredictionDetailPayload(payload = {}) {
+  const id = `pred-detail-${predictionDetailPayloads.size + 1}`;
+  predictionDetailPayloads.set(id, payload);
+  return id;
+}
+
+function moneylineSourceRows(team = {}) {
+  return [
+    ['Total', predictionScoreLabel(team.total)],
+    ['Hitting', `${Math.round(team.hitting || 0)}/333 from ${team.heat?.sourceLabel || 'projected lineup L5'}`],
+    ['L5 AVG/SLG/OPS', `${formatRateValue(team.heat?.avg, 3, true)} / ${formatRateValue(team.heat?.slg, 3, true)} / ${formatRateValue(team.heat?.ops, 3, false)}`],
+    ['Starter', team?.starter?.fullName || team?.starter?.name || 'Starter unavailable'],
+    ['Starter ERA/WHIP', `${predictionMetricValue(team.starterMetrics?.seasonEra, 2, false)} / ${predictionMetricValue(team.starterMetrics?.seasonWhip, 2, false)}`],
+    ['Recent ERA/WHIP', `${predictionMetricValue(team.starterMetrics?.recentEra, 2, false)} / ${predictionMetricValue(team.starterMetrics?.recentWhip, 2, false)}`],
+    ['Bullpen L10 ERA/WHIP', `${predictionMetricValue(team.bullpen?.era, 2, false)} / ${predictionMetricValue(team.bullpen?.whip, 2, false)}`],
+    ['Momentum', `${team.recentTeam?.recordText || 'Recent record unavailable'} ${team.streak ? `| ${team.streak}` : ''}`],
+  ];
+}
+
+function renderMoneylineTeam(team, opponentScore = 0) {
+  const winPct = Number.isFinite(Number(team?.winPct)) ? `${Math.round(Number(team.winPct) * 100)}%` : '';
+  return `
+    <div class="moneyline-team" style="--team-color:${escapeHtml(team.color || getTeamColor(team.team) || '#66d9ff')}">
+      <div class="moneyline-team-main">
+        <img src="${escapeHtml(team.logo || getLogoPath(team.team) || 'placeholder.png')}" alt="" />
+        <div>
+          <strong>${escapeHtml(displayTeamAbbrev(team.team))}</strong>
+          <span>${escapeHtml(winPct)} | edge ${Math.round(Number(team.total || 0) - Number(opponentScore || 0))}</span>
+        </div>
+      </div>
+      <div class="moneyline-total">${predictionScoreLabel(team.total)}</div>
+      <div class="moneyline-breakdown">
+        <span><b>Hit</b>${Math.round(team.hitting || 0)}/333</span>
+        <span><b>Pitch</b>${Math.round(team.pitching || 0)}/333</span>
+        <span><b>Mo</b>${Math.round(team.momentum || 0)}/334</span>
+      </div>
+    </div>
+  `;
+}
+
+function renderMoneylineCard(row) {
+  const favorite = Number(row.away.total) >= Number(row.home.total) ? row.away : row.home;
+  const dog = favorite === row.away ? row.home : row.away;
+  const detailId = registerPredictionDetailPayload({
+    title: `${displayTeamAbbrev(row.away.team)} @ ${displayTeamAbbrev(row.home.team)}`,
+    subtitle: `Lean ${displayTeamAbbrev(favorite.team)} by ${Math.round(Number(favorite.total) - Number(dog.total))} points`,
+    rows: [
+      [`${displayTeamAbbrev(row.away.team)} Total`, predictionScoreLabel(row.away.total)],
+      ...moneylineSourceRows(row.away),
+      [`${displayTeamAbbrev(row.home.team)} Total`, predictionScoreLabel(row.home.total)],
+      ...moneylineSourceRows(row.home),
+    ],
+  });
+  return `
+    <article class="moneyline-card is-clickable" data-prediction-detail-id="${escapeHtml(detailId)}" style="--team-color:${escapeHtml(favorite.color || '#66d9ff')}">
+      <header>
+        <div>
+          <span class="leaders-section-title">${escapeHtml(displayTeamAbbrev(row.away.team))} @ ${escapeHtml(displayTeamAbbrev(row.home.team))}</span>
+          <span class="leaders-section-subtitle">Lean ${escapeHtml(displayTeamAbbrev(favorite.team))} by ${Math.round(Number(favorite.total) - Number(dog.total))} points</span>
+        </div>
+      </header>
+      <div class="moneyline-teams">
+        ${renderMoneylineTeam(row.away, row.home.total)}
+        ${renderMoneylineTeam(row.home, row.away.total)}
+      </div>
+    </article>
+  `;
+}
+
+function renderPredictionsBoard(payload) {
+  const entries = Array.isArray(payload?.entries) ? payload.entries : [];
+  const tab = normalizePredictionTab(payload?.tab || currentPredictionTab);
+  if (tab === 'moneylines') predictionDetailPayloads.clear();
+  const shell = document.createElement('div');
+  shell.className = 'leaders-shell predictions-shell';
+  const subtitle = tab === 'hitting'
+    ? 'Hot or due bats against weak pitching and favorable handedness'
+    : tab === 'pitching'
+      ? 'High K/9 starters against cold recent lineups'
+      : '1000-point team lean: hitting heat, pitching heat, and momentum';
+  shell.innerHTML = `
+    <section class="leaders-section predictions-section">
+      <div class="leaders-section-header">
+        <div>
+          <span class="leaders-section-title">Predictions</span>
+          <span class="leaders-section-subtitle">${escapeHtml(subtitle)}</span>
+        </div>
+        ${renderPredictionTabs()}
+      </div>
+      ${entries.length ? '' : `<div class="leaders-empty">No ${escapeHtml(tab)} predictions fit the current filters yet.</div>`}
+      ${tab === 'moneylines'
+        ? `<div class="moneyline-grid">${entries.map(renderMoneylineCard).join('')}</div>`
+        : `<div class="hot-card-grid prediction-card-grid">${entries.map((entry) => renderPredictionPlayerCard(entry, tab)).join('')}</div>`}
+    </section>
+  `;
+  shell.querySelectorAll('.hot-card-avatar, .hot-card-logo, .moneyline-team-main img').forEach((img) => {
+    img.onerror = () => {
+      img.onerror = null;
+      img.src = 'placeholder.png';
+    };
+  });
+  return shell;
+}
+
+async function refreshPredictionsView(options = {}) {
+  const { showLoading = false } = options;
+  if (!predictionsPageEl || currentOverlayPage !== 'predictions') return;
+  const renderId = ++predictionsRenderSequence;
+  updateLeadersContext();
+  if (showLoading || !predictionsPageEl.querySelector('.predictions-shell')) {
+    predictionsPageEl.replaceChildren(createLeaderEmpty('Loading predictions...'));
+  }
+  try {
+    const payload = await collectPredictionsPayload(latestRenderedGames);
+    if (renderId !== predictionsRenderSequence) return;
+    const signature = JSON.stringify({
+      tab: currentPredictionTab,
+      teamFilter: currentLeaderTeamSelection().teamId || '',
+      opponents: currentLeadersOpponentMode,
+      date: dateInput.value || formatDate(new Date()),
+      entries: payload.entries.map((entry) => currentPredictionTab === 'moneylines'
+        ? [entry?.game?.gamePk, Math.round(entry?.away?.total || 0), Math.round(entry?.home?.total || 0)]
+        : [entry.playerId, Math.round(entry.score || 0)]),
+    });
+    if (predictionsPageEl.dataset.renderSignature === signature && predictionsPageEl.querySelector('.predictions-shell')) return;
+    predictionsPageEl.dataset.renderSignature = signature;
+    predictionsPageEl.replaceChildren(renderPredictionsBoard(payload));
+  } catch (error) {
+    if (renderId !== predictionsRenderSequence) return;
+    predictionsPageEl.replaceChildren(createLeaderEmpty(`Could not load predictions (${error.message}).`));
   }
 }
 
@@ -12325,7 +13365,7 @@ function confirmedTeamLineupForHot(game, side) {
 
 function activeLineupForRecognition(game, side) {
   const previewFallback = game?.previewLineupFallback?.[side] || [];
-  if (Array.isArray(previewFallback) && previewFallback.length) {
+  if (isUsableLineupCandidate(previewFallback)) {
     return normalizeLineupCollectionForSide(game, side, previewFallback)
       .filter((entry) => Number.isFinite(Number(entry?.id)) && Number(entry.id) > 0)
       .filter((entry) => String(entry?.position || '').toUpperCase() !== 'P')
@@ -13624,6 +14664,7 @@ function initLeadersControls() {
     if (currentOverlayPage === 'leaders') refreshLeadersView();
     if (currentOverlayPage === 'hot') refreshHotView();
     if (currentOverlayPage === 'teamStats') refreshTeamStatsView();
+    if (currentOverlayPage === 'predictions') refreshPredictionsView();
     if (currentOverlayPage === 'hrLeaderboard') refreshHrLeaderboardView();
   });
   leadersPositionSelectEl?.addEventListener('change', () => {
@@ -13638,6 +14679,7 @@ function initLeadersControls() {
     if (currentOverlayPage === 'leaders') refreshLeadersView();
     if (currentOverlayPage === 'hot') refreshHotView();
     if (currentOverlayPage === 'teamStats') refreshTeamStatsView();
+    if (currentOverlayPage === 'predictions') refreshPredictionsView();
     if (currentOverlayPage === 'hrLeaderboard') refreshHrLeaderboardView();
   });
   hrLeaderboardPageEl?.addEventListener('click', (e) => {
@@ -13645,6 +14687,47 @@ function initLeadersControls() {
     if (!btn) return;
     hrLeaderboardPeriod = btn.dataset.hrPeriod || 'week';
     refreshHrLeaderboardView();
+  });
+  predictionsPageEl?.addEventListener('click', (e) => {
+    const tabBtn = e.target.closest('[data-prediction-tab]');
+    if (tabBtn) {
+      currentPredictionTab = normalizePredictionTab(tabBtn.dataset.predictionTab);
+      predictionsPageEl.dataset.renderSignature = '';
+      refreshPredictionsView({ showLoading: false });
+      return;
+    }
+    const pitcherBtn = e.target.closest('.prediction-pitcher-link[data-pitcher-id]');
+    if (pitcherBtn) {
+      const playerId = Number(pitcherBtn.dataset.pitcherId);
+      if (!Number.isFinite(playerId) || playerId <= 0) return;
+      e.preventDefault();
+      e.stopPropagation();
+      openPlayerStatOverlay(playerId, buildLeaderOverlayGame({
+        playerId,
+        teamAbbrev: pitcherBtn.dataset.teamAbbrev || '',
+        gamePk: pitcherBtn.dataset.gamePk || '',
+      }));
+      return;
+    }
+    if (e.target.closest('.prediction-source-details')) return;
+    const detailCard = e.target.closest('[data-prediction-detail-id]');
+    if (detailCard) {
+      e.preventDefault();
+      e.stopPropagation();
+      openPredictionDetailDialog(predictionDetailPayloads.get(detailCard.dataset.predictionDetailId));
+      return;
+    }
+    const item = e.target.closest('.prediction-card[data-player-id]');
+    if (!item) return;
+    const playerId = Number(item.dataset.playerId);
+    if (!Number.isFinite(playerId) || playerId <= 0) return;
+    e.preventDefault();
+    e.stopPropagation();
+    openPlayerStatOverlay(playerId, buildLeaderOverlayGame({
+      playerId,
+      teamAbbrev: item.dataset.teamAbbrev || '',
+      gamePk: item.dataset.gamePk || '',
+    }));
   });
   leadersPageEl?.addEventListener('click', (e) => {
     const navBtn = e.target.closest('[data-leader-card-nav]');
@@ -13914,6 +14997,9 @@ function renderPitchingSide(sectionEl, teamCode, color, staff, game = null) {
   const current = staff?.current;
   if (currentEl) {
     currentEl.dataset.playerId = String(current?.id ?? '');
+    const side = sameTeamAbbrev(teamCode, game?.away) ? 'away' : sameTeamAbbrev(teamCode, game?.home) ? 'home' : '';
+    const starter = side ? starterFromPitchingHistory(game, side) : null;
+    const starterExited = Boolean(current && starter && Number(current?.id) !== Number(starter?.id) && current?.role !== 'starter');
     const currentLabel = current?.isPotentialStarter ? 'Potential Starter:' : current?.role === 'starter' ? 'Starter' : 'Current Pitcher';
     currentEl.innerHTML = current ? `
       <div class="pitching-card-label">${currentLabel}</div>
@@ -13921,6 +15007,7 @@ function renderPitchingSide(sectionEl, teamCode, color, staff, game = null) {
         <div class="pitching-card-name pitcher-priority-name" title="${escapeHtml(current.fullName || current.name || 'Pitcher')}" style="color:${color}">${lineupPitcherNameHtml(current)}</div>
         <div class="pitching-card-meta pitcher-priority-meta">${pitcherSeasonMetaLine(current)}</div>
       </div>
+      ${starterExited ? `<div class="pitcher-substitution-note">Starter ${escapeHtml(lastName(starter.fullName || starter.name || 'Pitcher'))} has exited</div>` : ''}
     ` : '<div class="pitching-card-empty">Awaiting pitcher</div>';
   }
 
@@ -14096,7 +15183,7 @@ function renderLineupPitcherSummary(containerEl, color, staff) {
     return;
   }
   const detailLine = showingCurrent && hasChangedPitcher
-    ? `<span class="lineup-team-pitcher-current">Starter: ${escapeHtml(lastName(starter?.fullName || starter?.name || 'Pitcher'))}</span>`
+    ? `<span class="lineup-team-pitcher-current is-subbed-out">Starter ${escapeHtml(lastName(starter?.fullName || starter?.name || 'Pitcher'))} exited</span>`
     : '';
   const label = displayPitcher?.isPotentialStarter ? 'Potential Starter:' : showingCurrent ? 'Current Pitcher' : 'Starter';
   containerEl.innerHTML = `
@@ -15814,9 +16901,41 @@ function lineupLooksAlphabetical(lineup = []) {
   return samePositions >= Math.max(5, names.length - 1);
 }
 
+function isUsableLineupCandidate(lineup = []) {
+  return Array.isArray(lineup) && lineup.length >= 9 && !lineupLooksAlphabetical(lineup);
+}
+
+function firstUsableLineup(promises = []) {
+  const pending = promises.filter(Boolean);
+  if (!pending.length) return Promise.resolve([]);
+  return new Promise((resolve) => {
+    let remaining = pending.length;
+    let resolved = false;
+    const settleEmpty = () => {
+      remaining -= 1;
+      if (!resolved && remaining <= 0) {
+        resolved = true;
+        resolve([]);
+      }
+    };
+    pending.forEach((promise) => {
+      Promise.resolve(promise).then((lineup) => {
+        if (resolved) return;
+        if (isUsableLineupCandidate(lineup)) {
+          resolved = true;
+          resolve(lineup);
+          return;
+        }
+        settleEmpty();
+      }, settleEmpty);
+    });
+  });
+}
+
 function hasTrustedLineupOrder(game, side) {
   const lineup = side === 'away' ? game?.lineup?.away : game?.lineup?.home;
   if (!Array.isArray(lineup) || !lineup.length) return false;
+  if (lineupHitterCount(normalizeLineupCollectionForSide(game, side, lineup)) < 9) return false;
   if (shouldPreferProbablePitcher(game) && lineupLooksAlphabetical(lineup)) return false;
   return true;
 }
@@ -15851,9 +16970,10 @@ function archivedFallbackLineup(game, side) {
     ? archived?.lineup?.away
     : archived?.lineup?.home;
   if (Array.isArray(archivedLineup) && archivedLineup.length) {
-    return (sanitizeStoredLineup({ [archivedSide]: archivedLineup })?.[archivedSide] || [])
+    const sanitized = (sanitizeStoredLineup({ [archivedSide]: archivedLineup })?.[archivedSide] || [])
       .map((entry) => entry?.substitutionStarter ? entry.substitutionStarter : entry)
       .map((entry) => ({ ...entry, substitutionStarter: null, today: '0-0', isActive: false, isNextUp: false }));
+    return isUsableLineupCandidate(sanitized) ? sanitized : [];
   }
   return [];
 }
@@ -15863,10 +16983,6 @@ function fallbackTeamLineupFromLookup(game, side) {
   const lineup = side === 'away' ? game?.lineup?.away : game?.lineup?.home;
   const bench = side === 'away' ? game?.lineup?.awayBench : game?.lineup?.homeBench;
   const archived = archivedFallbackLineup(game, side);
-  if (shouldPreferProbablePitcher(game) && archived.length) {
-    return normalizeLineupCollectionForSide(game, side, archived);
-  }
-
   if (Array.isArray(lineup) && lineup.length && hasTrustedLineupOrder(game, side)) {
     return normalizeLineupCollectionForSide(game, side, lineup);
   }
@@ -15937,6 +17053,104 @@ async function fetchTeamActiveRoster(teamAbbrev, game) {
   });
   teamActiveRosterCache.set(cacheKey, promise);
   return promise;
+}
+
+function lineupHitterCount(lineup = []) {
+  return (Array.isArray(lineup) ? lineup : [])
+    .filter((entry) => Number.isFinite(Number(entry?.id)) && Number(entry.id) > 0)
+    .filter((entry) => String(entry?.position || '').toUpperCase() !== 'P')
+    .length;
+}
+
+function lineupNeedsCompletion(lineup = []) {
+  return lineupHitterCount(lineup) < 9;
+}
+
+function fallbackLineupCandidateScore(entry = {}, profile = null) {
+  const batting = profile?.batting || entry?.batting || {};
+  const ops = Number(batting.ops);
+  const avg = Number(batting.avg);
+  const games = statNumber(batting.games ?? batting.gamesPlayed);
+  const atBats = statNumber(batting.atBats);
+  const position = String(profile?.position || entry?.position || '').toUpperCase();
+  const positionPenalty = position === 'C' ? 0.04 : 0;
+  return (Number.isFinite(ops) ? ops : Number.isFinite(avg) ? avg * 2 : 0)
+    + Math.min(games, 120) / 1000
+    + Math.min(atBats, 500) / 10000
+    - positionPenalty;
+}
+
+function fallbackLineupEntryFromProfile(profile = {}, slot = 1) {
+  return {
+    id: profile.id,
+    slot,
+    name: lastName(profile.fullName || profile.name || 'Unknown'),
+    fullName: profile.fullName || profile.name || 'Unknown',
+    position: profile.position || '',
+    bats: profile.bats || '',
+    throws: profile.throws || '',
+    avg: lineupAvgValue(profile, '---'),
+    today: normalizeLineupTodayValue(profile.todayBatting),
+    gameBatting: profile?.gameBatting || {},
+    batting: profile?.batting || {},
+    source: 'lineup-completion',
+  };
+}
+
+function renumberLineup(lineup = []) {
+  return (Array.isArray(lineup) ? lineup : []).slice(0, 9).map((entry, index) => ({
+    ...entry,
+    slot: index + 1,
+  }));
+}
+
+async function completeLineupToNine(game, side, lineup = []) {
+  if (!game) return lineup;
+  const team = side === 'away' ? game.away : game.home;
+  const seen = new Set();
+  const completed = [];
+  const addEntry = (entry) => {
+    const normalized = normalizeLineupEntryForSide(game, side, entry, completed.length + 1);
+    const id = Number(normalized?.id);
+    if (!Number.isFinite(id) || id <= 0 || seen.has(id)) return;
+    if (String(normalized?.position || '').toUpperCase() === 'P') return;
+    seen.add(id);
+    completed.push(normalized);
+  };
+
+  normalizeLineupCollectionForSide(game, side, lineup).forEach(addEntry);
+  if (completed.length >= 9) return renumberLineup(completed);
+
+  const bench = side === 'away' ? game?.lineup?.awayBench : game?.lineup?.homeBench;
+  normalizeLineupCollectionForSide(game, side, Array.isArray(bench) ? bench : []).forEach(addEntry);
+  if (completed.length >= 9) return renumberLineup(completed);
+
+  Object.values(game?.playerLookup || {})
+    .filter((profile) => sameTeamAbbrev(profile?.teamAbbrev, team))
+    .filter((profile) => String(profile?.position || '').toUpperCase() !== 'P')
+    .sort((a, b) => fallbackLineupCandidateScore(b) - fallbackLineupCandidateScore(a)
+      || String(a?.fullName || '').localeCompare(String(b?.fullName || '')))
+    .forEach((profile) => addEntry(fallbackLineupEntryFromProfile(profile, completed.length + 1)));
+  if (completed.length >= 9) return renumberLineup(completed);
+
+  const roster = await fetchTeamActiveRoster(team, game).catch(() => []);
+  roster
+    .filter((player) => String(player?.position || '').toUpperCase() !== 'P')
+    .sort((a, b) => {
+      const aProfile = game?.playerLookup?.[String(a?.id)] || null;
+      const bProfile = game?.playerLookup?.[String(b?.id)] || null;
+      return fallbackLineupCandidateScore(b, bProfile) - fallbackLineupCandidateScore(a, aProfile);
+    })
+    .forEach((player) => addEntry({
+      id: player.id,
+      fullName: player.fullName,
+      name: lastName(player.fullName),
+      position: player.position,
+      today: '0-0',
+      source: 'active-roster-completion',
+    }));
+
+  return renumberLineup(completed);
 }
 
 function injuryTimeText(entry, rosterType) {
@@ -16207,6 +17421,12 @@ function setLineupListRefreshing(listEl, refreshing = false) {
   }
 }
 
+function setLineupListLoadingFallback(listEl, loading = false) {
+  if (!listEl) return;
+  if (loading) listEl.dataset.lineupLoadingFallback = 'true';
+  else delete listEl.dataset.lineupLoadingFallback;
+}
+
 function preserveLineupTextDuringRefresh(listEl, teamCode = '', renderFallback) {
   const sameTeam = !teamCode || String(listEl?.dataset?.teamCode || '') === String(teamCode || '');
   if (sameTeam && lineupListHasRows(listEl)) {
@@ -16274,6 +17494,33 @@ async function syncLineupOverlay(game, options = {}) {
   if (awayRosterPanel) awayRosterPanel.style.setProperty('--team-logo-bg', `url("${game.awayLogo}")`);
   if (homeRosterPanel) homeRosterPanel.style.setProperty('--team-logo-bg', `url("${game.homeLogo}")`);
 
+  const awayLineupListEl = lineupOverlayEl.querySelector('.away-lineup-list');
+  const homeLineupListEl = lineupOverlayEl.querySelector('.home-lineup-list');
+  const awayHasConfirmedLineup = hasTrustedLineupOrder(game, 'away');
+  const homeHasConfirmedLineup = hasTrustedLineupOrder(game, 'home');
+  let awayDisplayLineup = fallbackTeamLineupFromLookup(game, 'away');
+  let homeDisplayLineup = fallbackTeamLineupFromLookup(game, 'home');
+  const remoteAwayLineupPromise = awayHasConfirmedLineup
+    ? Promise.resolve(awayDisplayLineup)
+    : fetchMlbStartingLineupFallback(game, 'away').catch(() => []);
+  const remoteHomeLineupPromise = homeHasConfirmedLineup
+    ? Promise.resolve(homeDisplayLineup)
+    : fetchMlbStartingLineupFallback(game, 'home').catch(() => []);
+  const awayInitialComplete = !lineupNeedsCompletion(awayDisplayLineup);
+  const homeInitialComplete = !lineupNeedsCompletion(homeDisplayLineup);
+  setLineupListLoadingFallback(awayLineupListEl, !awayHasConfirmedLineup && !awayInitialComplete);
+  setLineupListLoadingFallback(homeLineupListEl, !homeHasConfirmedLineup && !homeInitialComplete);
+  preserveLineupTextDuringRefresh(
+    awayLineupListEl,
+    game.away,
+    () => renderLineupList(awayLineupListEl, awayInitialComplete ? awayDisplayLineup : [], game.awayColor, game.away, new Set(), new Set(), new Map(), new Map(), new Map(), new Map(), new Map(), new Map()),
+  );
+  preserveLineupTextDuringRefresh(
+    homeLineupListEl,
+    game.home,
+    () => renderLineupList(homeLineupListEl, homeInitialComplete ? homeDisplayLineup : [], game.homeColor, game.home, new Set(), new Set(), new Map(), new Map(), new Map(), new Map(), new Map(), new Map()),
+  );
+
   const freshPitchers = await resolveFreshLineupPitchers(game);
   if (shouldPreferProbablePitcher(game)) {
     game.pitching = game.pitching || emptyPitchingData();
@@ -16308,64 +17555,56 @@ async function syncLineupOverlay(game, options = {}) {
   renderLineupPitcherSummary(awayPitcherSummaryEl, game.awayColor, awayPitcherSummary);
   renderLineupPitcherSummary(homePitcherSummaryEl, game.homeColor, homePitcherSummary);
   syncLineupGamePickState(game);
-  const awayLineupListEl = lineupOverlayEl.querySelector('.away-lineup-list');
-  const homeLineupListEl = lineupOverlayEl.querySelector('.home-lineup-list');
-  const awayHasConfirmedLineup = hasTrustedLineupOrder(game, 'away');
-  const homeHasConfirmedLineup = hasTrustedLineupOrder(game, 'home');
-  let awayDisplayLineup = awayHasConfirmedLineup ? fallbackTeamLineupFromLookup(game, 'away') : [];
-  let homeDisplayLineup = homeHasConfirmedLineup ? fallbackTeamLineupFromLookup(game, 'home') : [];
-  preserveLineupTextDuringRefresh(
-    awayLineupListEl,
-    game.away,
-    () => renderLineupList(awayLineupListEl, awayDisplayLineup, game.awayColor, game.away, new Set(), new Set(), new Map(), new Map(), new Map(), new Map(), new Map(), new Map()),
-  );
-  preserveLineupTextDuringRefresh(
-    homeLineupListEl,
-    game.home,
-    () => renderLineupList(homeLineupListEl, homeDisplayLineup, game.homeColor, game.home, new Set(), new Set(), new Map(), new Map(), new Map(), new Map(), new Map(), new Map()),
-  );
   const [remoteAwayLineup, remoteHomeLineup] = await Promise.all([
-    awayHasConfirmedLineup ? Promise.resolve(awayDisplayLineup) : fetchMlbStartingLineupFallback(game, 'away').catch(() => []),
-    homeHasConfirmedLineup ? Promise.resolve(homeDisplayLineup) : fetchMlbStartingLineupFallback(game, 'home').catch(() => []),
+    remoteAwayLineupPromise,
+    remoteHomeLineupPromise,
   ]);
+  setLineupListLoadingFallback(awayLineupListEl, false);
+  setLineupListLoadingFallback(homeLineupListEl, false);
   if (!awayHasConfirmedLineup) {
     awayDisplayLineup = normalizeLineupCollectionForSide(game, 'away', remoteAwayLineup) || [];
   }
   if (!homeHasConfirmedLineup) {
     homeDisplayLineup = normalizeLineupCollectionForSide(game, 'home', remoteHomeLineup) || [];
   }
-  if (!awayDisplayLineup.length) {
-    awayDisplayLineup = fallbackTeamLineupFromLookup(game, 'away');
-  }
-  if (!homeDisplayLineup.length) {
-    homeDisplayLineup = fallbackTeamLineupFromLookup(game, 'home');
-  }
+  if (!awayDisplayLineup.length) awayDisplayLineup = fallbackTeamLineupFromLookup(game, 'away');
+  if (!homeDisplayLineup.length) homeDisplayLineup = fallbackTeamLineupFromLookup(game, 'home');
+  [awayDisplayLineup, homeDisplayLineup] = await Promise.all([
+    completeLineupToNine(game, 'away', awayDisplayLineup),
+    completeLineupToNine(game, 'home', homeDisplayLineup),
+  ]);
   [awayDisplayLineup, homeDisplayLineup] = await Promise.all([
     !awayHasConfirmedLineup ? enrichFallbackLineupDisplay(game, 'away', awayDisplayLineup) : Promise.resolve(awayDisplayLineup),
     !homeHasConfirmedLineup ? enrichFallbackLineupDisplay(game, 'home', homeDisplayLineup) : Promise.resolve(homeDisplayLineup),
   ]);
-  if (!awayHasConfirmedLineup && awayDisplayLineup.length) {
+  const awayLineupReady = !lineupNeedsCompletion(awayDisplayLineup);
+  const homeLineupReady = !lineupNeedsCompletion(homeDisplayLineup);
+  setLineupListLoadingFallback(awayLineupListEl, !awayLineupReady);
+  setLineupListLoadingFallback(homeLineupListEl, !homeLineupReady);
+  const awayRenderLineup = awayLineupReady ? awayDisplayLineup : [];
+  const homeRenderLineup = homeLineupReady ? homeDisplayLineup : [];
+  if (!awayHasConfirmedLineup && awayLineupReady) {
     game.previewLineupFallback = { ...(game.previewLineupFallback || {}), away: awayDisplayLineup };
   }
-  if (!homeHasConfirmedLineup && homeDisplayLineup.length) {
+  if (!homeHasConfirmedLineup && homeLineupReady) {
     game.previewLineupFallback = { ...(game.previewLineupFallback || {}), home: homeDisplayLineup };
   }
-  const recentBattingStatsPromise = getLineupRecentBattingStatsMap(game, [awayDisplayLineup, homeDisplayLineup], lineupStatGameWindow).catch(() => new Map());
+  const recentBattingStatsPromise = getLineupRecentBattingStatsMap(game, [awayRenderLineup, homeRenderLineup], lineupStatGameWindow).catch(() => new Map());
   if (lineupListNeedsInterimPaint(awayLineupListEl, game.away)) {
-    renderLineupList(awayLineupListEl, awayDisplayLineup, game.awayColor, game.away, new Set(), new Set(), new Map(), new Map(), new Map(), new Map(), new Map(), new Map());
+    renderLineupList(awayLineupListEl, awayRenderLineup, game.awayColor, game.away, new Set(), new Set(), new Map(), new Map(), new Map(), new Map(), new Map(), new Map());
   } else {
     setLineupListRefreshing(awayLineupListEl, true);
   }
   if (lineupListNeedsInterimPaint(homeLineupListEl, game.home)) {
-    renderLineupList(homeLineupListEl, homeDisplayLineup, game.homeColor, game.home, new Set(), new Set(), new Map(), new Map(), new Map(), new Map(), new Map(), new Map());
+    renderLineupList(homeLineupListEl, homeRenderLineup, game.homeColor, game.home, new Set(), new Set(), new Map(), new Map(), new Map(), new Map(), new Map(), new Map());
   } else {
     setLineupListRefreshing(homeLineupListEl, true);
   }
   renderPitchingSide(lineupOverlayEl.querySelector('.away-pitching'), game.away, game.awayColor, awayPitchingDisplay, game);
   renderPitchingSide(lineupOverlayEl.querySelector('.home-pitching'), game.home, game.homeColor, homePitchingDisplay, game);
   Promise.all([
-    hydrateRosterSide(awayRosterPanel, game, 'away', awayDisplayLineup),
-    hydrateRosterSide(homeRosterPanel, game, 'home', homeDisplayLineup),
+    hydrateRosterSide(awayRosterPanel, game, 'away', awayRenderLineup),
+    hydrateRosterSide(homeRosterPanel, game, 'home', homeRenderLineup),
   ]).catch(() => {});
   hydratePitcherFireStreaks(lineupOverlayEl);
   hydratePitcherColdStreaks(lineupOverlayEl);
@@ -16393,17 +17632,17 @@ async function syncLineupOverlay(game, options = {}) {
     renderLineupStatusBadges(awayLineupStreakEl, game.awayStreak, formatLineupTeamStatus(game.awayLastSevenRecord, game.awaySeasonStats));
     renderLineupStatusBadges(homeLineupStreakEl, game.homeStreak, formatLineupTeamStatus(game.homeLastSevenRecord, game.homeSeasonStats));
     const [awaySplitFlagMap, homeSplitFlagMap] = await Promise.all([
-      handedSplitFlagMapForLineup(game, 'away', awayDisplayLineup).catch(() => new Map()),
-      handedSplitFlagMapForLineup(game, 'home', homeDisplayLineup).catch(() => new Map()),
+      handedSplitFlagMapForLineup(game, 'away', awayRenderLineup).catch(() => new Map()),
+      handedSplitFlagMapForLineup(game, 'home', homeRenderLineup).catch(() => new Map()),
     ]);
     const [awayEliteMatchupMap, homeEliteMatchupMap, awayDueBadgeMap, homeDueBadgeMap] = await Promise.all([
-      eliteMatchupMapForLineup(game, 'away', awayDisplayLineup, batterBadgeMap).catch(() => new Map()),
-      eliteMatchupMapForLineup(game, 'home', homeDisplayLineup, batterBadgeMap).catch(() => new Map()),
-      getLineupHomeRunDueBadgeMap(game, [awayDisplayLineup]).catch(() => new Map()),
-      getLineupHomeRunDueBadgeMap(game, [homeDisplayLineup]).catch(() => new Map()),
+      eliteMatchupMapForLineup(game, 'away', awayRenderLineup, batterBadgeMap).catch(() => new Map()),
+      eliteMatchupMapForLineup(game, 'home', homeRenderLineup, batterBadgeMap).catch(() => new Map()),
+      getLineupHomeRunDueBadgeMap(game, [awayRenderLineup]).catch(() => new Map()),
+      getLineupHomeRunDueBadgeMap(game, [homeRenderLineup]).catch(() => new Map()),
     ]);
-    renderLineupList(awayLineupListEl, awayDisplayLineup, game.awayColor, game.away, hotPlayerIds, coldPlayerIds, hitStreakMap, batterBadgeMap, recentBattingStatsMap, awaySplitFlagMap, awayEliteMatchupMap, awayDueBadgeMap);
-    renderLineupList(homeLineupListEl, homeDisplayLineup, game.homeColor, game.home, hotPlayerIds, coldPlayerIds, hitStreakMap, batterBadgeMap, recentBattingStatsMap, homeSplitFlagMap, homeEliteMatchupMap, homeDueBadgeMap);
+    renderLineupList(awayLineupListEl, awayRenderLineup, game.awayColor, game.away, hotPlayerIds, coldPlayerIds, hitStreakMap, batterBadgeMap, recentBattingStatsMap, awaySplitFlagMap, awayEliteMatchupMap, awayDueBadgeMap);
+    renderLineupList(homeLineupListEl, homeRenderLineup, game.homeColor, game.home, hotPlayerIds, coldPlayerIds, hitStreakMap, batterBadgeMap, recentBattingStatsMap, homeSplitFlagMap, homeEliteMatchupMap, homeDueBadgeMap);
   } catch {
     setLineupListRefreshing(awayLineupListEl, false);
     setLineupListRefreshing(homeLineupListEl, false);
@@ -16666,33 +17905,36 @@ function initLineupOverlay() {
 function renderLineupList(listEl, lineup, color, teamCode = '', hotPlayerIds = new Set(), coldPlayerIds = new Set(), hitStreakMap = new Map(), batterBadgeMap = new Map(), recentStatsMap = new Map(), handedSplitFlagMap = new Map(), eliteMatchupMap = new Map(), dueBadgeMap = new Map()) {
   if (!listEl) return;
   listEl.dataset.teamCode = String(teamCode || '');
-  const fingerprint = JSON.stringify((lineup || []).map((entry) => {
-    const id = String(entry?.id || '');
-    const recent = recentStatsMap?.get?.(id) || null;
-    const badges = batterBadgeMap?.get?.(id) || null;
-    return [
-      id,
-      entry?.slot,
-      entry?.name,
-      entry?.position,
-      entry?.avg,
-      entry?.today,
-      entry?.isActive ? 1 : 0,
-      entry?.isNextUp ? 1 : 0,
-      hotPlayerIds?.has?.(id) ? 1 : 0,
-      coldPlayerIds?.has?.(id) ? 1 : 0,
-      hitStreakMap?.get?.(id) || 0,
-      badges?.avgBurst ? 1 : 0,
-      badges?.powerBurst ? 1 : 0,
-      badges?.slugBurst ? 1 : 0,
-      handedSplitFlagMap?.get?.(id) || '',
-      eliteMatchupMap?.get?.(id) || '',
-      dueBadgeMap?.get?.(id)?.hr || '',
-      dueBadgeMap?.get?.(id)?.xbh || '',
-      recent ? `${recent.atBats}:${recent.hits}:${recent.avg}:${recent.extraBaseHits}:${recent.homeRuns}:${recent.walks}:${recent.strikeOuts}` : '',
-      entry?.substitutionStarter ? `${entry.substitutionStarter.id}:${entry.substitutionStarter.fullName}:${entry.substitutionStarter.today}` : '',
-    ];
-  }));
+  const fingerprint = JSON.stringify({
+    loadingFallback: listEl.dataset.lineupLoadingFallback === 'true',
+    rows: (lineup || []).map((entry) => {
+      const id = String(entry?.id || '');
+      const recent = recentStatsMap?.get?.(id) || null;
+      const badges = batterBadgeMap?.get?.(id) || null;
+      return [
+        id,
+        entry?.slot,
+        entry?.name,
+        entry?.position,
+        entry?.avg,
+        entry?.today,
+        entry?.isActive ? 1 : 0,
+        entry?.isNextUp ? 1 : 0,
+        hotPlayerIds?.has?.(id) ? 1 : 0,
+        coldPlayerIds?.has?.(id) ? 1 : 0,
+        hitStreakMap?.get?.(id) || 0,
+        badges?.avgBurst ? 1 : 0,
+        badges?.powerBurst ? 1 : 0,
+        badges?.slugBurst ? 1 : 0,
+        handedSplitFlagMap?.get?.(id) || '',
+        eliteMatchupMap?.get?.(id) || '',
+        dueBadgeMap?.get?.(id)?.hr || '',
+        dueBadgeMap?.get?.(id)?.xbh || '',
+        recent ? `${recent.atBats}:${recent.hits}:${recent.avg}:${recent.extraBaseHits}:${recent.homeRuns}:${recent.walks}:${recent.strikeOuts}` : '',
+        entry?.substitutionStarter ? `${entry.substitutionStarter.id}:${entry.substitutionStarter.fullName}:${entry.substitutionStarter.today}` : '',
+      ];
+    }),
+  });
   if (listEl.dataset.renderFingerprint === fingerprint) {
     setLineupListRefreshing(listEl, false);
     return;
@@ -16703,7 +17945,9 @@ function renderLineupList(listEl, lineup, color, teamCode = '', hotPlayerIds = n
   if (!lineup?.length) {
     const empty = document.createElement('div');
     empty.className = 'lineup-empty';
-    empty.textContent = 'Previous lineup unavailable';
+    empty.textContent = listEl.dataset.lineupLoadingFallback === 'true'
+      ? 'Loading previous lineup...'
+      : 'Previous lineup unavailable';
     listEl.appendChild(empty);
     return;
   }
@@ -17176,6 +18420,7 @@ async function finalizeRenderedGames(cards, homeRuns = []) {
   if (currentOverlayPage === 'leaders') await refreshLeadersView({ showLoading: false });
   if (currentOverlayPage === 'hot') await refreshHotView({ showLoading: false });
   if (currentOverlayPage === 'teamStats') await refreshTeamStatsView({ showLoading: false });
+  if (currentOverlayPage === 'predictions') await refreshPredictionsView({ showLoading: false });
   if (currentOverlayPage === 'hrLeaderboard') refreshHrLeaderboardView();
 }
 
@@ -17215,6 +18460,7 @@ async function renderGamesEmptyState(message) {
     if (currentOverlayPage === 'leaders') await refreshLeadersView({ showLoading: false });
     if (currentOverlayPage === 'hot') await refreshHotView({ showLoading: false });
     if (currentOverlayPage === 'teamStats') await refreshTeamStatsView({ showLoading: false });
+    if (currentOverlayPage === 'predictions') await refreshPredictionsView({ showLoading: false });
     if (currentOverlayPage === 'hrLeaderboard') refreshHrLeaderboardView();
 }
 
