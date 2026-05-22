@@ -20893,9 +20893,23 @@ function playerStatHeatMapSplitRows(row = {}) {
     </div>`;
   return `<div class="player-heatmap-metric-table player-heatmap-split-table">
     <div class="player-heatmap-metric-row header"><span>Split</span><b>PA</b><b>AVG</b><b>SLG</b><b>ISO</b><b>HR</b><b>XBH</b></div>
-    ${split('Vs LHP', 'lhp')}
-    ${split('Vs RHP', 'rhp')}
+    ${split('vL', 'lhp')}
+    ${split('vR', 'rhp')}
   </div>`;
+}
+
+function playerStatHeatMapPitchLabel(pitch = '') {
+  return ({
+    fastball: 'FB',
+    sinker: 'SNK',
+    cutter: 'CUT',
+    slider: 'SL',
+    sweeper: 'SWP',
+    curveball: 'CB',
+    changeup: 'CH',
+    splitter: 'SPL',
+    knuckle_curve: 'KC',
+  })[pitch] || String(pitch).replace(/_/g, ' ').toUpperCase();
 }
 
 function playerStatHeatMapPitchList(row = {}) {
@@ -20913,7 +20927,7 @@ function playerStatHeatMapPitchRows(row = {}, side = 'batter') {
   const pitchList = playerStatHeatMapPitchList(row);
   const usablePitches = pitchList.length ? pitchList : PLAYER_HEATMAP_PITCHES;
   for (const pitch of usablePitches) {
-    const label = pitch.replace(/_/g, ' ');
+    const label = playerStatHeatMapPitchLabel(pitch);
     if (side === 'pitcher') {
       const usage = Number(row[`pitcher_${pitch}_usage_pct`]);
       if (!Number.isFinite(usage) || usage <= 0.05) continue;
@@ -20967,7 +20981,7 @@ function renderPlayerStatHeatMapSnakeCalendar(group, selectedDate = '') {
         <span>Snake rows by sevens</span>
       </div>
       <div class="player-heatmap-snake-wrap">
-        <div class="player-heatmap-snake-grid" style="grid-template-rows:repeat(${rowsNeeded}, 36px);">${cells}</div>
+        <div class="player-heatmap-snake-grid" style="grid-template-rows:repeat(${rowsNeeded}, 30px);">${cells}</div>
       </div>
       <div class="player-heatmap-snake-legend">
         <span>0 TB</span><i data-heat-level="0"></i><i data-heat-level="1"></i><i data-heat-level="2"></i><i data-heat-level="3"></i><i data-heat-level="4"></i><i data-heat-level="5"></i><span>6+ TB</span><strong>* HR</strong><strong>H/A</strong><strong>L/R</strong>
@@ -21074,18 +21088,18 @@ function renderPlayerStatHeatMapHtml(profile, game, group, row) {
           <b>${escapeHtml(playerLine)}</b>
         </section>
         ${playerHeatMapMetricTable('Player Card Stats', [
-          ['Games', totals.games],
-          ['Hit Rate / Game', playerStatHeatMapRate(group.rows.filter((item) => playerHeatMapOutcome(item).hits > 0).length, totals.games)],
+          ['G', totals.games],
+          ['H/G', playerStatHeatMapRate(group.rows.filter((item) => playerHeatMapOutcome(item).hits > 0).length, totals.games)],
           ['H / AB', `${totals.hits}-${totals.atBats}`],
           ['AVG', playerStatHeatMapDecimal(totals.hits, totals.atBats)],
-          ['TB / Game', totals.games ? (totals.tb / totals.games).toFixed(2) : '--'],
-          ['2+ TB Rate', playerStatHeatMapRate(totals.twoTb, totals.games)],
+          ['TB/G', totals.games ? (totals.tb / totals.games).toFixed(2) : '--'],
+          ['2TB%', playerStatHeatMapRate(totals.twoTb, totals.games)],
           ['HR', totals.hr],
-          ['Season AVG', row.season_avg || '--'],
-          ['Season SLG', row.season_slg || '--'],
-          ['Season OPS', row.season_ops || '--'],
-          ['Season ISO', row.season_iso || '--'],
-          ['HR Rate', row.season_hr_rate || '--'],
+          ['sAVG', row.season_avg || '--'],
+          ['sSLG', row.season_slg || '--'],
+          ['sOPS', row.season_ops || '--'],
+          ['sISO', row.season_iso || '--'],
+          ['HR%', row.season_hr_rate || '--'],
         ])}
         ${playerStatHeatMapTable('Handedness Splits', playerStatHeatMapSplitRows(row))}
         ${playerStatHeatMapTable('Batter Pitch Breakdown', playerStatHeatMapPitchRows(row, 'batter'))}
@@ -21093,22 +21107,22 @@ function renderPlayerStatHeatMapHtml(profile, game, group, row) {
       <main class="player-stat-heatmap-main">
         <header>
           <strong>Total Bases Heat</strong>
-          <span>${escapeHtml(`${selectedDate || '--'} | ${playerHeatMapSource || PLAYER_HEATMAP_DEFAULT_CSV}`)}</span>
+          <span>${escapeHtml(selectedDate || '--')}</span>
         </header>
         ${renderPlayerStatHeatMapSnakeCalendar(group, selectedDate)}
         ${playerHeatMapMetricTable('Matchup / Weather', [
-          ['Starter Hand', row.starter_hand || '--'],
-          [`Vs ${row.starter_hand || '?'}HP ISO`, row.batter_vs_hand_iso || '--'],
-          [`Vs ${row.starter_hand || '?'}HP SLG`, row.batter_vs_hand_slg || '--'],
-          [`Vs ${row.starter_hand || '?'}HP OPS`, row.batter_vs_hand_ops || '--'],
-          ['Regressed ISO', row.regressed_vs_hand_iso || '--'],
-          ['Split Adj', row.split_adjustment || '--'],
-          ['Same Hand Penalty', row.same_hand_penalty || '--'],
-          ['Weather Source', row.weather_source || '--'],
+          ['TH', row.starter_hand || '--'],
+          [`v${row.starter_hand || '?'} ISO`, row.batter_vs_hand_iso || '--'],
+          [`v${row.starter_hand || '?'} SLG`, row.batter_vs_hand_slg || '--'],
+          [`v${row.starter_hand || '?'} OPS`, row.batter_vs_hand_ops || '--'],
+          ['rISO', row.regressed_vs_hand_iso || '--'],
+          ['Spl+', row.split_adjustment || '--'],
+          ['SH Pen', row.same_hand_penalty || '--'],
+          ['Wx Src', row.weather_source || '--'],
           ['Temp', row.temperature_f || row.weather_temp || '--'],
-          ['Wind MPH', row.wind_speed_mph || row.wind_speed || '--'],
-          ['HR Weather Score', row.hr_weather_score || '--'],
-          ['Stadium', row.stadium || '--'],
+          ['Wind', row.wind_speed_mph || row.wind_speed || '--'],
+          ['Wx HR', row.hr_weather_score || '--'],
+          ['Park', row.stadium || '--'],
         ])}
       </main>
       <aside class="player-stat-heatmap-stack player-stat-heatmap-pitcher">
@@ -21130,23 +21144,12 @@ function renderPlayerStatHeatMapHtml(profile, game, group, row) {
           ['SLG', row.pitcher_slg_allowed || '--'],
         ])}
         ${playerHeatMapMetricTable('Pitcher Handedness Splits', [
-          [`Vs ${group.hand || '?'}HH AVG`, row.pitcher_hand_avg || '--'],
-          [`Vs ${group.hand || '?'}HH SLG`, row.pitcher_hand_slg || '--'],
-          [`Vs ${group.hand || '?'}HH HR`, row.pitcher_hand_hr || '--'],
-          [`Vs ${group.hand || '?'}HH K`, row.pitcher_hand_k || '--'],
+          [`v${group.hand || '?'} AVG`, row.pitcher_hand_avg || '--'],
+          [`v${group.hand || '?'} SLG`, row.pitcher_hand_slg || '--'],
+          [`v${group.hand || '?'} HR`, row.pitcher_hand_hr || '--'],
+          [`v${group.hand || '?'} K`, row.pitcher_hand_k || '--'],
           ['Weakness', row.pitcher_weakness || '--'],
-          ['Vulnerability', row.pitcher_vs_hand_vulnerability_flag || '--'],
-        ])}
-        ${playerHeatMapMetricTable('Pitch Arsenal Summary', [
-          ['Best Pitch', row.best_pitch_family || '--'],
-          ['Usage', row.best_pitch_family_usage_pct || '--'],
-          ['Batter HR Rate', row.best_pitch_family_batter_hr_rate || '--'],
-          ['Batter SLG', row.best_pitch_family_batter_slg || '--'],
-          ['Batter ISO', row.best_pitch_family_batter_iso || '--'],
-          ['Pitcher HR Rate', row.best_pitch_family_pitcher_hr_allowed_rate || '--'],
-          ['Pitcher SLG', row.best_pitch_family_pitcher_slg_allowed || '--'],
-          ['Advantage', row.best_pitch_family_advantage_score || '--'],
-          ['K Risk', row.worst_pitch_family_k_risk_score || row.k_risk || '--'],
+          ['Vuln', row.pitcher_vs_hand_vulnerability_flag || '--'],
         ])}
         ${playerStatHeatMapTable('Pitcher Pitch Breakdown', playerStatHeatMapPitchRows(row, 'pitcher'))}
       </aside>
