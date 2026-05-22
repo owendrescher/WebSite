@@ -1607,3 +1607,44 @@ body.dashboard-page .lineup-pos {
     min-height: 0;
   }
 }
+
+body.dashboard-page .player-stat-modal {
+  grid-template-rows: auto auto minmax(0, 1fr) auto;
+}
+
+body.dashboard-page .player-stat-heatmap {
+  min-height: 0;
+  overflow: auto;
+}
+
+@media (max-width: 720px), (max-height: 430px) and (orientation: landscape) {
+  body.dashboard-page .player-stat-overlay,
+  body.dashboard-page[data-overlay-dock='top'] .player-stat-overlay,
+  body.dashboard-page[data-overlay-dock='bottom'] .player-stat-overlay {
+    place-items: center;
+    padding: max(4px, env(safe-area-inset-top)) max(4px, env(safe-area-inset-right)) max(4px, env(safe-area-inset-bottom)) max(4px, env(safe-area-inset-left));
+    overflow: hidden;
+  }
+
+  body.dashboard-page .player-stat-modal {
+    width: calc(100dvw - 8px);
+    height: calc(100dvh - 8px);
+    max-width: calc(100dvw - 8px);
+    max-height: calc(100dvh - 8px);
+    overflow: hidden;
+    grid-template-rows: auto auto minmax(0, 1fr) auto;
+  }
+
+  body.dashboard-page .player-stat-modal > :not(.player-stat-header):not(.player-stat-heatmap) {
+    overflow: hidden;
+  }
+
+  body.dashboard-page .player-stat-body {
+    overflow-y: auto;
+    overflow-x: hidden;
+  }
+
+  body.dashboard-page .player-stat-heatmap {
+    overflow: auto;
+  }
+}

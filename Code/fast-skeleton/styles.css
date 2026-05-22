@@ -3660,8 +3660,8 @@ body[data-overlay-dock='bottom'] .player-stat-overlay {
 
 .player-stat-heatmap-grid {
   display: grid;
-  grid-template-columns: minmax(190px, 0.74fr) minmax(330px, 1.28fr) minmax(210px, 0.82fr);
-  gap: 7px;
+  grid-template-columns: minmax(150px, 0.7fr) minmax(280px, 1.35fr) minmax(165px, 0.78fr);
+  gap: 5px;
   min-height: 100%;
   align-items: start;
 }
@@ -3675,8 +3675,8 @@ body[data-overlay-dock='bottom'] .player-stat-overlay {
 .player-stat-heatmap-main {
   display: grid;
   align-content: start;
-  gap: 6px;
-  padding: 7px;
+  gap: 5px;
+  padding: 5px;
   border: 1px solid color-mix(in srgb, var(--line) 65%, transparent);
   border-radius: 7px;
   background: color-mix(in srgb, var(--panel-item) 70%, transparent);
@@ -3702,14 +3702,14 @@ body[data-overlay-dock='bottom'] .player-stat-overlay {
 .player-stat-heatmap-stack {
   display: grid;
   align-content: start;
-  gap: 6px;
+  gap: 5px;
 }
 
 .player-stat-heatmap-identity {
   display: grid;
-  grid-template-columns: 68px minmax(0, 1fr);
-  gap: 7px;
-  padding: 7px;
+  grid-template-columns: 58px minmax(0, 1fr);
+  gap: 6px;
+  padding: 5px;
   border: 1px solid color-mix(in srgb, var(--line) 65%, transparent);
   border-radius: 7px;
   background:
@@ -3719,8 +3719,8 @@ body[data-overlay-dock='bottom'] .player-stat-overlay {
 
 .player-stat-heatmap-identity img {
   grid-row: span 2;
-  width: 68px;
-  height: 82px;
+  width: 58px;
+  height: 72px;
   object-fit: cover;
   border-radius: 7px;
   border: 1px solid color-mix(in srgb, var(--line) 70%, transparent);
@@ -3736,7 +3736,7 @@ body[data-overlay-dock='bottom'] .player-stat-overlay {
 
 .player-stat-heatmap-identity strong {
   color: var(--badge-text);
-  font: 900 0.76rem/1.05 var(--font-ui);
+  font: 900 0.66rem/1.05 var(--font-ui);
   overflow-wrap: anywhere;
 }
 
@@ -3755,7 +3755,7 @@ body[data-overlay-dock='bottom'] .player-stat-overlay {
   border: 1px solid color-mix(in srgb, var(--line) 45%, transparent);
   border-radius: 6px;
   background: color-mix(in srgb, var(--panel-bg) 68%, transparent);
-  font-size: 0.58rem;
+  font-size: 0.54rem;
   line-height: 1.2;
 }
 
@@ -3771,7 +3771,7 @@ body[data-overlay-dock='bottom'] .player-stat-overlay {
 
 .player-heatmap-calendar-shell {
   min-width: 0;
-  padding: 7px;
+  padding: 5px;
   border: 1px solid color-mix(in srgb, var(--accent) 18%, transparent);
   border-radius: 7px;
   background:
@@ -3808,8 +3808,8 @@ body[data-overlay-dock='bottom'] .player-stat-overlay {
 
 .player-heatmap-snake-grid {
   display: grid;
-  grid-template-columns: repeat(7, 50px);
-  gap: 4px;
+  grid-template-columns: repeat(7, 36px);
+  gap: 3px;
   min-width: max-content;
 }
 
@@ -3819,14 +3819,14 @@ body[data-overlay-dock='bottom'] .player-stat-overlay {
   grid-template-rows: auto 1fr auto;
   align-items: center;
   justify-items: center;
-  width: 50px;
-  height: 50px;
+  width: 36px;
+  height: 36px;
   border: 1px solid color-mix(in srgb, white 12%, transparent);
   border-radius: 6px;
   padding: 3px;
   background: color-mix(in srgb, var(--panel-item) 86%, white 3%);
   color: color-mix(in srgb, var(--text) 86%, transparent);
-  font: 900 0.56rem/1 var(--font-ui);
+  font: 900 0.45rem/1 var(--font-ui);
   cursor: pointer;
 }
 
@@ -3853,25 +3853,25 @@ body[data-overlay-dock='bottom'] .player-stat-overlay {
 }
 
 .player-heatmap-snake-cell .day-tb {
-  font-size: 0.86rem;
+  font-size: 0.74rem;
 }
 
 .player-heatmap-snake-cell .day-line {
-  font-size: 0.52rem;
+  font-size: 0.46rem;
   opacity: 0.9;
 }
 
 .venue-chip,
 .pitcher-hand-chip {
   position: absolute;
-  min-width: 13px;
-  height: 13px;
+  min-width: 11px;
+  height: 11px;
   display: grid;
   place-items: center;
   border-radius: 3px;
   background: rgba(3, 12, 20, 0.72);
   color: #eaf8ff;
-  font-size: 0.46rem;
+  font-size: 0.4rem;
   line-height: 1;
   border: 1px solid rgba(255,255,255,0.18);
 }
@@ -3891,7 +3891,7 @@ body[data-overlay-dock='bottom'] .player-stat-overlay {
   left: 3px;
   bottom: 1px;
   color: #fff7b2;
-  font-size: 0.9rem;
+  font-size: 0.78rem;
   line-height: 1;
   text-shadow: 0 1px 2px rgba(0,0,0,0.82);
 }
@@ -3989,7 +3989,7 @@ body[data-overlay-dock='bottom'] .player-stat-overlay {
 
 .player-stat-heatmap .player-heatmap-table-panel {
   border-radius: 7px;
-  padding: 6px;
+  padding: 5px;
 }
 
 .player-stat-heatmap .player-heatmap-table-panel h3 {
@@ -4002,17 +4002,17 @@ body[data-overlay-dock='bottom'] .player-stat-overlay {
 }
 
 .player-stat-heatmap .player-heatmap-mini-row {
-  min-height: 20px;
-  padding: 2px 6px;
+  min-height: 18px;
+  padding: 1px 5px;
   border-radius: 5px;
 }
 
 .player-stat-heatmap .player-heatmap-mini-row span {
-  font-size: 0.5rem;
+  font-size: 0.46rem;
 }
 
 .player-stat-heatmap .player-heatmap-mini-row b {
-  font-size: 0.6rem;
+  font-size: 0.54rem;
 }
 
 @media (max-width: 760px), (max-height: 520px) {
@@ -10555,5 +10555,196 @@ body[data-overlay-dock='bottom'] .player-stat-overlay {
   .player-stat-right {
     overflow: visible;
     height: auto;
+  }
+}
+
+@media (max-width: 600px) {
+  .player-stat-overlay {
+    position: fixed;
+    inset: 0;
+    padding: 4px;
+    padding-top: 4px;
+    overflow: hidden;
+  }
+
+  .player-stat-backdrop {
+    border-radius: 0;
+  }
+
+  .player-stat-modal {
+    width: calc(100dvw - 8px);
+    height: calc(100dvh - 8px);
+    max-width: calc(100dvw - 8px);
+    max-height: calc(100dvh - 8px);
+    border-radius: 8px;
+    overflow: hidden;
+  }
+
+  .player-stat-header {
+    min-height: 42px;
+    padding: 6px 8px;
+    gap: 6px;
+  }
+
+  .player-stat-title strong {
+    font-size: 0.9rem;
+  }
+
+  .player-stat-title span {
+    font-size: 0.58rem;
+  }
+
+  .player-stat-close,
+  .player-stat-nav {
+    width: 28px;
+    height: 28px;
+    border-radius: 7px;
+  }
+
+  .player-stat-tabs {
+    padding: 5px 7px;
+    gap: 5px;
+  }
+
+  .player-stat-tab {
+    min-height: 26px;
+    padding: 4px 8px;
+    border-radius: 6px;
+    font-size: 0.56rem;
+  }
+
+  .player-stat-body {
+    grid-template-columns: 92px minmax(0, 1fr);
+    gap: 6px;
+    padding: 6px;
+    overflow-y: auto;
+    overflow-x: hidden;
+  }
+
+  .player-stat-left {
+    grid-template-columns: minmax(0, 1fr);
+    gap: 5px;
+    padding: 5px;
+  }
+
+  .player-stat-headshot {
+    height: 108px;
+    border-radius: 6px;
+  }
+
+  .player-stat-bio {
+    padding: 5px;
+    font-size: 0.5rem;
+    line-height: 1.22;
+  }
+
+  .player-stat-block {
+    padding: 6px;
+    font-size: 0.6rem;
+    line-height: 1.2;
+  }
+
+  .player-stat-table {
+    border-spacing: 0 2px;
+  }
+
+  .player-stat-table th,
+  .player-stat-table td {
+    padding: 3px 4px;
+    font-size: 0.52rem;
+  }
+
+  .player-stat-table td {
+    font-size: 0.6rem;
+  }
+
+  .player-stat-footer {
+    padding: 5px 8px;
+    font-size: 0.48rem;
+  }
+
+  .player-stat-heatmap {
+    padding: 4px;
+    overflow: auto;
+  }
+
+  .player-stat-heatmap-grid {
+    grid-template-columns: minmax(0, 1fr);
+    gap: 4px;
+  }
+
+  .player-stat-heatmap-main,
+  .player-stat-heatmap-stack {
+    gap: 4px;
+  }
+
+  .player-stat-heatmap-identity {
+    grid-template-columns: 48px minmax(0, 1fr);
+    padding: 4px;
+  }
+
+  .player-stat-heatmap-identity img {
+    width: 48px;
+    height: 58px;
+  }
+
+  .player-stat-heatmap-identity strong {
+    font-size: 0.58rem;
+  }
+
+  .player-stat-heatmap-identity span,
+  .player-stat-heatmap-identity small,
+  .player-stat-heatmap-identity > b {
+    font-size: 0.46rem;
+  }
+
+  .player-heatmap-calendar-shell {
+    padding: 4px;
+  }
+
+  .player-heatmap-snake-grid {
+    grid-template-columns: repeat(7, 32px);
+    gap: 2px;
+  }
+
+  .player-heatmap-snake-cell {
+    width: 32px;
+    height: 32px;
+    border-radius: 5px;
+    padding: 2px;
+    font-size: 0.4rem;
+  }
+
+  .player-heatmap-snake-cell .day-tb {
+    font-size: 0.64rem;
+  }
+
+  .player-heatmap-snake-cell .day-line {
+    font-size: 0.38rem;
+  }
+
+  .player-stat-heatmap .player-heatmap-table-panel,
+  .player-heatmap-calendar-shell {
+    border-radius: 6px;
+  }
+
+  .player-heatmap-metric-row,
+  .player-heatmap-pitch-table .player-heatmap-metric-row {
+    grid-template-columns: minmax(62px, 1fr) repeat(5, minmax(28px, 0.56fr));
+    gap: 2px;
+    padding: 1px 3px;
+    min-height: 17px;
+  }
+
+  .player-heatmap-split-table .player-heatmap-metric-row {
+    grid-template-columns: minmax(58px, 1fr) repeat(6, minmax(24px, 0.52fr));
+  }
+
+  .player-heatmap-metric-row span {
+    font-size: 0.4rem;
+  }
+
+  .player-heatmap-metric-row b {
+    font-size: 0.46rem;
   }
 }

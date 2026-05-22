@@ -6253,16 +6253,14 @@ function pitcherOpponentHandHtml(splits = null) {
 
 function renderPitcherOpponentHandSplits(profile, token) {
   if (!playerStatExtraEl || !profile?.id) return;
-  playerStatExtraEl.innerHTML = `${pitchStrengthTableHtml(null, 'pitcher')}${pitcherOpponentHandHtml(null)}<div class="player-stat-loading">Loading opponent handed splits</div>`;
+  playerStatExtraEl.innerHTML = `${pitcherOpponentHandHtml(null)}<div class="player-stat-loading">Loading opponent handed splits</div>`;
   Promise.allSettled([
-    getSavantPitchStrength(profile.id, 'pitcher'),
     getPitcherOpponentHandSplits(profile),
   ])
-    .then(([pitchResult, splitResult]) => {
+    .then(([splitResult]) => {
       if (!playerStatExtraEl || playerStatExtraEl.dataset.splitToken !== token) return;
-      const pitchRows = pitchResult.status === 'fulfilled' ? pitchResult.value : [];
       const splits = splitResult.status === 'fulfilled' ? splitResult.value : null;
-      playerStatExtraEl.innerHTML = `${pitchStrengthTableHtml(pitchRows, 'pitcher')}${splits ? pitcherOpponentHandHtml(splits) : `${pitcherOpponentHandHtml(null)}<div class="player-stat-loading">Unavailable</div>`}`;
+      playerStatExtraEl.innerHTML = splits ? pitcherOpponentHandHtml(splits) : `${pitcherOpponentHandHtml(null)}<div class="player-stat-loading">Unavailable</div>`;
     });
 }
 
@@ -6294,22 +6292,21 @@ function hydratePitcherOpponentHandMarkers(rootEl) {
 function renderPlayerHandedSplits(profile, game, token) {
   if (!playerStatExtraEl || !profile?.id) return;
   const matchupHand = currentMatchupPitcher(profile, game)?.throws || '';
-  playerStatExtraEl.innerHTML = `${pitchStrengthTableHtml(null, 'batter')}${battingContextHtml(null, matchupHand)}`;
+  playerStatExtraEl.innerHTML = `${playerStatRowsHtml('BATTING PROFILE', battingProjectionRows(profile, game))}${battingContextHtml(null, matchupHand)}`;
   Promise.allSettled([
-    getSavantPitchStrength(profile.id, 'batter'),
     getPlayerHandedBattingSplits(profile.id),
     getPlayerRecentBattingDetails(profile.id, game),
-  ]).then(([pitchResult, splitResult, recentResult]) => {
+  ]).then(([splitResult, recentResult]) => {
     if (!playerStatExtraEl || playerStatExtraEl.dataset.splitToken !== token) return;
-    const pitchRows = pitchResult.status === 'fulfilled' ? pitchResult.value : [];
     const splits = splitResult.status === 'fulfilled' ? splitResult.value : null;
     const gamesSince = recentResult.status === 'fulfilled' ? recentResult.value?.gamesSince || null : null;
     renderPlayerBattingSeasonBlock(profile, game, gamesSince);
+    const profileHtml = playerStatRowsHtml('BATTING PROFILE', battingProjectionRows(profile, game, gamesSince));
     const handed = splits ? { vsLeft: splits.vsLeft, vsRight: splits.vsRight } : null;
     if (handed) {
-      playerStatExtraEl.innerHTML = `${pitchStrengthTableHtml(pitchRows, 'batter')}${battingContextHtml(handed, matchupHand)}`;
+      playerStatExtraEl.innerHTML = `${profileHtml}${battingContextHtml(handed, matchupHand)}`;
     } else {
-      playerStatExtraEl.innerHTML = `${pitchStrengthTableHtml(pitchRows, 'batter')}<strong class="player-stat-subtitle">HANDED SPLITS</strong><div class="player-stat-loading">Unavailable</div>`;
+      playerStatExtraEl.innerHTML = `${profileHtml}<strong class="player-stat-subtitle">HANDED SPLITS</strong><div class="player-stat-loading">Unavailable</div>`;
     }
   });
 }
@@ -18167,7 +18164,7 @@ function renderPlayerStatHeatMapSnakeCalendar(group, selectedDate = '') {
         <span>Snake rows by sevens</span>
       </div>
       <div class="player-heatmap-snake-wrap">
-        <div class="player-heatmap-snake-grid" style="grid-template-rows:repeat(${rowsNeeded}, 50px);">${cells}</div>
+        <div class="player-heatmap-snake-grid" style="grid-template-rows:repeat(${rowsNeeded}, 36px);">${cells}</div>
       </div>
       <div class="player-heatmap-snake-legend">
         <span>0 TB</span><i data-heat-level="0"></i><i data-heat-level="1"></i><i data-heat-level="2"></i><i data-heat-level="3"></i><i data-heat-level="4"></i><i data-heat-level="5"></i><span>6+ TB</span><strong>* HR</strong><strong>H/A</strong><strong>L/R</strong>
@@ -23253,7 +23250,7 @@ function playerBattingSeasonRows(profile) {
 
 function renderPlayerBattingSeasonBlock(profile, game = null, gamesSince = null) {
   if (!playerStatSeasonEl || !profile) return;
-  playerStatSeasonEl.innerHTML = `${playerStatRowsHtml('BATTING', playerBattingSeasonRows(profile))}${playerStatRowsHtml('BATTING PROFILE', battingProjectionRows(profile, game, gamesSince))}`;
+  playerStatSeasonEl.innerHTML = playerStatRowsHtml('BATTING', playerBattingSeasonRows(profile));
 }
 
 function playerStatPreferredHeatMapDate(game) {
@@ -23328,36 +23325,20 @@ function renderPlayerStatHeatMapHtml(profile, game, group, row) {
           <span>${escapeHtml(`${selectedDate || '--'} | ${playerHeatMapSource || PLAYER_HEATMAP_DEFAULT_CSV}`)}</span>
         </header>
         ${renderPlayerStatHeatMapSnakeCalendar(group, selectedDate)}
-        <div class="player-stat-heatmap-center-grid">
-          ${playerHeatMapMetricTable('Prediction / Recent Power', [
-            ['Hit Score', row.hit_score || '--'],
-            ['TB2 Score', row.tb2_score || '--'],
-            ['HR Score', row.hr_score || '--'],
-            ['HR Rank', row.hr_rank || '--'],
-            ['Confidence', row.confidence_score || '--'],
-            ['K Risk', row.k_risk || '--'],
-            ['Recent BBE', row.recent_bbe || '--'],
-            ['Hard-Hit %', row.recent_hard_hit_pct || '--'],
-            ['Barrel %', row.recent_barrel_pct || '--'],
-            ['Avg EV', row.recent_avg_ev || '--'],
-            ['Max EV', row.recent_max_ev || '--'],
-            ['Power Adj', row.recent_power_adjustment || '--'],
-          ])}
-          ${playerHeatMapMetricTable('Matchup / Weather', [
-            ['Starter Hand', row.starter_hand || '--'],
-            [`Vs ${row.starter_hand || '?'}HP ISO`, row.batter_vs_hand_iso || '--'],
-            [`Vs ${row.starter_hand || '?'}HP SLG`, row.batter_vs_hand_slg || '--'],
-            [`Vs ${row.starter_hand || '?'}HP OPS`, row.batter_vs_hand_ops || '--'],
-            ['Regressed ISO', row.regressed_vs_hand_iso || '--'],
-            ['Split Adj', row.split_adjustment || '--'],
-            ['Same Hand Penalty', row.same_hand_penalty || '--'],
-            ['Weather Source', row.weather_source || '--'],
-            ['Temp', row.temperature_f || row.weather_temp || '--'],
-            ['Wind MPH', row.wind_speed_mph || row.wind_speed || '--'],
-            ['HR Weather Score', row.hr_weather_score || '--'],
-            ['Stadium', row.stadium || '--'],
-          ])}
-        </div>
+        ${playerHeatMapMetricTable('Matchup / Weather', [
+          ['Starter Hand', row.starter_hand || '--'],
+          [`Vs ${row.starter_hand || '?'}HP ISO`, row.batter_vs_hand_iso || '--'],
+          [`Vs ${row.starter_hand || '?'}HP SLG`, row.batter_vs_hand_slg || '--'],
+          [`Vs ${row.starter_hand || '?'}HP OPS`, row.batter_vs_hand_ops || '--'],
+          ['Regressed ISO', row.regressed_vs_hand_iso || '--'],
+          ['Split Adj', row.split_adjustment || '--'],
+          ['Same Hand Penalty', row.same_hand_penalty || '--'],
+          ['Weather Source', row.weather_source || '--'],
+          ['Temp', row.temperature_f || row.weather_temp || '--'],
+          ['Wind MPH', row.wind_speed_mph || row.wind_speed || '--'],
+          ['HR Weather Score', row.hr_weather_score || '--'],
+          ['Stadium', row.stadium || '--'],
+        ])}
       </main>
       <aside class="player-stat-heatmap-stack player-stat-heatmap-pitcher">
         <section class="player-stat-heatmap-identity">
@@ -23398,16 +23379,6 @@ function renderPlayerStatHeatMapHtml(profile, game, group, row) {
         ])}
         ${playerStatHeatMapTable('Pitcher Pitch Breakdown', playerStatHeatMapPitchRows(row, 'pitcher'))}
       </aside>
-      <section class="player-stat-heatmap-detail">
-        ${playerStatHeatMapTable('Details', playerStatHeatMapMetricRows([
-          ['Selected Day', playerLine],
-          ['Opponent', row.opponent || '--'],
-          ['Home/Away', playerStatHeatMapVenueMarker(row) || '--'],
-          ['Pitch Detail', row.pitch_family_hr_matchup_detail || row.pitch_family_hr_matchup || '--'],
-          ['K Detail', row.pitch_family_k_risk_detail || '--'],
-          ['Data Flags', [row.pitch_family_leakage_flag === 'true' ? row.pitch_family_leakage_reasons : '', row.leakage_flag === 'true' ? row.leakage_reasons : ''].filter(Boolean).join(' | ') || 'None'],
-        ]))}
-      </section>
     </div>
   `;
 }
