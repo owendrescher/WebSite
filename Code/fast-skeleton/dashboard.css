@@ -549,15 +549,39 @@ body.dashboard-page .prediction-tabs {
   border-radius: 6px;
 }
 
+body.dashboard-page .prediction-tabbar {
+  gap: 5px;
+}
+
 body.dashboard-page .prediction-tabs button {
   min-height: 26px;
   border-radius: 4px;
   font-size: 0.54rem;
 }
 
+body.dashboard-page .prediction-sort-toggle {
+  min-height: 30px;
+  border-radius: 6px;
+  font-size: 0.5rem;
+}
+
 body.dashboard-page .prediction-source-row {
   border-radius: 6px;
   background: color-mix(in srgb, var(--panel-bg) 72%, transparent);
+}
+
+body.dashboard-page .prediction-source-section {
+  background: transparent;
+}
+
+body.dashboard-page .prediction-detail-grid .prediction-source-row {
+  background:
+    linear-gradient(160deg, color-mix(in srgb, var(--row-color, var(--prediction-accent-color, var(--accent))) 14%, transparent), transparent 62%),
+    color-mix(in srgb, var(--panel-bg) 76%, transparent);
+}
+
+body.dashboard-page .prediction-results-panel {
+  border-radius: 8px;
 }
 
 body.dashboard-page .prediction-source-details summary {
@@ -568,14 +592,33 @@ body.dashboard-page .moneyline-grid {
   grid-template-columns: repeat(auto-fit, minmax(240px, 1fr));
 }
 
+body.dashboard-page .moneyline-team {
+  grid-template-columns: minmax(0, 1fr) 34px auto;
+}
+
+body.dashboard-page dialog.player-stat-modal.prediction-detail-dialog[open] {
+  width: min(calc(100vw - 24px), 720px);
+  height: min(calc(100dvh - 48px), 620px);
+  max-height: calc(100dvh - 48px);
+  overflow: hidden;
+}
+
+body.dashboard-page dialog.player-stat-modal.prediction-detail-dialog .prediction-detail-body {
+  overflow: auto;
+}
+
 @media (max-width: 640px) {
   body.dashboard-page .prediction-card-grid,
   body.dashboard-page .moneyline-grid {
     grid-template-columns: 1fr;
   }
 
+  body.dashboard-page .prediction-tabbar,
   body.dashboard-page .prediction-tabs {
     width: 100%;
+  }
+
+  body.dashboard-page .prediction-tabs {
     overflow-x: auto;
     justify-content: flex-start;
   }

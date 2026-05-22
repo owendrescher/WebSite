@@ -1,0 +1,33 @@
+name: Update MLB Heatmaps
+
+on:
+  schedule:
+    - cron: "0 5 * * *"
+  workflow_dispatch:
+    inputs:
+      start_date:
+        description: "Optional start date, YYYY-MM-DD"
+        required: false
+      end_date:
+        description: "Optional end date, YYYY-MM-DD"
+        required: false
+
+jobs:
+  update:
+    runs-on: ubuntu-latest
+    defaults:
+      run:
+        working-directory: Code/fast-skeleton
+    env:
+      SUPABASE_URL: ${{ secrets.SUPABASE_URL }}
+      SUPABASE_SERVICE_ROLE_KEY: ${{ secrets.SUPABASE_SERVICE_ROLE_KEY }}
+      HEATMAP_START_DATE: ${{ github.event.inputs.start_date }}
+      HEATMAP_END_DATE: ${{ github.event.inputs.end_date }}
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: "20"
+      - run: npm install
+      - run: npx playwright install --with-deps chromium
+      - run: npm run update:heatmaps

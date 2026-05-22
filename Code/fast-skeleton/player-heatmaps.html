@@ -1,0 +1,1840 @@
+<!doctype html>
+<html lang="en">
+  <head>
+    <meta charset="utf-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1" />
+    <meta name="color-scheme" content="dark" />
+    <title>Player Heat Maps Workshop</title>
+    <style>
+      :root {
+        --bg: #07111d;
+        --panel: #0c1d2d;
+        --panel-2: #10283d;
+        --line: rgba(144, 195, 232, 0.22);
+        --text: #eaf6ff;
+        --muted: #8eabc0;
+        --accent: #60c4ff;
+        --zero: #9ee9ff;
+        --one: #f6fbff;
+        --two: #ffd2d7;
+        --three: #ff8188;
+        --four: #d71920;
+      }
+
+      * { box-sizing: border-box; }
+
+      body {
+        margin: 0;
+        min-height: 100vh;
+        background:
+          linear-gradient(135deg, rgba(96,196,255,0.09), transparent 34%),
+          radial-gradient(circle at top right, rgba(215,25,32,0.12), transparent 30%),
+          var(--bg);
+        color: var(--text);
+        font-family: Inter, ui-sans-serif, system-ui, -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif;
+      }
+
+      button,
+      input,
+      select {
+        font: inherit;
+      }
+
+      .page {
+        width: min(1780px, calc(100vw - 28px));
+        margin: 0 auto;
+        padding: 18px 0 30px;
+      }
+
+      .topbar {
+        display: flex;
+        align-items: end;
+        justify-content: space-between;
+        gap: 14px;
+        margin-bottom: 14px;
+      }
+
+      .title {
+        display: grid;
+        gap: 4px;
+      }
+
+      .title h1 {
+        margin: 0;
+        font-size: clamp(1.35rem, 2.2vw, 2.3rem);
+        line-height: 1;
+        letter-spacing: 0.02em;
+        text-transform: uppercase;
+      }
+
+      .title p {
+        margin: 0;
+        color: var(--muted);
+        font-size: 0.82rem;
+        font-weight: 700;
+      }
+
+      .controls {
+        display: flex;
+        align-items: end;
+        justify-content: flex-end;
+        gap: 10px;
+        flex-wrap: wrap;
+      }
+
+      label {
+        display: grid;
+        gap: 5px;
+        min-width: 190px;
+      }
+
+      label span,
+      .status {
+        color: var(--muted);
+        font-size: 0.62rem;
+        font-weight: 900;
+        letter-spacing: 0.07em;
+        text-transform: uppercase;
+      }
+
+      select,
+      input[type="file"],
+      input[type="search"],
+      input[type="text"] {
+        min-height: 38px;
+        border: 1px solid var(--line);
+        border-radius: 8px;
+        background: var(--panel);
+        color: var(--text);
+        padding: 7px 9px;
+      }
+
+      button.action {
+        min-height: 38px;
+        border: 1px solid rgba(96,196,255,0.42);
+        border-radius: 8px;
+        background: rgba(96,196,255,0.12);
+        color: var(--text);
+        padding: 7px 11px;
+        font-size: 0.72rem;
+        font-weight: 950;
+        letter-spacing: 0.04em;
+        text-transform: uppercase;
+        cursor: pointer;
+      }
+
+      button.action:hover,
+      button.action:focus-visible {
+        border-color: rgba(255,255,255,0.7);
+        outline: none;
+      }
+
+      .status {
+        min-width: 260px;
+        padding: 9px 10px;
+        border: 1px solid var(--line);
+        border-radius: 8px;
+        background: rgba(255,255,255,0.035);
+      }
+
+      .board {
+        display: grid;
+        grid-template-columns: minmax(300px, 0.9fr) minmax(520px, 1.35fr) minmax(300px, 0.9fr);
+        gap: 12px;
+        align-items: start;
+      }
+
+      .stack {
+        display: grid;
+        gap: 6px;
+        min-width: 0;
+      }
+
+      .panel {
+        border: 1px solid var(--line);
+        border-radius: 9px;
+        background:
+          linear-gradient(180deg, rgba(255,255,255,0.045), transparent 56%),
+          var(--panel);
+        box-shadow: 0 18px 36px rgba(0,0,0,0.22);
+        overflow: hidden;
+      }
+
+      .identity {
+        display: grid;
+        grid-template-columns: 92px minmax(0, 1fr);
+        gap: 7px;
+        padding: 7px;
+      }
+
+      .identity img {
+        grid-row: span 2;
+        width: 92px;
+        height: 112px;
+        border-radius: 8px;
+        object-fit: cover;
+        background: #13283b;
+        border: 1px solid var(--line);
+      }
+
+      .identity-main {
+        display: grid;
+        align-content: start;
+        gap: 3px;
+        min-width: 0;
+      }
+
+      .identity-main strong {
+        font-size: 0.96rem;
+        line-height: 1.04;
+      }
+
+      .identity-main span,
+      .identity-main small,
+      .today span {
+        color: var(--muted);
+        font-size: 0.54rem;
+        font-weight: 900;
+        letter-spacing: 0.05em;
+        text-transform: uppercase;
+      }
+
+      .today {
+        align-self: end;
+        display: grid;
+        gap: 2px;
+        padding: 6px;
+        border-radius: 8px;
+        border: 1px solid rgba(255,255,255,0.08);
+        background: rgba(255,255,255,0.045);
+      }
+
+      .today b {
+        font-size: 0.68rem;
+        line-height: 1.2;
+      }
+
+      .table-panel {
+        padding: 6px;
+      }
+
+      .table-panel h2 {
+        margin: 0 0 4px;
+        color: color-mix(in srgb, var(--accent) 62%, white 38%);
+        font-size: 0.56rem;
+        font-weight: 950;
+        letter-spacing: 0.08em;
+        text-transform: uppercase;
+      }
+
+      .metric-table {
+        display: grid;
+        gap: 2px;
+      }
+
+      .metric-row {
+        min-height: 20px;
+        display: grid;
+        grid-template-columns: minmax(88px, 1fr) auto;
+        align-items: center;
+        gap: 8px;
+        padding: 2px 6px;
+        border: 1px solid rgba(255,255,255,0.065);
+        border-radius: 5px;
+        background: rgba(255,255,255,0.035);
+      }
+
+      .metric-row span {
+        color: var(--muted);
+        font-size: 0.5rem;
+        font-weight: 900;
+        text-transform: uppercase;
+      }
+
+      .metric-row b {
+        font-size: 0.6rem;
+        text-align: right;
+        overflow-wrap: anywhere;
+      }
+
+      .center-card {
+        display: grid;
+        gap: 7px;
+      }
+
+      .calendar-shell {
+        padding: 12px;
+      }
+
+      .calendar-head {
+        display: flex;
+        align-items: end;
+        justify-content: space-between;
+        gap: 10px;
+        margin-bottom: 10px;
+      }
+
+      .calendar-head h2 {
+        margin: 0;
+        font-size: 1rem;
+        line-height: 1;
+        text-transform: uppercase;
+      }
+
+      .calendar-head p {
+        margin: 4px 0 0;
+        color: var(--muted);
+        font-size: 0.72rem;
+        font-weight: 700;
+      }
+
+      .calendar-scroll {
+        overflow-x: auto;
+        padding-bottom: 4px;
+      }
+
+      .snake-grid {
+        display: grid;
+        grid-template-columns: repeat(7, 68px);
+        grid-auto-rows: 58px;
+        gap: 7px;
+        min-width: max-content;
+      }
+
+      .day-cell {
+        position: relative;
+        display: grid;
+        align-content: center;
+        justify-items: center;
+        gap: 2px;
+        border: 1px solid rgba(255,255,255,0.16);
+        border-radius: 9px;
+        color: #06111c;
+        padding: 5px;
+        cursor: pointer;
+        transition: transform 120ms ease, outline-color 120ms ease;
+        overflow: hidden;
+      }
+
+      .day-cell::before {
+        content: attr(data-opp);
+        position: absolute;
+        inset: 0;
+        display: grid;
+        place-items: center;
+        color: rgba(6,17,28,0.15);
+        font-size: 1.65rem;
+        font-weight: 950;
+        letter-spacing: 0.02em;
+        pointer-events: none;
+      }
+
+      .day-cell:hover,
+      .day-cell:focus-visible {
+        outline: 2px solid rgba(255,255,255,0.72);
+        outline-offset: 1px;
+        transform: translateY(-1px);
+      }
+
+      .day-cell.selected,
+      .day-cell.today {
+        outline: 3px solid #bdf7a1;
+        outline-offset: 2px;
+        border-color: rgba(189,247,161,0.95);
+        box-shadow: 0 0 0 2px rgba(189,247,161,0.18), 0 0 18px rgba(189,247,161,0.42);
+      }
+
+      .day-cell.no-row {
+        opacity: 0.34;
+        cursor: default;
+        background: #183044;
+        color: rgba(255,255,255,0.72);
+      }
+
+      .day-cell.no-row:hover {
+        transform: none;
+        outline: none;
+      }
+
+      .day-cell[data-level="0"] { background: var(--zero); }
+      .day-cell[data-level="1"] { background: var(--one); }
+      .day-cell[data-level="2"] { background: var(--two); }
+      .day-cell[data-level="3"] { background: var(--three); color: #210406; }
+      .day-cell[data-level="4"] { background: var(--four); color: #fff; }
+
+      .day-date {
+        position: relative;
+        z-index: 1;
+        font-size: 0.58rem;
+        font-weight: 950;
+        opacity: 0.86;
+      }
+
+      .day-tb {
+        position: relative;
+        z-index: 1;
+        font-size: 1.05rem;
+        font-weight: 950;
+        line-height: 1;
+      }
+
+      .day-line {
+        position: relative;
+        z-index: 1;
+        font-size: 0.54rem;
+        font-weight: 900;
+      }
+
+      .hr-star {
+        position: absolute;
+        right: 4px;
+        top: -5px;
+        color: #ffe36d;
+        font-size: 1.25rem;
+        line-height: 1;
+        text-shadow: 0 1px 3px rgba(0,0,0,0.78);
+      }
+
+      .venue-chip {
+        position: absolute;
+        left: 5px;
+        top: 4px;
+        z-index: 1;
+        font-size: 0.58rem;
+        font-weight: 950;
+        line-height: 1;
+        text-shadow: 0 1px 3px rgba(255,255,255,0.42);
+      }
+
+      .pitcher-hand-chip {
+        position: absolute;
+        left: 5px;
+        bottom: 4px;
+        z-index: 1;
+        font-size: 0.58rem;
+        font-weight: 950;
+        line-height: 1;
+        text-shadow: 0 1px 3px rgba(255,255,255,0.42);
+      }
+
+      .legend {
+        display: flex;
+        align-items: center;
+        flex-wrap: wrap;
+        gap: 7px;
+        color: var(--muted);
+        font-size: 0.66rem;
+        font-weight: 900;
+      }
+
+      .legend i {
+        width: 18px;
+        height: 18px;
+        border-radius: 4px;
+        border: 1px solid rgba(255,255,255,0.18);
+      }
+
+      .legend i:nth-of-type(1) { background: var(--zero); }
+      .legend i:nth-of-type(2) { background: var(--one); }
+      .legend i:nth-of-type(3) { background: var(--two); }
+      .legend i:nth-of-type(4) { background: var(--three); }
+      .legend i:nth-of-type(5) { background: var(--four); }
+
+      .center-grid {
+        display: grid;
+        grid-template-columns: repeat(2, minmax(0, 1fr));
+        gap: 7px;
+      }
+
+      .pitch-table .metric-row {
+        grid-template-columns: 1.1fr 0.75fr 0.75fr 0.75fr;
+      }
+
+      .split-table .metric-row {
+        grid-template-columns: 0.85fr repeat(6, minmax(34px, 0.6fr));
+      }
+
+      .pitcher-split-table .metric-row {
+        grid-template-columns: 0.95fr repeat(6, minmax(34px, 0.6fr));
+      }
+
+      .yearly-pitching-table .metric-row {
+        grid-template-columns: repeat(5, minmax(42px, 1fr));
+      }
+
+      .yearly-pitching-table .metric-row span,
+      .yearly-pitching-table .metric-row b {
+        text-align: center;
+      }
+
+      .recent-starts {
+        display: grid;
+        gap: 5px;
+      }
+
+      .recent-start {
+        display: grid;
+        gap: 5px;
+        padding: 7px;
+        border: 1px solid rgba(96,196,255,0.2);
+        border-radius: 7px;
+        background: rgba(96,196,255,0.08);
+      }
+
+      .recent-start-head {
+        display: flex;
+        justify-content: space-between;
+        gap: 8px;
+        color: var(--text);
+        font-size: 0.6rem;
+        font-weight: 950;
+      }
+
+      .recent-start-line {
+        font-size: 0.95rem;
+        font-weight: 950;
+      }
+
+      .recent-start-mini {
+        display: grid;
+        grid-template-columns: repeat(6, minmax(0, 1fr));
+        gap: 5px;
+      }
+
+      .recent-start-mini b {
+        min-height: 21px;
+        display: grid;
+        place-items: center;
+        border: 1px solid rgba(255,255,255,0.12);
+        border-radius: 4px;
+        background: rgba(0,0,0,0.24);
+        font-size: 0.55rem;
+      }
+
+      .pitch-table .metric-row.header {
+        background: rgba(96,196,255,0.12);
+      }
+
+      .pitch-table .metric-row.header span,
+      .pitch-table .metric-row.header b {
+        color: var(--muted);
+        font-size: 0.52rem;
+        text-transform: uppercase;
+      }
+
+      .detail-strip {
+        padding: 8px;
+      }
+
+      .detail-strip .metric-row {
+        grid-template-columns: 130px minmax(0, 1fr);
+      }
+
+      @media (max-width: 1280px) {
+        .board {
+          grid-template-columns: minmax(0, 1fr);
+        }
+
+        .center-grid {
+          grid-template-columns: minmax(0, 1fr);
+        }
+      }
+    </style>
+  </head>
+  <body>
+    <main class="page">
+      <header class="topbar">
+        <div class="title">
+          <h1>Player Heat Maps</h1>
+          <p>Workshop view from the prediction audit CSV. Heat is total bases. Starred cells are home-run games.</p>
+        </div>
+        <div class="controls">
+          <label>
+            <span>CSV</span>
+            <input id="csvInput" type="file" accept=".csv,text/csv" />
+          </label>
+          <label>
+            <span>Search</span>
+            <input id="playerSearch" type="search" placeholder="Filter players" />
+          </label>
+          <label>
+            <span>Player</span>
+            <select id="playerSelect"></select>
+          </label>
+          <label>
+            <span>Preview Date</span>
+            <input id="previewDate" type="text" inputmode="numeric" placeholder="YYYY-MM-DD" />
+          </label>
+          <button id="updateCsvBtn" class="action" type="button">Update CSV</button>
+          <div id="status" class="status">Loading season_data_0401-0520.csv...</div>
+        </div>
+      </header>
+      <section id="board" class="board"></section>
+    </main>
+
+    <script src="../shared/supabase-config.js?v=20260521heatmap"></script>
+    <script>
+      const DEFAULT_CSV = 'season_data_0401-0520.csv';
+      const REMOTE_CSV_URL = 'https://dzebznhmnrbtzuqogtnt.supabase.co/storage/v1/object/public/mlb-heatmaps/season_data_0401-0520.csv';
+      const PITCHES = ['fastball', 'sinker', 'cutter', 'slider', 'sweeper', 'curveball', 'changeup', 'splitter', 'knuckle_curve', 'other'];
+      let rows = [];
+      let csvHeaders = [];
+      let groups = [];
+      let selectedKey = '';
+      let selectedDate = '';
+      const mlbJsonCache = new Map();
+      const pitcherStatCache = new Map();
+      const gameTeamCache = new Map();
+      const gameFeedCache = new Map();
+
+      const boardEl = document.getElementById('board');
+      const statusEl = document.getElementById('status');
+      const playerSelectEl = document.getElementById('playerSelect');
+      const playerSearchEl = document.getElementById('playerSearch');
+      const previewDateEl = document.getElementById('previewDate');
+      const csvInputEl = document.getElementById('csvInput');
+      const updateCsvBtnEl = document.getElementById('updateCsvBtn');
+
+      function clean(value) {
+        return String(value ?? '').replace(/\s+/g, ' ').trim();
+      }
+
+      function csvSourceUrls() {
+        const configured = clean(window.OWENTOOLS_HEATMAP_CSV_URL || window.OWENTOOLS_SUPABASE?.heatmapCsvUrl || '');
+        const projectUrl = clean(window.OWENTOOLS_SUPABASE?.url || '').replace(/\/+$/, '');
+        const derived = projectUrl
+          ? `${projectUrl}/storage/v1/object/public/mlb-heatmaps/${DEFAULT_CSV}`
+          : '';
+        return [...new Set([configured, REMOTE_CSV_URL, derived, DEFAULT_CSV].filter(Boolean))];
+      }
+
+      function esc(value) {
+        return clean(value).replace(/[&<>"']/g, (char) => ({
+          '&': '&amp;',
+          '<': '&lt;',
+          '>': '&gt;',
+          '"': '&quot;',
+          "'": '&#39;',
+        }[char]));
+      }
+
+      function cssEsc(value) {
+        if (window.CSS?.escape) return CSS.escape(String(value ?? ''));
+        return String(value ?? '').replace(/["\\]/g, '\\$&');
+      }
+
+      function firstFilled(row, keys, fallback = '--') {
+        for (const key of keys) {
+          const value = clean(row[key]);
+          if (value) return value;
+        }
+        return fallback;
+      }
+
+      async function mlbJson(url) {
+        const href = String(url);
+        if (mlbJsonCache.has(href)) return mlbJsonCache.get(href);
+        const promise = fetch(href).then((response) => {
+          if (!response.ok) throw new Error(`MLB Stats API ${response.status}`);
+          return response.json();
+        }).catch((error) => {
+          mlbJsonCache.delete(href);
+          throw error;
+        });
+        mlbJsonCache.set(href, promise);
+        return promise;
+      }
+
+      function parseCsvDocument(text = '') {
+        const out = [];
+        let row = [];
+        let field = '';
+        let quoted = false;
+        const source = String(text || '');
+        for (let i = 0; i < source.length; i += 1) {
+          const char = source[i];
+          const next = source[i + 1];
+          if (quoted && char === '"' && next === '"') {
+            field += '"';
+            i += 1;
+            continue;
+          }
+          if (char === '"') {
+            quoted = !quoted;
+            continue;
+          }
+          if (!quoted && char === ',') {
+            row.push(field);
+            field = '';
+            continue;
+          }
+          if (!quoted && (char === '\n' || char === '\r')) {
+            if (char === '\r' && next === '\n') i += 1;
+            row.push(field);
+            if (row.some((value) => clean(value))) out.push(row);
+            row = [];
+            field = '';
+            continue;
+          }
+          field += char;
+        }
+        row.push(field);
+        if (row.some((value) => clean(value))) out.push(row);
+        if (out.length < 2) return { headers: [], rows: [] };
+        const headers = out[0].map(clean);
+        return {
+          headers,
+          rows: out.slice(1).map((values) => Object.fromEntries(headers.map((header, index) => [header, values[index] ?? '']))),
+        };
+      }
+
+      function parseCsv(text = '') {
+        const doc = parseCsvDocument(text);
+        if (doc.headers.length) csvHeaders = doc.headers;
+        return doc.rows;
+      }
+
+      function csvEscape(value) {
+        const text = value == null ? '' : String(value);
+        return /[",\r\n]/.test(text) ? `"${text.replace(/"/g, '""')}"` : text;
+      }
+
+      function rowsToCsv(rowList, headers = csvHeaders) {
+        const headerLine = headers.map(csvEscape).join(',');
+        const body = rowList.map((row) => headers.map((header) => csvEscape(row[header] ?? '')).join(',')).join('\r\n');
+        return body ? `${headerLine}\r\n${body}` : headerLine;
+      }
+
+      function wait(ms) {
+        return new Promise((resolve) => setTimeout(resolve, ms));
+      }
+
+      function downloadText(filename, content) {
+        const blob = new Blob([content], { type: 'text/csv;charset=utf-8;' });
+        const url = URL.createObjectURL(blob);
+        const link = document.createElement('a');
+        link.href = url;
+        link.download = filename;
+        document.body.appendChild(link);
+        link.click();
+        link.remove();
+        setTimeout(() => URL.revokeObjectURL(url), 1000);
+      }
+
+      async function saveMasterCsv(filename, content) {
+        if (window.location.origin !== 'null') {
+          try {
+            const response = await fetch('/api/save-season-csv', {
+              method: 'POST',
+              headers: { 'Content-Type': 'text/csv;charset=utf-8' },
+              body: content,
+            });
+            if (response.ok) return 'saved';
+          } catch {}
+        }
+        downloadText(filename, content);
+        return 'downloaded';
+      }
+
+      function todayIso() {
+        return new Date().toISOString().slice(0, 10);
+      }
+
+      function monthDay(dateText) {
+        const date = new Date(`${dateText}T00:00:00`);
+        if (!Number.isFinite(date.getTime())) return dateText || '--';
+        return date.toLocaleDateString(undefined, { month: 'short', day: 'numeric' });
+      }
+
+      function addDays(dateText, days) {
+        const date = new Date(`${dateText}T00:00:00`);
+        if (!Number.isFinite(date.getTime())) return '';
+        date.setDate(date.getDate() + days);
+        return date.toISOString().slice(0, 10);
+      }
+
+      function yesterdayIso() {
+        return addDays(todayIso(), -1);
+      }
+
+      function normalizedDateInput(value) {
+        const text = clean(value);
+        const iso = text.match(/^(\d{4})-(\d{1,2})-(\d{1,2})$/);
+        if (iso) return `${iso[1]}-${iso[2].padStart(2, '0')}-${iso[3].padStart(2, '0')}`;
+        const slash = text.match(/^(\d{1,2})[/-](\d{1,2})(?:[/-](\d{2,4}))?$/);
+        if (slash) {
+          const year = slash[3] ? (slash[3].length === 2 ? `20${slash[3]}` : slash[3]) : todayIso().slice(0, 4);
+          return `${year}-${slash[1].padStart(2, '0')}-${slash[2].padStart(2, '0')}`;
+        }
+        return '';
+      }
+
+      function num(row, keys, fallback = 0) {
+        for (const key of keys) {
+          const value = Number(row?.[key]);
+          if (Number.isFinite(value)) return value;
+        }
+        return fallback;
+      }
+
+      function bool(row, keys) {
+        return keys.some((key) => ['1', 'true', 'yes'].includes(clean(row?.[key]).toLowerCase()));
+      }
+
+      function dateOf(row) {
+        return clean(row.date || row.game_date || row.source_date || row.day_section).slice(0, 10);
+      }
+
+      function playerKey(row) {
+        return clean(row.batter_id) || clean(row.batter_name).toLowerCase();
+      }
+
+      function handLabel(value, role = 'batter') {
+        const hand = clean(value).toUpperCase().slice(0, 1);
+        if (role === 'pitcher') return hand === 'L' ? 'LHP' : hand === 'R' ? 'RHP' : '--';
+        if (hand === 'L') return 'LHH';
+        if (hand === 'R') return 'RHH';
+        if (hand === 'S') return 'SH';
+        return '--';
+      }
+
+      function seasonFor(dateText) {
+        const year = Number(clean(dateText).slice(0, 4));
+        return Number.isFinite(year) && year > 1900 ? year : new Date().getFullYear();
+      }
+
+      function inningsNumber(value) {
+        const text = clean(value);
+        if (!text) return null;
+        const [whole, frac = '0'] = text.split('.');
+        const base = Number(whole);
+        const outs = Number(frac);
+        if (!Number.isFinite(base)) return null;
+        return base + (Number.isFinite(outs) ? outs / 3 : 0);
+      }
+
+      function perNine(count, ipText) {
+        const ip = inningsNumber(ipText);
+        const value = Number(count);
+        return ip && Number.isFinite(value) ? ((value * 9) / ip).toFixed(2) : '--';
+      }
+
+      function rateDiff(slg, avg) {
+        const s = Number(slg);
+        const a = Number(avg);
+        return Number.isFinite(s) && Number.isFinite(a) ? (s - a).toFixed(3) : '--';
+      }
+
+      function teamAbbrev(value) {
+        return clean(value).toUpperCase().replace(/[^A-Z]/g, '').slice(0, 4) || '--';
+      }
+
+      function venueMarker(row) {
+        const direct = clean(row.team_home_away || row.home_away || row.game_home_away || row.venue);
+        if (/^(home|h)$/i.test(direct)) return 'H';
+        if (/^(away|a|road|visitor)$/i.test(direct)) return 'A';
+        const isHome = clean(row.is_home || row.home_game).toLowerCase();
+        if (['1', 'true', 'yes'].includes(isHome)) return 'H';
+        if (['0', 'false', 'no'].includes(isHome)) return 'A';
+        const team = teamAbbrev(row.team);
+        const home = teamAbbrev(row.home_team || row.home || row.home_abbrev);
+        const away = teamAbbrev(row.away_team || row.away || row.away_abbrev);
+        if (team !== '--' && home !== '--' && team === home) return 'H';
+        if (team !== '--' && away !== '--' && team === away) return 'A';
+        return '';
+      }
+
+      async function gameTeamsForRow(row) {
+        const gamePk = clean(row.game_id || row.game_pk || row.gamePk);
+        if (!gamePk) return null;
+        if (gameTeamCache.has(gamePk)) return gameTeamCache.get(gamePk);
+        const promise = mlbJson(`https://statsapi.mlb.com/api/v1.1/game/${gamePk}/feed/live`)
+          .then((data) => {
+            const away = teamAbbrev(data?.gameData?.teams?.away?.abbreviation || data?.gameData?.teams?.away?.teamCode || data?.gameData?.teams?.away?.name);
+            const home = teamAbbrev(data?.gameData?.teams?.home?.abbreviation || data?.gameData?.teams?.home?.teamCode || data?.gameData?.teams?.home?.name);
+            return { away, home };
+          });
+        gameTeamCache.set(gamePk, promise);
+        return promise;
+      }
+
+      async function gameFeedForRow(row) {
+        const gamePk = clean(row.game_id || row.game_pk || row.gamePk);
+        if (!gamePk) return null;
+        if (gameFeedCache.has(gamePk)) return gameFeedCache.get(gamePk);
+        const promise = mlbJson(`https://statsapi.mlb.com/api/v1.1/game/${gamePk}/feed/live`);
+        gameFeedCache.set(gamePk, promise);
+        return promise;
+      }
+
+      async function hydrateCalendarVenueChips() {
+        const cells = [...document.querySelectorAll('.day-cell[data-game-id][data-team]')]
+          .filter((cell) => clean(cell.dataset.gameId) && !clean(cell.querySelector('.venue-chip')?.textContent));
+        await Promise.all(cells.map(async (cell) => {
+          const row = rows.find((item) => clean(item.game_id || item.game_pk || item.gamePk) === clean(cell.dataset.gameId) && teamAbbrev(item.team) === teamAbbrev(cell.dataset.team));
+          if (!row) return;
+          const teams = await gameTeamsForRow(row).catch(() => null);
+          if (!teams) return;
+          const team = teamAbbrev(row.team);
+          const marker = team === teams.home ? 'H' : team === teams.away ? 'A' : '';
+          if (!marker) return;
+          let chip = cell.querySelector('.venue-chip');
+          if (!chip) {
+            chip = document.createElement('span');
+            chip.className = 'venue-chip';
+            cell.prepend(chip);
+          }
+          chip.textContent = marker;
+          cell.title = `${cell.title} | ${marker}`;
+        }));
+      }
+
+      function headshot(id) {
+        const numeric = Number(id);
+        return Number.isFinite(numeric) && numeric > 0
+          ? `https://img.mlbstatic.com/mlb-photos/image/upload/w_160,q_auto:good/v1/people/${numeric}/headshot/67/current`
+          : 'baseball.png';
+      }
+
+      function outcome(row) {
+        const tb = num(row, ['full_tb', 'starter_tb', 'tb']);
+        const hr = num(row, ['full_hr', 'starter_hr', 'hr']);
+        const h = num(row, ['full_h', 'starter_h', 'h']);
+        const ab = num(row, ['full_ab', 'starter_ab', 'ab']);
+        const rbi = num(row, ['full_rbi', 'starter_rbi', 'rbi']);
+        const r = num(row, ['full_r', 'starter_r', 'r']);
+        return { tb, hr, h, ab, rbi, r, homered: hr > 0 || bool(row, ['result_hr']) };
+      }
+
+      function tbLevel(tb) {
+        const value = Number(tb) || 0;
+        if (value <= 0) return 0;
+        if (value === 1) return 1;
+        if (value === 2) return 2;
+        if (value === 3) return 3;
+        return 4;
+      }
+
+      function buildGroups() {
+        const map = new Map();
+        for (const row of rows) {
+          const key = playerKey(row);
+          const date = dateOf(row);
+          if (!key || !date) continue;
+          if (!map.has(key)) {
+            map.set(key, {
+              key,
+              id: clean(row.batter_id),
+              name: clean(row.batter_name) || 'Unknown Player',
+              team: clean(row.team),
+              hand: clean(row.batter_hand),
+              rows: [],
+            });
+          }
+          map.get(key).rows.push(row);
+        }
+        groups = [...map.values()]
+          .map((group) => ({
+            ...group,
+            rows: group.rows.sort((a, b) => dateOf(a).localeCompare(dateOf(b))),
+          }))
+          .sort((a, b) => a.name.localeCompare(b.name));
+      }
+
+      function filteredGroups() {
+        const query = clean(playerSearchEl.value).toLowerCase();
+        return query
+          ? groups.filter((group) => `${group.name} ${group.team}`.toLowerCase().includes(query))
+          : groups;
+      }
+
+      function syncPlayerSelect() {
+        const visible = filteredGroups();
+        if (!visible.some((group) => group.key === selectedKey)) {
+          selectedKey = visible.find((group) => group.rows.some((row) => dateOf(row) === selectedDate))?.key
+            || visible[0]?.key
+            || groups.find((group) => group.rows.some((row) => dateOf(row) === selectedDate))?.key
+            || groups[0]?.key
+            || '';
+        }
+        playerSelectEl.innerHTML = visible.map((group) => `<option value="${esc(group.key)}"${group.key === selectedKey ? ' selected' : ''}>${esc(group.name)} (${esc(group.team)} - ${group.rows.length} games)</option>`).join('')
+          || '<option value="">No players</option>';
+      }
+
+      function metric(label, value) {
+        return `<div class="metric-row"><span>${esc(label)}</span><b>${esc(value === '' || value == null ? '--' : value)}</b></div>`;
+      }
+
+      function panel(title, html) {
+        return `<section class="panel table-panel"><h2>${esc(title)}</h2>${html}</section>`;
+      }
+
+      function identityCard({ id, name, team, meta, today }) {
+        return `
+          <section class="panel identity">
+            <img src="${headshot(id)}" alt="${esc(name)} headshot" onerror="this.onerror=null;this.src='baseball.png';" />
+            <div class="identity-main">
+              <strong>${esc(name)}</strong>
+              <span>${esc(team || '--')}</span>
+              <small>${esc(meta || '')}</small>
+            </div>
+            <div class="today"><span>Selected Day</span><b>${esc(today || '--')}</b></div>
+          </section>
+        `;
+      }
+
+      function groupTotals(group) {
+        return group.rows.reduce((acc, row) => {
+          const day = outcome(row);
+          acc.games += 1;
+          acc.h += day.h;
+          acc.ab += day.ab;
+          acc.tb += day.tb;
+          acc.hr += day.hr;
+          acc.hitGames += day.h > 0 ? 1 : 0;
+          acc.twoTbGames += day.tb >= 2 ? 1 : 0;
+          return acc;
+        }, { games: 0, h: 0, ab: 0, tb: 0, hr: 0, hitGames: 0, twoTbGames: 0 });
+      }
+
+      function rowForGroupDate(group, date) {
+        return group.rows.find((item) => dateOf(item) === date) || null;
+      }
+
+      function groupDateRange(group) {
+        const dates = group.rows.map(dateOf).filter(Boolean).sort();
+        if (!dates.length) return [];
+        const out = [];
+        for (let cursor = dates[0]; cursor && cursor <= dates[dates.length - 1]; cursor = addDays(cursor, 1)) out.push(cursor);
+        return out;
+      }
+
+      function rate(numerator, denominator, digits = 1) {
+        return denominator ? `${((numerator / denominator) * 100).toFixed(digits)}%` : '--';
+      }
+
+      function decimal(numerator, denominator, digits = 3) {
+        return denominator ? (numerator / denominator).toFixed(digits) : '--';
+      }
+
+      function handedSplitRows(row) {
+        const split = (label, prefix) => `
+          <div class="metric-row">
+            <span>${esc(label)}</span>
+            <b>${esc(row[`batter_vs_${prefix}_pa`] || '--')}</b>
+            <b>${esc(row[`batter_vs_${prefix}_avg`] || '--')}</b>
+            <b>${esc(row[`batter_vs_${prefix}_slg`] || '--')}</b>
+            <b>${esc(row[`batter_vs_${prefix}_iso`] || '--')}</b>
+            <b>${esc(row[`batter_vs_${prefix}_hr_rate`] || '--')}</b>
+            <b>${esc(row[`batter_vs_${prefix}_xbh_rate`] || row[`batter_vs_${prefix}_xbh`] || '--')}</b>
+          </div>
+        `;
+        return `<div class="metric-table split-table">
+          <div class="metric-row header"><span>Split</span><b>PA</b><b>AVG</b><b>SLG</b><b>ISO</b><b>HR</b><b>XBH</b></div>
+          ${split('Vs LHP', 'lhp')}
+          ${split('Vs RHP', 'rhp')}
+        </div>`;
+      }
+
+      function pitcherHandedSplitRows(row) {
+        const key = pitcherHydrateKey(row);
+        return `<div class="metric-table pitcher-split-table" data-pitcher-splits="${esc(key)}">
+          <div class="metric-row"><span>MLB Splits</span><b>Loading...</b></div>
+        </div>`;
+      }
+
+      function pitcherPitchList(row) {
+        return PITCHES
+          .map((pitch) => ({ pitch, usage: Number(row[`pitcher_${pitch}_usage_pct`]) }))
+          .filter((item) => Number.isFinite(item.usage) && item.usage > 0.05)
+          .sort((a, b) => b.usage - a.usage)
+          .map((item) => item.pitch);
+      }
+
+      function pitchRows(row, side) {
+        const rowsHtml = side === 'pitcher'
+          ? [`<div class="metric-row header"><span>Pitch</span><b>Usage</b><b>PA</b><b>SLG</b></div>`]
+          : [`<div class="metric-row header"><span>Pitch</span><b>PA</b><b>SLG</b><b>ISO</b></div>`];
+        const pitchList = pitcherPitchList(row);
+        const usablePitches = pitchList.length ? pitchList : PITCHES;
+        for (const pitch of usablePitches) {
+          if (side === 'pitcher') {
+            const usage = Number(row[`pitcher_${pitch}_usage_pct`]);
+            if (!Number.isFinite(usage) || usage <= 0.05) continue;
+            rowsHtml.push(`<div class="metric-row"><span>${esc(pitch.replace('_', ' '))}</span><b>${esc(usage.toFixed(1))}</b><b>${esc(row[`pitcher_${pitch}_pa`] || '--')}</b><b>${esc(row[`pitcher_${pitch}_slg_allowed`] || '--')}</b></div>`);
+          } else {
+            const pa = Number(row[`batter_${pitch}_pa`]);
+            const slg = clean(row[`batter_${pitch}_slg`]);
+            const iso = clean(row[`batter_${pitch}_iso`]);
+            if ((!Number.isFinite(pa) || pa <= 0) && !slg && !iso) continue;
+            rowsHtml.push(`<div class="metric-row"><span>${esc(pitch.replace('_', ' '))}</span><b>${esc(Number.isFinite(pa) ? pa : '--')}</b><b>${esc(slg || '--')}</b><b>${esc(iso || '--')}</b></div>`);
+          }
+        }
+        return `<div class="metric-table pitch-table">${rowsHtml.join('')}</div>`;
+      }
+
+      function yearlyPitchingRows(row) {
+        const key = pitcherHydrateKey(row);
+        return `<div class="metric-table yearly-pitching-table" data-pitcher-yearly="${esc(key)}">
+          <div class="metric-row"><span>MLB Season</span><b>Loading...</b></div>
+        </div>`;
+      }
+
+      function previousStartFromColumns(row, index) {
+        const prefixes = [
+          `pitcher_last_${index}_`,
+          `last_start_${index}_`,
+          `prev_start_${index}_`,
+          `previous_start_${index}_`,
+        ];
+        const get = (suffixes) => {
+          for (const prefix of prefixes) {
+            for (const suffix of suffixes) {
+              const value = clean(row[`${prefix}${suffix}`]);
+              if (value) return value;
+            }
+          }
+          return '';
+        };
+        const date = get(['date', 'game_date']);
+        const opponent = get(['opponent', 'opp', 'team']);
+        if (!date && !opponent) return null;
+        return {
+          date,
+          opponent,
+          ip: get(['ip', 'innings']),
+          er: get(['er', 'earned_runs']),
+          k: get(['k', 'so', 'strikeouts']),
+          bb: get(['bb', 'walks']),
+          h: get(['h', 'hits']),
+          hr: get(['hr', 'home_runs']),
+          p: get(['p', 'pitches', 'pitch_count']),
+        };
+      }
+
+      function previousStartsFromHistory(row) {
+        const starterId = clean(row.starter_id);
+        const currentDate = dateOf(row);
+        if (!starterId || !currentDate) return [];
+        const byGame = new Map();
+        for (const candidate of rows) {
+          if (clean(candidate.starter_id) !== starterId) continue;
+          const date = dateOf(candidate);
+          if (!date || date >= currentDate) continue;
+          const key = `${date}:${clean(candidate.game_id) || clean(candidate.team)}`;
+          if (!byGame.has(key)) {
+            byGame.set(key, { date, opponent: clean(candidate.team), h: 0, hr: 0, k: 0, bb: 0, ab: 0, ip: '', er: '', p: '' });
+          }
+          const game = byGame.get(key);
+          game.h += num(candidate, ['starter_h']);
+          game.hr += num(candidate, ['starter_hr']);
+          game.k += num(candidate, ['starter_k']);
+          game.bb += num(candidate, ['starter_bb']);
+          game.ab += num(candidate, ['starter_ab']);
+        }
+        return [...byGame.values()].sort((a, b) => b.date.localeCompare(a.date)).slice(0, 3);
+      }
+
+      function pitcherHydrateKey(row) {
+        return `${clean(row.starter_id)}|${dateOf(row)}|${clean(row.batter_hand) || 'R'}`;
+      }
+
+      function pitcherRowFromHydrateKey(key) {
+        const [starterId, date, batterHand] = String(key || '').split('|');
+        return rows.find((row) => clean(row.starter_id) === starterId && dateOf(row) === date && clean(row.batter_hand) === batterHand)
+          || rows.find((row) => clean(row.starter_id) === starterId && dateOf(row) === date)
+          || null;
+      }
+
+      function pitchingStatValue(stat, keys, fallback = '--') {
+        for (const key of keys) {
+          const value = clean(stat?.[key]);
+          if (value) return value;
+        }
+        return fallback;
+      }
+
+      async function fetchPitcherSeasonStats(playerId, dateText) {
+        const id = Number(playerId);
+        if (!Number.isFinite(id) || id <= 0) return null;
+        const season = seasonFor(dateText);
+        const key = `season:${id}:${season}`;
+        if (pitcherStatCache.has(key)) return pitcherStatCache.get(key);
+        const url = new URL(`https://statsapi.mlb.com/api/v1/people/${id}/stats`);
+        url.searchParams.set('stats', 'season');
+        url.searchParams.set('group', 'pitching');
+        url.searchParams.set('season', String(season));
+        url.searchParams.set('gameType', 'R');
+        const promise = mlbJson(url).then((data) => data?.stats?.[0]?.splits?.[0]?.stat || null);
+        pitcherStatCache.set(key, promise);
+        return promise;
+      }
+
+      async function fetchPitcherHandSplit(playerId, dateText, sitCode) {
+        const id = Number(playerId);
+        if (!Number.isFinite(id) || id <= 0) return null;
+        const season = seasonFor(dateText);
+        const key = `split:${id}:${season}:${sitCode}`;
+        if (pitcherStatCache.has(key)) return pitcherStatCache.get(key);
+        const url = new URL(`https://statsapi.mlb.com/api/v1/people/${id}/stats`);
+        url.searchParams.set('stats', 'statSplits');
+        url.searchParams.set('group', 'pitching');
+        url.searchParams.set('season', String(season));
+        url.searchParams.set('sitCodes', sitCode);
+        url.searchParams.set('gameType', 'R');
+        const promise = mlbJson(url).then((data) => data?.stats?.[0]?.splits?.[0]?.stat || null);
+        pitcherStatCache.set(key, promise);
+        return promise;
+      }
+
+      async function fetchPitcherGameLog(playerId, dateText) {
+        const id = Number(playerId);
+        if (!Number.isFinite(id) || id <= 0) return [];
+        const season = seasonFor(dateText);
+        const key = `gamelog:${id}:${season}`;
+        if (pitcherStatCache.has(key)) return pitcherStatCache.get(key);
+        const url = new URL(`https://statsapi.mlb.com/api/v1/people/${id}/stats`);
+        url.searchParams.set('stats', 'gameLog');
+        url.searchParams.set('group', 'pitching');
+        url.searchParams.set('season', String(season));
+        url.searchParams.set('gameType', 'R');
+        const promise = mlbJson(url).then((data) => data?.stats?.[0]?.splits || []);
+        pitcherStatCache.set(key, promise);
+        return promise;
+      }
+
+      function yearlyPitchingHtml(stat = null) {
+        const ip = pitchingStatValue(stat, ['inningsPitched']);
+        const hr = Number(stat?.homeRuns ?? stat?.hrAllowed);
+        const k = Number(stat?.strikeOuts ?? stat?.so);
+        return `<div class="metric-row header"><span>IP</span><span>ERA</span><span>WHIP</span><span>HR/9</span><span>K/9</span></div>
+          <div class="metric-row">
+            <b>${esc(ip)}</b>
+            <b>${esc(pitchingStatValue(stat, ['era']))}</b>
+            <b>${esc(pitchingStatValue(stat, ['whip', 'walksAndHitsPerInningPitched']))}</b>
+            <b>${esc(pitchingStatValue(stat, ['homeRunsPer9'], perNine(hr, ip)))}</b>
+            <b>${esc(pitchingStatValue(stat, ['strikeoutsPer9'], perNine(k, ip)))}</b>
+          </div>`;
+      }
+
+      function pitcherSplitRow(label, stat = null) {
+        const avg = pitchingStatValue(stat, ['avg']);
+        const slg = pitchingStatValue(stat, ['slg']);
+        const pa = pitchingStatValue(stat, ['plateAppearances', 'battersFaced', 'atBats']);
+        return `<div class="metric-row">
+          <span>${esc(label)}</span>
+          <b>${esc(pa)}</b>
+          <b>${esc(avg)}</b>
+          <b>${esc(slg)}</b>
+          <b>${esc(rateDiff(slg, avg))}</b>
+          <b>${esc(pitchingStatValue(stat, ['homeRuns', 'hrAllowed', 'hr']))}</b>
+          <b>${esc(pitchingStatValue(stat, ['strikeOuts', 'so']))}</b>
+        </div>`;
+      }
+
+      function pitcherHandSplitsHtml(vsLeft = null, vsRight = null) {
+        return `<div class="metric-row header"><span>Split</span><b>PA/BF</b><b>BAA</b><b>SLGA</b><b>ISOA</b><b>HR</b><b>K</b></div>
+          ${pitcherSplitRow('Vs LHH', vsLeft)}
+          ${pitcherSplitRow('Vs RHH', vsRight)}`;
+      }
+
+      function isPitchingStart(split) {
+        const stat = split?.stat || {};
+        const ip = inningsNumber(stat.inningsPitched);
+        return Number(stat.gamesStarted ?? stat.gamesStartedPitching ?? 0) > 0
+          || Number(stat.starts ?? 0) > 0
+          || (Number.isFinite(ip) && ip >= 3)
+          || String(stat.note || '').toLowerCase().includes('start');
+      }
+
+      function pitcherStartHtml(split) {
+        const stat = split?.stat || {};
+        const opponent = split?.opponent?.abbreviation || split?.opponent?.teamCode || split?.opponent?.name || '';
+        return `<div class="recent-start">
+          <div class="recent-start-head"><span>${esc(monthDay(split?.date || ''))}</span><b>${esc(opponent ? `vs ${teamAbbrev(opponent)}` : '--')}</b></div>
+          <div class="recent-start-line">IP ${esc(pitchingStatValue(stat, ['inningsPitched']))}</div>
+          <div class="recent-start-mini">
+            <b>ER ${esc(pitchingStatValue(stat, ['earnedRuns']))}</b>
+            <b>K ${esc(pitchingStatValue(stat, ['strikeOuts', 'so']))}</b>
+            <b>BB ${esc(pitchingStatValue(stat, ['baseOnBalls', 'walks']))}</b>
+            <b>H ${esc(pitchingStatValue(stat, ['hits']))}</b>
+            <b>HR ${esc(pitchingStatValue(stat, ['homeRuns']))}</b>
+            <b>P ${esc(pitchingStatValue(stat, ['pitchesThrown', 'numberOfPitches']))}</b>
+          </div>
+        </div>`;
+      }
+
+      function selectedOutingHtml(split = null, row = null) {
+        if (!split) return '<div class="metric-table">' + metric('Selected Outing', 'No MLB game-log outing found for this date') + '</div>';
+        const stat = split?.stat || {};
+        const opponent = split?.opponent?.abbreviation || split?.opponent?.teamCode || split?.opponent?.name || row?.team || '';
+        return `<div class="recent-start selected-outing">
+          <div class="recent-start-head"><span>${esc(monthDay(split?.date || dateOf(row) || ''))}</span><b>${esc(opponent ? `vs ${teamAbbrev(opponent)}` : '--')}</b></div>
+          <div class="recent-start-line">IP ${esc(pitchingStatValue(stat, ['inningsPitched']))}</div>
+          <div class="recent-start-mini">
+            <b>ER ${esc(pitchingStatValue(stat, ['earnedRuns']))}</b>
+            <b>K ${esc(pitchingStatValue(stat, ['strikeOuts', 'so']))}</b>
+            <b>BB ${esc(pitchingStatValue(stat, ['baseOnBalls', 'walks']))}</b>
+            <b>H ${esc(pitchingStatValue(stat, ['hits']))}</b>
+            <b>HR ${esc(pitchingStatValue(stat, ['homeRuns']))}</b>
+            <b>P ${esc(pitchingStatValue(stat, ['pitchesThrown', 'numberOfPitches']))}</b>
+          </div>
+        </div>`;
+      }
+
+      function selectedOutingFromGameLog(splits = [], row = null) {
+        const date = dateOf(row);
+        const gamePk = clean(row?.game_id || row?.game_pk || row?.gamePk);
+        const sameDate = splits.filter((split) => clean(split?.date) === date);
+        if (gamePk) {
+          const exact = sameDate.find((split) => clean(split?.game?.gamePk || split?.gamePk || split?.game?.pk) === gamePk);
+          if (exact) return exact;
+        }
+        return sameDate.find(isPitchingStart) || sameDate[0] || null;
+      }
+
+      function previousStartsHtml(splits = [], dateText = '') {
+        const starts = splits
+          .filter((split) => clean(split?.date) && clean(split.date) < clean(dateText))
+          .filter(isPitchingStart)
+          .sort((a, b) => clean(b.date).localeCompare(clean(a.date)))
+          .slice(0, 3);
+        if (!starts.length) return '<div class="metric-table">' + metric('MLB Game Log', 'No previous starts found') + '</div>';
+        return starts.map(pitcherStartHtml).join('');
+      }
+
+      async function hydrateMlbPitcherPanels() {
+        const keys = [...new Set([
+          ...[...document.querySelectorAll('[data-pitcher-yearly]')].map((el) => el.dataset.pitcherYearly),
+          ...[...document.querySelectorAll('[data-pitcher-splits]')].map((el) => el.dataset.pitcherSplits),
+          ...[...document.querySelectorAll('[data-pitcher-outing]')].map((el) => el.dataset.pitcherOuting),
+          ...[...document.querySelectorAll('[data-pitcher-starts]')].map((el) => el.dataset.pitcherStarts),
+        ].filter(Boolean))];
+        await Promise.all(keys.map(async (key) => {
+          const row = pitcherRowFromHydrateKey(key);
+          if (!row) return;
+          const id = clean(row.starter_id);
+          const date = dateOf(row);
+          try {
+            const [seasonStat, vsLeft, vsRight, gameLog] = await Promise.all([
+              fetchPitcherSeasonStats(id, date).catch(() => null),
+              fetchPitcherHandSplit(id, date, 'vl').catch(() => null),
+              fetchPitcherHandSplit(id, date, 'vr').catch(() => null),
+              fetchPitcherGameLog(id, date).catch(() => []),
+            ]);
+            document.querySelectorAll(`[data-pitcher-yearly="${cssEsc(key)}"]`).forEach((el) => { el.innerHTML = yearlyPitchingHtml(seasonStat); });
+            document.querySelectorAll(`[data-pitcher-splits="${cssEsc(key)}"]`).forEach((el) => { el.innerHTML = pitcherHandSplitsHtml(vsLeft, vsRight); });
+            document.querySelectorAll(`[data-pitcher-outing="${cssEsc(key)}"]`).forEach((el) => { el.innerHTML = selectedOutingHtml(selectedOutingFromGameLog(gameLog, row), row); });
+            document.querySelectorAll(`[data-pitcher-starts="${cssEsc(key)}"]`).forEach((el) => { el.innerHTML = previousStartsHtml(gameLog, date); });
+          } catch (error) {
+            document.querySelectorAll(`[data-pitcher-yearly="${cssEsc(key)}"], [data-pitcher-splits="${cssEsc(key)}"], [data-pitcher-outing="${cssEsc(key)}"], [data-pitcher-starts="${cssEsc(key)}"]`).forEach((el) => {
+              el.innerHTML = '<div class="metric-table">' + metric('MLB Data', error.message || 'Unavailable') + '</div>';
+            });
+          }
+        }));
+      }
+
+      function pitcherPreviousStartsRows(row) {
+        const key = pitcherHydrateKey(row);
+        return `<div class="recent-starts" data-pitcher-starts="${esc(key)}">
+          <div class="metric-table">${metric('MLB Game Log', 'Loading...')}</div>
+        </div>`;
+      }
+
+      function pitcherSelectedOutingRows(row) {
+        const key = pitcherHydrateKey(row);
+        return `<div class="recent-starts" data-pitcher-outing="${esc(key)}">
+          <div class="metric-table">${metric('Selected Outing', 'Loading...')}</div>
+        </div>`;
+      }
+
+      function hrAttributionRows(row) {
+        const key = pitcherHydrateKey(row);
+        return `<div class="recent-starts" data-hr-attribution="${esc(key)}">
+          <div class="metric-table">${metric('HR Attribution', 'Loading...')}</div>
+        </div>`;
+      }
+
+      function playerFromFeed(feed, playerId) {
+        const id = clean(playerId);
+        if (!id) return null;
+        return feed?.gameData?.players?.[`ID${id}`]
+          || feed?.liveData?.boxscore?.teams?.away?.players?.[`ID${id}`]?.person
+          || feed?.liveData?.boxscore?.teams?.home?.players?.[`ID${id}`]?.person
+          || null;
+      }
+
+      function boxscorePlayerForFeed(feed, playerId) {
+        const id = clean(playerId);
+        if (!id) return null;
+        return feed?.liveData?.boxscore?.teams?.away?.players?.[`ID${id}`]
+          || feed?.liveData?.boxscore?.teams?.home?.players?.[`ID${id}`]
+          || null;
+      }
+
+      function pitcherGameLineFromFeed(feed, pitcherId) {
+        const player = boxscorePlayerForFeed(feed, pitcherId);
+        const stat = player?.stats?.pitching || {};
+        return {
+          ip: pitchingStatValue(stat, ['inningsPitched']),
+          er: pitchingStatValue(stat, ['earnedRuns']),
+          k: pitchingStatValue(stat, ['strikeOuts', 'so']),
+          bb: pitchingStatValue(stat, ['baseOnBalls', 'walks']),
+          h: pitchingStatValue(stat, ['hits']),
+          hr: pitchingStatValue(stat, ['homeRuns']),
+          p: pitchingStatValue(stat, ['pitchesThrown', 'numberOfPitches']),
+        };
+      }
+
+      function inningLabelForPlay(play) {
+        const half = clean(play?.about?.halfInning).toLowerCase();
+        const inning = clean(play?.about?.inning);
+        const label = half === 'top' ? 'Top' : half === 'bottom' ? 'Bot' : clean(play?.about?.halfInning);
+        return `${label} ${inning}`.trim() || '--';
+      }
+
+      function selectedBatterHomeRuns(feed, row) {
+        const batterId = clean(row.batter_id);
+        if (!feed || !batterId) return [];
+        return (feed?.liveData?.plays?.allPlays || [])
+          .filter((play) => clean(play?.result?.event).toLowerCase() === 'home run')
+          .filter((play) => clean(play?.matchup?.batter?.id) === batterId);
+      }
+
+      function hrAttributionHtml(feed, row) {
+        const plays = selectedBatterHomeRuns(feed, row);
+        if (!plays.length) return '<div class="metric-table">' + metric('HR Attribution', 'No HR by selected hitter in this game') + '</div>';
+        return plays.map((play) => {
+          const pitcherId = clean(play?.matchup?.pitcher?.id);
+          const pitcher = playerFromFeed(feed, pitcherId);
+          const pitcherName = clean(play?.matchup?.pitcher?.fullName || pitcher?.fullName || pitcher?.name || row.starter_name || 'Unknown Pitcher');
+          const pitcherHand = handLabel(play?.matchup?.pitchHand?.code || pitcher?.pitchHand?.code || pitcher?.pitchHand?.description || '', 'pitcher');
+          const role = pitcherId && pitcherId === clean(row.starter_id) ? 'listed starter' : 'bullpen/other';
+          const line = pitcherGameLineFromFeed(feed, pitcherId);
+          const distance = clean(play?.playEvents?.find((event) => event?.hitData?.totalDistance)?.hitData?.totalDistance);
+          return `<div class="recent-start">
+            <div class="recent-start-head"><span>${esc(inningLabelForPlay(play))}</span><b>${esc(role)}</b></div>
+            <div class="recent-start-line">${esc(pitcherName)} ${esc(pitcherHand)}</div>
+            <div class="recent-start-mini">
+              <b>IP ${esc(line.ip)}</b>
+              <b>ER ${esc(line.er)}</b>
+              <b>K ${esc(line.k)}</b>
+              <b>H ${esc(line.h)}</b>
+              <b>HR ${esc(line.hr)}</b>
+              <b>${esc(distance ? `${distance} ft` : 'Dist --')}</b>
+            </div>
+          </div>`;
+        }).join('');
+      }
+
+      async function hydrateHrAttributionPanels() {
+        const keys = [...new Set([...document.querySelectorAll('[data-hr-attribution]')].map((el) => el.dataset.hrAttribution).filter(Boolean))];
+        await Promise.all(keys.map(async (key) => {
+          const row = pitcherRowFromHydrateKey(key);
+          if (!row) return;
+          try {
+            const feed = await gameFeedForRow(row);
+            document.querySelectorAll(`[data-hr-attribution="${cssEsc(key)}"]`).forEach((el) => { el.innerHTML = hrAttributionHtml(feed, row); });
+          } catch (error) {
+            document.querySelectorAll(`[data-hr-attribution="${cssEsc(key)}"]`).forEach((el) => {
+              el.innerHTML = '<div class="metric-table">' + metric('HR Attribution', error.message || 'Unavailable') + '</div>';
+            });
+          }
+        }));
+      }
+
+      function snakeCalendar(group, selected) {
+        const today = todayIso();
+        const dates = groupDateRange(group);
+        const cells = dates.map((date, index) => {
+          const row = rowForGroupDate(group, date);
+          const day = outcome(row);
+          const chunk = Math.floor(index / 7);
+          const offset = index % 7;
+          const col = chunk % 2 === 0 ? offset + 1 : 7 - offset;
+          if (!row) {
+            return `
+              <button class="day-cell no-row${date === selected ? ' selected' : ''}${date === today ? ' today' : ''}" data-date="${esc(date)}" data-opp="OFF" data-level="0" style="grid-column:${col};grid-row:${chunk + 1};" title="${esc(`${date}: off day / no row`)}">
+                <span class="day-date">${esc(date.slice(5))}</span>
+                <span class="day-tb">OFF</span>
+                <span class="day-line">--</span>
+              </button>
+            `;
+          }
+          const marker = venueMarker(row);
+          const opponent = teamAbbrev(row.opponent);
+          const pitcherHand = clean(row.starter_hand).toUpperCase().slice(0, 1);
+          return `
+            <button class="day-cell${date === selected ? ' selected' : ''}${date === today ? ' today' : ''}" data-date="${esc(date)}" data-game-id="${esc(row.game_id || row.game_pk || row.gamePk)}" data-team="${esc(row.team)}" data-opp="${esc(opponent)}" data-level="${tbLevel(day.tb)}" style="grid-column:${col};grid-row:${chunk + 1};" title="${esc(`${date}: ${marker ? `${marker} ` : ''}${opponent}, ${day.h}-${day.ab}, ${day.hr} HR, ${day.rbi} RBI, ${day.r} R, ${day.tb} TB`)}">
+              ${marker ? `<span class="venue-chip">${esc(marker)}</span>` : ''}
+              ${day.homered ? '<span class="hr-star">*</span>' : ''}
+              <span class="day-date">${esc(date.slice(5))}</span>
+              <span class="day-tb">${day.tb}</span>
+              <span class="day-line">${day.h}-${day.ab}</span>
+              ${['L', 'R'].includes(pitcherHand) ? `<span class="pitcher-hand-chip">${esc(pitcherHand)}</span>` : ''}
+            </button>
+          `;
+        }).join('');
+        const rowsNeeded = Math.max(1, Math.ceil(dates.length / 7));
+        return `
+          <section class="panel calendar-shell">
+            <div class="calendar-head">
+              <div>
+                <h2>Total Bases Heat</h2>
+                <p>Snake rows: days 1-7 left to right, days 8-14 right to left, continuing by sevens.</p>
+              </div>
+              <div class="legend">
+                <span>Hitless</span><i></i><span>Single</span><i></i><span>2 TB</span><i></i><span>3 TB</span><i></i><span>4+ TB</span><i></i><span>* HR</span>
+              </div>
+            </div>
+            <div class="calendar-scroll">
+              <div class="snake-grid" style="grid-template-rows:repeat(${rowsNeeded}, 58px);">${cells}</div>
+            </div>
+          </section>
+        `;
+      }
+
+      function render() {
+        if (!selectedDate) selectedDate = previewDateEl.value || todayIso();
+        if (previewDateEl.value !== selectedDate) previewDateEl.value = selectedDate;
+        syncPlayerSelect();
+        const group = groups.find((item) => item.key === selectedKey) || filteredGroups()[0] || groups[0];
+        if (!group) {
+          boardEl.innerHTML = '<section class="panel table-panel">No CSV rows loaded.</section>';
+          return;
+        }
+        if (!group.rows.some((row) => dateOf(row) === selectedDate)) {
+          selectedDate = group.rows.some((row) => dateOf(row) === previewDateEl.value)
+            ? previewDateEl.value
+            : dateOf(group.rows[group.rows.length - 1]);
+        }
+        if (previewDateEl.value !== selectedDate) previewDateEl.value = selectedDate;
+        const row = group.rows.find((item) => dateOf(item) === selectedDate) || group.rows[group.rows.length - 1];
+        const day = outcome(row);
+        const totals = groupTotals(group);
+        const today = `${day.h}-${day.ab}, ${day.hr} HR, ${day.rbi} RBI, ${day.r} R, ${day.tb} TB`;
+        boardEl.innerHTML = `
+          <aside class="stack">
+            ${identityCard({ id: group.id, name: group.name, team: `${group.team} | ${handLabel(group.hand)}`, meta: `Order ${row.batting_order || '--'} | ${selectedDate}`, today })}
+            ${panel('Player Card Stats', `<div class="metric-table">
+              ${metric('Games', totals.games)}
+              ${metric('Hit Rate / Game', rate(totals.hitGames, totals.games))}
+              ${metric('H / AB', `${totals.h}-${totals.ab}`)}
+              ${metric('AVG', decimal(totals.h, totals.ab))}
+              ${metric('TB / Game', totals.games ? (totals.tb / totals.games).toFixed(2) : '--')}
+              ${metric('2+ TB Rate', rate(totals.twoTbGames, totals.games))}
+              ${metric('HR', totals.hr)}
+              ${metric('Season AVG', row.season_avg)}
+              ${metric('Season SLG', row.season_slg)}
+              ${metric('Season OPS', row.season_ops)}
+              ${metric('Season ISO', row.season_iso)}
+              ${metric('HR Rate', row.season_hr_rate)}
+            </div>`)}
+            ${panel('Handedness Splits', handedSplitRows(row))}
+            ${panel('Batter Pitch Breakdown', pitchRows(row, 'batter'))}
+          </aside>
+          <main class="center-card">
+            ${snakeCalendar(group, selectedDate)}
+            <div class="center-grid">
+              ${panel('Prediction / Recent Power', `<div class="metric-table">
+                ${metric('Hit Score', row.hit_score)}
+                ${metric('TB2 Score', row.tb2_score)}
+                ${metric('HR Score', row.hr_score)}
+                ${metric('HR Rank', row.hr_rank)}
+                ${metric('Confidence', row.confidence_score)}
+                ${metric('K Risk', row.k_risk)}
+                ${metric('Recent BBE', row.recent_bbe)}
+                ${metric('Hard-Hit %', row.recent_hard_hit_pct)}
+                ${metric('Barrel %', row.recent_barrel_pct)}
+                ${metric('Avg EV', row.recent_avg_ev)}
+                ${metric('Max EV', row.recent_max_ev)}
+                ${metric('Power Adj', row.recent_power_adjustment)}
+              </div>`)}
+              ${panel('Matchup / Weather', `<div class="metric-table">
+                ${metric('Starter Hand', row.starter_hand)}
+                ${metric('Vs Hand ISO', row.batter_vs_hand_iso)}
+                ${metric('Regressed ISO', row.regressed_vs_hand_iso)}
+                ${metric('Split Adj', row.split_adjustment)}
+                ${metric('Same Hand Penalty', row.same_hand_penalty)}
+                ${metric('Weather Source', row.weather_source)}
+                ${metric('Temp', row.temperature_f || row.weather_temp)}
+                ${metric('Wind MPH', row.wind_speed_mph || row.wind_speed)}
+                ${metric('HR Weather Score', row.hr_weather_score)}
+                ${metric('Stadium', row.stadium)}
+              </div>`)}
+            </div>
+            <section class="panel detail-strip">
+              <div class="metric-table">
+                ${metric('Pitch Matchup Detail', row.pitch_family_hr_matchup_detail || row.pitch_family_hr_matchup)}
+                ${metric('Pitch K Detail', row.pitch_family_k_risk_detail)}
+                ${metric('Data Flags', [row.pitch_family_leakage_flag === 'true' ? row.pitch_family_leakage_reasons : '', row.leakage_flag === 'true' ? row.leakage_reasons : ''].filter(Boolean).join(' | ') || 'None')}
+              </div>
+            </section>
+          </main>
+          <aside class="stack">
+            ${identityCard({ id: row.starter_id, name: row.starter_name || 'Unknown Pitcher', team: `${row.opponent || ''} | ${handLabel(row.starter_hand, 'pitcher')}`, meta: row.stadium, today: `${firstFilled(row, ['pitcher_ip', 'starter_ip', 'season_ip', 'innings_pitched'])} IP, ${row.pitcher_era || '--'} ERA` })}
+            ${panel('Pitcher Yearly Totals', yearlyPitchingRows(row))}
+            ${panel('Pitcher Handedness Splits', pitcherHandedSplitRows(row))}
+            ${panel('Selected Outing', pitcherSelectedOutingRows(row))}
+            ${panel('HR Attribution', hrAttributionRows(row))}
+            ${panel('Previous Starts', pitcherPreviousStartsRows(row))}
+            ${panel('Pitcher Pitch Breakdown', pitchRows(row, 'pitcher'))}
+          </aside>
+        `;
+        hydrateCalendarVenueChips().catch(() => {});
+        hydrateMlbPitcherPanels().catch(() => {});
+        hydrateHrAttributionPanels().catch(() => {});
+      }
+
+      async function loadDefaultCsv() {
+        let lastError = null;
+        for (const sourceUrl of csvSourceUrls()) {
+          try {
+            const url = new URL(sourceUrl, window.location.href).toString();
+            const response = await fetch(`${url}${url.includes('?') ? '&' : '?'}_ts=${Date.now()}`, { cache: 'no-store' });
+            if (!response.ok) throw new Error(`HTTP ${response.status}`);
+            rows = parseCsv(await response.text());
+            buildGroups();
+            selectedDate = todayIso();
+            previewDateEl.value = selectedDate;
+            statusEl.textContent = `${rows.length.toLocaleString()} rows loaded from ${sourceUrl}`;
+            render();
+            await loadTodayPreviewRows();
+            await autoUpdateMissingRows();
+            return;
+          } catch (error) {
+            lastError = error;
+          }
+        }
+        try {
+          buildGroups();
+          selectedDate = todayIso();
+          previewDateEl.value = selectedDate;
+          render();
+        } catch (error) {
+          lastError = error;
+        }
+        if (lastError) {
+          statusEl.textContent = `Could not auto-load ${DEFAULT_CSV}. Use CSV upload.`;
+          boardEl.innerHTML = '<section class="panel table-panel"><h2>Waiting for CSV</h2><div class="metric-table">' + metric('Auto-load issue', lastError.message || 'Browser blocked file access') + '</div></section>';
+        }
+      }
+
+      playerSelectEl.addEventListener('change', () => {
+        selectedKey = playerSelectEl.value;
+        selectedDate = '';
+        render();
+      });
+
+      playerSearchEl.addEventListener('input', () => {
+        syncPlayerSelect();
+      });
+
+      playerSearchEl.addEventListener('change', () => {
+        selectedKey = playerSelectEl.value || selectedKey;
+        selectedDate = '';
+        render();
+      });
+
+      previewDateEl.addEventListener('change', () => {
+        const parsed = normalizedDateInput(previewDateEl.value);
+        if (!parsed) {
+          statusEl.textContent = 'Use YYYY-MM-DD or M/D/YYYY for preview date.';
+          return;
+        }
+        selectedDate = parsed;
+        previewDateEl.value = parsed;
+        selectedKey = '';
+        render();
+      });
+
+      previewDateEl.addEventListener('keydown', (event) => {
+        if (event.key !== 'Enter') return;
+        event.preventDefault();
+        previewDateEl.dispatchEvent(new Event('change'));
+      });
+
+      boardEl.addEventListener('click', (event) => {
+        const cell = event.target.closest('.day-cell[data-date]');
+        if (!cell || cell.classList.contains('no-row')) return;
+        selectedDate = cell.dataset.date || '';
+        render();
+      });
+
+      csvInputEl.addEventListener('change', async () => {
+        const file = csvInputEl.files?.[0];
+        if (!file) return;
+        rows = parseCsv(await file.text());
+        buildGroups();
+        selectedKey = '';
+        selectedDate = todayIso();
+        previewDateEl.value = selectedDate;
+        statusEl.textContent = `${rows.length.toLocaleString()} rows loaded from ${file.name}`;
+        render();
+      });
+
+      function masterMaxDate() {
+        return rows.filter((row) => !row.__heatmapPreview).map(dateOf).filter(Boolean).sort().at(-1) || '';
+      }
+
+      function expectedMissingDates() {
+        const last = masterMaxDate();
+        const end = yesterdayIso();
+        const dates = [];
+        if (!last || last >= end) return dates;
+        for (let cursor = addDays(last, 1); cursor && cursor <= end; cursor = addDays(cursor, 1)) dates.push(cursor);
+        return dates;
+      }
+
+      async function capturePredictionRangeCsv(start, end) {
+        if (window.location.origin === 'null') {
+          throw new Error('Open this page through a local web server, not file://. Browser security blocks file-origin pages from reading predictions.html.');
+        }
+        const iframe = document.createElement('iframe');
+        iframe.hidden = true;
+        iframe.src = `predictions.html?page=predictions&heatmapUpdate=${Date.now()}`;
+        document.body.appendChild(iframe);
+        try {
+          await new Promise((resolve, reject) => {
+            const timer = setTimeout(() => reject(new Error('Timed out loading predictions engine')), 45000);
+            iframe.addEventListener('load', () => {
+              clearTimeout(timer);
+              resolve();
+            }, { once: true });
+          });
+          const win = iframe.contentWindow;
+          for (let i = 0; i < 160; i += 1) {
+            if (typeof win.exportPredictionAuditRangeCsv === 'function' && typeof win.downloadTextFile === 'function') break;
+            await wait(250);
+          }
+          if (typeof win.exportPredictionAuditRangeCsv !== 'function') {
+            throw new Error('Predictions range export function was not available.');
+          }
+          const captured = [];
+          const originalDownload = win.downloadTextFile;
+          win.downloadTextFile = (filename, content, mimeType) => {
+            captured.push({ filename, content, mimeType });
+          };
+          await win.exportPredictionAuditRangeCsv(start, end);
+          win.downloadTextFile = originalDownload;
+          const wanted = captured.find((file) => /^model_summary_by_day_/i.test(file.filename))
+            || captured.find((file) => /^prediction_audit_batch_/i.test(file.filename));
+          if (!wanted) throw new Error('Predictions export finished, but no audit CSV was captured.');
+          return wanted;
+        } finally {
+          iframe.remove();
+        }
+      }
+
+      async function loadTodayPreviewRows() {
+        const target = todayIso();
+        if (rows.some((row) => dateOf(row) === target)) return;
+        statusEl.textContent = `Loading today's preview from Predictions exporter...`;
+        try {
+          const generated = await capturePredictionRangeCsv(target, target);
+          const doc = parseCsvDocument(generated.content);
+          const previewRows = doc.rows
+            .filter((row) => dateOf(row) === target)
+            .map((row) => ({ ...row, __heatmapPreview: true }));
+          if (!previewRows.length) {
+            statusEl.textContent = `${rows.length.toLocaleString()} rows loaded from ${DEFAULT_CSV}; no preview rows found for today.`;
+            return;
+          }
+          const existingKeys = new Set(rows.map((row) => `${dateOf(row)}:${clean(row.batter_id)}:${clean(row.game_id)}`));
+          rows = rows.concat(previewRows.filter((row) => !existingKeys.has(`${dateOf(row)}:${clean(row.batter_id)}:${clean(row.game_id)}`)));
+          buildGroups();
+          selectedDate = target;
+          selectedKey = previewRows[0] ? playerKey(previewRows[0]) : selectedKey;
+          previewDateEl.value = target;
+          statusEl.textContent = `${rows.length.toLocaleString()} rows loaded, including today's in-memory preview.`;
+          render();
+        } catch (error) {
+          statusEl.textContent = `${rows.length.toLocaleString()} rows loaded from ${DEFAULT_CSV}; today's preview failed: ${error.message || 'unknown error'}`;
+        }
+      }
+
+      async function appendUpdateRows(updateRows, sourceName = 'model_summary_by_day CSV') {
+        const missingDates = new Set(expectedMissingDates());
+        if (!missingDates.size) {
+          statusEl.textContent = 'CSV is already current through yesterday.';
+          return;
+        }
+        const existingKeys = new Set(rows.map((row) => `${dateOf(row)}:${clean(row.batter_id)}:${clean(row.game_id)}`));
+        const additions = updateRows.filter((row) => {
+          const key = `${dateOf(row)}:${clean(row.batter_id)}:${clean(row.game_id)}`;
+          return missingDates.has(dateOf(row)) && !existingKeys.has(key);
+        });
+        if (!additions.length) {
+          statusEl.textContent = `${sourceName} loaded, but no missing-date rows matched ${[...missingDates].join(', ')}.`;
+          return;
+        }
+        rows = rows.concat(additions).sort((a, b) => dateOf(a).localeCompare(dateOf(b)) || clean(a.batter_name).localeCompare(clean(b.batter_name)));
+        buildGroups();
+        selectedDate = additions.map(dateOf).sort().at(-1) || selectedDate;
+        previewDateEl.value = selectedDate;
+        const exportRows = rows.filter((row) => !row.__heatmapPreview);
+        const min = exportRows.map(dateOf).filter(Boolean).sort()[0] || 'updated';
+        const max = masterMaxDate() || 'updated';
+        const saveMode = await saveMasterCsv(`season_data_${min}_to_${max}.csv`, rowsToCsv(exportRows));
+        statusEl.textContent = `Appended ${additions.length.toLocaleString()} rows from ${sourceName}; ${saveMode === 'saved' ? 'saved season_data_0401-0520.csv' : 'downloaded updated master CSV'}.`;
+        render();
+      }
+
+      async function handleUpdateDocument(text, sourceName) {
+        const doc = parseCsvDocument(text);
+        const missingHeader = csvHeaders.find((header) => !doc.headers.includes(header));
+        if (missingHeader) {
+          statusEl.textContent = `Update blocked: missing column ${missingHeader} in ${sourceName}.`;
+          return;
+        }
+        for (const header of doc.headers) {
+          if (header && !csvHeaders.includes(header)) csvHeaders.push(header);
+        }
+        await appendUpdateRows(doc.rows, sourceName);
+      }
+
+      async function generateAndAppendMissingRows({ quiet = false } = {}) {
+        const missing = expectedMissingDates();
+        if (!missing.length) {
+          if (!quiet) statusEl.textContent = 'CSV is already current through yesterday.';
+          return false;
+        }
+        const start = missing[0];
+        const end = missing[missing.length - 1];
+        statusEl.textContent = `Generating missing predictions ${start} to ${end} with the Predictions exporter...`;
+        const generated = await capturePredictionRangeCsv(start, end);
+        await handleUpdateDocument(generated.content, generated.filename);
+        return true;
+      }
+
+      async function autoUpdateMissingRows() {
+        if (!expectedMissingDates().length) return;
+        if (window.location.origin === 'null') {
+          statusEl.textContent += ' Open through the local server to auto-update missing days.';
+          return;
+        }
+        try {
+          await generateAndAppendMissingRows({ quiet: true });
+        } catch (error) {
+          statusEl.textContent = `Auto-update failed: ${error.message || 'unknown error'}`;
+        }
+      }
+
+      updateCsvBtnEl.addEventListener('click', async () => {
+        if (updateCsvBtnEl.disabled) return;
+        updateCsvBtnEl.disabled = true;
+        updateCsvBtnEl.textContent = 'Updating...';
+        try {
+          await generateAndAppendMissingRows();
+        } catch (error) {
+          statusEl.textContent = `Update failed: ${error.message || 'unknown error'}`;
+        } finally {
+          updateCsvBtnEl.disabled = false;
+          updateCsvBtnEl.textContent = 'Update CSV';
+        }
+      });
+
+      loadDefaultCsv();
+    </script>
+  </body>
+</html>

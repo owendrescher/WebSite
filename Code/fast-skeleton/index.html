@@ -17,7 +17,7 @@
     <meta name="twitter:description" content="Live MLB scoreboard, lineups, pitcher trends, hot players, and betting stat tools." />
     <link rel="icon" type="image/png" href="baseball.png" />
     <link rel="apple-touch-icon" href="baseball.png" />
-    <link rel="stylesheet" href="styles.css?v=20260516e" />
+    <link rel="stylesheet" href="styles.css?v=20260521heatmap" />
   </head>
   <body>
     <section id="betInputPanel" class="utility-panel bet-input-panel">
@@ -226,7 +226,6 @@
           <button type="button" data-page-nav="leaders" aria-selected="false">League Leaders</button>
           <button type="button" data-page-nav="hot" aria-selected="false">Hot Players</button>
           <button type="button" data-page-nav="teamStats" aria-selected="false">Team Stats</button>
-          <button type="button" data-page-nav="predictions" aria-selected="false">Predictions</button>
           <button type="button" data-page-nav="hrLeaderboard" aria-selected="false">HR Leaderboard</button>
         </nav>
         <div id="leadersToolbar" class="leaders-toolbar" hidden>
@@ -303,6 +302,7 @@
                   <img class="lineup-logo away-lineup-logo lineup-logo-pick-trigger" data-lineup-pick-side="away" role="button" tabindex="0" src="placeholder.png" alt="Away logo" title="Pick away team to win" />
                   <span class="away-lineup-team"></span>
                   <span class="team-streak lineup-team-streak away-lineup-streak"></span>
+                  <button type="button" class="lineup-prediction-chip away-lineup-prediction" data-lineup-prediction-side="away" hidden>--</button>
                 </div>
                 <div class="lineup-state-scoreboard">
                   <span id="lineupStateAwayCode" class="lineup-state-away-code"></span>
@@ -314,6 +314,7 @@
                 <div class="lineup-team-header lineup-team-header-home">
                   <span class="home-lineup-team"></span>
                   <span class="team-streak lineup-team-streak home-lineup-streak"></span>
+                  <button type="button" class="lineup-prediction-chip home-lineup-prediction" data-lineup-prediction-side="home" hidden>--</button>
                   <img class="lineup-logo home-lineup-logo lineup-logo-pick-trigger" data-lineup-pick-side="home" role="button" tabindex="0" src="placeholder.png" alt="Home logo" title="Pick home team to win" />
                 </div>
               </div>
@@ -404,6 +405,10 @@
             <button class="player-stat-nav player-stat-nav-next" type="button" data-player-stat-nav="1" aria-label="Next player">&rsaquo;</button>
             <button id="playerStatCloseBtn" class="player-stat-close" type="button" aria-label="Close player card">×</button>
           </header>
+          <div class="player-stat-tabs" role="tablist" aria-label="Player card views">
+            <button type="button" class="player-stat-tab active" data-player-stat-tab="stats" aria-selected="true">Stats</button>
+            <button type="button" class="player-stat-tab" data-player-stat-tab="heatmap" aria-selected="false">Heat Map</button>
+          </div>
           <div class="player-stat-body">
             <section class="player-stat-left">
               <img id="playerStatHeadshot" class="player-stat-headshot" src="placeholder.png" alt="Player headshot" />
@@ -416,6 +421,7 @@
               <div id="playerStatMatchup" class="player-stat-block"></div>
             </section>
           </div>
+          <div id="playerStatHeatmap" class="player-stat-heatmap" hidden></div>
           <footer class="player-stat-footer">Click a lineup name to open</footer>
         </article>
       </section>
@@ -487,7 +493,7 @@
       </article>
     </template>
 
-    <script src="../shared/supabase-config.js?v=20260510f"></script>
+    <script src="../shared/supabase-config.js?v=20260521heatmap"></script>
     <script>
       window.OWENTOOLS_SYNC = {
         toolId: "baseball-dashboard",
@@ -500,6 +506,6 @@
       };
     </script>
     <script src="../shared/owentools-sync.js?v=20260511a"></script>
-    <script src="app.js?v=20260516e"></script>
+    <script src="app.js?v=20260521heatmap"></script>
   </body>
 </html>
