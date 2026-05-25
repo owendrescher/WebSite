@@ -593,12 +593,12 @@ body.dashboard-page .moneyline-grid {
 }
 
 body.dashboard-page .moneyline-team {
-  grid-template-columns: minmax(0, 1fr) 34px auto;
+  grid-template-columns: minmax(0, 1fr) 34px;
 }
 
 body.dashboard-page dialog.player-stat-modal.prediction-detail-dialog[open] {
-  width: min(calc(100vw - 24px), 720px);
-  height: min(calc(100dvh - 48px), 620px);
+  width: min(calc(100vw - 24px), 560px);
+  height: min(calc(100dvh - 48px), 520px);
   max-height: calc(100dvh - 48px);
   overflow: hidden;
 }

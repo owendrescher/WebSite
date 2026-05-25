@@ -1,0 +1,821 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1" />
+  <title>MLB Prediction Study Saver</title>
+  <style>
+    :root {
+      color-scheme: dark;
+      --bg: #06111a;
+      --panel: #0d2130;
+      --line: #2b5267;
+      --text: #f3fbff;
+      --muted: #9fc0cf;
+      --accent: #81def2;
+      --hot: #ff4f66;
+      --good: #9dffcb;
+    }
+    * { box-sizing: border-box; }
+    body {
+      margin: 0;
+      background: var(--bg);
+      color: var(--text);
+      font: 13px/1.35 system-ui, -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif;
+    }
+    main {
+      width: min(1320px, calc(100vw - 28px));
+      margin: 0 auto;
+      padding: 18px 0 28px;
+    }
+    h1 {
+      margin: 0 0 6px;
+      font-size: 22px;
+      letter-spacing: .05em;
+      text-transform: uppercase;
+    }
+    p {
+      max-width: 920px;
+      margin: 0 0 12px;
+      color: var(--muted);
+    }
+    .panel {
+      border: 1px solid var(--line);
+      border-radius: 8px;
+      background: var(--panel);
+      padding: 12px;
+      margin: 10px 0;
+    }
+    .toolbar {
+      display: flex;
+      flex-wrap: wrap;
+      align-items: end;
+      gap: 10px;
+    }
+    label {
+      display: grid;
+      gap: 4px;
+      color: var(--muted);
+      font-size: 11px;
+      font-weight: 900;
+      letter-spacing: .06em;
+      text-transform: uppercase;
+    }
+    input, button {
+      border: 1px solid var(--line);
+      border-radius: 6px;
+      background: #071722;
+      color: var(--text);
+      padding: 8px 10px;
+      font: inherit;
+      font-weight: 850;
+    }
+    input[type="date"] { min-width: 150px; }
+    button {
+      cursor: pointer;
+      text-transform: uppercase;
+      letter-spacing: .04em;
+    }
+    button:hover { border-color: var(--accent); }
+    button:disabled {
+      cursor: wait;
+      opacity: .55;
+    }
+    .status {
+      margin-left: auto;
+      color: var(--muted);
+      font-weight: 800;
+    }
+    progress {
+      width: 100%;
+      height: 12px;
+      accent-color: var(--accent);
+    }
+    .metrics {
+      display: grid;
+      grid-template-columns: repeat(4, minmax(0, 1fr));
+      gap: 8px;
+    }
+    .metric {
+      border: 1px solid rgba(159, 192, 207, .22);
+      border-radius: 7px;
+      padding: 8px;
+      background: #081925;
+    }
+    .metric span {
+      display: block;
+      color: var(--muted);
+      font-size: 10px;
+      font-weight: 900;
+      letter-spacing: .06em;
+      text-transform: uppercase;
+    }
+    .metric b {
+      display: block;
+      margin-top: 3px;
+      font-size: 18px;
+      color: var(--accent);
+    }
+    .table-wrap {
+      overflow: auto;
+      max-height: 58vh;
+      border: 1px solid rgba(159, 192, 207, .22);
+      border-radius: 8px;
+    }
+    table {
+      width: 100%;
+      min-width: 1500px;
+      border-collapse: collapse;
+      table-layout: fixed;
+    }
+    th, td {
+      border-bottom: 1px solid rgba(159, 192, 207, .22);
+      padding: 6px 7px;
+      text-align: left;
+      white-space: nowrap;
+      overflow: hidden;
+      text-overflow: ellipsis;
+      font-variant-numeric: tabular-nums;
+    }
+    th {
+      position: sticky;
+      top: 0;
+      z-index: 1;
+      background: #102b3d;
+      color: var(--accent);
+      font-size: 10px;
+      letter-spacing: .05em;
+      text-transform: uppercase;
+    }
+    .muted { color: var(--muted); }
+    .win { color: var(--good); font-weight: 900; }
+    .loss { color: var(--hot); font-weight: 900; }
+    @media (max-width: 760px) {
+      main { width: calc(100vw - 14px); padding-top: 10px; }
+      .metrics { grid-template-columns: repeat(2, minmax(0, 1fr)); }
+      .status { width: 100%; margin-left: 0; }
+    }
+  </style>
+</head>
+<body>
+  <main>
+    <h1>Prediction Study Saver</h1>
+    <p>
+      Builds one row per team-game using only information known before that game: recent team form, team hitting and pitching heat,
+      bullpen ERA, starter last start, starter season line, home/away, then the final result.
+    </p>
+
+    <section class="panel toolbar">
+      <label>
+        <span>Start</span>
+        <input id="startDate" type="date" value="2026-04-01" />
+      </label>
+      <label>
+        <span>End</span>
+        <input id="endDate" type="date" value="2026-04-15" />
+      </label>
+      <label>
+        <span>Season Start</span>
+        <input id="seasonStart" type="date" value="2026-03-01" />
+      </label>
+      <button id="buildBtn" type="button">Build Dataset</button>
+      <button id="downloadBtn" type="button" disabled>Download CSV</button>
+      <span id="status" class="status">Ready.</span>
+    </section>
+
+    <section class="panel">
+      <progress id="progress" value="0" max="1"></progress>
+    </section>
+
+    <section class="panel metrics">
+      <div class="metric"><span>Rows</span><b id="rowCount">0</b></div>
+      <div class="metric"><span>Games</span><b id="gameCount">0</b></div>
+      <div class="metric"><span>Boxscores</span><b id="boxCount">0</b></div>
+      <div class="metric"><span>Saved</span><b id="saveState">No</b></div>
+    </section>
+
+    <section class="panel">
+      <div class="table-wrap">
+        <table>
+          <thead id="thead"></thead>
+          <tbody id="tbody">
+            <tr><td class="muted">Build a dataset to preview rows.</td></tr>
+          </tbody>
+        </table>
+      </div>
+    </section>
+  </main>
+
+  <script>
+    const MLB_API_BASE = 'https://statsapi.mlb.com/api/v1';
+    const cache = new Map();
+    const state = { rows: [], csv: '', filename: '' };
+
+    const columns = [
+      'date', 'game_pk', 'team', 'opponent', 'home_away', 'result', 'runs_for', 'runs_against',
+      'team_l10_w', 'team_l10_l', 'team_l10_win_pct', 'win_streak',
+      'l10_avg', 'l10_slg', 'l10_era', 'l10_bullpen_era', 'team_heat_l10',
+      'l5_avg', 'l5_slg', 'l5_era', 'l5_bullpen_era', 'team_heat_l5',
+      'last_avg', 'last_slg', 'last_era', 'last_bullpen_era', 'team_heat_last',
+      'season_avg', 'season_slg', 'season_era', 'season_bullpen_era', 'team_heat_season',
+      'starter_id', 'starter_name', 'starter_hand',
+      'starter_last_ip', 'starter_last_er', 'starter_last_h', 'starter_last_bb', 'starter_last_k', 'starter_last_hr', 'starter_heat_last_start',
+      'starter_season_gs', 'starter_season_ip', 'starter_season_era', 'starter_season_whip', 'starter_season_hr9', 'starter_season_k9', 'starter_heat_season',
+    ];
+
+    const els = {
+      startDate: document.getElementById('startDate'),
+      endDate: document.getElementById('endDate'),
+      seasonStart: document.getElementById('seasonStart'),
+      buildBtn: document.getElementById('buildBtn'),
+      downloadBtn: document.getElementById('downloadBtn'),
+      status: document.getElementById('status'),
+      progress: document.getElementById('progress'),
+      rowCount: document.getElementById('rowCount'),
+      gameCount: document.getElementById('gameCount'),
+      boxCount: document.getElementById('boxCount'),
+      saveState: document.getElementById('saveState'),
+      thead: document.getElementById('thead'),
+      tbody: document.getElementById('tbody'),
+    };
+
+    function setStatus(text) {
+      els.status.textContent = text;
+    }
+
+    function setProgress(done, total) {
+      els.progress.max = Math.max(1, total || 1);
+      els.progress.value = Math.max(0, done || 0);
+    }
+
+    function dateOnly(value) {
+      return String(value || '').slice(0, 10);
+    }
+
+    function nextDate(date) {
+      const d = new Date(`${date}T12:00:00Z`);
+      d.setUTCDate(d.getUTCDate() + 1);
+      return d.toISOString().slice(0, 10);
+    }
+
+    function compareDate(a, b) {
+      return dateOnly(a).localeCompare(dateOnly(b));
+    }
+
+    function num(value) {
+      const n = Number(String(value ?? '').replace(/[^\d.-]/g, ''));
+      return Number.isFinite(n) ? n : 0;
+    }
+
+    function rate(value, digits = 3, trimZero = true) {
+      const n = Number(value);
+      if (!Number.isFinite(n)) return '';
+      const fixed = n.toFixed(digits);
+      return trimZero ? fixed.replace(/^0\./, '.') : fixed;
+    }
+
+    function inningsToOuts(value) {
+      if (value == null || value === '') return 0;
+      const parts = String(value).split('.');
+      const whole = Number(parts[0]);
+      const fraction = Number(parts[1] || 0);
+      if (!Number.isFinite(whole) || !Number.isFinite(fraction)) return 0;
+      return (whole * 3) + fraction;
+    }
+
+    function outsToInnings(outs) {
+      const total = Math.max(0, Math.floor(Number(outs) || 0));
+      return `${Math.floor(total / 3)}.${total % 3}`;
+    }
+
+    function clamp(value, min, max) {
+      return Math.max(min, Math.min(max, value));
+    }
+
+    function scale(value, low, high, invert = false) {
+      if (value == null || value === '') return 50;
+      const n = Number(value);
+      if (!Number.isFinite(n)) return 50;
+      const raw = (n - low) / Math.max(0.00001, high - low);
+      const score = clamp(raw, 0, 1) * 100;
+      return invert ? 100 - score : score;
+    }
+
+    function teamHeat(metrics) {
+      if (!metrics) return '';
+      const score = (
+        scale(metrics.winPct, .300, .700) * .20
+        + scale(metrics.avg, .210, .290) * .20
+        + scale(metrics.slg, .330, .500) * .25
+        + scale(metrics.era, 2.80, 5.80, true) * .20
+        + scale(metrics.bullpenEra, 2.80, 5.80, true) * .15
+      );
+      return Math.round(score);
+    }
+
+    function starterHeat(line) {
+      if (!line || !line.outs) return '';
+      const era = (line.er * 27) / line.outs;
+      const whip = ((line.h + line.bb) * 3) / line.outs;
+      const k9 = (line.k * 27) / line.outs;
+      const hr9 = (line.hr * 27) / line.outs;
+      const score = (
+        scale(era, 2.50, 6.00, true) * .34
+        + scale(whip, .90, 1.60, true) * .24
+        + scale(k9, 5.0, 11.5) * .24
+        + scale(hr9, .50, 1.80, true) * .18
+      );
+      return Math.round(score);
+    }
+
+    function csvEscape(value) {
+      const text = String(value ?? '');
+      return /[",\r\n]/.test(text) ? `"${text.replace(/"/g, '""')}"` : text;
+    }
+
+    function escapeHtml(value) {
+      return String(value ?? '').replace(/[&<>"']/g, (ch) => ({
+        '&': '&amp;',
+        '<': '&lt;',
+        '>': '&gt;',
+        '"': '&quot;',
+        "'": '&#39;',
+      }[ch]));
+    }
+
+    function toCsv(rows) {
+      return [
+        columns.map(csvEscape).join(','),
+        ...rows.map((row) => columns.map((key) => csvEscape(row[key])).join(',')),
+      ].join('\r\n');
+    }
+
+    async function getJson(url) {
+      if (cache.has(url)) return cache.get(url);
+      const promise = fetch(url).then((response) => {
+        if (!response.ok) throw new Error(`${response.status} ${response.statusText}`);
+        return response.json();
+      });
+      cache.set(url, promise);
+      return promise;
+    }
+
+    function scheduleUrl(startDate, endDate) {
+      const url = new URL(`${MLB_API_BASE}/schedule`);
+      url.searchParams.set('sportId', '1');
+      url.searchParams.set('gameTypes', 'R');
+      url.searchParams.set('startDate', startDate);
+      url.searchParams.set('endDate', endDate);
+      url.searchParams.set('hydrate', 'probablePitcher,team,venue');
+      return url.toString();
+    }
+
+    async function getScheduleGames(startDate, endDate) {
+      const payload = await getJson(scheduleUrl(startDate, endDate));
+      return (payload.dates || []).flatMap((day) => (day.games || []).map((game) => ({
+        gamePk: game.gamePk,
+        date: day.date || dateOnly(game.officialDate || game.gameDate),
+        officialDate: dateOnly(game.officialDate || day.date || game.gameDate),
+        status: game.status || {},
+        venue: game.venue?.name || '',
+        away: {
+          id: game.teams?.away?.team?.id,
+          abbrev: game.teams?.away?.team?.abbreviation || game.teams?.away?.team?.teamCode || '',
+          name: game.teams?.away?.team?.name || '',
+          score: Number(game.teams?.away?.score),
+          probable: game.teams?.away?.probablePitcher || null,
+        },
+        home: {
+          id: game.teams?.home?.team?.id,
+          abbrev: game.teams?.home?.team?.abbreviation || game.teams?.home?.team?.teamCode || '',
+          name: game.teams?.home?.team?.name || '',
+          score: Number(game.teams?.home?.score),
+          probable: game.teams?.home?.probablePitcher || null,
+        },
+      })));
+    }
+
+    function isFinalGame(game) {
+      const text = `${game.status?.abstractGameState || ''} ${game.status?.detailedState || ''} ${game.status?.codedGameState || ''}`;
+      return /final|completed|F\b/i.test(text) && Number.isFinite(game.away.score) && Number.isFinite(game.home.score);
+    }
+
+    async function getBoxscore(gamePk) {
+      return getJson(`${MLB_API_BASE}/game/${gamePk}/boxscore`);
+    }
+
+    function teamBattingStats(teamBox) {
+      const batting = teamBox?.teamStats?.batting || {};
+      const hits = num(batting.hits);
+      const doubles = num(batting.doubles);
+      const triples = num(batting.triples);
+      const homeRuns = num(batting.homeRuns);
+      const atBats = num(batting.atBats);
+      const totalBases = num(batting.totalBases) || Math.max(0, hits - doubles - triples - homeRuns) + (doubles * 2) + (triples * 3) + (homeRuns * 4);
+      return { atBats, hits, totalBases };
+    }
+
+    function pitchingLine(player) {
+      const stat = player?.stats?.pitching || {};
+      const outs = inningsToOuts(stat.inningsPitched);
+      return {
+        outs,
+        er: num(stat.earnedRuns),
+        h: num(stat.hits),
+        bb: num(stat.baseOnBalls ?? stat.walks),
+        k: num(stat.strikeOuts),
+        hr: num(stat.homeRuns),
+      };
+    }
+
+    function addLine(a, b) {
+      a.outs += num(b.outs);
+      a.er += num(b.er);
+      a.h += num(b.h);
+      a.bb += num(b.bb);
+      a.k += num(b.k);
+      a.hr += num(b.hr);
+      return a;
+    }
+
+    function blankLine() {
+      return { outs: 0, er: 0, h: 0, bb: 0, k: 0, hr: 0 };
+    }
+
+    function firstText(...values) {
+      for (const value of values) {
+        const text = String(value ?? '').trim();
+        if (text) return text;
+      }
+      return '';
+    }
+
+    function handednessCode(value) {
+      const text = String(value ?? '').trim().toUpperCase();
+      if (!text) return '';
+      if (text === 'R' || text.startsWith('RIGHT')) return 'R';
+      if (text === 'L' || text.startsWith('LEFT')) return 'L';
+      if (text === 'S' || text.startsWith('SWITCH')) return 'S';
+      return text.slice(0, 1);
+    }
+
+    function pitcherIdentity(teamBox, pitcherId, probable) {
+      const player = teamBox?.players?.[`ID${pitcherId}`];
+      return {
+        id: pitcherId || probable?.id || '',
+        name: firstText(player?.person?.fullName, player?.person?.lastName, probable?.fullName, probable?.lastName),
+        hand: handednessCode(firstText(
+          player?.person?.pitchHand?.code,
+          player?.person?.pitchHand?.description,
+          player?.person?.throws,
+          player?.person?.throwingHand,
+          probable?.pitchHand?.code,
+          probable?.pitchHand?.description,
+          probable?.throws,
+          probable?.throwingHand,
+        )),
+      };
+    }
+
+    async function playerHand(playerId) {
+      const id = Number(playerId);
+      if (!Number.isFinite(id) || id <= 0) return '';
+      const person = await getJson(`${MLB_API_BASE}/people/${id}`).catch(() => null);
+      const player = person?.people?.[0] || {};
+      return handednessCode(firstText(
+        player?.pitchHand?.code,
+        player?.pitchHand?.description,
+        player?.throws,
+        player?.throwingHand,
+      ));
+    }
+
+    async function enrichStarterHands(teamLogs) {
+      const starters = [];
+      for (const logs of teamLogs.values()) {
+        for (const log of logs) {
+          if (log?.starter?.id && !log.starter.hand) starters.push(log.starter);
+        }
+      }
+      const ids = [...new Set(starters.map((starter) => String(starter.id)).filter(Boolean))];
+      const entries = await mapWithConcurrency(ids, 8, async (id) => [id, await playerHand(id)]);
+      const handById = new Map(entries.filter(([, hand]) => hand));
+      for (const starter of starters) {
+        starter.hand = handById.get(String(starter.id)) || starter.hand || '';
+      }
+    }
+
+    function buildTeamGameLog(game, side, boxscore) {
+      const isHome = side === 'home';
+      const team = game[side];
+      const opp = game[isHome ? 'away' : 'home'];
+      const teamBox = boxscore?.teams?.[side] || {};
+      const batting = teamBattingStats(teamBox);
+      const pitcherIds = teamBox.pitchers || [];
+      const starterId = Number(pitcherIds[0]) || Number(team.probable?.id) || '';
+      const starter = pitcherIdentity(teamBox, starterId, team.probable);
+      const totalPitching = (pitcherIds || []).reduce((sum, id) => addLine(sum, pitchingLine(teamBox.players?.[`ID${id}`])), blankLine());
+      const bullpenPitching = (pitcherIds || []).slice(1).reduce((sum, id) => addLine(sum, pitchingLine(teamBox.players?.[`ID${id}`])), blankLine());
+      const runsFor = isHome ? game.home.score : game.away.score;
+      const runsAgainst = isHome ? game.away.score : game.home.score;
+      return {
+        gamePk: game.gamePk,
+        date: game.officialDate,
+        teamId: team.id,
+        team: team.abbrev,
+        opponentId: opp.id,
+        opponent: opp.abbrev,
+        homeAway: isHome ? 'H' : 'A',
+        win: runsFor > runsAgainst,
+        runsFor,
+        runsAgainst,
+        ...batting,
+        pitching: totalPitching,
+        bullpen: bullpenPitching,
+        starter,
+        starterLine: starterId ? pitchingLine(teamBox.players?.[`ID${starterId}`]) : blankLine(),
+      };
+    }
+
+    function buildLogs(games, boxscores) {
+      const teamLogs = new Map();
+      const pitcherStarts = new Map();
+      const addTeamLog = (log) => {
+        if (!teamLogs.has(log.team)) teamLogs.set(log.team, []);
+        teamLogs.get(log.team).push(log);
+        if (log.starter?.id) {
+          const key = String(log.starter.id);
+          if (!pitcherStarts.has(key)) pitcherStarts.set(key, []);
+          pitcherStarts.get(key).push({
+            date: log.date,
+            gamePk: log.gamePk,
+            team: log.team,
+            opponent: log.opponent,
+            homeAway: log.homeAway,
+            ...log.starterLine,
+          });
+        }
+      };
+      for (const game of games) {
+        const boxscore = boxscores.get(String(game.gamePk));
+        if (!boxscore) continue;
+        addTeamLog(buildTeamGameLog(game, 'away', boxscore));
+        addTeamLog(buildTeamGameLog(game, 'home', boxscore));
+      }
+      for (const logs of teamLogs.values()) logs.sort((a, b) => compareDate(a.date, b.date) || a.gamePk - b.gamePk);
+      for (const logs of pitcherStarts.values()) logs.sort((a, b) => compareDate(a.date, b.date) || a.gamePk - b.gamePk);
+      return { teamLogs, pitcherStarts };
+    }
+
+    function aggregateTeam(logs) {
+      const base = {
+        games: logs.length,
+        wins: logs.filter((game) => game.win).length,
+        losses: logs.filter((game) => !game.win).length,
+        atBats: 0,
+        hits: 0,
+        totalBases: 0,
+        outs: 0,
+        er: 0,
+        bullpenOuts: 0,
+        bullpenEr: 0,
+      };
+      for (const game of logs) {
+        base.atBats += game.atBats;
+        base.hits += game.hits;
+        base.totalBases += game.totalBases;
+        base.outs += game.pitching.outs;
+        base.er += game.pitching.er;
+        base.bullpenOuts += game.bullpen.outs;
+        base.bullpenEr += game.bullpen.er;
+      }
+      const metrics = {
+        ...base,
+        winPct: base.games ? base.wins / base.games : null,
+        avg: base.atBats ? base.hits / base.atBats : null,
+        slg: base.atBats ? base.totalBases / base.atBats : null,
+        era: base.outs ? (base.er * 27) / base.outs : null,
+        bullpenEra: base.bullpenOuts ? (base.bullpenEr * 27) / base.bullpenOuts : null,
+      };
+      metrics.heat = teamHeat(metrics);
+      return metrics;
+    }
+
+    function winStreak(logs) {
+      if (!logs.length) return 0;
+      const last = logs[logs.length - 1].win;
+      let count = 0;
+      for (let i = logs.length - 1; i >= 0; i -= 1) {
+        if (logs[i].win !== last) break;
+        count += 1;
+      }
+      return last ? count : -count;
+    }
+
+    function pitcherSeasonLine(logs) {
+      const line = logs.reduce((sum, game) => addLine(sum, game), blankLine());
+      const gs = logs.length;
+      return {
+        gs,
+        ...line,
+        ip: outsToInnings(line.outs),
+        era: line.outs ? (line.er * 27) / line.outs : null,
+        whip: line.outs ? ((line.h + line.bb) * 3) / line.outs : null,
+        hr9: line.outs ? (line.hr * 27) / line.outs : null,
+        k9: line.outs ? (line.k * 27) / line.outs : null,
+        heat: starterHeat(line),
+      };
+    }
+
+    function teamContext(teamLogs, team, date, gamePk) {
+      const previous = (teamLogs.get(team) || []).filter((game) => compareDate(game.date, date) < 0 || (game.date === date && game.gamePk < gamePk));
+      const last = previous.slice(-1);
+      const l5 = previous.slice(-5);
+      const l10 = previous.slice(-10);
+      return {
+        previous,
+        last: aggregateTeam(last),
+        l5: aggregateTeam(l5),
+        l10: aggregateTeam(l10),
+        season: aggregateTeam(previous),
+        streak: winStreak(previous),
+      };
+    }
+
+    function addTeamMetrics(row, prefix, metrics) {
+      row[`${prefix}_avg`] = rate(metrics.avg, 3, true);
+      row[`${prefix}_slg`] = rate(metrics.slg, 3, true);
+      row[`${prefix}_era`] = rate(metrics.era, 2, false);
+      row[`${prefix}_bullpen_era`] = rate(metrics.bullpenEra, 2, false);
+      row[`team_heat_${prefix}`] = metrics.heat;
+    }
+
+    function buildRows(targetGames, teamLogs, pitcherStarts) {
+      const rows = [];
+      for (const game of targetGames.filter(isFinalGame)) {
+        for (const side of ['away', 'home']) {
+          const isHome = side === 'home';
+          const team = game[side];
+          const opp = game[isHome ? 'away' : 'home'];
+          const runsFor = isHome ? game.home.score : game.away.score;
+          const runsAgainst = isHome ? game.away.score : game.home.score;
+          const context = teamContext(teamLogs, team.abbrev, game.officialDate, game.gamePk);
+          const currentLog = (teamLogs.get(team.abbrev) || []).find((log) => log.gamePk === game.gamePk);
+          const starter = currentLog?.starter || {
+            id: team.probable?.id || '',
+            name: firstText(team.probable?.fullName, team.probable?.lastName),
+            hand: handednessCode(firstText(team.probable?.pitchHand?.code, team.probable?.pitchHand?.description, team.probable?.throws, team.probable?.throwingHand)),
+          };
+          const starterPrevious = (pitcherStarts.get(String(starter.id)) || []).filter((line) => compareDate(line.date, game.officialDate) < 0 || (line.date === game.officialDate && line.gamePk < game.gamePk));
+          const hasStarterLast = starterPrevious.length > 0;
+          const starterLast = starterPrevious.slice(-1)[0] || blankLine();
+          const starterSeason = pitcherSeasonLine(starterPrevious);
+          const row = {
+            date: game.officialDate,
+            game_pk: game.gamePk,
+            team: team.abbrev,
+            opponent: opp.abbrev,
+            home_away: isHome ? 'H' : 'A',
+            result: runsFor > runsAgainst ? 'W' : 'L',
+            runs_for: runsFor,
+            runs_against: runsAgainst,
+            team_l10_w: context.l10.wins,
+            team_l10_l: context.l10.losses,
+            team_l10_win_pct: rate(context.l10.winPct, 3, true),
+            win_streak: context.streak,
+            starter_id: starter.id || '',
+            starter_name: starter.name || '',
+            starter_hand: starter.hand || '',
+            starter_last_ip: hasStarterLast ? outsToInnings(starterLast.outs) : '',
+            starter_last_er: hasStarterLast ? starterLast.er : '',
+            starter_last_h: hasStarterLast ? starterLast.h : '',
+            starter_last_bb: hasStarterLast ? starterLast.bb : '',
+            starter_last_k: hasStarterLast ? starterLast.k : '',
+            starter_last_hr: hasStarterLast ? starterLast.hr : '',
+            starter_heat_last_start: hasStarterLast && starterLast.outs ? starterHeat(starterLast) : '',
+            starter_season_gs: starterSeason.gs,
+            starter_season_ip: starterSeason.ip,
+            starter_season_era: rate(starterSeason.era, 2, false),
+            starter_season_whip: rate(starterSeason.whip, 2, false),
+            starter_season_hr9: rate(starterSeason.hr9, 2, false),
+            starter_season_k9: rate(starterSeason.k9, 2, false),
+            starter_heat_season: starterSeason.heat,
+          };
+          addTeamMetrics(row, 'l10', context.l10);
+          addTeamMetrics(row, 'l5', context.l5);
+          addTeamMetrics(row, 'last', context.last);
+          addTeamMetrics(row, 'season', context.season);
+          rows.push(row);
+        }
+      }
+      return rows;
+    }
+
+    async function mapWithConcurrency(items, limit, worker) {
+      const results = new Array(items.length);
+      let index = 0;
+      let done = 0;
+      const workers = Array.from({ length: Math.max(1, Math.min(limit, items.length)) }, async () => {
+        while (index < items.length) {
+          const current = index;
+          index += 1;
+          results[current] = await worker(items[current], current);
+          done += 1;
+          setProgress(done, items.length);
+        }
+      });
+      await Promise.all(workers);
+      return results;
+    }
+
+    function renderPreview(rows) {
+      els.thead.innerHTML = `<tr>${columns.map((column) => `<th>${column}</th>`).join('')}</tr>`;
+      const preview = rows.slice(0, 80);
+      els.tbody.innerHTML = preview.map((row) => `
+        <tr>
+          ${columns.map((column) => {
+            const value = row[column] ?? '';
+            const cls = column === 'result' ? (value === 'W' ? 'win' : 'loss') : '';
+            return `<td class="${cls}" title="${escapeHtml(value)}">${escapeHtml(value)}</td>`;
+          }).join('')}
+        </tr>
+      `).join('') || '<tr><td class="muted">No completed games found in that range.</td></tr>';
+    }
+
+    function downloadCsv() {
+      if (!state.csv) return;
+      const blob = new Blob([state.csv], { type: 'text/csv;charset=utf-8;' });
+      const url = URL.createObjectURL(blob);
+      const a = document.createElement('a');
+      a.href = url;
+      a.download = state.filename || 'prediction-study.csv';
+      document.body.appendChild(a);
+      a.click();
+      a.remove();
+      URL.revokeObjectURL(url);
+    }
+
+    async function buildDataset() {
+      const start = dateOnly(els.startDate.value);
+      const end = dateOnly(els.endDate.value);
+      const seasonStart = dateOnly(els.seasonStart.value);
+      if (!start || !end || !seasonStart || compareDate(start, end) > 0 || compareDate(seasonStart, end) > 0) {
+        setStatus('Check the date range.');
+        return;
+      }
+      els.buildBtn.disabled = true;
+      els.downloadBtn.disabled = true;
+      els.saveState.textContent = 'No';
+      state.rows = [];
+      state.csv = '';
+      state.filename = '';
+      try {
+        setStatus('Loading schedules...');
+        setProgress(0, 1);
+        const [allGames, targetGames] = await Promise.all([
+          getScheduleGames(seasonStart, end),
+          getScheduleGames(start, end),
+        ]);
+        const finalGames = allGames.filter(isFinalGame);
+        const boxscoreGames = finalGames.filter((game) => compareDate(game.officialDate, seasonStart) >= 0 && compareDate(game.officialDate, end) <= 0);
+        els.gameCount.textContent = String(targetGames.filter(isFinalGame).length);
+        els.boxCount.textContent = '0';
+        setStatus(`Loading ${boxscoreGames.length} boxscores...`);
+        const boxscoreEntries = await mapWithConcurrency(boxscoreGames, 6, async (game) => {
+          const box = await getBoxscore(game.gamePk);
+          els.boxCount.textContent = String(Number(els.boxCount.textContent) + 1);
+          return [String(game.gamePk), box];
+        });
+        const boxscores = new Map(boxscoreEntries);
+        setStatus('Building logs and rows...');
+        const logs = buildLogs(boxscoreGames, boxscores);
+        setStatus('Filling starter handedness...');
+        await enrichStarterHands(logs.teamLogs);
+        const rows = buildRows(targetGames, logs.teamLogs, logs.pitcherStarts);
+        state.rows = rows;
+        state.csv = toCsv(rows);
+        state.filename = `prediction-study-${start}-to-${end}.csv`;
+        try {
+          localStorage.setItem('prediction-study-latest:v1', JSON.stringify({ createdAt: new Date().toISOString(), start, end, rows }));
+          els.saveState.textContent = 'Local';
+        } catch {
+          els.saveState.textContent = 'CSV';
+        }
+        els.rowCount.textContent = String(rows.length);
+        els.downloadBtn.disabled = rows.length === 0;
+        renderPreview(rows);
+        setProgress(1, 1);
+        setStatus(`Built ${rows.length} rows. Preview shows first 80.`);
+      } catch (error) {
+        console.error(error);
+        setStatus(`Build failed: ${error.message || error}`);
+      } finally {
+        els.buildBtn.disabled = false;
+      }
+    }
+
+    els.buildBtn.addEventListener('click', buildDataset);
+    els.downloadBtn.addEventListener('click', downloadCsv);
+  </script>
+</body>
+</html>

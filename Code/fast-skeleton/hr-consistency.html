@@ -1,0 +1,493 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1" />
+  <title>HR Consistency Lab</title>
+  <style>
+    :root {
+      color-scheme: dark;
+      --bg: #07131d;
+      --panel: #0d2130;
+      --line: #2a5267;
+      --text: #f2fbff;
+      --muted: #9fc0cf;
+      --accent: #81def2;
+      --hot: #ff4f66;
+    }
+    body {
+      margin: 0;
+      background: var(--bg);
+      color: var(--text);
+      font: 13px/1.35 system-ui, -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif;
+    }
+    main {
+      max-width: 1180px;
+      margin: 0 auto;
+      padding: 18px;
+    }
+    h1 {
+      margin: 0 0 6px;
+      font-size: 22px;
+      letter-spacing: .04em;
+      text-transform: uppercase;
+    }
+    .toolbar, .panel {
+      border: 1px solid var(--line);
+      border-radius: 8px;
+      background: var(--panel);
+      padding: 12px;
+      margin: 10px 0;
+    }
+    .toolbar {
+      display: flex;
+      flex-wrap: wrap;
+      align-items: center;
+      gap: 10px;
+    }
+    button, input {
+      border: 1px solid var(--line);
+      border-radius: 6px;
+      background: #081925;
+      color: var(--text);
+      padding: 7px 9px;
+      font: inherit;
+      font-weight: 800;
+    }
+    button { cursor: pointer; }
+    button:hover { border-color: var(--accent); }
+    table {
+      width: 100%;
+      border-collapse: collapse;
+      table-layout: fixed;
+    }
+    th, td {
+      border-bottom: 1px solid rgba(159, 192, 207, .24);
+      padding: 7px 6px;
+      text-align: left;
+      vertical-align: top;
+      white-space: nowrap;
+      overflow: hidden;
+      text-overflow: ellipsis;
+    }
+    th {
+      color: var(--accent);
+      font-size: 11px;
+      text-transform: uppercase;
+      letter-spacing: .05em;
+      background: #102b3d;
+      position: sticky;
+      top: 0;
+    }
+    .muted { color: var(--muted); }
+    .score {
+      color: var(--hot);
+      font-weight: 1000;
+    }
+    .note {
+      max-width: 850px;
+      color: var(--muted);
+    }
+    tr[data-player-key] {
+      cursor: pointer;
+    }
+    tr[data-player-key]:hover td,
+    tr[data-player-key].selected td {
+      background: rgba(129, 222, 242, .08);
+    }
+    .detail-panel[hidden] {
+      display: none;
+    }
+    .detail-head {
+      display: flex;
+      align-items: baseline;
+      justify-content: space-between;
+      gap: 12px;
+      margin-bottom: 8px;
+    }
+    .detail-head h2 {
+      margin: 0;
+      font-size: 18px;
+      letter-spacing: .04em;
+      text-transform: uppercase;
+    }
+    .chart-wrap {
+      overflow-x: auto;
+      border: 1px solid rgba(159, 192, 207, .24);
+      border-radius: 8px;
+      background: #06131d;
+    }
+    .chart-svg {
+      display: block;
+      width: 100%;
+      min-width: 920px;
+      height: auto;
+    }
+    .legend {
+      display: flex;
+      flex-wrap: wrap;
+      gap: 12px;
+      margin: 8px 0;
+      color: var(--muted);
+      font-weight: 800;
+      font-size: 12px;
+    }
+    .legend i {
+      display: inline-block;
+      width: 18px;
+      height: 8px;
+      margin-right: 5px;
+      border-radius: 999px;
+      vertical-align: 1px;
+    }
+    .hr-games {
+      margin-top: 10px;
+      overflow-x: auto;
+    }
+    .hr-games td,
+    .hr-games th {
+      padding: 6px 8px;
+    }
+  </style>
+</head>
+<body>
+  <main>
+    <h1>HR Consistency Lab</h1>
+    <div class="note">Loads the heatmap CSV, groups by hitter, and scores whether each hitter's HR cadence repeats around their own average HR interval, plus recurring game context.</div>
+    <div class="toolbar">
+      <button id="loadDefaultBtn" type="button">Load default CSV</button>
+      <input id="fileInput" type="file" accept=".csv,text/csv" />
+      <span id="status" class="muted">No CSV loaded.</span>
+    </div>
+    <section class="panel">
+      <table>
+        <thead>
+          <tr>
+            <th style="width:18%">Player</th>
+            <th>Team</th>
+            <th>HR G</th>
+            <th>Total G</th>
+            <th>Avg Gap</th>
+            <th>Cadence</th>
+            <th>Score</th>
+            <th>Pattern Read</th>
+            <th>HR Dates</th>
+          </tr>
+        </thead>
+        <tbody id="tbody">
+          <tr><td colspan="9" class="muted">Load a CSV to begin.</td></tr>
+        </tbody>
+      </table>
+    </section>
+    <section id="detailPanel" class="panel detail-panel" hidden>
+      <div class="detail-head">
+        <div>
+          <h2 id="detailTitle">Player Detail</h2>
+          <div id="detailMeta" class="muted"></div>
+        </div>
+      </div>
+      <div class="legend">
+        <span><i style="background: rgba(129, 222, 242, .12);"></i>Home game shade</span>
+        <span><i style="background: rgba(255, 255, 255, .05);"></i>Away game shade</span>
+        <span><i style="background: #81def2;"></i>Total bases axis left</span>
+        <span><i style="background: #ff4f66;"></i>HR axis right, labeled by pitcher hand</span>
+      </div>
+      <div id="chart" class="chart-wrap"></div>
+      <div id="hrGames" class="hr-games"></div>
+    </section>
+  </main>
+  <script>
+    const tbody = document.getElementById('tbody');
+    const statusEl = document.getElementById('status');
+    const detailPanel = document.getElementById('detailPanel');
+    const detailTitle = document.getElementById('detailTitle');
+    const detailMeta = document.getElementById('detailMeta');
+    const chartEl = document.getElementById('chart');
+    const hrGamesEl = document.getElementById('hrGames');
+    let currentGroups = new Map();
+    let currentAnalyzed = [];
+
+    function parseCsv(text) {
+      const rows = [];
+      let row = [];
+      let cell = '';
+      let quoted = false;
+      for (let i = 0; i < text.length; i += 1) {
+        const ch = text[i];
+        const next = text[i + 1];
+        if (quoted) {
+          if (ch === '"' && next === '"') { cell += '"'; i += 1; }
+          else if (ch === '"') quoted = false;
+          else cell += ch;
+        } else if (ch === '"') quoted = true;
+        else if (ch === ',') { row.push(cell); cell = ''; }
+        else if (ch === '\n') { row.push(cell); rows.push(row); row = []; cell = ''; }
+        else if (ch !== '\r') cell += ch;
+      }
+      if (cell || row.length) { row.push(cell); rows.push(row); }
+      const headers = rows.shift() || [];
+      return rows.map((values) => Object.fromEntries(headers.map((header, i) => [header.trim(), (values[i] || '').trim()])));
+    }
+
+    const num = (value) => {
+      const n = Number(String(value ?? '').replace('%', ''));
+      return Number.isFinite(n) ? n : 0;
+    };
+    const dateOf = (row) => String(row.date || row.game_date || row.source_date || '').slice(0, 10);
+    const playerKey = (row) => row.batter_id || row.player_id || row.batter_name || row.player_name || '';
+    const playerName = (row) => row.batter_name || row.player_name || row.name || 'Unknown';
+    const isHr = (row) => num(row.full_hr || row.hr || row.home_runs || row.result_hr) > 0;
+    const totalBasesOf = (row) => num(row.full_tb || row.tb || row.total_bases);
+    const homeRunsOf = (row) => num(row.full_hr || row.hr || row.home_runs || row.result_hr);
+    const venueOf = (row) => String(row.team_home_away || row.home_away || row.venue_side || '').toUpperCase().slice(0, 1);
+    const pitcherHandOf = (row) => String(row.starter_hand || row.pitcher_hand || row.pitcher_throws || '').toUpperCase().slice(0, 1);
+    const escapeHtml = (value) => String(value ?? '').replace(/[&<>"']/g, (ch) => ({
+      '&': '&amp;',
+      '<': '&lt;',
+      '>': '&gt;',
+      '"': '&quot;',
+      "'": '&#39;',
+    }[ch]));
+
+    function groupRows(rows) {
+      const groups = new Map();
+      rows.forEach((row) => {
+        const key = playerKey(row);
+        if (!key || !dateOf(row)) return;
+        if (!groups.has(key)) groups.set(key, []);
+        groups.get(key).push(row);
+      });
+      return groups;
+    }
+
+    function concentration(values) {
+      const filtered = values.filter(Boolean);
+      if (!filtered.length) return 0;
+      const counts = new Map();
+      filtered.forEach((v) => counts.set(v, (counts.get(v) || 0) + 1));
+      return Math.max(...counts.values()) / filtered.length;
+    }
+
+    function hrCadence(rows, hrRows) {
+      const byDate = [...rows].sort((a, b) => dateOf(a).localeCompare(dateOf(b)));
+      const hrDateSet = new Set(hrRows.map(dateOf));
+      const hrIndexes = byDate
+        .map((row, index) => (hrDateSet.has(dateOf(row)) ? index : -1))
+        .filter((index) => index >= 0);
+      if (hrIndexes.length < 2) {
+        return { gaps: [], avgGap: 0, score: 0.25, withinOne: 0, label: 'needs more HRs' };
+      }
+      const gaps = hrIndexes.slice(1).map((index, i) => Math.max(1, index - hrIndexes[i]));
+      const mean = gaps.reduce((a, b) => a + b, 0) / gaps.length;
+      const withinOne = gaps.filter((gap) => Math.abs(gap - mean) <= 1).length / gaps.length;
+      const withinTwo = gaps.filter((gap) => Math.abs(gap - mean) <= 2).length / gaps.length;
+      const variance = gaps.reduce((sum, gap) => sum + ((gap - mean) ** 2), 0) / gaps.length;
+      const spreadScore = Math.max(0, Math.min(1, 1 - (Math.sqrt(variance) / Math.max(1, mean))));
+      return {
+        gaps,
+        avgGap: mean,
+        withinOne,
+        score: (withinOne * 0.58) + (withinTwo * 0.22) + (spreadScore * 0.20),
+        label: `${mean.toFixed(1)} G avg; ${Math.round(withinOne * 100)}% within +/-1`,
+      };
+    }
+
+    function recentTbSignal(rows, hrRows) {
+      const byDate = [...rows].sort((a, b) => dateOf(a).localeCompare(dateOf(b)));
+      const indexByDate = new Map(byDate.map((row, index) => [dateOf(row), index]));
+      const samples = hrRows.map((row) => {
+        const idx = indexByDate.get(dateOf(row));
+        if (!Number.isFinite(idx)) return null;
+        const prev = byDate.slice(Math.max(0, idx - 3), idx);
+        if (!prev.length) return null;
+        return prev.reduce((sum, item) => sum + totalBasesOf(item), 0) / prev.length;
+      }).filter((value) => value !== null);
+      if (!samples.length) return 0;
+      const avg = samples.reduce((a, b) => a + b, 0) / samples.length;
+      return Math.max(0, Math.min(1, avg / 4));
+    }
+
+    function analyze(rows) {
+      currentGroups = groupRows(rows);
+      return [...currentGroups.entries()].map(([key, playerRows]) => {
+        const hrs = playerRows.filter(isHr);
+        const hrDates = hrs.map(dateOf).sort();
+        const handConc = concentration(hrs.map((row) => row.starter_hand || row.pitcher_hand));
+        const venueConc = concentration(hrs.map((row) => row.team_home_away || row.home_away));
+        const orderConc = concentration(hrs.map((row) => row.batting_order || row.order));
+        const oppConc = concentration(hrs.map((row) => row.opponent));
+        const cadence = hrCadence(playerRows, hrs);
+        const leadIn = recentTbSignal(playerRows, hrs);
+        const rate = hrs.length / Math.max(1, playerRows.length);
+        const score = Math.round(100 * (
+          (cadence.score * .42)
+          + (handConc * .16)
+          + (venueConc * .10)
+          + (orderConc * .10)
+          + (oppConc * .06)
+          + (leadIn * .16)
+        ));
+        const patterns = [
+          cadence.label,
+          handConc >= .65 ? `hand ${hrs[0]?.starter_hand || '--'}` : '',
+          venueConc >= .65 ? `venue ${hrs[0]?.team_home_away || '--'}` : '',
+          orderConc >= .65 ? `order ${hrs[0]?.batting_order || '--'}` : '',
+          leadIn >= .55 ? 'TB lead-in' : '',
+        ].filter(Boolean).join(', ') || 'mixed';
+        return {
+          key,
+          name: playerName(playerRows[0]),
+          team: playerRows[0].team || '',
+          games: playerRows.length,
+          hrGames: hrs.length,
+          rate,
+          avgGap: cadence.avgGap,
+          cadence: cadence.label,
+          score,
+          patterns,
+          dates: hrDates.join(', '),
+        };
+      }).filter((row) => row.games >= 5 && row.hrGames >= 4).sort((a, b) => b.score - a.score || b.hrGames - a.hrGames);
+    }
+
+    function render(rows) {
+      const analyzed = analyze(rows);
+      currentAnalyzed = analyzed;
+      statusEl.textContent = `${rows.length} rows loaded, ${analyzed.length} hitters scored (min 5 games, min 4 HR).`;
+      tbody.innerHTML = analyzed.map((row) => `
+        <tr data-player-key="${escapeHtml(row.key)}">
+          <td title="${escapeHtml(row.name)}">${escapeHtml(row.name)}</td>
+          <td>${escapeHtml(row.team || '--')}</td>
+          <td>${row.hrGames}</td>
+          <td>${row.games}</td>
+          <td>${row.avgGap ? row.avgGap.toFixed(1) : '--'}</td>
+          <td title="${escapeHtml(row.cadence)}">${escapeHtml(row.cadence)}</td>
+          <td class="score">${row.score}</td>
+          <td title="${escapeHtml(row.patterns)}">${escapeHtml(row.patterns)}</td>
+          <td title="${escapeHtml(row.dates)}">${escapeHtml(row.dates)}</td>
+        </tr>
+      `).join('') || '<tr><td colspan="9" class="muted">No HR rows found.</td></tr>';
+      detailPanel.hidden = true;
+      chartEl.innerHTML = '';
+      hrGamesEl.innerHTML = '';
+    }
+
+    function renderPlayerDetail(summary) {
+      const rows = [...(currentGroups.get(summary.key) || [])].sort((a, b) => dateOf(a).localeCompare(dateOf(b)));
+      if (!rows.length) return;
+      const maxTb = Math.max(4, ...rows.map(totalBasesOf));
+      const maxHr = Math.max(1, ...rows.map(homeRunsOf));
+      const width = Math.max(920, rows.length * 34 + 120);
+      const height = 340;
+      const left = 48;
+      const right = 48;
+      const top = 28;
+      const bottom = 58;
+      const innerW = width - left - right;
+      const innerH = height - top - bottom;
+      const x = (index) => left + (rows.length <= 1 ? innerW / 2 : (index * innerW) / (rows.length - 1));
+      const yTb = (value) => top + innerH - ((value / maxTb) * innerH);
+      const yHr = (value) => top + innerH - ((value / maxHr) * innerH);
+      const bandLeft = (index) => index === 0 ? left : (x(index - 1) + x(index)) / 2;
+      const bandRight = (index) => index === rows.length - 1 ? left + innerW : (x(index) + x(index + 1)) / 2;
+      const bands = rows.map((row, index) => {
+        const venue = venueOf(row);
+        const fill = venue === 'H' ? 'rgba(129,222,242,.12)' : 'rgba(255,255,255,.05)';
+        return `<rect x="${bandLeft(index).toFixed(1)}" y="${top}" width="${(bandRight(index) - bandLeft(index)).toFixed(1)}" height="${innerH}" fill="${fill}"></rect>`;
+      }).join('');
+      const grid = [0, .25, .5, .75, 1].map((tick) => {
+        const y = top + innerH - (tick * innerH);
+        return `<line x1="${left}" x2="${left + innerW}" y1="${y.toFixed(1)}" y2="${y.toFixed(1)}" stroke="rgba(159,192,207,.18)"></line>`;
+      }).join('');
+      const tbPoints = rows.map((row, index) => `${x(index).toFixed(1)},${yTb(totalBasesOf(row)).toFixed(1)}`).join(' ');
+      const hrPoints = rows.map((row, index) => `${x(index).toFixed(1)},${yHr(homeRunsOf(row)).toFixed(1)}`).join(' ');
+      const tbDots = rows.map((row, index) => `<circle cx="${x(index).toFixed(1)}" cy="${yTb(totalBasesOf(row)).toFixed(1)}" r="3.6" fill="#81def2"></circle>`).join('');
+      const hrDots = rows.map((row, index) => {
+        const hr = homeRunsOf(row);
+        if (hr <= 0) return '';
+        const cx = x(index);
+        const cy = yHr(hr);
+        const hand = pitcherHandOf(row) || '?';
+        return `<circle cx="${cx.toFixed(1)}" cy="${cy.toFixed(1)}" r="5.2" fill="#ff4f66" stroke="#ffd4dc" stroke-width="1.2"></circle><text x="${cx.toFixed(1)}" y="${(cy - 10).toFixed(1)}" text-anchor="middle" fill="#fff" font-size="11" font-weight="900">${escapeHtml(hand)}</text>`;
+      }).join('');
+      const dateEvery = Math.max(1, Math.ceil(rows.length / 12));
+      const dateLabels = rows.map((row, index) => {
+        if (index % dateEvery && index !== rows.length - 1) return '';
+        return `<text x="${x(index).toFixed(1)}" y="${height - 20}" text-anchor="middle" fill="#9fc0cf" font-size="10">${escapeHtml(dateOf(row).slice(5))}</text>`;
+      }).join('');
+      const homeAwayLabels = rows.map((row, index) => {
+        const venue = venueOf(row);
+        if (!venue) return '';
+        return `<text x="${x(index).toFixed(1)}" y="${height - 36}" text-anchor="middle" fill="#f2fbff" font-size="10" font-weight="900">${escapeHtml(venue)}</text>`;
+      }).join('');
+      detailTitle.textContent = summary.name;
+      detailMeta.textContent = `${summary.team || '--'} | ${summary.games} games | ${summary.hrGames} HR games | score ${summary.score}`;
+      chartEl.innerHTML = `
+        <svg class="chart-svg" viewBox="0 0 ${width} ${height}" role="img" aria-label="${escapeHtml(summary.name)} total bases and home runs over time">
+          ${bands}
+          ${grid}
+          <line x1="${left}" x2="${left}" y1="${top}" y2="${top + innerH}" stroke="rgba(159,192,207,.55)"></line>
+          <line x1="${left + innerW}" x2="${left + innerW}" y1="${top}" y2="${top + innerH}" stroke="rgba(159,192,207,.55)"></line>
+          <line x1="${left}" x2="${left + innerW}" y1="${top + innerH}" y2="${top + innerH}" stroke="rgba(159,192,207,.55)"></line>
+          <text x="12" y="${top + 4}" fill="#81def2" font-size="11" font-weight="900">TB ${maxTb}</text>
+          <text x="14" y="${top + innerH}" fill="#81def2" font-size="11" font-weight="900">0</text>
+          <text x="${width - 12}" y="${top + 4}" text-anchor="end" fill="#ff4f66" font-size="11" font-weight="900">HR ${maxHr}</text>
+          <text x="${width - 12}" y="${top + innerH}" text-anchor="end" fill="#ff4f66" font-size="11" font-weight="900">0</text>
+          <polyline points="${tbPoints}" fill="none" stroke="#81def2" stroke-width="2.4" stroke-linejoin="round" stroke-linecap="round"></polyline>
+          <polyline points="${hrPoints}" fill="none" stroke="#ff4f66" stroke-width="2.1" stroke-linejoin="round" stroke-linecap="round" opacity=".9"></polyline>
+          ${tbDots}
+          ${hrDots}
+          ${homeAwayLabels}
+          ${dateLabels}
+        </svg>
+      `;
+      const hrRows = rows.filter((row) => homeRunsOf(row) > 0);
+      hrGamesEl.innerHTML = `
+        <table>
+          <thead><tr><th>Date</th><th>H/A</th><th>Opp</th><th>Pitcher Hand</th><th>TB</th><th>HR</th></tr></thead>
+          <tbody>${hrRows.map((row) => `
+            <tr>
+              <td>${escapeHtml(dateOf(row))}</td>
+              <td>${escapeHtml(venueOf(row) || '--')}</td>
+              <td>${escapeHtml(row.opponent || '--')}</td>
+              <td>${escapeHtml(pitcherHandOf(row) || '--')}</td>
+              <td>${totalBasesOf(row)}</td>
+              <td>${homeRunsOf(row)}</td>
+            </tr>
+          `).join('') || '<tr><td colspan="6" class="muted">No HR games for this hitter.</td></tr>'}</tbody>
+        </table>
+      `;
+      detailPanel.hidden = false;
+    }
+
+    tbody.addEventListener('click', (event) => {
+      const rowEl = event.target.closest('tr[data-player-key]');
+      if (!rowEl) return;
+      tbody.querySelectorAll('tr.selected').forEach((row) => row.classList.remove('selected'));
+      rowEl.classList.add('selected');
+      const summary = currentAnalyzed.find((row) => row.key === rowEl.dataset.playerKey);
+      if (summary) renderPlayerDetail(summary);
+      detailPanel.scrollIntoView({ block: 'nearest' });
+    });
+
+    document.addEventListener('keydown', (event) => {
+      if (event.key !== 'Escape') return;
+      detailPanel.hidden = true;
+      tbody.querySelectorAll('tr.selected').forEach((row) => row.classList.remove('selected'));
+    });
+
+    document.getElementById('loadDefaultBtn').addEventListener('click', async () => {
+      statusEl.textContent = 'Loading season_data_0401-0520.csv...';
+      const response = await fetch('season_data_0401-0520.csv');
+      render(parseCsv(await response.text()));
+    });
+
+    document.getElementById('fileInput').addEventListener('change', async (event) => {
+      const file = event.target.files?.[0];
+      if (!file) return;
+      statusEl.textContent = `Loading ${file.name}...`;
+      render(parseCsv(await file.text()));
+    });
+  </script>
+</body>
+</html>

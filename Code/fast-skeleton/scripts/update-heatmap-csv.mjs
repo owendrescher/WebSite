@@ -160,6 +160,158 @@ function unionHeaders(...headerSets) {
   return headers;
 }
 
+function num(value) {
+  const numeric = Number(value);
+  return Number.isFinite(numeric) ? numeric : 0;
+}
+
+function totalBasesFromLine(line = {}) {
+  const hits = num(line.hits);
+  const doubles = num(line.doubles);
+  const triples = num(line.triples);
+  const homeRuns = num(line.homeRuns ?? line.hr);
+  const singles = Math.max(0, hits - doubles - triples - homeRuns);
+  return singles + (doubles * 2) + (triples * 3) + (homeRuns * 4);
+}
+
+function normalizeBattingLine(line = null) {
+  if (!line) return null;
+  const out = {
+    atBats: num(line.atBats),
+    hits: num(line.hits),
+    doubles: num(line.doubles),
+    triples: num(line.triples),
+    homeRuns: num(line.homeRuns ?? line.hr),
+    runs: num(line.runs),
+    walks: num(line.baseOnBalls ?? line.walks ?? line.bb),
+    strikeOuts: num(line.strikeOuts ?? line.so),
+    rbi: num(line.rbi),
+    totalBases: num(line.totalBases) || totalBasesFromLine(line),
+  };
+  const hasLine = Object.values(out).some((value) => Number(value) > 0);
+  return hasLine ? out : null;
+}
+
+function battingLineFromPlay(play = {}) {
+  const eventType = clean(play?.result?.eventType).toLowerCase();
+  const bases = eventType === 'single' ? 1
+    : eventType === 'double' ? 2
+      : eventType === 'triple' ? 3
+        : eventType === 'home_run' ? 4
+          : 0;
+  const isWalk = eventType === 'walk' || eventType === 'intent_walk';
+  const isHitByPitch = eventType === 'hit_by_pitch';
+  const isSacrifice = eventType === 'sac_fly' || eventType === 'sac_bunt' || eventType === 'sac_fly_double_play' || eventType === 'sac_bunt_double_play';
+  const isInterference = eventType === 'catcher_interf' || eventType === 'catcher_interference';
+  return {
+    atBats: (!isWalk && !isHitByPitch && !isSacrifice && !isInterference) ? 1 : 0,
+    hits: bases > 0 ? 1 : 0,
+    doubles: eventType === 'double' ? 1 : 0,
+    triples: eventType === 'triple' ? 1 : 0,
+    homeRuns: eventType === 'home_run' ? 1 : 0,
+    runs: 0,
+    walks: (isWalk || isHitByPitch) ? 1 : 0,
+    strikeOuts: eventType.includes('strikeout') ? 1 : 0,
+    rbi: num(play?.result?.rbi),
+    totalBases: bases,
+  };
+}
+
+function addBattingLine(target, line) {
+  for (const key of ['atBats', 'hits', 'doubles', 'triples', 'homeRuns', 'runs', 'walks', 'strikeOuts', 'rbi', 'totalBases']) {
+    target[key] = num(target[key]) + num(line?.[key]);
+  }
+  return target;
+}
+
+function emptyBattingLine() {
+  return { atBats: 0, hits: 0, doubles: 0, triples: 0, homeRuns: 0, runs: 0, walks: 0, strikeOuts: 0, rbi: 0, totalBases: 0 };
+}
+
+function boxscoreBattingLine(live = {}, playerId = '') {
+  const id = clean(playerId);
+  if (!id) return null;
+  for (const side of ['away', 'home']) {
+    const player = live?.liveData?.boxscore?.teams?.[side]?.players?.[`ID${id}`];
+    const line = normalizeBattingLine(player?.stats?.batting || null);
+    if (line) return line;
+  }
+  return null;
+}
+
+function starterBattingLine(live = {}, batterId = '', starterId = '') {
+  const batter = Number(batterId);
+  const starter = Number(starterId);
+  if (!Number.isFinite(batter) || !Number.isFinite(starter) || batter <= 0 || starter <= 0) return null;
+  const total = emptyBattingLine();
+  for (const play of live?.liveData?.plays?.allPlays || []) {
+    if (!play?.about?.isComplete) continue;
+    if (Number(play?.matchup?.batter?.id) !== batter) continue;
+    if (Number(play?.matchup?.pitcher?.id) !== starter) continue;
+    addBattingLine(total, battingLineFromPlay(play));
+  }
+  return Object.values(total).some((value) => Number(value) > 0) ? total : null;
+}
+
+async function fetchMlbLiveFeed(gamePk) {
+  const response = await fetch(`https://statsapi.mlb.com/api/v1.1/game/${encodeURIComponent(gamePk)}/feed/live`);
+  if (!response.ok) throw new Error(`MLB live feed ${gamePk} failed with ${response.status}`);
+  return response.json();
+}
+
+function applyOutcomeLine(row, prefix, line) {
+  if (!line) return false;
+  row[`${prefix}_ab`] = line.atBats;
+  row[`${prefix}_h`] = line.hits;
+  row[`${prefix}_2b`] = line.doubles;
+  row[`${prefix}_3b`] = line.triples;
+  row[`${prefix}_hr`] = line.homeRuns;
+  row[`${prefix}_r`] = line.runs;
+  row[`${prefix}_bb`] = line.walks;
+  row[`${prefix}_k`] = line.strikeOuts;
+  row[`${prefix}_tb`] = line.totalBases;
+  row[`${prefix}_rbi`] = line.rbi;
+  return true;
+}
+
+async function correctGeneratedOutcomeRows(rows = []) {
+  const byGame = new Map();
+  for (const row of rows) {
+    const gamePk = clean(row.game_id || row.gamePk || row.game_pk);
+    if (!gamePk) continue;
+    if (!byGame.has(gamePk)) byGame.set(gamePk, []);
+    byGame.get(gamePk).push(row);
+  }
+  let corrected = 0;
+  for (const [gamePk, gameRows] of byGame) {
+    let live = null;
+    try {
+      live = await fetchMlbLiveFeed(gamePk);
+    } catch (error) {
+      console.warn(`Could not refresh MLB outcome lines for game ${gamePk}: ${error?.message || error}`);
+      continue;
+    }
+    for (const row of gameRows) {
+      const full = boxscoreBattingLine(live, row.batter_id || row.player_id || row.mlb_id);
+      const starter = starterBattingLine(live, row.batter_id || row.player_id || row.mlb_id, row.starter_id || row.pitcher_id);
+      const fullApplied = applyOutcomeLine(row, 'full', full);
+      applyOutcomeLine(row, 'starter', starter);
+      if (fullApplied) {
+        row.result_1_hit = full.hits >= 1 ? 1 : 0;
+        row.result_2_tb = full.totalBases >= 2 ? 1 : 0;
+        row.result_hr = full.homeRuns >= 1 ? 1 : 0;
+        row.result_1_run = full.runs >= 1 ? 1 : 0;
+        row.result_2_runs = full.runs >= 2 ? 1 : 0;
+        row.eligible_for_eval = 1;
+        row.exclude_reason = '';
+        corrected += 1;
+      }
+    }
+  }
+  console.log(`Refreshed MLB boxscore outcome lines for ${corrected.toLocaleString()} generated rows across ${byGame.size.toLocaleString()} games.`);
+  return rows;
+}
+
 async function downloadCurrentCsv() {
   const { data, error } = await supabase.storage.from(BUCKET).download(OBJECT_PATH);
   if (error) {
@@ -269,6 +421,7 @@ async function main() {
   if (!generatedRows.length) {
     throw new Error(`Generated ${generatedFile.filename}, but it had no rows for ${startDate} through ${endDate}.`);
   }
+  await correctGeneratedOutcomeRows(generatedRows);
 
   const mergedRows = mergeRows(current.rows, generatedRows);
   const headers = unionHeaders(current.headers, generated.headers, Object.keys(mergedRows[0] || {}));
