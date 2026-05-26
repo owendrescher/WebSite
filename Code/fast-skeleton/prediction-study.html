@@ -3,7 +3,7 @@
 <head>
   <meta charset="utf-8" />
   <meta name="viewport" content="width=device-width, initial-scale=1" />
-  <title>MLB Prediction Study Saver</title>
+  <title>MLB Prediction Sponge</title>
   <style>
     :root {
       color-scheme: dark;
@@ -71,6 +71,7 @@
       font-weight: 850;
     }
     input[type="date"] { min-width: 150px; }
+    input[type="number"] { width: 96px; }
     button {
       cursor: pointer;
       text-transform: uppercase;
@@ -150,6 +151,17 @@
     .muted { color: var(--muted); }
     .win { color: var(--good); font-weight: 900; }
     .loss { color: var(--hot); font-weight: 900; }
+    .mode-btn {
+      min-width: 86px;
+      color: var(--accent);
+    }
+    .range-note {
+      width: 100%;
+      color: var(--muted);
+      font-size: 11px;
+      font-weight: 800;
+    }
+    .is-hidden { display: none !important; }
     @media (max-width: 760px) {
       main { width: calc(100vw - 14px); padding-top: 10px; }
       .metrics { grid-template-columns: repeat(2, minmax(0, 1fr)); }
@@ -159,28 +171,42 @@
 </head>
 <body>
   <main>
-    <h1>Prediction Study Saver</h1>
+    <h1>Prediction Sponge</h1>
     <p>
-      Builds one row per team-game using only information known before that game: recent team form, team hitting and pitching heat,
-      bullpen ERA, starter last start, starter season line, home/away, then the final result.
+      The sponge absorbs completed MLB games into one row per team-game using only information known before that game: recent team form,
+      team hitting and pitching heat, bullpen ERA, starter last start, starter season line, home/away, then the final result.
+      A season means April 1 through September 30.
     </p>
 
     <section class="panel toolbar">
       <label>
-        <span>Start</span>
+        <span>Start Mode</span>
+        <button id="startModeBtn" class="mode-btn" type="button" data-mode="date">Date</button>
+      </label>
+      <label id="startDateField">
+        <span>Start Date</span>
         <input id="startDate" type="date" value="2026-04-01" />
       </label>
+      <label id="startSeasonField" class="is-hidden">
+        <span>Start Season</span>
+        <input id="startSeason" type="number" min="2000" max="2099" step="1" value="2026" />
+      </label>
       <label>
-        <span>End</span>
+        <span>End Mode</span>
+        <button id="endModeBtn" class="mode-btn" type="button" data-mode="date">Date</button>
+      </label>
+      <label id="endDateField">
+        <span>End Date</span>
         <input id="endDate" type="date" value="2026-04-15" />
       </label>
-      <label>
-        <span>Season Start</span>
-        <input id="seasonStart" type="date" value="2026-03-01" />
+      <label id="endSeasonField" class="is-hidden">
+        <span>End Season</span>
+        <input id="endSeason" type="number" min="2000" max="2099" step="1" value="2026" />
       </label>
-      <button id="buildBtn" type="button">Build Dataset</button>
+      <button id="buildBtn" type="button">Absorb Games</button>
       <button id="downloadBtn" type="button" disabled>Download CSV</button>
       <span id="status" class="status">Ready.</span>
+      <div id="rangeNote" class="range-note"></div>
     </section>
 
     <section class="panel">
@@ -218,15 +244,37 @@
       'l5_avg', 'l5_slg', 'l5_era', 'l5_bullpen_era', 'team_heat_l5',
       'last_avg', 'last_slg', 'last_era', 'last_bullpen_era', 'team_heat_last',
       'season_avg', 'season_slg', 'season_era', 'season_bullpen_era', 'team_heat_season',
+      'season_hr_per_game', 'season_hr_per_pa', 'l10_hr_per_game', 'l5_hr_per_game', 'last_game_hr',
+      'season_iso', 'l10_iso',
+      'season_hr_allowed_per_game', 'l10_hr_allowed_per_game',
+      'bullpen_season_hr9', 'bullpen_l10_hr9', 'bullpen_l5_hr9',
+      'season_obp', 'l10_obp', 'l5_obp', 'season_ops', 'l10_ops',
+      'season_walk_rate', 'l10_walk_rate', 'season_k_rate_offense', 'l10_k_rate_offense',
+      'season_runs_per_game', 'l10_runs_per_game', 'l5_runs_per_game',
+      'season_runs_allowed_per_game', 'l10_runs_allowed_per_game', 'l5_runs_allowed_per_game',
+      'run_differential_per_game', 'l10_run_differential_per_game',
+      'team_strength_score', 'opp_strength_score', 'l5_avg_opp_strength', 'l10_avg_opp_strength',
+      'qa_l5_win_form', 'qa_l10_win_form', 'qa_l5_run_diff', 'qa_l10_run_diff',
+      'qa_l5_offense_vs_expected', 'qa_l10_offense_vs_expected',
+      'qa_l5_pitching_vs_expected', 'qa_l10_pitching_vs_expected',
+      'qa_l5_heat', 'qa_l10_heat',
       'starter_id', 'starter_name', 'starter_hand',
       'starter_last_ip', 'starter_last_er', 'starter_last_h', 'starter_last_bb', 'starter_last_k', 'starter_last_hr', 'starter_heat_last_start',
-      'starter_season_gs', 'starter_season_ip', 'starter_season_era', 'starter_season_whip', 'starter_season_hr9', 'starter_season_k9', 'starter_heat_season',
+      'starter_season_gs', 'starter_season_ip', 'starter_season_era', 'starter_season_whip', 'starter_season_hr9', 'starter_l5_hr9', 'starter_season_k9', 'starter_heat_season',
     ];
 
     const els = {
       startDate: document.getElementById('startDate'),
       endDate: document.getElementById('endDate'),
-      seasonStart: document.getElementById('seasonStart'),
+      startSeason: document.getElementById('startSeason'),
+      endSeason: document.getElementById('endSeason'),
+      startModeBtn: document.getElementById('startModeBtn'),
+      endModeBtn: document.getElementById('endModeBtn'),
+      startDateField: document.getElementById('startDateField'),
+      endDateField: document.getElementById('endDateField'),
+      startSeasonField: document.getElementById('startSeasonField'),
+      endSeasonField: document.getElementById('endSeasonField'),
+      rangeNote: document.getElementById('rangeNote'),
       buildBtn: document.getElementById('buildBtn'),
       downloadBtn: document.getElementById('downloadBtn'),
       status: document.getElementById('status'),
@@ -260,6 +308,79 @@
 
     function compareDate(a, b) {
       return dateOnly(a).localeCompare(dateOnly(b));
+    }
+
+    function yearFromDate(value) {
+      const year = Number(String(value || '').slice(0, 4));
+      return Number.isFinite(year) && year >= 2000 ? year : new Date().getFullYear();
+    }
+
+    function normalizeSeason(value) {
+      const year = Number(value);
+      return Number.isFinite(year) && year >= 2000 && year <= 2099 ? Math.trunc(year) : new Date().getFullYear();
+    }
+
+    function seasonStartDate(season) {
+      return `${normalizeSeason(season)}-04-01`;
+    }
+
+    function seasonEndDate(season) {
+      return `${normalizeSeason(season)}-09-30`;
+    }
+
+    function spongeSeasonForDate(value) {
+      return yearFromDate(value);
+    }
+
+    function dateMode(button) {
+      return button?.dataset?.mode === 'season' ? 'season' : 'date';
+    }
+
+    function setMode(button, mode) {
+      const next = mode === 'season' ? 'season' : 'date';
+      button.dataset.mode = next;
+      button.textContent = next === 'season' ? 'Season' : 'Date';
+    }
+
+    function toggleMode(button) {
+      setMode(button, dateMode(button) === 'date' ? 'season' : 'date');
+      syncRangeControls();
+    }
+
+    function resolvedSpongeRange() {
+      const startMode = dateMode(els.startModeBtn);
+      const endMode = dateMode(els.endModeBtn);
+      const start = startMode === 'season'
+        ? seasonStartDate(els.startSeason.value)
+        : dateOnly(els.startDate.value);
+      const end = endMode === 'season'
+        ? seasonEndDate(els.endSeason.value)
+        : dateOnly(els.endDate.value);
+      if (!start || !end) return null;
+      const seasonStart = seasonStartDate(spongeSeasonForDate(start));
+      return {
+        start,
+        end,
+        seasonStart,
+        startMode,
+        endMode,
+        startLabel: startMode === 'season' ? `Season ${normalizeSeason(els.startSeason.value)}` : start,
+        endLabel: endMode === 'season' ? `Season ${normalizeSeason(els.endSeason.value)}` : end,
+      };
+    }
+
+    function syncRangeControls() {
+      const startSeasonMode = dateMode(els.startModeBtn) === 'season';
+      const endSeasonMode = dateMode(els.endModeBtn) === 'season';
+      els.startDateField.classList.toggle('is-hidden', startSeasonMode);
+      els.startSeasonField.classList.toggle('is-hidden', !startSeasonMode);
+      els.endDateField.classList.toggle('is-hidden', endSeasonMode);
+      els.endSeasonField.classList.toggle('is-hidden', !endSeasonMode);
+      const range = resolvedSpongeRange();
+      const chunks = range ? spongeScheduleChunks(range.start, range.end) : [];
+      els.rangeNote.textContent = range
+        ? `Sponge target: ${range.startLabel} to ${range.endLabel} (${range.start} through ${range.end}). ${chunks.length} season chunk${chunks.length === 1 ? '' : 's'}; each season is Apr 1 through Sep 30.`
+        : '';
     }
 
     function num(value) {
@@ -395,6 +516,40 @@
       })));
     }
 
+    function uniqueGames(games) {
+      const byPk = new Map();
+      for (const game of games || []) {
+        if (!game?.gamePk) continue;
+        byPk.set(String(game.gamePk), game);
+      }
+      return [...byPk.values()].sort((a, b) => compareDate(a.officialDate, b.officialDate) || Number(a.gamePk) - Number(b.gamePk));
+    }
+
+    function spongeScheduleChunks(startDate, endDate) {
+      const chunks = [];
+      const startYear = spongeSeasonForDate(startDate);
+      const endYear = spongeSeasonForDate(endDate);
+      for (let season = startYear; season <= endYear; season += 1) {
+        const chunkStart = compareDate(startDate, seasonStartDate(season)) > 0 ? startDate : seasonStartDate(season);
+        const chunkEnd = compareDate(endDate, seasonEndDate(season)) < 0 ? endDate : seasonEndDate(season);
+        if (compareDate(chunkStart, chunkEnd) <= 0) chunks.push({ season, start: chunkStart, end: chunkEnd });
+      }
+      return chunks;
+    }
+
+    async function getSpongeScheduleGames(startDate, endDate, label = 'schedule') {
+      const chunks = spongeScheduleChunks(startDate, endDate);
+      const results = [];
+      let done = 0;
+      for (const chunk of chunks) {
+        setStatus(`Loading ${label}: ${chunk.season} (${chunk.start} to ${chunk.end})...`);
+        results.push(...await getScheduleGames(chunk.start, chunk.end));
+        done += 1;
+        setProgress(done, chunks.length);
+      }
+      return uniqueGames(results);
+    }
+
     function isFinalGame(game) {
       const text = `${game.status?.abstractGameState || ''} ${game.status?.detailedState || ''} ${game.status?.codedGameState || ''}`;
       return /final|completed|F\b/i.test(text) && Number.isFinite(game.away.score) && Number.isFinite(game.home.score);
@@ -411,8 +566,13 @@
       const triples = num(batting.triples);
       const homeRuns = num(batting.homeRuns);
       const atBats = num(batting.atBats);
+      const walks = num(batting.baseOnBalls ?? batting.walks);
+      const strikeOuts = num(batting.strikeOuts);
+      const hitByPitch = num(batting.hitByPitch);
+      const sacFlies = num(batting.sacFlies);
+      const plateAppearances = num(batting.plateAppearances) || atBats + walks + hitByPitch + sacFlies;
       const totalBases = num(batting.totalBases) || Math.max(0, hits - doubles - triples - homeRuns) + (doubles * 2) + (triples * 3) + (homeRuns * 4);
-      return { atBats, hits, totalBases };
+      return { atBats, hits, totalBases, homeRuns, walks, strikeOuts, hitByPitch, sacFlies, plateAppearances };
     }
 
     function pitchingLine(player) {
@@ -521,6 +681,7 @@
       return {
         gamePk: game.gamePk,
         date: game.officialDate,
+        gameDateTime: game.gameDate || '',
         teamId: team.id,
         team: team.abbrev,
         opponentId: opp.id,
@@ -548,6 +709,7 @@
           if (!pitcherStarts.has(key)) pitcherStarts.set(key, []);
           pitcherStarts.get(key).push({
             date: log.date,
+            gameDateTime: log.gameDateTime || '',
             gamePk: log.gamePk,
             team: log.team,
             opponent: log.opponent,
@@ -562,8 +724,8 @@
         addTeamLog(buildTeamGameLog(game, 'away', boxscore));
         addTeamLog(buildTeamGameLog(game, 'home', boxscore));
       }
-      for (const logs of teamLogs.values()) logs.sort((a, b) => compareDate(a.date, b.date) || a.gamePk - b.gamePk);
-      for (const logs of pitcherStarts.values()) logs.sort((a, b) => compareDate(a.date, b.date) || a.gamePk - b.gamePk);
+      for (const logs of teamLogs.values()) logs.sort((a, b) => compareDate(a.date, b.date) || String(a.gameDateTime || '').localeCompare(String(b.gameDateTime || '')) || a.gamePk - b.gamePk);
+      for (const logs of pitcherStarts.values()) logs.sort((a, b) => compareDate(a.date, b.date) || String(a.gameDateTime || '').localeCompare(String(b.gameDateTime || '')) || a.gamePk - b.gamePk);
       return { teamLogs, pitcherStarts };
     }
 
@@ -575,27 +737,62 @@
         atBats: 0,
         hits: 0,
         totalBases: 0,
+        homeRuns: 0,
+        walks: 0,
+        strikeOuts: 0,
+        hitByPitch: 0,
+        sacFlies: 0,
+        plateAppearances: 0,
+        runsFor: 0,
+        runsAgainst: 0,
         outs: 0,
         er: 0,
+        hrAllowed: 0,
         bullpenOuts: 0,
         bullpenEr: 0,
+        bullpenHr: 0,
       };
       for (const game of logs) {
         base.atBats += game.atBats;
         base.hits += game.hits;
         base.totalBases += game.totalBases;
+        base.homeRuns += game.homeRuns;
+        base.walks += game.walks;
+        base.strikeOuts += game.strikeOuts;
+        base.hitByPitch += game.hitByPitch;
+        base.sacFlies += game.sacFlies;
+        base.plateAppearances += game.plateAppearances;
+        base.runsFor += game.runsFor;
+        base.runsAgainst += game.runsAgainst;
         base.outs += game.pitching.outs;
         base.er += game.pitching.er;
+        base.hrAllowed += game.pitching.hr;
         base.bullpenOuts += game.bullpen.outs;
         base.bullpenEr += game.bullpen.er;
+        base.bullpenHr += game.bullpen.hr;
       }
+      const obpDenominator = base.atBats + base.walks + base.hitByPitch + base.sacFlies;
+      const obp = obpDenominator ? (base.hits + base.walks + base.hitByPitch) / obpDenominator : null;
+      const slg = base.atBats ? base.totalBases / base.atBats : null;
       const metrics = {
         ...base,
         winPct: base.games ? base.wins / base.games : null,
         avg: base.atBats ? base.hits / base.atBats : null,
-        slg: base.atBats ? base.totalBases / base.atBats : null,
+        slg,
+        iso: Number.isFinite(slg) && base.atBats ? slg - (base.hits / base.atBats) : null,
+        obp,
+        ops: Number.isFinite(obp) && Number.isFinite(slg) ? obp + slg : null,
+        hrPerGame: base.games ? base.homeRuns / base.games : null,
+        hrPerPa: base.plateAppearances ? base.homeRuns / base.plateAppearances : null,
+        walkRate: base.plateAppearances ? base.walks / base.plateAppearances : null,
+        kRate: base.plateAppearances ? base.strikeOuts / base.plateAppearances : null,
+        runsPerGame: base.games ? base.runsFor / base.games : null,
+        runsAllowedPerGame: base.games ? base.runsAgainst / base.games : null,
+        runDifferentialPerGame: base.games ? (base.runsFor - base.runsAgainst) / base.games : null,
+        hrAllowedPerGame: base.games ? base.hrAllowed / base.games : null,
         era: base.outs ? (base.er * 27) / base.outs : null,
         bullpenEra: base.bullpenOuts ? (base.bullpenEr * 27) / base.bullpenOuts : null,
+        bullpenHr9: base.bullpenOuts ? (base.bullpenHr * 27) / base.bullpenOuts : null,
       };
       metrics.heat = teamHeat(metrics);
       return metrics;
@@ -627,8 +824,25 @@
       };
     }
 
-    function teamContext(teamLogs, team, date, gamePk) {
-      const previous = (teamLogs.get(team) || []).filter((game) => compareDate(game.date, date) < 0 || (game.date === date && game.gamePk < gamePk));
+    function isBeforeGame(candidate, date, gamePk, gameDateTime = '') {
+      const dateCompare = compareDate(candidate.date, date);
+      if (dateCompare < 0) return true;
+      if (dateCompare > 0) return false;
+      if (candidate.gameDateTime && gameDateTime && candidate.gameDateTime !== gameDateTime) {
+        return String(candidate.gameDateTime) < String(gameDateTime);
+      }
+      return Number(candidate.gamePk || 0) < Number(gamePk || 0);
+    }
+
+    function teamContext(teamLogs, team, date, gamePk, gameDateTime = '') {
+      const currentSeason = spongeSeasonForDate(date);
+      const seasonStart = seasonStartDate(currentSeason);
+      const seasonEnd = seasonEndDate(currentSeason);
+      const previous = (teamLogs.get(team) || []).filter((game) => (
+        compareDate(game.date, seasonStart) >= 0
+        && compareDate(game.date, seasonEnd) <= 0
+        && isBeforeGame(game, date, gamePk, gameDateTime)
+      ));
       const last = previous.slice(-1);
       const l5 = previous.slice(-5);
       const l10 = previous.slice(-10);
@@ -650,6 +864,199 @@
       row[`team_heat_${prefix}`] = metrics.heat;
     }
 
+    function addSpongeStatFields(row, context, starterL5) {
+      row.season_hr_per_game = rate(context.season.hrPerGame, 3, false);
+      row.season_hr_per_pa = rate(context.season.hrPerPa, 4, false);
+      row.l10_hr_per_game = rate(context.l10.hrPerGame, 3, false);
+      row.l5_hr_per_game = rate(context.l5.hrPerGame, 3, false);
+      row.last_game_hr = context.last.games ? context.last.homeRuns : '';
+      row.season_iso = rate(context.season.iso, 3, true);
+      row.l10_iso = rate(context.l10.iso, 3, true);
+      row.season_hr_allowed_per_game = rate(context.season.hrAllowedPerGame, 3, false);
+      row.l10_hr_allowed_per_game = rate(context.l10.hrAllowedPerGame, 3, false);
+      row.starter_l5_hr9 = rate(starterL5.hr9, 2, false);
+      row.bullpen_season_hr9 = rate(context.season.bullpenHr9, 2, false);
+      row.bullpen_l10_hr9 = rate(context.l10.bullpenHr9, 2, false);
+      row.bullpen_l5_hr9 = rate(context.l5.bullpenHr9, 2, false);
+      row.season_obp = rate(context.season.obp, 3, true);
+      row.l10_obp = rate(context.l10.obp, 3, true);
+      row.l5_obp = rate(context.l5.obp, 3, true);
+      row.season_ops = rate(context.season.ops, 3, true);
+      row.l10_ops = rate(context.l10.ops, 3, true);
+      row.season_walk_rate = rate(context.season.walkRate, 3, true);
+      row.l10_walk_rate = rate(context.l10.walkRate, 3, true);
+      row.season_k_rate_offense = rate(context.season.kRate, 3, true);
+      row.l10_k_rate_offense = rate(context.l10.kRate, 3, true);
+      row.season_runs_per_game = rate(context.season.runsPerGame, 2, false);
+      row.l10_runs_per_game = rate(context.l10.runsPerGame, 2, false);
+      row.l5_runs_per_game = rate(context.l5.runsPerGame, 2, false);
+      row.season_runs_allowed_per_game = rate(context.season.runsAllowedPerGame, 2, false);
+      row.l10_runs_allowed_per_game = rate(context.l10.runsAllowedPerGame, 2, false);
+      row.l5_runs_allowed_per_game = rate(context.l5.runsAllowedPerGame, 2, false);
+      row.run_differential_per_game = rate(context.season.runDifferentialPerGame, 2, false);
+      row.l10_run_differential_per_game = rate(context.l10.runDifferentialPerGame, 2, false);
+    }
+
+    function optionalNumber(value) {
+      if (value === null || value === undefined || value === '') return null;
+      const n = Number(String(value).replace(/[^\d.-]/g, ''));
+      return Number.isFinite(n) ? n : null;
+    }
+
+    function lowerBound(values, target) {
+      let lo = 0;
+      let hi = values.length;
+      while (lo < hi) {
+        const mid = Math.floor((lo + hi) / 2);
+        if (values[mid] < target) lo = mid + 1;
+        else hi = mid;
+      }
+      return lo;
+    }
+
+    function upperBound(values, target) {
+      let lo = 0;
+      let hi = values.length;
+      while (lo < hi) {
+        const mid = Math.floor((lo + hi) / 2);
+        if (values[mid] <= target) lo = mid + 1;
+        else hi = mid;
+      }
+      return lo;
+    }
+
+    function centeredPercentileMaps(rows, specs) {
+      const maps = {};
+      for (const spec of specs) {
+        const values = rows
+          .map((row) => optionalNumber(row[spec.key]))
+          .filter((value) => Number.isFinite(value))
+          .sort((a, b) => a - b);
+        const map = new Map();
+        for (const row of rows) {
+          const value = optionalNumber(row[spec.key]);
+          if (!Number.isFinite(value) || values.length < 2) {
+            map.set(row, 0);
+            continue;
+          }
+          const less = lowerBound(values, value);
+          const upper = upperBound(values, value);
+          const rank = less + ((upper - less - 1) / 2);
+          const percentile = rank / (values.length - 1);
+          const adjusted = spec.inverse ? 1 - percentile : percentile;
+          map.set(row, (adjusted * 100) - 50);
+        }
+        maps[spec.key] = map;
+      }
+      return maps;
+    }
+
+    function average(values) {
+      const usable = values.filter((value) => Number.isFinite(value));
+      return usable.length ? usable.reduce((sum, value) => sum + value, 0) / usable.length : null;
+    }
+
+    function rollingWindowStats(row, windowRows, prefix) {
+      const required = prefix === 'l10' ? 10 : 5;
+      if (windowRows.length < required) return;
+      const oppStrengths = windowRows.map((game) => optionalNumber(game.opp_strength_score) ?? 50);
+      const weights = oppStrengths.map((strength) => 0.75 + (0.50 * (strength / 100)));
+      const winForms = windowRows.map((game, index) => {
+        const winValue = game.result === 'W' ? 1 : game.result === 'L' ? -1 : null;
+        return winValue === null ? null : winValue * weights[index];
+      });
+      const runDiffs = windowRows.map((game, index) => {
+        const runsFor = optionalNumber(game.runs_for);
+        const runsAgainst = optionalNumber(game.runs_against);
+        return Number.isFinite(runsFor) && Number.isFinite(runsAgainst) ? (runsFor - runsAgainst) * weights[index] : null;
+      });
+      const offenseExpected = windowRows.map((game) => {
+        const runsFor = optionalNumber(game.runs_for);
+        const expectedAgainst = optionalNumber(game._opp_season_runs_allowed_per_game);
+        return Number.isFinite(runsFor) && Number.isFinite(expectedAgainst) ? runsFor - expectedAgainst : null;
+      });
+      const pitchingExpected = windowRows.map((game) => {
+        const runsAgainst = optionalNumber(game.runs_against);
+        const expectedFor = optionalNumber(game._opp_season_runs_per_game);
+        return Number.isFinite(runsAgainst) && Number.isFinite(expectedFor) ? expectedFor - runsAgainst : null;
+      });
+      const avgOppStrength = average(oppStrengths);
+      const winForm = average(winForms);
+      const runDiff = average(runDiffs);
+      const offenseVsExpected = average(offenseExpected);
+      const pitchingVsExpected = average(pitchingExpected);
+      const heat = Number.isFinite(winForm) && Number.isFinite(runDiff) ? Math.max(0, Math.min(100, 50 + (8 * winForm) + (2 * runDiff))) : null;
+      row[`${prefix}_avg_opp_strength`] = rate(avgOppStrength, 1, false);
+      row[`qa_${prefix}_win_form`] = rate(winForm, 3, false);
+      row[`qa_${prefix}_run_diff`] = rate(runDiff, 2, false);
+      row[`qa_${prefix}_offense_vs_expected`] = rate(offenseVsExpected, 2, false);
+      row[`qa_${prefix}_pitching_vs_expected`] = rate(pitchingVsExpected, 2, false);
+      row[`qa_${prefix}_heat`] = rate(heat, 1, false);
+    }
+
+    function addScheduleStrengthFeatures(rows) {
+      const bySeason = new Map();
+      for (const row of rows) {
+        const season = spongeSeasonForDate(row.date);
+        if (!bySeason.has(season)) bySeason.set(season, []);
+        bySeason.get(season).push(row);
+      }
+      for (const seasonRows of bySeason.values()) {
+        const maps = centeredPercentileMaps(seasonRows, [
+          { key: 'team_heat_season' },
+          { key: 'run_differential_per_game' },
+          { key: 'season_ops' },
+          { key: 'season_era', inverse: true },
+          { key: 'season_bullpen_era', inverse: true },
+          { key: 'season_slg' },
+        ]);
+        for (const row of seasonRows) {
+          const centeredScore = (
+            0.30 * maps.team_heat_season.get(row)
+            + 0.20 * maps.run_differential_per_game.get(row)
+            + 0.15 * maps.season_ops.get(row)
+            + 0.15 * maps.season_era.get(row)
+            + 0.10 * maps.season_bullpen_era.get(row)
+            + 0.10 * maps.season_slg.get(row)
+          );
+          row.team_strength_score = rate(Math.max(0, Math.min(100, 50 + centeredScore)), 1, false);
+        }
+      }
+
+      const byGame = new Map();
+      for (const row of rows) {
+        const key = String(row.game_pk || '');
+        if (!byGame.has(key)) byGame.set(key, []);
+        byGame.get(key).push(row);
+      }
+      for (const row of rows) {
+        const opponentRow = (byGame.get(String(row.game_pk || '')) || [])
+          .find((candidate) => candidate !== row && candidate.team === row.opponent);
+        row.opp_strength_score = rate(optionalNumber(opponentRow?.team_strength_score) ?? 50, 1, false);
+        row._opp_season_runs_allowed_per_game = opponentRow?.season_runs_allowed_per_game ?? '';
+        row._opp_season_runs_per_game = opponentRow?.season_runs_per_game ?? '';
+      }
+
+      const byTeam = new Map();
+      for (const row of rows) {
+        if (!byTeam.has(row.team)) byTeam.set(row.team, []);
+        byTeam.get(row.team).push(row);
+      }
+      for (const teamRows of byTeam.values()) {
+        teamRows.sort((a, b) => (
+          compareDate(a.date, b.date)
+          || String(a._game_datetime || '').localeCompare(String(b._game_datetime || ''))
+          || Number(a.game_pk || 0) - Number(b.game_pk || 0)
+        ));
+        for (let index = 0; index < teamRows.length; index += 1) {
+          const previous = teamRows.slice(0, index);
+          rollingWindowStats(teamRows[index], previous.slice(-5), 'l5');
+          rollingWindowStats(teamRows[index], previous.slice(-10), 'l10');
+        }
+      }
+      return rows;
+    }
+
     function buildRows(targetGames, teamLogs, pitcherStarts) {
       const rows = [];
       for (const game of targetGames.filter(isFinalGame)) {
@@ -659,19 +1066,28 @@
           const opp = game[isHome ? 'away' : 'home'];
           const runsFor = isHome ? game.home.score : game.away.score;
           const runsAgainst = isHome ? game.away.score : game.home.score;
-          const context = teamContext(teamLogs, team.abbrev, game.officialDate, game.gamePk);
+          const context = teamContext(teamLogs, team.abbrev, game.officialDate, game.gamePk, game.gameDate || '');
           const currentLog = (teamLogs.get(team.abbrev) || []).find((log) => log.gamePk === game.gamePk);
           const starter = currentLog?.starter || {
             id: team.probable?.id || '',
             name: firstText(team.probable?.fullName, team.probable?.lastName),
             hand: handednessCode(firstText(team.probable?.pitchHand?.code, team.probable?.pitchHand?.description, team.probable?.throws, team.probable?.throwingHand)),
           };
-          const starterPrevious = (pitcherStarts.get(String(starter.id)) || []).filter((line) => compareDate(line.date, game.officialDate) < 0 || (line.date === game.officialDate && line.gamePk < game.gamePk));
+          const currentSeason = spongeSeasonForDate(game.officialDate);
+          const currentSeasonStart = seasonStartDate(currentSeason);
+          const currentSeasonEnd = seasonEndDate(currentSeason);
+          const starterPrevious = (pitcherStarts.get(String(starter.id)) || []).filter((line) => (
+            compareDate(line.date, currentSeasonStart) >= 0
+            && compareDate(line.date, currentSeasonEnd) <= 0
+            && isBeforeGame(line, game.officialDate, game.gamePk, game.gameDate || '')
+          ));
           const hasStarterLast = starterPrevious.length > 0;
           const starterLast = starterPrevious.slice(-1)[0] || blankLine();
           const starterSeason = pitcherSeasonLine(starterPrevious);
+          const starterL5 = pitcherSeasonLine(starterPrevious.slice(-5));
           const row = {
             date: game.officialDate,
+            _game_datetime: game.gameDate || game.officialDate,
             game_pk: game.gamePk,
             team: team.abbrev,
             opponent: opp.abbrev,
@@ -698,6 +1114,7 @@
             starter_season_era: rate(starterSeason.era, 2, false),
             starter_season_whip: rate(starterSeason.whip, 2, false),
             starter_season_hr9: rate(starterSeason.hr9, 2, false),
+            starter_l5_hr9: rate(starterL5.hr9, 2, false),
             starter_season_k9: rate(starterSeason.k9, 2, false),
             starter_heat_season: starterSeason.heat,
           };
@@ -705,6 +1122,7 @@
           addTeamMetrics(row, 'l5', context.l5);
           addTeamMetrics(row, 'last', context.last);
           addTeamMetrics(row, 'season', context.season);
+          addSpongeStatFields(row, context, starterL5);
           rows.push(row);
         }
       }
@@ -756,13 +1174,12 @@
     }
 
     async function buildDataset() {
-      const start = dateOnly(els.startDate.value);
-      const end = dateOnly(els.endDate.value);
-      const seasonStart = dateOnly(els.seasonStart.value);
-      if (!start || !end || !seasonStart || compareDate(start, end) > 0 || compareDate(seasonStart, end) > 0) {
+      const range = resolvedSpongeRange();
+      if (!range || compareDate(range.start, range.end) > 0 || compareDate(range.seasonStart, range.end) > 0) {
         setStatus('Check the date range.');
         return;
       }
+      const { start, end, seasonStart } = range;
       els.buildBtn.disabled = true;
       els.downloadBtn.disabled = true;
       els.saveState.textContent = 'No';
@@ -772,10 +1189,8 @@
       try {
         setStatus('Loading schedules...');
         setProgress(0, 1);
-        const [allGames, targetGames] = await Promise.all([
-          getScheduleGames(seasonStart, end),
-          getScheduleGames(start, end),
-        ]);
+        const allGames = await getSpongeScheduleGames(seasonStart, end, 'context schedules');
+        const targetGames = await getSpongeScheduleGames(start, end, 'target schedules');
         const finalGames = allGames.filter(isFinalGame);
         const boxscoreGames = finalGames.filter((game) => compareDate(game.officialDate, seasonStart) >= 0 && compareDate(game.officialDate, end) <= 0);
         els.gameCount.textContent = String(targetGames.filter(isFinalGame).length);
@@ -791,12 +1206,13 @@
         const logs = buildLogs(boxscoreGames, boxscores);
         setStatus('Filling starter handedness...');
         await enrichStarterHands(logs.teamLogs);
-        const rows = buildRows(targetGames, logs.teamLogs, logs.pitcherStarts);
+        const contextRows = addScheduleStrengthFeatures(buildRows(allGames, logs.teamLogs, logs.pitcherStarts));
+        const rows = contextRows.filter((row) => compareDate(row.date, start) >= 0 && compareDate(row.date, end) <= 0);
         state.rows = rows;
         state.csv = toCsv(rows);
-        state.filename = `prediction-study-${start}-to-${end}.csv`;
+        state.filename = `prediction-sponge-${start}-to-${end}.csv`;
         try {
-          localStorage.setItem('prediction-study-latest:v1', JSON.stringify({ createdAt: new Date().toISOString(), start, end, rows }));
+          localStorage.setItem('prediction-study-latest:v1', JSON.stringify({ createdAt: new Date().toISOString(), start, end, seasonStart, startMode: range.startMode, endMode: range.endMode, rows }));
           els.saveState.textContent = 'Local';
         } catch {
           els.saveState.textContent = 'CSV';
@@ -814,8 +1230,20 @@
       }
     }
 
+    els.startModeBtn.addEventListener('click', () => toggleMode(els.startModeBtn));
+    els.endModeBtn.addEventListener('click', () => toggleMode(els.endModeBtn));
+    [els.startDate, els.endDate, els.startSeason, els.endSeason].forEach((input) => input.addEventListener('input', syncRangeControls));
+    els.startDate.addEventListener('change', () => {
+      els.startSeason.value = String(spongeSeasonForDate(els.startDate.value));
+      syncRangeControls();
+    });
+    els.endDate.addEventListener('change', () => {
+      els.endSeason.value = String(spongeSeasonForDate(els.endDate.value));
+      syncRangeControls();
+    });
     els.buildBtn.addEventListener('click', buildDataset);
     els.downloadBtn.addEventListener('click', downloadCsv);
+    syncRangeControls();
   </script>
 </body>
 </html>
