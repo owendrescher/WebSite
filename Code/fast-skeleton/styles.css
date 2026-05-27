@@ -3580,10 +3580,78 @@ body[data-overlay-dock='bottom'] .player-stat-overlay {
 }
 
 .player-stat-title strong {
+  display: flex;
+  align-items: center;
+  flex-wrap: wrap;
+  gap: 5px;
   font-family: var(--font-display);
   font-size: 1.28rem;
   letter-spacing: 0.08em;
   line-height: 1;
+}
+
+.player-stat-name-badges {
+  display: inline-flex;
+  align-items: center;
+  gap: 4px;
+  min-width: 0;
+  font-family: var(--font-ui);
+  letter-spacing: 0;
+  line-height: 1;
+  vertical-align: middle;
+}
+
+.player-stat-name-badges:empty {
+  display: none;
+}
+
+.player-stat-title strong .handedness-tag,
+.player-stat-title strong .pitcher-used-yesterday,
+.player-stat-title strong .pitcher-hand-avg-marker,
+.player-stat-title strong .pitcher-hr-risk,
+.player-stat-title strong .pitcher-whip-risk,
+.player-stat-title strong .lineup-hot-emoji,
+.player-stat-title strong .lineup-cold-emoji,
+.player-stat-title strong .lineup-avg-burst,
+.player-stat-title strong .lineup-power-burst,
+.player-stat-title strong .lineup-slug-burst,
+.player-stat-title strong .lineup-split-flag,
+.player-stat-title strong .lineup-elite-matchup-badge,
+.player-stat-title strong .lineup-hit-streak,
+.player-stat-title strong .lineup-due-badge {
+  letter-spacing: 0;
+}
+
+.player-stat-title strong .lineup-hot-emoji,
+.player-stat-title strong .lineup-cold-emoji,
+.player-stat-title strong .lineup-avg-burst,
+.player-stat-title strong .lineup-power-burst,
+.player-stat-title strong .lineup-slug-burst,
+.player-stat-title strong .lineup-split-flag {
+  font-size: 0.92rem;
+  color: inherit;
+}
+
+.player-stat-title strong .lineup-elite-matchup-badge {
+  color: #ffe88f;
+  font-size: 0.68rem;
+}
+
+.player-stat-title strong .lineup-hit-streak {
+  color: color-mix(in srgb, #f4fbff 78%, var(--accent) 22%);
+  font-size: 0.68rem;
+}
+
+.player-stat-title strong .lineup-due-badge {
+  font-size: 0.56rem;
+}
+
+.player-stat-title strong .lineup-due-badge-hr {
+  color: #ffe66d;
+}
+
+.player-stat-title strong .lineup-due-badge-xbh {
+  color: #edf4ff;
 }
 
 .player-stat-title span {
@@ -4030,9 +4098,12 @@ body[data-overlay-dock='bottom'] .player-stat-overlay {
   grid-template-columns: minmax(56px, 1.1fr) repeat(5, minmax(34px, 0.72fr));
 }
 
-.player-heatmap-split-table .player-heatmap-metric-row,
-.player-heatmap-pitcher-split-table .player-heatmap-metric-row {
+.player-heatmap-split-table .player-heatmap-metric-row {
   grid-template-columns: minmax(44px, 0.9fr) repeat(4, minmax(42px, 0.75fr));
+}
+
+.player-heatmap-pitcher-split-table .player-heatmap-metric-row {
+  grid-template-columns: minmax(44px, 0.9fr) repeat(5, minmax(39px, 0.72fr));
 }
 
 .player-heatmap-metric-row.header {
@@ -6753,10 +6824,15 @@ body[data-theme='dark-pastel'] .scoreboard .score-mini-count strong {
 .lineup-live-details .detail-col {
   padding: 6px 8px;
   gap: 3px;
+  min-height: 0;
+  overflow: hidden;
 }
 
 .lineup-live-details .play-col {
+  display: grid;
   grid-template-rows: auto minmax(0, 1fr) auto;
+  min-height: 0;
+  overflow: hidden;
 }
 
 .lineup-live-details .detail-col h4 {
@@ -6766,8 +6842,13 @@ body[data-theme='dark-pastel'] .scoreboard .score-mini-count strong {
 
 .lineup-live-details .ticker {
   gap: 3px;
+  height: 100%;
+  max-height: 100%;
   overflow-y: auto;
   min-height: 0;
+  overscroll-behavior: contain;
+  touch-action: pan-y;
+  -webkit-overflow-scrolling: touch;
   scrollbar-width: thin;
   scrollbar-color: color-mix(in srgb, var(--accent) 45%, transparent) transparent;
 }
@@ -8677,16 +8758,24 @@ body[data-overlay-dock='bottom'] .score-state-strip,
 
 .play-by-play-modal {
   width: min(820px, calc(100vw - 24px));
+  max-height: calc(100dvh - 32px);
+  display: grid;
+  grid-template-rows: auto minmax(0, 1fr);
+  overflow: hidden;
 }
 
 .pbp-text {
-  max-height: min(68vh, 720px);
-  overflow: auto;
+  min-height: 0;
+  max-height: none;
+  overflow-y: auto;
   margin: 0;
   padding: 14px;
   font: 0.92rem/1.4 var(--font);
   color: var(--text);
   background: rgba(3, 12, 22, 0.72);
+  overscroll-behavior: contain;
+  touch-action: pan-y;
+  -webkit-overflow-scrolling: touch;
 }
 
 .pbp-half {
@@ -11045,7 +11134,7 @@ body[data-overlay-dock='bottom'] .player-stat-overlay {
   }
 
   .player-heatmap-pitcher-split-table .player-heatmap-metric-row {
-    grid-template-columns: minmax(34px, 0.9fr) repeat(4, minmax(30px, 0.72fr));
+    grid-template-columns: minmax(34px, 0.9fr) repeat(5, minmax(28px, 0.68fr));
   }
 
   .player-heatmap-metric-row span {

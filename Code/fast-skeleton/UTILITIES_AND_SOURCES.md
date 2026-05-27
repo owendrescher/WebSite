@@ -275,6 +275,29 @@ This is a map of the current active dashboard, the standalone tools in this fold
 
 ## Standalone Pages
 
+### `stat-crawler.html`
+- Purpose:
+  - One-hit dataset crawler.
+  - Creates one row per batter/game matchup, with target fields for `hit_1plus`, `full_pa`, `full_ab`, and `full_h`.
+  - Preserves exact batter-vs-every-pitcher-faced detail in `pitcher_matchups_json`; this includes starter and bullpen plate appearances separately, so a batter facing the starter early and a reliever late is not collapsed into one starter-only matchup.
+  - Builds in-house pregame rolling stats before each game is added to the history stores.
+- Sources:
+  - MLB schedule: `https://statsapi.mlb.com/api/v1/schedule`
+  - MLB live feed/play-by-play: `https://statsapi.mlb.com/api/v1.1/game/{gamePk}/feed/live`
+  - MLB boxscore fallback: `https://statsapi.mlb.com/api/v1/game/{gamePk}/boxscore`
+  - MLB player bio fallback for missing handedness: `https://statsapi.mlb.com/api/v1/people/{playerId}`
+- Generated feature layers:
+  - Batter usage and expected PA.
+  - Batter season/recent/vs-hand hit skill with sample-size columns.
+  - Opposing starter hit vulnerability with neutral fallback flags for no prior MLB sample.
+  - Opposing bullpen hit environment, recent usage, and left/right mix.
+  - Batter pitch-type result history vs pitcher pitch-type allowed history, with pitch-mix sample/fallback fields.
+  - Exact same-game pitcher segments for actual starter and every reliever faced.
+  - Dedupe and validation reporting for player-game uniqueness, handedness coverage, starter counts, PA/AB consistency, and calibration buckets.
+- Outputs:
+  - Downloaded CSV, default filename pattern `stat-crawler-{start}-to-{end}.csv`.
+  - Downloaded JSON, same rows plus parsed `pitcher_matchups`.
+
 ### `player-heatmaps.html`
 - Purpose:
   - Workshop page for the heatmap CSV.
@@ -318,6 +341,25 @@ This is a map of the current active dashboard, the standalone tools in this fold
 - Outputs:
   - Downloaded CSV, default filename pattern `prediction-sponge-{start}-to-{end}.csv`.
   - Latest generated rows in localStorage key `prediction-study-latest:v1`.
+
+### `intense-sponge.html`
+- Purpose:
+  - Multi-table "intense sponge" for heavier historical absorption.
+  - Builds context from April 1 of the selected start season while outputting only the selected target range.
+  - Exports separate tables for games, team-game context, starter context, bullpen context, lineups, player lineup stats, weather/park placeholders, and postgame results.
+- Sources:
+  - MLB schedule: `https://statsapi.mlb.com/api/v1/schedule`
+  - MLB live feed/play-by-play: `https://statsapi.mlb.com/api/v1.1/game/{gamePk}/feed/live`
+  - MLB boxscore from live feed fallback shape: `https://statsapi.mlb.com/api/v1/game/{gamePk}/boxscore`
+  - MLB player bio fallback: `https://statsapi.mlb.com/api/v1/people/{playerId}`
+- Populated from MLB data:
+  - Game identity, results, first-five runs, extra innings, day/night from start time.
+  - Team season-to-date offense, recent windows, home/away, venue, handedness splits, pitch-type splits.
+  - Opponent staff pitching, starter workload/form/splits/arsenal, bullpen season/recent/fatigue/top usage arms.
+  - Starting lineup slots and player-level season/split/recent/history rows.
+  - Postgame batting and opponent starter/bullpen outcomes.
+- Explicit placeholders/flags:
+  - Weather, park factors, odds, umpire, injury/WAR, public defense, travel miles, and some Statcast-only metrics are exported as blank fields with missing-source flags until those sources are wired in.
 
 ## Updater And Local Server Scripts
 

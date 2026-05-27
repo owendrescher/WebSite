@@ -1,0 +1,2704 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1" />
+  <meta name="color-scheme" content="dark" />
+  <title>MLB Intense Sponge</title>
+  <style>
+    :root {
+      --bg: #06111a;
+      --panel: #0d2230;
+      --panel-2: #102b3d;
+      --line: rgba(129, 222, 242, 0.28);
+      --text: #f3fbff;
+      --muted: #9fc0cf;
+      --accent: #81def2;
+      --gold: #ffd769;
+      --bad: #ff6f80;
+      --good: #9dffcb;
+      --mono: "Cascadia Mono", Consolas, monospace;
+    }
+
+    * { box-sizing: border-box; }
+
+    body {
+      margin: 0;
+      min-height: 100vh;
+      background:
+        radial-gradient(circle at top left, rgba(129, 222, 242, 0.16), transparent 38rem),
+        linear-gradient(180deg, #081724, var(--bg));
+      color: var(--text);
+      font: 13px/1.38 system-ui, -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif;
+    }
+
+    main {
+      width: min(1500px, calc(100vw - 24px));
+      margin: 0 auto;
+      padding: 18px 0 30px;
+    }
+
+    header {
+      display: flex;
+      align-items: end;
+      justify-content: space-between;
+      gap: 14px;
+      margin-bottom: 12px;
+    }
+
+    h1 {
+      margin: 0 0 4px;
+      color: var(--gold);
+      font-size: clamp(1.45rem, 3vw, 2.35rem);
+      letter-spacing: .08em;
+      text-transform: uppercase;
+    }
+
+    .sub {
+      max-width: 980px;
+      color: var(--muted);
+      font-weight: 700;
+    }
+
+    .links {
+      display: flex;
+      gap: 8px;
+      flex-wrap: wrap;
+      justify-content: flex-end;
+    }
+
+    a,
+    button,
+    input,
+    select {
+      font: inherit;
+    }
+
+    .link-btn,
+    button {
+      border: 1px solid color-mix(in srgb, var(--accent) 62%, transparent);
+      border-radius: 7px;
+      background:
+        linear-gradient(180deg, rgba(255,255,255,.08), transparent 58%),
+        color-mix(in srgb, var(--panel-2) 86%, black 14%);
+      color: var(--text);
+      padding: 8px 11px;
+      cursor: pointer;
+      text-decoration: none;
+      font-weight: 900;
+      letter-spacing: .045em;
+      text-transform: uppercase;
+    }
+
+    button:hover,
+    .link-btn:hover {
+      border-color: var(--gold);
+      color: var(--gold);
+    }
+
+    button:disabled {
+      cursor: not-allowed;
+      opacity: .55;
+    }
+
+    .grid {
+      display: grid;
+      grid-template-columns: minmax(300px, 390px) minmax(0, 1fr);
+      gap: 12px;
+      align-items: start;
+    }
+
+    .panel {
+      border: 1px solid var(--line);
+      border-radius: 8px;
+      background:
+        linear-gradient(180deg, rgba(255,255,255,.05), transparent 44%),
+        color-mix(in srgb, var(--panel) 92%, black 8%);
+      box-shadow: 0 18px 36px rgba(0,0,0,.24);
+      overflow: hidden;
+    }
+
+    .panel h2 {
+      margin: 0;
+      padding: 10px 12px;
+      border-bottom: 1px solid var(--line);
+      color: #b9f1ff;
+      font-size: .92rem;
+      letter-spacing: .08em;
+      text-transform: uppercase;
+      background: rgba(255,255,255,.04);
+    }
+
+    .body {
+      padding: 12px;
+    }
+
+    .controls {
+      display: grid;
+      gap: 10px;
+    }
+
+    label {
+      display: grid;
+      gap: 5px;
+      color: var(--muted);
+      font-size: .74rem;
+      font-weight: 900;
+      letter-spacing: .06em;
+      text-transform: uppercase;
+    }
+
+    input,
+    select {
+      width: 100%;
+      border: 1px solid color-mix(in srgb, var(--line) 82%, transparent);
+      border-radius: 6px;
+      background: rgba(2, 10, 18, .78);
+      color: var(--text);
+      padding: 9px 10px;
+      outline: none;
+    }
+
+    .row {
+      display: grid;
+      grid-template-columns: 1fr 1fr;
+      gap: 8px;
+    }
+
+    .button-grid {
+      display: grid;
+      grid-template-columns: 1fr 1fr;
+      gap: 8px;
+    }
+
+    .download-grid {
+      display: grid;
+      gap: 8px;
+    }
+
+    .metrics {
+      display: grid;
+      grid-template-columns: repeat(5, minmax(0, 1fr));
+      gap: 8px;
+      margin-bottom: 12px;
+    }
+
+    .metric {
+      border: 1px solid var(--line);
+      border-radius: 8px;
+      background: rgba(3, 13, 22, .58);
+      padding: 10px;
+      min-width: 0;
+    }
+
+    .metric span {
+      display: block;
+      color: var(--muted);
+      font-size: .66rem;
+      font-weight: 900;
+      letter-spacing: .08em;
+      text-transform: uppercase;
+    }
+
+    .metric strong {
+      display: block;
+      margin-top: 4px;
+      color: var(--text);
+      font-size: 1.35rem;
+      line-height: 1;
+      font-family: var(--mono);
+    }
+
+    .progress-shell {
+      width: 100%;
+      height: 12px;
+      border: 1px solid var(--line);
+      border-radius: 999px;
+      background: rgba(0,0,0,.36);
+      overflow: hidden;
+      margin-bottom: 10px;
+    }
+
+    .progress {
+      width: 0%;
+      height: 100%;
+      background: linear-gradient(90deg, var(--accent), var(--gold));
+      transition: width 160ms ease;
+    }
+
+    .status {
+      min-height: 22px;
+      color: var(--muted);
+      margin-bottom: 10px;
+      font-weight: 800;
+    }
+
+    .log {
+      min-height: 130px;
+      max-height: 240px;
+      overflow: auto;
+      border: 1px solid rgba(129, 222, 242, .18);
+      border-radius: 7px;
+      background: rgba(0,0,0,.25);
+      padding: 9px;
+      color: #d6f4ff;
+      white-space: pre-wrap;
+      font-family: var(--mono);
+      font-size: .78rem;
+    }
+
+    .table-wrap {
+      max-height: 54vh;
+      overflow: auto;
+      border-top: 1px solid var(--line);
+    }
+
+    table {
+      width: 100%;
+      min-width: 1800px;
+      border-collapse: collapse;
+      table-layout: fixed;
+    }
+
+    th,
+    td {
+      border-right: 1px solid rgba(129, 222, 242, .16);
+      border-bottom: 1px solid rgba(129, 222, 242, .18);
+      padding: 6px 7px;
+      text-align: left;
+      white-space: nowrap;
+      overflow: hidden;
+      text-overflow: ellipsis;
+      font-variant-numeric: tabular-nums;
+    }
+
+    th {
+      position: sticky;
+      top: 0;
+      z-index: 1;
+      background: #102b3d;
+      color: var(--accent);
+      font-size: .68rem;
+      letter-spacing: .05em;
+      text-transform: uppercase;
+    }
+
+    .empty {
+      padding: 16px;
+      color: var(--muted);
+      font-weight: 800;
+    }
+
+    .source-list {
+      display: grid;
+      gap: 6px;
+      color: var(--muted);
+      font-size: .8rem;
+      line-height: 1.35;
+      margin-top: 10px;
+    }
+
+    .source-list code {
+      color: #d7f6ff;
+      font-family: var(--mono);
+      font-size: .74rem;
+      overflow-wrap: anywhere;
+    }
+
+    @media (max-width: 920px) {
+      header { align-items: flex-start; flex-direction: column; }
+      .grid { grid-template-columns: 1fr; }
+      .metrics { grid-template-columns: repeat(2, minmax(0, 1fr)); }
+    }
+  </style>
+</head>
+<body>
+  <main>
+    <header>
+      <div>
+        <h1>Intense Sponge</h1>
+        <div class="sub">
+          Multi-table MLB absorber for team-game context, lineups, starters, bullpens, postgame targets,
+          and data-quality flags. Built from pregame history only, then joined with actual results.
+        </div>
+      </div>
+      <div class="links">
+        <a class="link-btn" href="prediction-study.html">Sponge v1</a>
+        <a class="link-btn" href="stat-crawler.html">Stat Crawler</a>
+      </div>
+    </header>
+
+    <section class="grid">
+      <aside class="panel">
+        <h2>Absorb</h2>
+        <div class="body controls">
+          <div class="row">
+            <label>Start
+              <input id="startDate" type="date" />
+            </label>
+            <label>End
+              <input id="endDate" type="date" />
+            </label>
+          </div>
+          <div class="row">
+            <label>Start Season
+              <input id="startSeason" type="number" min="2000" max="2100" step="1" />
+            </label>
+            <label>End Season
+              <input id="endSeason" type="number" min="2000" max="2100" step="1" />
+            </label>
+          </div>
+          <label>Mode
+            <select id="rangeMode">
+              <option value="date">Date to date</option>
+              <option value="season">Season to season</option>
+              <option value="season-to-date">Season to date</option>
+              <option value="date-to-season">Date to season</option>
+            </select>
+          </label>
+          <div class="button-grid">
+            <button id="buildBtn" type="button">Build</button>
+            <button id="stopBtn" type="button" disabled>Stop</button>
+          </div>
+          <div class="download-grid">
+            <button id="downloadCombinedBtn" type="button" disabled>Download Team Context</button>
+            <button id="downloadAllBtn" type="button" disabled>Download All Tables</button>
+          </div>
+          <div class="source-list">
+            <div><code>statsapi.mlb.com/api/v1/schedule</code></div>
+            <div><code>statsapi.mlb.com/api/v1.1/game/{gamePk}/feed/live</code></div>
+            <div><code>statsapi.mlb.com/api/v1/game/{gamePk}/boxscore</code></div>
+            <div><code>statsapi.mlb.com/api/v1/people/{playerId}</code></div>
+          </div>
+        </div>
+      </aside>
+
+      <section class="panel">
+        <h2>Output</h2>
+        <div class="body">
+          <div class="metrics">
+            <div class="metric"><span>Games</span><strong id="gamesMetric">0</strong></div>
+            <div class="metric"><span>Team Rows</span><strong id="rowsMetric">0</strong></div>
+            <div class="metric"><span>Lineups</span><strong id="lineupsMetric">0</strong></div>
+            <div class="metric"><span>Players</span><strong id="playersMetric">0</strong></div>
+            <div class="metric"><span>Warnings</span><strong id="warningsMetric">0</strong></div>
+          </div>
+          <div class="progress-shell"><div id="progress" class="progress"></div></div>
+          <div id="status" class="status">Ready.</div>
+          <div id="log" class="log"></div>
+        </div>
+        <div id="preview" class="table-wrap">
+          <div class="empty">No rows yet.</div>
+        </div>
+      </section>
+    </section>
+  </main>
+
+  <script>
+    const MLB_API = 'https://statsapi.mlb.com/api/v1';
+    const MLB_LIVE_API = 'https://statsapi.mlb.com/api/v1.1';
+    const SPONGE_VERSION = 'intense-v1';
+    const cache = new Map();
+    const personCache = new Map();
+    let cancelRequested = false;
+    let tables = emptyTables();
+
+    const TEAM_CONTEXT_BASE_COLUMNS = [
+      'game_id', 'date', 'season', 'game_number_for_team', 'team', 'opponent', 'home_team', 'away_team',
+      'is_home', 'venue', 'stadium_id', 'division_game', 'interleague_game', 'doubleheader_game',
+      'doubleheader_game_number', 'day_game', 'night_game', 'start_time_local', 'start_time_et',
+      'team_runs', 'opponent_runs', 'total_runs', 'team_win', 'team_margin', 'game_went_extra_innings',
+      'innings_played', 'first_5_team_runs', 'first_5_opponent_runs', 'first_5_total_runs',
+      'first_5_team_win', 'first_5_margin',
+    ];
+
+    const OFFENSE_COLUMNS = [
+      'team_games_played_to_date', 'team_runs_per_game', 'team_runs_total', 'team_pa_per_game',
+      'team_ab_per_game', 'team_hits_per_game', 'team_1b_per_game', 'team_2b_per_game',
+      'team_3b_per_game', 'team_hr_per_game', 'team_tb_per_game', 'team_rbi_per_game',
+      'team_bb_per_game', 'team_k_per_game', 'team_hbp_per_game', 'team_sb_per_game',
+      'team_cs_per_game', 'team_gidp_per_game', 'team_lob_per_game', 'team_avg', 'team_obp',
+      'team_slg', 'team_ops', 'team_iso', 'team_babip', 'team_bb_rate', 'team_k_rate',
+      'team_bb_minus_k_rate', 'team_hr_rate', 'team_xbh_rate', 'team_tb_per_pa',
+      'team_runs_per_pa', 'team_runs_per_hit', 'team_runs_per_times_on_base', 'team_woba',
+      'team_xwoba', 'team_wrc_plus', 'team_ops_plus', 'team_xba', 'team_xslg',
+      'team_barrel_rate', 'team_hard_hit_rate', 'team_avg_exit_velocity', 'team_launch_angle',
+      'team_sweet_spot_rate', 'team_chase_rate', 'team_whiff_rate', 'team_contact_rate',
+      'team_zone_contact_rate', 'team_o_contact_rate', 'team_z_swing_rate', 'team_o_swing_rate',
+    ];
+
+    const WINDOW_COLUMNS = [
+      ...['l3', 'l5', 'l7', 'l10', 'l15', 'l30'].flatMap((w) => [
+        `team_${w}_runs`, `team_${w}_runs_per_game`, `team_${w}_ops`, `team_${w}_obp`,
+        `team_${w}_slg`, `team_${w}_iso`, `team_${w}_hr_per_game`, `team_${w}_k_rate`,
+        `team_${w}_bb_rate`, `team_${w}_woba`, `team_${w}_hard_hit_rate`, `team_${w}_barrel_rate`,
+      ]),
+    ];
+
+    const HAND_COLUMNS = [
+      ...['lhp', 'rhp'].flatMap((hand) => [
+        `team_vs_${hand}_pa`, `team_vs_${hand}_ab`, `team_vs_${hand}_runs`, `team_vs_${hand}_hits`,
+        `team_vs_${hand}_1b`, `team_vs_${hand}_2b`, `team_vs_${hand}_3b`, `team_vs_${hand}_hr`,
+        `team_vs_${hand}_bb`, `team_vs_${hand}_k`, `team_vs_${hand}_hbp`, `team_vs_${hand}_tb`,
+        `team_vs_${hand}_avg`, `team_vs_${hand}_obp`, `team_vs_${hand}_slg`, `team_vs_${hand}_ops`,
+        `team_vs_${hand}_iso`, `team_vs_${hand}_woba`, `team_vs_${hand}_xwoba`, `team_vs_${hand}_wrc_plus`,
+        `team_vs_${hand}_k_rate`, `team_vs_${hand}_bb_rate`, `team_vs_${hand}_hr_rate`,
+        `team_vs_${hand}_barrel_rate`, `team_vs_${hand}_hard_hit_rate`, `team_vs_${hand}_avg_ev`,
+        `team_vs_${hand}_launch_angle`,
+      ]),
+      'opposing_starter_hand', 'team_vs_starter_hand_pa', 'team_vs_starter_hand_avg',
+      'team_vs_starter_hand_obp', 'team_vs_starter_hand_slg', 'team_vs_starter_hand_ops',
+      'team_vs_starter_hand_iso', 'team_vs_starter_hand_woba', 'team_vs_starter_hand_xwoba',
+      'team_vs_starter_hand_wrc_plus', 'team_vs_starter_hand_k_rate', 'team_vs_starter_hand_bb_rate',
+      'team_vs_starter_hand_hr_rate', 'team_vs_starter_hand_barrel_rate',
+      'team_vs_starter_hand_hard_hit_rate', 'team_vs_starter_hand_avg_ev',
+      'team_vs_starter_hand_launch_angle', 'team_vs_starter_hand_runs_per_pa',
+      'team_hand_ops_advantage', 'team_hand_woba_advantage', 'team_hand_iso_advantage',
+      'team_hand_k_rate_advantage', 'team_hand_bb_rate_advantage', 'team_hand_hr_rate_advantage',
+      'team_hand_barrel_rate_advantage', 'team_hand_hard_hit_advantage', 'team_hand_sample_reliability',
+    ];
+
+    const SPLIT_CONTEXT_COLUMNS = [
+      ...['home', 'away'].flatMap((spot) => [
+        `team_${spot}_games`, `team_${spot}_runs_per_game`, `team_${spot}_avg`, `team_${spot}_obp`,
+        `team_${spot}_slg`, `team_${spot}_ops`, `team_${spot}_iso`, `team_${spot}_woba`,
+        `team_${spot}_hr_per_game`, `team_${spot}_k_rate`, `team_${spot}_bb_rate`,
+      ]),
+      'team_current_home_away_runs_per_game', 'team_current_home_away_ops',
+      'team_current_home_away_iso', 'team_current_home_away_woba',
+      'team_current_home_away_hr_per_game', 'team_current_home_away_k_rate',
+      'team_current_home_away_bb_rate',
+      'team_venue_games', 'team_venue_runs_per_game', 'team_venue_avg', 'team_venue_obp',
+      'team_venue_slg', 'team_venue_ops', 'team_venue_iso', 'team_venue_hr_per_game',
+      'team_venue_woba', 'team_venue_k_rate', 'team_venue_bb_rate',
+      'team_prior_games_at_this_venue', 'team_prior_runs_per_game_at_this_venue',
+      'team_prior_ops_at_this_venue', 'team_prior_hr_per_game_at_this_venue',
+    ];
+
+    const OPP_PITCHING_COLUMNS = [
+      'opp_pitching_runs_allowed_per_game', 'opp_pitching_era', 'opp_pitching_fip',
+      'opp_pitching_xfip', 'opp_pitching_whip', 'opp_pitching_hits_allowed_per_game',
+      'opp_pitching_hr_allowed_per_game', 'opp_pitching_bb_per_game', 'opp_pitching_k_per_game',
+      'opp_pitching_k_rate', 'opp_pitching_bb_rate', 'opp_pitching_hr_rate',
+      'opp_pitching_babip_allowed', 'opp_pitching_avg_allowed', 'opp_pitching_obp_allowed',
+      'opp_pitching_slg_allowed', 'opp_pitching_ops_allowed', 'opp_pitching_woba_allowed',
+      'opp_pitching_xwoba_allowed', 'opp_pitching_barrel_rate_allowed',
+      'opp_pitching_hard_hit_rate_allowed', 'opp_pitching_avg_ev_allowed',
+      'opp_pitching_launch_angle_allowed',
+      ...['l5', 'l10', 'l15', 'l30'].flatMap((w) => [
+        `opp_pitching_${w}_runs_allowed_per_game`, `opp_pitching_${w}_era`,
+        `opp_pitching_${w}_whip`, `opp_pitching_${w}_hr_allowed_per_game`,
+        `opp_pitching_${w}_k_rate`, `opp_pitching_${w}_bb_rate`,
+      ]),
+    ];
+
+    const STARTER_COLUMNS = [
+      'starter_name', 'starter_id', 'starter_hand', 'starter_age', 'starter_team',
+      'starter_games_started_to_date', 'starter_games_pitched_to_date', 'starter_ip_to_date',
+      'starter_batters_faced_to_date', 'starter_pitches_thrown_to_date', 'starter_era',
+      'starter_fip', 'starter_xfip', 'starter_siera', 'starter_whip', 'starter_k_per_9',
+      'starter_bb_per_9', 'starter_hr_per_9', 'starter_h_per_9', 'starter_k_rate',
+      'starter_bb_rate', 'starter_k_minus_bb_rate', 'starter_hr_rate', 'starter_groundball_rate',
+      'starter_flyball_rate', 'starter_line_drive_rate', 'starter_popup_rate',
+      'starter_babip_allowed', 'starter_lob_rate', 'starter_avg_allowed', 'starter_obp_allowed',
+      'starter_slg_allowed', 'starter_ops_allowed', 'starter_woba_allowed', 'starter_xwoba_allowed',
+      'starter_avg_ev_allowed', 'starter_max_ev_allowed', 'starter_hard_hit_rate_allowed',
+      'starter_barrel_rate_allowed', 'starter_launch_angle_allowed',
+      'starter_sweet_spot_rate_allowed', 'starter_xba_allowed', 'starter_xslg_allowed',
+      'starter_xera', 'starter_avg_ip_per_start', 'starter_median_ip_per_start',
+      'starter_avg_pitches_per_start', 'starter_last_start_date', 'starter_days_rest',
+      'starter_last_start_ip', 'starter_last_start_pitches', 'starter_l3_start_avg_ip',
+      'starter_l3_start_avg_pitches', 'starter_l5_start_avg_ip', 'starter_l5_start_avg_pitches',
+      ...['l3', 'l5'].flatMap((w) => [
+        `starter_${w}_era`, `starter_${w}_fip`, `starter_${w}_whip`, `starter_${w}_k_rate`,
+        `starter_${w}_bb_rate`, `starter_${w}_hr_rate`, `starter_${w}_avg_ev_allowed`,
+        `starter_${w}_hard_hit_rate_allowed`, `starter_${w}_barrel_rate_allowed`,
+      ]),
+      ...['lhb', 'rhb'].flatMap((hand) => [
+        `starter_vs_${hand}_pa`, `starter_vs_${hand}_avg_allowed`,
+        `starter_vs_${hand}_obp_allowed`, `starter_vs_${hand}_slg_allowed`,
+        `starter_vs_${hand}_ops_allowed`, `starter_vs_${hand}_woba_allowed`,
+        `starter_vs_${hand}_xwoba_allowed`, `starter_vs_${hand}_k_rate`,
+        `starter_vs_${hand}_bb_rate`, `starter_vs_${hand}_hr_rate`,
+        `starter_vs_${hand}_hard_hit_rate_allowed`, `starter_vs_${hand}_barrel_rate_allowed`,
+      ]),
+      ...['home', 'away'].flatMap((spot) => [
+        `starter_${spot}_ip`, `starter_${spot}_era`, `starter_${spot}_fip`,
+        `starter_${spot}_whip`, `starter_${spot}_ops_allowed`, `starter_${spot}_hr_per_9`,
+        `starter_${spot}_k_rate`, `starter_${spot}_bb_rate`,
+      ]),
+      ...['day', 'night'].flatMap((part) => [
+        `starter_${part}_ip`, `starter_${part}_era`, `starter_${part}_ops_allowed`,
+        `starter_${part}_hr_per_9`,
+      ]),
+    ];
+
+    const ARSENAL_COLUMNS = [
+      'starter_pitch_count', 'starter_primary_pitch', 'starter_secondary_pitch',
+      'starter_tertiary_pitch', 'starter_fourth_pitch', 'starter_has_four_seam',
+      'starter_has_sinkers', 'starter_has_slider', 'starter_has_sweeper',
+      'starter_has_curveball', 'starter_has_changeup', 'starter_has_splitter',
+      'starter_has_cutter', 'starter_has_knuckle_curve',
+      ...['ff', 'si', 'sl', 'st', 'cu', 'ch', 'fs', 'fc', 'kc'].flatMap((p) => [
+        `starter_${p}_usage`, `starter_${p}_velocity`, `starter_${p}_spin_rate`,
+        `starter_${p}_vertical_break`, `starter_${p}_horizontal_break`,
+        `starter_${p}_release_extension`, `starter_${p}_release_height`,
+        `starter_${p}_release_side`, `starter_${p}_run_value`, `starter_${p}_ba_allowed`,
+        `starter_${p}_slg_allowed`, `starter_${p}_woba_allowed`,
+        `starter_${p}_xwoba_allowed`, `starter_${p}_whiff_rate`, `starter_${p}_chase_rate`,
+        `starter_${p}_zone_rate`, `starter_${p}_putaway_rate`,
+        `starter_${p}_hard_hit_rate_allowed`, `starter_${p}_barrel_rate_allowed`,
+        `starter_${p}_hr_allowed`, `team_vs_${p}_run_value`, `team_vs_${p}_ba`,
+        `team_vs_${p}_slg`, `team_vs_${p}_woba`, `team_vs_${p}_xwoba`,
+        `team_vs_${p}_whiff_rate`, `team_vs_${p}_hard_hit_rate`,
+        `team_vs_${p}_barrel_rate`,
+      ]),
+      'team_vs_starter_primary_pitch_woba', 'team_vs_starter_primary_pitch_xwoba',
+      'team_vs_starter_primary_pitch_slg', 'team_vs_starter_primary_pitch_whiff_rate',
+      'team_vs_starter_primary_pitch_barrel_rate', 'team_vs_starter_secondary_pitch_woba',
+      'team_vs_starter_secondary_pitch_xwoba', 'team_vs_starter_secondary_pitch_slg',
+      'team_vs_starter_secondary_pitch_whiff_rate', 'team_vs_starter_secondary_pitch_barrel_rate',
+      'starter_primary_pitch_quality', 'starter_secondary_pitch_quality',
+      'starter_arsenal_matchup_score_raw',
+    ];
+
+    const BULLPEN_COLUMNS = [
+      'opp_bullpen_ip_to_date', 'opp_bullpen_era', 'opp_bullpen_fip', 'opp_bullpen_xfip',
+      'opp_bullpen_whip', 'opp_bullpen_k_rate', 'opp_bullpen_bb_rate',
+      'opp_bullpen_hr_rate', 'opp_bullpen_k_minus_bb_rate', 'opp_bullpen_avg_allowed',
+      'opp_bullpen_obp_allowed', 'opp_bullpen_slg_allowed', 'opp_bullpen_ops_allowed',
+      'opp_bullpen_woba_allowed', 'opp_bullpen_xwoba_allowed', 'opp_bullpen_babip_allowed',
+      'opp_bullpen_lob_rate', 'opp_bullpen_groundball_rate', 'opp_bullpen_flyball_rate',
+      'opp_bullpen_hard_hit_rate_allowed', 'opp_bullpen_barrel_rate_allowed',
+      'opp_bullpen_avg_ev_allowed',
+      ...['l3', 'l5', 'l10', 'l15', 'l30'].flatMap((w) => [
+        `opp_bullpen_${w}_era`, `opp_bullpen_${w}_whip`, `opp_bullpen_${w}_hr_rate`,
+        `opp_bullpen_${w}_k_rate`, `opp_bullpen_${w}_bb_rate`,
+      ]),
+      'opp_bullpen_ip_yesterday', 'opp_bullpen_ip_last_2_days', 'opp_bullpen_ip_last_3_days',
+      'opp_bullpen_ip_last_5_days', 'opp_bullpen_pitches_yesterday',
+      'opp_bullpen_pitches_last_2_days', 'opp_bullpen_pitches_last_3_days',
+      'opp_bullpen_pitches_last_5_days', 'opp_bullpen_back_to_back_pitchers_used',
+      'opp_bullpen_three_in_four_pitchers_used', 'opp_bullpen_high_leverage_arms_used_yesterday',
+      'opp_bullpen_closer_used_yesterday', 'opp_bullpen_closer_pitches_yesterday',
+      'opp_bullpen_setup_arms_used_yesterday', 'opp_bullpen_available_relievers_count',
+      'opp_bullpen_fresh_relievers_count', 'opp_bullpen_tired_relievers_count',
+      ...Array.from({ length: 8 }, (_, index) => index + 1).flatMap((n) => [
+        `opp_reliever_${n}_name`, `opp_reliever_${n}_hand`, `opp_reliever_${n}_role`,
+        `opp_reliever_${n}_era`, `opp_reliever_${n}_fip`, `opp_reliever_${n}_whip`,
+        `opp_reliever_${n}_k_rate`, `opp_reliever_${n}_bb_rate`,
+        `opp_reliever_${n}_hr_rate`, `opp_reliever_${n}_woba_allowed`,
+        `opp_reliever_${n}_xwoba_allowed`, `opp_reliever_${n}_days_rest`,
+        `opp_reliever_${n}_pitches_last_1_day`, `opp_reliever_${n}_pitches_last_3_days`,
+        `opp_reliever_${n}_available`,
+      ]),
+    ];
+
+    const LINEUP_COLUMNS = [
+      'lineup_confirmed', 'lineup_confirmed_time',
+      ...Array.from({ length: 9 }, (_, index) => index + 1).flatMap((n) => [
+        `batting_order_${n}_player_id`, `batting_order_${n}_name`,
+        `batting_order_${n}_hand`, `batting_order_${n}_position`,
+      ]),
+      'lineup_season_avg', 'lineup_season_obp', 'lineup_season_slg', 'lineup_season_ops',
+      'lineup_season_iso', 'lineup_season_woba', 'lineup_season_xwoba',
+      'lineup_season_wrc_plus', 'lineup_season_hr_rate', 'lineup_season_k_rate',
+      'lineup_season_bb_rate', 'lineup_season_barrel_rate', 'lineup_season_hard_hit_rate',
+      'lineup_vs_starter_hand_avg', 'lineup_vs_starter_hand_obp',
+      'lineup_vs_starter_hand_slg', 'lineup_vs_starter_hand_ops',
+      'lineup_vs_starter_hand_iso', 'lineup_vs_starter_hand_woba',
+      'lineup_vs_starter_hand_xwoba', 'lineup_vs_starter_hand_wrc_plus',
+      'lineup_vs_starter_hand_k_rate', 'lineup_vs_starter_hand_bb_rate',
+      'lineup_vs_starter_hand_hr_rate', 'lineup_vs_starter_hand_barrel_rate',
+      'lineup_vs_starter_hand_hard_hit_rate', 'lineup_vs_starter_hand_pa',
+      ...['l7', 'l15'].flatMap((w) => [
+        `lineup_${w}_avg`, `lineup_${w}_obp`, `lineup_${w}_slg`, `lineup_${w}_ops`,
+        `lineup_${w}_woba`, `lineup_${w}_hr`, `lineup_${w}_k_rate`, `lineup_${w}_bb_rate`,
+      ]),
+      'projected_lineup_strength', 'actual_lineup_strength', 'missing_regulars_count',
+      'missing_top_3_hitters_count', 'missing_top_5_hitters_count', 'rested_regulars_count',
+      'rookies_in_lineup_count', 'bench_players_in_lineup_count', 'lefty_batters_count',
+      'righty_batters_count', 'switch_hitters_count', 'same_side_batters_vs_starter_count',
+      'opposite_side_batters_vs_starter_count',
+      'lineup_vs_starter_total_pa', 'lineup_vs_starter_total_ab',
+      'lineup_vs_starter_total_hits', 'lineup_vs_starter_total_2b',
+      'lineup_vs_starter_total_3b', 'lineup_vs_starter_total_hr',
+      'lineup_vs_starter_total_bb', 'lineup_vs_starter_total_k',
+      'lineup_vs_starter_total_avg', 'lineup_vs_starter_total_obp',
+      'lineup_vs_starter_total_slg', 'lineup_vs_starter_total_ops',
+      'lineup_vs_starter_total_woba',
+    ];
+
+    const LINEUP_PLAYER_COLUMNS = [
+      'game_id', 'date', 'team', 'opponent', 'starter_id', 'starter_hand', 'batting_order',
+      'player_id', 'name', 'bats', 'position',
+      'season_pa', 'season_avg', 'season_obp', 'season_slg', 'season_ops', 'season_iso',
+      'season_woba', 'season_xwoba', 'season_wrc_plus', 'season_hr', 'season_hr_rate',
+      'season_k_rate', 'season_bb_rate', 'season_barrel_rate', 'season_hard_hit_rate',
+      'season_avg_ev', 'season_launch_angle', 'vs_starter_hand_pa', 'vs_starter_hand_avg',
+      'vs_starter_hand_obp', 'vs_starter_hand_slg', 'vs_starter_hand_ops',
+      'vs_starter_hand_iso', 'vs_starter_hand_woba', 'vs_starter_hand_xwoba',
+      'vs_starter_hand_wrc_plus', 'vs_starter_hand_hr_rate', 'vs_starter_hand_k_rate',
+      'vs_starter_hand_bb_rate', 'vs_starter_hand_barrel_rate',
+      'vs_starter_hand_hard_hit_rate', 'l7_ops', 'l15_ops', 'l30_ops',
+      'l7_woba', 'l15_woba', 'l30_woba', 'l7_hr', 'l15_hr', 'l30_hr',
+      'vs_starter_pa', 'vs_starter_hits', 'vs_starter_hr', 'vs_starter_bb',
+      'vs_starter_k', 'vs_starter_avg', 'vs_starter_slg', 'vs_starter_ops',
+    ];
+
+    const REST_SCHEDULE_COLUMNS = [
+      'team_days_since_last_game', 'opp_days_since_last_game',
+      ...[3, 5, 7, 10].flatMap((n) => [`team_games_last_${n}_days`, `opp_games_last_${n}_days`]),
+      'team_is_on_back_to_back', 'opp_is_on_back_to_back', 'team_is_on_3_games_in_3_days',
+      'opp_is_on_3_games_in_3_days', 'team_is_on_6_games_in_7_days',
+      'opp_is_on_6_games_in_7_days', 'team_previous_city', 'opp_previous_city',
+      'team_travel_miles_since_last_game', 'opp_travel_miles_since_last_game',
+      'team_timezone_change', 'opp_timezone_change', 'team_cross_country_travel',
+      'opp_cross_country_travel', 'team_home_stand_game_number', 'team_road_trip_game_number',
+      'opp_home_stand_game_number', 'opp_road_trip_game_number', 'series_game_number',
+      'team_series_wins_so_far', 'team_series_losses_so_far', 'opp_series_wins_so_far',
+      'opp_series_losses_so_far', 'rubber_match', 'sweep_game', 'getaway_day',
+    ];
+
+    const PLACEHOLDER_COLUMNS = [
+      'team_defensive_runs_saved', 'team_outs_above_average', 'team_fielding_percentage',
+      'team_errors_per_game', 'team_double_plays_per_game', 'team_catcher_framing_runs',
+      'team_catcher_pop_time', 'team_catcher_caught_stealing_rate',
+      'team_stolen_bases_allowed', 'team_passed_balls', 'team_wild_pitches_allowed',
+      'opp_defensive_runs_saved', 'opp_outs_above_average', 'opp_errors_per_game',
+      'opp_catcher_framing_runs', 'opp_catcher_caught_stealing_rate',
+      'team_sb', 'team_cs', 'team_sb_success_rate', 'team_stolen_base_attempts_per_game',
+      'team_extra_bases_taken', 'team_baserunning_runs', 'team_sprint_speed_avg',
+      'team_gidp_rate', 'team_lob_rate', 'team_runners_left_in_scoring_position_per_game',
+      'team_risp_avg', 'team_risp_ops', 'opp_pitcher_stolen_bases_allowed',
+      'opp_pitcher_pickoffs', 'opp_pitcher_time_to_plate', 'opp_catcher_pop_time',
+      'opp_catcher_throwing_runs', 'opp_catcher_caught_stealing_rate',
+      'team_il_players_count', 'team_il_position_players_count', 'team_il_pitchers_count',
+      'team_il_starting_pitchers_count', 'team_il_bullpen_pitchers_count',
+      'team_il_regular_batters_count', 'team_il_projected_war_total',
+      'team_il_batter_war_total', 'team_il_pitcher_war_total',
+      'opp_il_players_count', 'opp_il_position_players_count', 'opp_il_pitchers_count',
+      'opp_il_starting_pitchers_count', 'opp_il_bullpen_pitchers_count',
+      'opp_il_regular_batters_count', 'opp_il_projected_war_total',
+      'opp_il_batter_war_total', 'opp_il_pitcher_war_total',
+      'team_recent_callups_count', 'team_recent_optioned_players_count',
+      'team_recent_trades_count', 'team_recent_roster_moves_count',
+      'opp_recent_callups_count', 'opp_recent_optioned_players_count',
+      'opp_recent_trades_count', 'opp_recent_roster_moves_count',
+    ];
+
+    const PARK_WEATHER_COLUMNS = [
+      'park_run_factor', 'park_hr_factor', 'park_1b_factor', 'park_2b_factor', 'park_3b_factor',
+      'park_bb_factor', 'park_k_factor', 'park_lhb_hr_factor', 'park_rhb_hr_factor',
+      'park_lhb_run_factor', 'park_rhb_run_factor', 'park_foul_territory_size',
+      'park_altitude', 'park_roof_type', 'park_is_dome', 'park_has_retractable_roof',
+      'roof_status', 'lf_wall_distance', 'lcf_wall_distance', 'cf_wall_distance',
+      'rcf_wall_distance', 'rf_wall_distance', 'lf_wall_height', 'lcf_wall_height',
+      'cf_wall_height', 'rcf_wall_height', 'rf_wall_height', 'field_orientation_degrees',
+      'home_plate_to_cf_bearing', 'weather_source', 'weather_station_id',
+      'game_time_temperature', 'game_time_feels_like', 'game_time_humidity',
+      'game_time_pressure', 'game_time_cloud_cover', 'game_time_precip_probability',
+      'game_time_precip_amount', 'game_time_wind_speed', 'game_time_wind_gust',
+      'game_time_wind_direction_degrees', 'game_time_wind_direction_cardinal',
+      'wind_blowing_out_to_cf', 'wind_blowing_in_from_cf', 'wind_blowing_out_to_lf',
+      'wind_blowing_out_to_rf', 'wind_crosswind_left_to_right',
+      'wind_crosswind_right_to_left', 'wind_angle_relative_to_cf',
+      'wind_angle_relative_to_pull_side_lhb', 'wind_angle_relative_to_pull_side_rhb',
+      'air_density', 'density_altitude', 'dew_point', 'roof_closed',
+      'weather_applies_to_game', 'indoor_game',
+    ];
+
+    const PULL_COLUMNS = [
+      'team_pull_rate', 'team_center_rate', 'team_oppo_rate', 'team_lhb_pull_rate',
+      'team_lhb_center_rate', 'team_lhb_oppo_rate', 'team_rhb_pull_rate',
+      'team_rhb_center_rate', 'team_rhb_oppo_rate', 'team_air_pull_rate',
+      'team_air_center_rate', 'team_air_oppo_rate', 'team_ground_pull_rate',
+      'team_ground_center_rate', 'team_ground_oppo_rate', 'lineup_pull_rate',
+      'lineup_center_rate', 'lineup_oppo_rate', 'lineup_lhb_pull_rate',
+      'lineup_rhb_pull_rate', 'lineup_air_pull_rate', 'lineup_air_oppo_rate',
+      ...Array.from({ length: 9 }, (_, index) => index + 1).flatMap((n) => [
+        `b${n}_pull_rate`, `b${n}_center_rate`, `b${n}_oppo_rate`,
+        `b${n}_air_pull_rate`, `b${n}_air_oppo_rate`, `b${n}_fb_pull_rate`,
+        `b${n}_fb_oppo_rate`,
+      ]),
+    ];
+
+    const UMP_ODDS_COLUMNS = [
+      'home_plate_umpire', 'umpire_games_to_date', 'umpire_runs_per_game',
+      'umpire_strike_rate', 'umpire_ball_rate', 'umpire_called_strike_rate',
+      'umpire_walk_rate', 'umpire_k_rate', 'umpire_home_team_win_rate',
+      'umpire_over_rate', 'umpire_avg_total_runs', 'umpire_pitcher_friendly_score',
+      'umpire_hitter_friendly_score', 'open_home_moneyline', 'open_away_moneyline',
+      'open_total', 'open_home_runline', 'open_away_runline', 'close_home_moneyline',
+      'close_away_moneyline', 'close_total', 'close_home_runline', 'close_away_runline',
+      'moneyline_movement_home', 'moneyline_movement_away', 'total_line_movement',
+      'home_implied_win_probability_open', 'home_implied_win_probability_close',
+      'away_implied_win_probability_open', 'away_implied_win_probability_close',
+    ];
+
+    const ACTUAL_COLUMNS = [
+      'actual_team_runs', 'actual_opponent_runs', 'actual_total_runs', 'actual_team_win',
+      'actual_team_hits', 'actual_team_1b', 'actual_team_2b', 'actual_team_3b',
+      'actual_team_hr', 'actual_team_bb', 'actual_team_k', 'actual_team_hbp',
+      'actual_team_tb', 'actual_team_lob', 'actual_team_risp_hits', 'actual_team_risp_ab',
+      'actual_team_gidp', 'actual_team_sb', 'actual_team_cs', 'actual_team_avg',
+      'actual_team_obp', 'actual_team_slg', 'actual_team_ops',
+      'actual_opp_starter_ip', 'actual_opp_starter_runs_allowed',
+      'actual_opp_starter_er_allowed', 'actual_opp_starter_hits_allowed',
+      'actual_opp_starter_hr_allowed', 'actual_opp_starter_bb', 'actual_opp_starter_k',
+      'actual_opp_starter_pitches', 'actual_opp_starter_strikes',
+      'actual_opp_bullpen_ip', 'actual_opp_bullpen_runs_allowed',
+      'actual_opp_bullpen_er_allowed', 'actual_opp_bullpen_hits_allowed',
+      'actual_opp_bullpen_hr_allowed', 'actual_opp_bullpen_bb', 'actual_opp_bullpen_k',
+      'actual_opp_bullpen_pitches', 'actual_team_runs_first_5',
+      'actual_opp_runs_first_5', 'actual_team_hits_first_5', 'actual_team_hr_first_5',
+      'actual_starter_runs_allowed_first_5',
+    ];
+
+    const QUALITY_COLUMNS = [
+      'lineup_was_confirmed_pre_game', 'starter_was_confirmed_pre_game',
+      'starter_changed_after_collection', 'game_was_postponed', 'game_was_suspended',
+      'game_was_resumed_later', 'game_was_shortened', 'weather_missing',
+      'park_factor_missing', 'bullpen_data_missing', 'lineup_data_missing',
+      'statcast_data_missing', 'betting_data_missing', 'data_collection_timestamp',
+      'data_version', 'sponge_version', 'source_mlb_stats', 'source_statcast',
+      'source_weather', 'source_odds', 'source_lineups',
+    ];
+
+    const TEAM_CONTEXT_COLUMNS = [
+      ...TEAM_CONTEXT_BASE_COLUMNS,
+      ...OFFENSE_COLUMNS,
+      ...WINDOW_COLUMNS,
+      ...HAND_COLUMNS,
+      ...SPLIT_CONTEXT_COLUMNS,
+      ...OPP_PITCHING_COLUMNS,
+      ...STARTER_COLUMNS,
+      ...ARSENAL_COLUMNS,
+      ...BULLPEN_COLUMNS,
+      ...LINEUP_COLUMNS,
+      ...REST_SCHEDULE_COLUMNS,
+      ...PLACEHOLDER_COLUMNS,
+      ...PARK_WEATHER_COLUMNS,
+      ...PULL_COLUMNS,
+      ...UMP_ODDS_COLUMNS,
+      ...ACTUAL_COLUMNS,
+      ...QUALITY_COLUMNS,
+    ];
+
+    const GAME_COLUMNS = [
+      'game_id', 'date', 'season', 'home_team', 'away_team', 'venue', 'stadium_id',
+      'division_game', 'interleague_game', 'doubleheader_game', 'doubleheader_game_number',
+      'day_game', 'night_game', 'start_time_local', 'start_time_et', 'home_runs',
+      'away_runs', 'total_runs', 'home_win', 'game_went_extra_innings', 'innings_played',
+      'first_5_home_runs', 'first_5_away_runs', 'first_5_total_runs',
+    ];
+
+    const SIMPLE_CONTEXT_COLUMNS = ['game_id', 'date', 'team', 'opponent', ...STARTER_COLUMNS, ...QUALITY_COLUMNS];
+    const BULLPEN_TABLE_COLUMNS = ['game_id', 'date', 'team', 'opponent', ...BULLPEN_COLUMNS, ...QUALITY_COLUMNS];
+    const LINEUP_TABLE_COLUMNS = ['game_id', 'date', 'team', 'opponent', 'starter_id', 'starter_hand', ...LINEUP_COLUMNS, ...QUALITY_COLUMNS];
+    const POSTGAME_COLUMNS = ['game_id', 'date', 'team', 'opponent', ...ACTUAL_COLUMNS];
+    const PARK_TABLE_COLUMNS = ['game_id', 'date', 'venue', 'stadium_id', ...PARK_WEATHER_COLUMNS, ...QUALITY_COLUMNS];
+
+    const els = {
+      startDate: document.getElementById('startDate'),
+      endDate: document.getElementById('endDate'),
+      startSeason: document.getElementById('startSeason'),
+      endSeason: document.getElementById('endSeason'),
+      rangeMode: document.getElementById('rangeMode'),
+      buildBtn: document.getElementById('buildBtn'),
+      stopBtn: document.getElementById('stopBtn'),
+      downloadCombinedBtn: document.getElementById('downloadCombinedBtn'),
+      downloadAllBtn: document.getElementById('downloadAllBtn'),
+      progress: document.getElementById('progress'),
+      status: document.getElementById('status'),
+      log: document.getElementById('log'),
+      preview: document.getElementById('preview'),
+      gamesMetric: document.getElementById('gamesMetric'),
+      rowsMetric: document.getElementById('rowsMetric'),
+      lineupsMetric: document.getElementById('lineupsMetric'),
+      playersMetric: document.getElementById('playersMetric'),
+      warningsMetric: document.getElementById('warningsMetric'),
+    };
+
+    function emptyTables() {
+      return {
+        games: [],
+        team_game_context: [],
+        starter_context: [],
+        bullpen_context: [],
+        lineups: [],
+        player_lineup_stats: [],
+        weather: [],
+        parks: [],
+        postgame_results: [],
+      };
+    }
+
+    function todayIso() {
+      return new Date().toISOString().slice(0, 10);
+    }
+
+    function dateOnly(value) {
+      return String(value || '').slice(0, 10);
+    }
+
+    function seasonForDate(value) {
+      const year = Number(String(value || '').slice(0, 4));
+      return Number.isFinite(year) && year > 0 ? year : new Date().getFullYear();
+    }
+
+    function seasonStart(year) {
+      return `${Number(year)}-04-01`;
+    }
+
+    function seasonEnd(year) {
+      return `${Number(year)}-09-30`;
+    }
+
+    function addDays(dateText, days) {
+      const [year, month, day] = String(dateText || '').split('-').map(Number);
+      const date = new Date(Date.UTC(year, month - 1, day + Number(days || 0)));
+      return date.toISOString().slice(0, 10);
+    }
+
+    function diffDays(a, b) {
+      if (!a || !b) return '';
+      const d1 = new Date(`${a}T00:00:00Z`);
+      const d2 = new Date(`${b}T00:00:00Z`);
+      return Math.round((d2 - d1) / 86400000);
+    }
+
+    function compareDate(a, b) {
+      return dateOnly(a).localeCompare(dateOnly(b));
+    }
+
+    function clamp(value, min, max) {
+      return Math.max(min, Math.min(max, Number(value) || 0));
+    }
+
+    function num(value, fallback = 0) {
+      const n = Number(String(value ?? '').replace(/[^\d.-]/g, ''));
+      return Number.isFinite(n) ? n : fallback;
+    }
+
+    function safeDiv(numerator, denominator) {
+      const den = Number(denominator);
+      return den > 0 ? Number(numerator) / den : null;
+    }
+
+    function rate(value, digits = 3, trim = true) {
+      const n = Number(value);
+      if (!Number.isFinite(n)) return '';
+      const text = n.toFixed(digits);
+      return trim ? text.replace(/^0\./, '.') : text;
+    }
+
+    function pctRate(numerator, denominator, digits = 3) {
+      return rate(safeDiv(numerator, denominator), digits, true);
+    }
+
+    function clean(value) {
+      return String(value ?? '').trim();
+    }
+
+    function handCode(value) {
+      const raw = clean(value).toUpperCase();
+      if (raw.startsWith('L')) return 'L';
+      if (raw.startsWith('R')) return 'R';
+      if (raw.startsWith('S')) return 'S';
+      return '';
+    }
+
+    function pitchCode(value) {
+      const raw = clean(value).toUpperCase();
+      if (!raw) return 'UNK';
+      if (raw === 'FF' || raw.includes('4-SEAM')) return 'ff';
+      if (raw === 'SI' || raw === 'FT' || raw.includes('SINK')) return 'si';
+      if (raw === 'SL' || raw.includes('SLIDER')) return 'sl';
+      if (raw === 'ST' || raw.includes('SWEEPER')) return 'st';
+      if (raw === 'CU' || raw === 'KC' || raw.includes('CURVE')) return raw === 'KC' ? 'kc' : 'cu';
+      if (raw === 'CH' || raw.includes('CHANGE')) return 'ch';
+      if (raw === 'FS' || raw.includes('SPLIT')) return 'fs';
+      if (raw === 'FC' || raw.includes('CUT')) return 'fc';
+      return raw.slice(0, 2).toLowerCase();
+    }
+
+    function inningsToOuts(value) {
+      if (value == null || value === '') return 0;
+      const [whole, part] = String(value).split('.');
+      return (Number(whole) || 0) * 3 + (Number(part) || 0);
+    }
+
+    function outsToIp(outs) {
+      const n = Math.max(0, Math.floor(Number(outs) || 0));
+      return Number(`${Math.floor(n / 3)}.${n % 3}`);
+    }
+
+    function localEtTime(gameDate) {
+      if (!gameDate) return '';
+      const date = new Date(gameDate);
+      if (Number.isNaN(date.getTime())) return '';
+      return date.toLocaleString('en-US', {
+        timeZone: 'America/New_York',
+        year: 'numeric',
+        month: '2-digit',
+        day: '2-digit',
+        hour: 'numeric',
+        minute: '2-digit',
+      });
+    }
+
+    function ageOnDate(birthDate, onDate) {
+      if (!birthDate || !onDate) return '';
+      const birth = new Date(`${birthDate}T00:00:00Z`);
+      const date = new Date(`${onDate}T00:00:00Z`);
+      if (Number.isNaN(birth.getTime()) || Number.isNaN(date.getTime())) return '';
+      let age = date.getUTCFullYear() - birth.getUTCFullYear();
+      const beforeBirthday = date.getUTCMonth() < birth.getUTCMonth()
+        || (date.getUTCMonth() === birth.getUTCMonth() && date.getUTCDate() < birth.getUTCDate());
+      if (beforeBirthday) age -= 1;
+      return age;
+    }
+
+    function isNightGame(gameDate) {
+      if (!gameDate) return '';
+      const hour = Number(new Intl.DateTimeFormat('en-US', {
+        timeZone: 'America/New_York',
+        hour: 'numeric',
+        hour12: false,
+      }).format(new Date(gameDate)));
+      return Number.isFinite(hour) ? (hour >= 17 ? 1 : 0) : '';
+    }
+
+    function setProgress(done, total) {
+      const pct = total > 0 ? Math.round((done / total) * 100) : 0;
+      els.progress.style.width = `${pct}%`;
+    }
+
+    function setStatus(message) {
+      els.status.innerHTML = message;
+    }
+
+    function log(message) {
+      const line = `[${new Date().toLocaleTimeString()}] ${message}`;
+      els.log.textContent = `${line}\n${els.log.textContent}`.slice(0, 18000);
+    }
+
+    async function fetchJson(url) {
+      if (cache.has(url)) return cache.get(url);
+      const promise = fetch(url, { cache: 'no-store' }).then((response) => {
+        if (!response.ok) throw new Error(`${response.status} ${response.statusText}`);
+        return response.json();
+      });
+      cache.set(url, promise);
+      return promise;
+    }
+
+    async function getPerson(playerId) {
+      const id = Number(playerId);
+      if (!Number.isFinite(id) || id <= 0) return {};
+      if (personCache.has(id)) return personCache.get(id);
+      const promise = fetchJson(`${MLB_API}/people/${id}`).then((payload) => payload?.people?.[0] || {}).catch(() => ({}));
+      personCache.set(id, promise);
+      return promise;
+    }
+
+    function scheduleUrl(startDate, endDate) {
+      const url = new URL(`${MLB_API}/schedule`);
+      url.searchParams.set('sportId', '1');
+      url.searchParams.set('gameTypes', 'R');
+      url.searchParams.set('startDate', startDate);
+      url.searchParams.set('endDate', endDate);
+      url.searchParams.set('hydrate', 'probablePitcher,team,venue');
+      return url.toString();
+    }
+
+    async function getScheduleGames(startDate, endDate) {
+      const payload = await fetchJson(scheduleUrl(startDate, endDate));
+      return (payload.dates || []).flatMap((day) => (day.games || []).map((game) => ({
+        gamePk: game.gamePk,
+        date: dateOnly(game.officialDate || day.date || game.gameDate),
+        gameDate: game.gameDate || '',
+        doubleHeader: game.doubleHeader || '',
+        gameNumber: game.gameNumber || '',
+        status: game.status || {},
+        venue: game.venue || {},
+        away: game.teams?.away || {},
+        home: game.teams?.home || {},
+      })));
+    }
+
+    async function getLive(gamePk) {
+      return fetchJson(`${MLB_LIVE_API}/game/${gamePk}/feed/live`);
+    }
+
+    function scheduleChunks(start, end) {
+      const chunks = [];
+      for (let season = seasonForDate(start); season <= seasonForDate(end); season += 1) {
+        const chunkStart = compareDate(start, seasonStart(season)) > 0 ? start : seasonStart(season);
+        const chunkEnd = compareDate(end, seasonEnd(season)) < 0 ? end : seasonEnd(season);
+        if (compareDate(chunkStart, chunkEnd) <= 0) chunks.push({ season, start: chunkStart, end: chunkEnd });
+      }
+      return chunks;
+    }
+
+    function resolvedRange() {
+      const mode = els.rangeMode.value;
+      const startSeason = Number(els.startSeason.value) || seasonForDate(todayIso());
+      const endSeason = Number(els.endSeason.value) || startSeason;
+      if (mode === 'season') return { start: seasonStart(startSeason), end: seasonEnd(endSeason) };
+      if (mode === 'season-to-date') return { start: seasonStart(startSeason), end: els.endDate.value || seasonEnd(startSeason) };
+      if (mode === 'date-to-season') return { start: els.startDate.value || seasonStart(startSeason), end: seasonEnd(endSeason) };
+      const start = els.startDate.value || todayIso();
+      const end = els.endDate.value || start;
+      return start <= end ? { start, end } : { start: end, end: start };
+    }
+
+    function isFinal(game) {
+      const text = `${game?.status?.abstractGameState || ''} ${game?.status?.detailedState || ''} ${game?.status?.codedGameState || ''}`;
+      return /final|completed|game over/i.test(text);
+    }
+
+    function teamAbbrevFromLive(live, side, scheduleGame) {
+      return clean(live?.gameData?.teams?.[side]?.abbreviation
+        || live?.gameData?.teams?.[side]?.teamCode
+        || scheduleGame?.[side]?.team?.abbreviation
+        || scheduleGame?.[side]?.team?.teamCode).toUpperCase();
+    }
+
+    function playerBox(boxscore, side, id) {
+      return boxscore?.teams?.[side]?.players?.[`ID${id}`] || null;
+    }
+
+    function battingOrderSpot(player) {
+      const raw = Number(player?.battingOrder);
+      return Number.isFinite(raw) && raw > 0 ? Math.floor(raw / 100) : '';
+    }
+
+    function isStartingBatter(player) {
+      const raw = Number(player?.battingOrder);
+      return Number.isFinite(raw) && raw > 0 && raw % 100 === 0;
+    }
+
+    function playerBats(live, player, id) {
+      const gamePlayer = live?.gameData?.players?.[`ID${id}`] || {};
+      return handCode(player?.person?.batSide?.code || gamePlayer?.batSide?.code || player?.person?.batSide?.description || gamePlayer?.batSide?.description);
+    }
+
+    function playerThrows(live, player, id) {
+      const gamePlayer = live?.gameData?.players?.[`ID${id}`] || {};
+      return handCode(player?.person?.pitchHand?.code || gamePlayer?.pitchHand?.code || player?.person?.pitchHand?.description || gamePlayer?.pitchHand?.description);
+    }
+
+    function emptyBatting() {
+      return {
+        pa: 0, ab: 0, h: 0, singles: 0, doubles: 0, triples: 0, hr: 0, bb: 0, ibb: 0,
+        k: 0, hbp: 0, sf: 0, sh: 0, tb: 0, r: 0, rbi: 0, sb: 0, cs: 0, gidp: 0,
+        lob: 0, rispH: 0, rispAb: 0, bbe: 0, hardHit: 0, barrel: 0, sweetSpot: 0,
+        evSum: 0, evCount: 0, laSum: 0, laCount: 0, xbaSum: 0, xbaCount: 0,
+        xslgSum: 0, xslgCount: 0, swings: 0, contact: 0, whiffs: 0,
+        groundballs: 0, lineDrives: 0, flyballs: 0, popups: 0,
+      };
+    }
+
+    function addBatting(target, line) {
+      for (const key of Object.keys(emptyBatting())) target[key] = num(target[key]) + num(line?.[key]);
+      return target;
+    }
+
+    function emptyPitching() {
+      return {
+        games: 0, starts: 0, outs: 0, bf: 0, h: 0, r: 0, er: 0, bb: 0, ibb: 0, k: 0,
+        hr: 0, hbp: 0, pitches: 0, strikes: 0, inherited: 0, inheritedScored: 0,
+        bbe: 0, hardHit: 0, barrel: 0, sweetSpot: 0, evSum: 0, evCount: 0,
+        laSum: 0, laCount: 0, xbaSum: 0, xbaCount: 0, xslgSum: 0, xslgCount: 0,
+        swings: 0, contact: 0, whiffs: 0, groundballs: 0, lineDrives: 0, flyballs: 0, popups: 0,
+      };
+    }
+
+    function addPitching(target, line) {
+      for (const key of Object.keys(emptyPitching())) target[key] = num(target[key]) + num(line?.[key]);
+      return target;
+    }
+
+    function officialPa(stat) {
+      const direct = num(stat?.plateAppearances, NaN);
+      if (Number.isFinite(direct)) return direct;
+      return num(stat?.atBats) + num(stat?.baseOnBalls) + num(stat?.intentionalWalks) + num(stat?.hitByPitch) + num(stat?.sacFlies) + num(stat?.sacBunts);
+    }
+
+    function battingFromStats(stat = {}) {
+      const h = num(stat.hits);
+      const doubles = num(stat.doubles);
+      const triples = num(stat.triples);
+      const hr = num(stat.homeRuns);
+      return {
+        pa: officialPa(stat),
+        ab: num(stat.atBats),
+        h,
+        singles: Math.max(0, h - doubles - triples - hr),
+        doubles,
+        triples,
+        hr,
+        bb: num(stat.baseOnBalls) + num(stat.intentionalWalks),
+        ibb: num(stat.intentionalWalks),
+        k: num(stat.strikeOuts),
+        hbp: num(stat.hitByPitch),
+        sf: num(stat.sacFlies),
+        sh: num(stat.sacBunts),
+        tb: num(stat.totalBases) || Math.max(0, h - doubles - triples - hr) + (2 * doubles) + (3 * triples) + (4 * hr),
+        r: num(stat.runs),
+        rbi: num(stat.rbi),
+        sb: num(stat.stolenBases),
+        cs: num(stat.caughtStealing),
+        gidp: num(stat.groundIntoDoublePlay),
+        lob: num(stat.leftOnBase),
+      };
+    }
+
+    function pitchingFromStats(stat = {}) {
+      return {
+        games: 1,
+        starts: num(stat.gamesStarted) > 0 ? 1 : 0,
+        outs: inningsToOuts(stat.inningsPitched),
+        bf: num(stat.battersFaced),
+        h: num(stat.hits),
+        r: num(stat.runs),
+        er: num(stat.earnedRuns),
+        bb: num(stat.baseOnBalls) + num(stat.intentionalWalks),
+        ibb: num(stat.intentionalWalks),
+        k: num(stat.strikeOuts),
+        hr: num(stat.homeRuns),
+        hbp: num(stat.hitByPitch),
+        pitches: num(stat.numberOfPitches),
+        strikes: num(stat.strikes),
+      };
+    }
+
+    function pitcherExtrasFromLive(live, pitcherId) {
+      const extras = {
+        bbe: 0, hardHit: 0, barrel: 0, sweetSpot: 0, evSum: 0, evCount: 0, maxEv: 0,
+        laSum: 0, laCount: 0, xbaSum: 0, xbaCount: 0, xslgSum: 0, xslgCount: 0,
+        swings: 0, contact: 0, whiffs: 0, groundballs: 0, lineDrives: 0, flyballs: 0, popups: 0,
+      };
+      for (const play of live?.liveData?.plays?.allPlays || []) {
+        if (!play?.about?.isComplete || Number(play?.matchup?.pitcher?.id) !== Number(pitcherId)) continue;
+        const line = eventBatting(play);
+        extras.bbe += line.bbe;
+        extras.hardHit += line.hardHit;
+        extras.barrel += line.barrel;
+        extras.sweetSpot += line.sweetSpot;
+        extras.evSum += line.evSum;
+        extras.evCount += line.evCount;
+        extras.maxEv = Math.max(extras.maxEv, line.evCount ? line.evSum / line.evCount : 0);
+        extras.laSum += line.laSum;
+        extras.laCount += line.laCount;
+        extras.xbaSum += line.xbaSum;
+        extras.xbaCount += line.xbaCount;
+        extras.xslgSum += line.xslgSum;
+        extras.xslgCount += line.xslgCount;
+        extras.swings += line.swings;
+        extras.contact += line.contact;
+        extras.whiffs += line.whiffs;
+        extras.groundballs += line.groundballs;
+        extras.lineDrives += line.lineDrives;
+        extras.flyballs += line.flyballs;
+        extras.popups += line.popups;
+      }
+      return extras;
+    }
+
+    function pitchingWithExtras(live, player, pitcherId) {
+      return {
+        ...pitchingFromStats(player?.stats?.pitching || {}),
+        ...pitcherExtrasFromLive(live, pitcherId),
+      };
+    }
+
+    function eventBatting(play) {
+      const event = clean(play?.result?.event);
+      const line = emptyBatting();
+      line.pa = 1;
+      line.h = ['Single', 'Double', 'Triple', 'Home Run'].includes(event) ? 1 : 0;
+      line.doubles = event === 'Double' ? 1 : 0;
+      line.triples = event === 'Triple' ? 1 : 0;
+      line.hr = event === 'Home Run' ? 1 : 0;
+      line.singles = line.h - line.doubles - line.triples - line.hr;
+      line.bb = /walk/i.test(event) ? 1 : 0;
+      line.hbp = /hit by pitch/i.test(event) ? 1 : 0;
+      line.sf = /sac fly/i.test(event) ? 1 : 0;
+      line.sh = /sac bunt/i.test(event) ? 1 : 0;
+      line.k = /strikeout/i.test(event) ? 1 : 0;
+      line.rbi = num(play?.result?.rbi);
+      line.ab = /walk|hit by pitch|sac fly|sac bunt|catcher interference/i.test(event) ? 0 : 1;
+      line.tb = line.singles + (2 * line.doubles) + (3 * line.triples) + (4 * line.hr);
+      for (const evt of play?.playEvents || []) {
+        if (evt?.isPitch) {
+          const desc = clean(evt?.details?.description).toLowerCase();
+          const swing = evt?.details?.isSwing === true || /swing|foul|in play|hit into play|bunt/i.test(desc);
+          const contact = /foul|in play|hit into play|foul bunt/i.test(desc);
+          if (swing) line.swings += 1;
+          if (contact) line.contact += 1;
+        }
+        if (evt?.hitData) {
+          const ev = Number(evt.hitData.launchSpeed);
+          const la = Number(evt.hitData.launchAngle);
+          const xba = Number(evt.hitData.estimatedBAUsingSpeedAngle ?? evt.hitData.estimatedBA);
+          const xslg = Number(evt.hitData.estimatedSLGUsingSpeedAngle ?? evt.hitData.estimatedSLG);
+          const trajectory = clean(evt.hitData.trajectory).toLowerCase();
+          line.bbe += 1;
+          if (Number.isFinite(ev)) {
+            line.evSum += ev;
+            line.evCount += 1;
+            if (ev >= 95) line.hardHit += 1;
+            if (ev >= 98 && Number.isFinite(la) && la >= 8 && la <= 50) line.barrel += 1;
+          }
+          if (Number.isFinite(la)) {
+            line.laSum += la;
+            line.laCount += 1;
+            if (la >= 8 && la <= 32) line.sweetSpot += 1;
+          }
+          if (Number.isFinite(xba)) {
+            line.xbaSum += xba;
+            line.xbaCount += 1;
+          }
+          if (Number.isFinite(xslg)) {
+            line.xslgSum += xslg;
+            line.xslgCount += 1;
+          }
+          if (trajectory.includes('ground')) line.groundballs = 1;
+          if (trajectory.includes('line')) line.lineDrives = 1;
+          if (trajectory.includes('fly')) line.flyballs = 1;
+          if (trajectory.includes('popup') || trajectory.includes('pop')) line.popups = 1;
+        }
+      }
+      line.whiffs = Math.max(0, line.swings - line.contact);
+      return line;
+    }
+
+    function statSummary(total = emptyBatting()) {
+      const obpDen = total.ab + total.bb + total.hbp + total.sf;
+      const avg = safeDiv(total.h, total.ab);
+      const obp = safeDiv(total.h + total.bb + total.hbp, obpDen);
+      const slg = safeDiv(total.tb, total.ab);
+      const ops = Number.isFinite(obp) && Number.isFinite(slg) ? obp + slg : null;
+      const iso = Number.isFinite(avg) && Number.isFinite(slg) ? slg - avg : null;
+      const wobaDen = total.ab + total.bb - total.ibb + total.sf + total.hbp;
+      const woba = safeDiv((0.69 * (total.bb - total.ibb)) + (0.72 * total.hbp) + (0.88 * total.singles) + (1.247 * total.doubles) + (1.578 * total.triples) + (2.031 * total.hr), wobaDen);
+      return {
+        games: total.games || 0,
+        pa: total.pa,
+        ab: total.ab,
+        runs: total.r,
+        hits: total.h,
+        singles: total.singles,
+        doubles: total.doubles,
+        triples: total.triples,
+        hr: total.hr,
+        tb: total.tb,
+        rbi: total.rbi,
+        bb: total.bb,
+        k: total.k,
+        hbp: total.hbp,
+        sb: total.sb,
+        cs: total.cs,
+        gidp: total.gidp,
+        lob: total.lob,
+        avg,
+        obp,
+        slg,
+        ops,
+        iso,
+        babip: safeDiv(total.h - total.hr, total.ab - total.k - total.hr + total.sf),
+        bbRate: safeDiv(total.bb, total.pa),
+        kRate: safeDiv(total.k, total.pa),
+        hrRate: safeDiv(total.hr, total.pa),
+        xbhRate: safeDiv(total.doubles + total.triples + total.hr, total.pa),
+        tbPerPa: safeDiv(total.tb, total.pa),
+        runsPerPa: safeDiv(total.r, total.pa),
+        runsPerHit: safeDiv(total.r, total.h),
+        runsPerTob: safeDiv(total.r, total.h + total.bb + total.hbp),
+        woba,
+        xwoba: total.xbaCount ? safeDiv(total.xbaSum, total.xbaCount) : null,
+        xba: total.xbaCount ? safeDiv(total.xbaSum, total.xbaCount) : null,
+        xslg: total.xslgCount ? safeDiv(total.xslgSum, total.xslgCount) : null,
+        barrelRate: safeDiv(total.barrel, total.bbe),
+        hardHitRate: safeDiv(total.hardHit, total.bbe),
+        avgEv: safeDiv(total.evSum, total.evCount),
+        launchAngle: safeDiv(total.laSum, total.laCount),
+        sweetSpotRate: safeDiv(total.sweetSpot, total.bbe),
+        whiffRate: safeDiv(total.whiffs, total.swings),
+        contactRate: safeDiv(total.contact, total.swings),
+      };
+    }
+
+    function pitchSummary(total = emptyPitching()) {
+      const ip = total.outs / 3;
+      const avgAllowed = safeDiv(total.h, Math.max(0, total.bf - total.bb - total.hbp - total.sf));
+      const obpAllowed = safeDiv(total.h + total.bb + total.hbp, total.bf);
+      const slgAllowed = safeDiv(total.h + (3 * total.hr), Math.max(0, total.bf - total.bb - total.hbp - total.sf));
+      const opsAllowed = Number.isFinite(obpAllowed) && Number.isFinite(slgAllowed) ? obpAllowed + slgAllowed : null;
+      const whip = ip > 0 ? (total.h + total.bb) / ip : null;
+      return {
+        games: total.games || 0,
+        starts: total.starts || 0,
+        h: total.h,
+        r: total.r,
+        er: total.er,
+        bb: total.bb,
+        k: total.k,
+        hr: total.hr,
+        pitches: total.pitches,
+        strikes: total.strikes,
+        outs: total.outs,
+        ip,
+        bf: total.bf,
+        era: total.outs ? (total.er * 27) / total.outs : null,
+        fip: total.outs ? (((13 * total.hr) + (3 * (total.bb + total.hbp)) - (2 * total.k)) / ip) + 3.10 : null,
+        whip,
+        k9: total.outs ? (total.k * 27) / total.outs : null,
+        bb9: total.outs ? (total.bb * 27) / total.outs : null,
+        hr9: total.outs ? (total.hr * 27) / total.outs : null,
+        h9: total.outs ? (total.h * 27) / total.outs : null,
+        kRate: safeDiv(total.k, total.bf),
+        bbRate: safeDiv(total.bb, total.bf),
+        hrRate: safeDiv(total.hr, total.bf),
+        kMinusBbRate: safeDiv(total.k - total.bb, total.bf),
+        avgAllowed,
+        obpAllowed,
+        slgAllowed,
+        opsAllowed,
+        wobaAllowed: null,
+        xwobaAllowed: total.xbaCount ? safeDiv(total.xbaSum, total.xbaCount) : null,
+        xbaAllowed: total.xbaCount ? safeDiv(total.xbaSum, total.xbaCount) : null,
+        xslgAllowed: total.xslgCount ? safeDiv(total.xslgSum, total.xslgCount) : null,
+        babipAllowed: safeDiv(total.h - total.hr, Math.max(0, total.bf - total.bb - total.hbp - total.k - total.hr)),
+        groundballRate: safeDiv(total.groundballs, total.bbe),
+        flyballRate: safeDiv(total.flyballs, total.bbe),
+        lineDriveRate: safeDiv(total.lineDrives, total.bbe),
+        popupRate: safeDiv(total.popups, total.bbe),
+        hardHitRate: safeDiv(total.hardHit, total.bbe),
+        barrelRate: safeDiv(total.barrel, total.bbe),
+        avgEv: safeDiv(total.evSum, total.evCount),
+        maxEv: total.maxEv || '',
+        launchAngle: safeDiv(total.laSum, total.laCount),
+        sweetSpotRate: safeDiv(total.sweetSpot, total.bbe),
+        contactAllowed: safeDiv(total.contact, total.swings),
+      };
+    }
+
+    function aggregateBatting(logs = []) {
+      const total = emptyBatting();
+      total.games = logs.length;
+      for (const row of logs) addBatting(total, row.batting || row);
+      return total;
+    }
+
+    function aggregatePitching(logs = []) {
+      const total = emptyPitching();
+      total.games = logs.length;
+      for (const row of logs) addPitching(total, row.pitching || row);
+      return total;
+    }
+
+    function median(values) {
+      const usable = values.map(Number).filter(Number.isFinite).sort((a, b) => a - b);
+      if (!usable.length) return null;
+      const mid = Math.floor(usable.length / 2);
+      return usable.length % 2 ? usable[mid] : (usable[mid - 1] + usable[mid]) / 2;
+    }
+
+    function priorLogs(map, key, date, gamePk) {
+      return (map.get(String(key)) || []).filter((row) => row.date < date || (row.date === date && Number(row.game_id || row.gamePk) < Number(gamePk)));
+    }
+
+    function fillBlankColumns(row, columns) {
+      for (const col of columns) {
+        if (!(col in row)) row[col] = '';
+      }
+      return row;
+    }
+
+    function csvEscape(value) {
+      const text = String(value ?? '');
+      return /[",\r\n]/.test(text) ? `"${text.replace(/"/g, '""')}"` : text;
+    }
+
+    function rowsToCsv(rows, preferredColumns = null) {
+      const columns = preferredColumns || [...new Set(rows.flatMap((row) => Object.keys(row)))];
+      return [
+        columns.map(csvEscape).join(','),
+        ...rows.map((row) => columns.map((col) => csvEscape(row[col])).join(',')),
+      ].join('\r\n');
+    }
+
+    function download(filename, rows, columns) {
+      const blob = new Blob([rowsToCsv(rows, columns)], { type: 'text/csv;charset=utf-8' });
+      const url = URL.createObjectURL(blob);
+      const link = document.createElement('a');
+      link.href = url;
+      link.download = filename;
+      document.body.appendChild(link);
+      link.click();
+      link.remove();
+      setTimeout(() => URL.revokeObjectURL(url), 800);
+    }
+
+    function teamFromSchedule(scheduleGame, live, side) {
+      const teamData = live?.gameData?.teams?.[side] || {};
+      const sched = scheduleGame?.[side]?.team || {};
+      return {
+        id: teamData.id || sched.id || scheduleGame?.[side]?.team?.id,
+        abbrev: clean(teamData.abbreviation || teamData.teamCode || sched.abbreviation || sched.teamCode).toUpperCase(),
+        name: clean(teamData.name || sched.name),
+      };
+    }
+
+    function actualStarterId(boxscore, side) {
+      const team = boxscore?.teams?.[side] || {};
+      for (const id of team.pitchers || []) {
+        const player = playerBox(boxscore, side, id);
+        if (num(player?.stats?.pitching?.gamesStarted) > 0) return Number(id);
+      }
+      const first = Number((team.pitchers || [])[0]);
+      return Number.isFinite(first) ? first : '';
+    }
+
+    function starterIdentity(live, boxscore, side, id) {
+      const player = playerBox(boxscore, side, id);
+      const gamePlayer = live?.gameData?.players?.[`ID${id}`] || {};
+      return {
+        id: id || '',
+        name: clean(player?.person?.fullName || gamePlayer.fullName || ''),
+        hand: playerThrows(live, player, id),
+        age: ageOnDate(gamePlayer.birthDate || player?.person?.birthDate, live?.gameData?.datetime?.officialDate),
+      };
+    }
+
+    function lineScoreRuns(live, side, maxInning = null) {
+      const innings = live?.liveData?.linescore?.innings || [];
+      return innings
+        .filter((inning) => !maxInning || Number(inning.num) <= maxInning)
+        .reduce((sum, inning) => sum + num(inning?.[side]?.runs), 0);
+    }
+
+    function inningsPlayed(live) {
+      return (live?.liveData?.linescore?.innings || []).length;
+    }
+
+    function buildActualPitching(live, boxscore, side) {
+      const team = boxscore?.teams?.[side] || {};
+      const starterId = actualStarterId(boxscore, side);
+      const starter = emptyPitching();
+      const bullpen = emptyPitching();
+      for (const id of team.pitchers || []) {
+        const player = playerBox(boxscore, side, id);
+        const line = pitchingWithExtras(live, player, id);
+        if (Number(id) === Number(starterId)) addPitching(starter, line);
+        else addPitching(bullpen, line);
+      }
+      return { starter, bullpen, starterId };
+    }
+
+    function buildTeamLine(live, boxscore, scheduleGame, side) {
+      const oppSide = side === 'home' ? 'away' : 'home';
+      const teamInfo = teamFromSchedule(scheduleGame, live, side);
+      const oppInfo = teamFromSchedule(scheduleGame, live, oppSide);
+      const teamBox = boxscore?.teams?.[side] || {};
+      const batting = battingFromStats(teamBox.teamStats?.batting || {});
+      const pitching = aggregatePitching((teamBox.pitchers || []).map((id) => pitchingWithExtras(live, playerBox(boxscore, side, id), id)));
+      const starterId = actualStarterId(boxscore, side);
+      const starterPlayer = playerBox(boxscore, side, starterId);
+      const starterLine = pitchingWithExtras(live, starterPlayer, starterId);
+      const bullpen = aggregatePitching((teamBox.pitchers || []).filter((id) => Number(id) !== Number(starterId)).map((id) => pitchingWithExtras(live, playerBox(boxscore, side, id), id)));
+      const runsFor = lineScoreRuns(live, side);
+      const runsAgainst = lineScoreRuns(live, oppSide);
+      return {
+        game_id: scheduleGame.gamePk,
+        date: dateOnly(scheduleGame.date || live?.gameData?.datetime?.officialDate),
+        gameDate: scheduleGame.gameDate || live?.gameData?.datetime?.dateTime || '',
+        team_id: teamInfo.id,
+        team: teamInfo.abbrev,
+        opponent_id: oppInfo.id,
+        opponent: oppInfo.abbrev,
+        is_home: side === 'home' ? 1 : 0,
+        venue: clean(live?.gameData?.venue?.name || scheduleGame.venue?.name),
+        stadium_id: live?.gameData?.venue?.id || scheduleGame.venue?.id || '',
+        batting,
+        pitching,
+        starter_id: starterId,
+        starter: starterIdentity(live, boxscore, side, starterId),
+        starterLine,
+        bullpen,
+        runs_for: runsFor,
+        runs_against: runsAgainst,
+        win: runsFor > runsAgainst ? 1 : 0,
+      };
+    }
+
+    function updatePlayDerivedLogs(ctx) {
+      const { live, game, awayTeam, homeTeam, logs } = ctx;
+      for (const play of live?.liveData?.plays?.allPlays || []) {
+        if (!play?.about?.isComplete) continue;
+        const batterId = Number(play?.matchup?.batter?.id);
+        const pitcherId = Number(play?.matchup?.pitcher?.id);
+        if (!Number.isFinite(batterId) || !Number.isFinite(pitcherId)) continue;
+        const battingSide = play?.about?.halfInning === 'top' ? 'away' : 'home';
+        const pitchingSide = battingSide === 'away' ? 'home' : 'away';
+        const battingTeam = battingSide === 'away' ? awayTeam : homeTeam;
+        const pitchingTeam = pitchingSide === 'away' ? awayTeam : homeTeam;
+        const pitcherHand = handCode(play?.matchup?.pitchHand?.code || play?.matchup?.pitchHand?.description);
+        const batterHand = handCode(play?.matchup?.batSide?.code || play?.matchup?.batSide?.description);
+        const line = eventBatting(play);
+        const pitchCount = (play?.playEvents || []).filter((evt) => evt?.isPitch).length;
+        const pitchingLine = {
+          ...emptyPitching(),
+          bf: line.pa,
+          h: line.h,
+          r: 0,
+          er: 0,
+          bb: line.bb,
+          k: line.k,
+          hr: line.hr,
+          hbp: line.hbp,
+          pitches: pitchCount,
+          bbe: line.bbe,
+          hardHit: line.hardHit,
+          barrel: line.barrel,
+          sweetSpot: line.sweetSpot,
+          evSum: line.evSum,
+          evCount: line.evCount,
+          laSum: line.laSum,
+          laCount: line.laCount,
+          xbaSum: line.xbaSum,
+          xbaCount: line.xbaCount,
+          xslgSum: line.xslgSum,
+          xslgCount: line.xslgCount,
+          swings: line.swings,
+          contact: line.contact,
+          whiffs: line.whiffs,
+          groundballs: line.groundballs,
+          lineDrives: line.lineDrives,
+          flyballs: line.flyballs,
+          popups: line.popups,
+        };
+        const date = dateOnly(game.date);
+        const common = { date, game_id: game.gamePk, gamePk: game.gamePk };
+        pushLog(logs.teamHand, `${battingTeam}:${pitcherHand}`, { ...common, batting: line });
+        pushLog(logs.pitcherSplit, `${pitcherId}:${batterHand}`, { ...common, pitching: pitchingLine });
+        pushLog(logs.playerSplit, `${batterId}:${pitcherHand}`, { ...common, batting: line });
+        pushLog(logs.batterPitcher, `${batterId}:${pitcherId}`, { ...common, batting: line });
+        const finalPitch = [...(play.playEvents || [])].reverse().find((evt) => evt?.isPitch);
+        const pitch = pitchCode(finalPitch?.details?.type?.code || finalPitch?.details?.type?.description);
+        pushLog(logs.teamPitchType, `${battingTeam}:${pitch}`, { ...common, batting: line });
+        pushLog(logs.pitcherPitchType, `${pitcherId}:${pitch}`, { ...common, pitching: pitchingLine, pitch });
+      }
+    }
+
+    function pushLog(map, key, value) {
+      const strKey = String(key || '');
+      if (!strKey || strKey.includes('undefined')) return;
+      if (!map.has(strKey)) map.set(strKey, []);
+      map.get(strKey).push(value);
+    }
+
+    function teamAggregateRows(logs, date, gamePk, season) {
+      return (logs || []).filter((row) => (
+        seasonForDate(row.date) === season
+        && (row.date < date || (row.date === date && Number(row.game_id) < Number(gamePk)))
+      ));
+    }
+
+    function addOffenseColumns(row, prefix, summary, games) {
+      row[`${prefix}_games`] = games;
+      row[`${prefix}_runs_per_game`] = rate(safeDiv(summary.runs, games), 2, false);
+      row[`${prefix}_avg`] = rate(summary.avg);
+      row[`${prefix}_obp`] = rate(summary.obp);
+      row[`${prefix}_slg`] = rate(summary.slg);
+      row[`${prefix}_ops`] = rate(summary.ops);
+      row[`${prefix}_iso`] = rate(summary.iso);
+      row[`${prefix}_woba`] = rate(summary.woba);
+      row[`${prefix}_hr_per_game`] = rate(safeDiv(summary.hr, games), 3, false);
+      row[`${prefix}_k_rate`] = rate(summary.kRate);
+      row[`${prefix}_bb_rate`] = rate(summary.bbRate);
+    }
+
+    function addMainOffense(row, logs) {
+      const total = aggregateBatting(logs);
+      const summary = statSummary(total);
+      const games = logs.length;
+      row.team_games_played_to_date = games;
+      row.team_runs_per_game = rate(safeDiv(total.r, games), 2, false);
+      row.team_runs_total = total.r;
+      row.team_pa_per_game = rate(safeDiv(total.pa, games), 2, false);
+      row.team_ab_per_game = rate(safeDiv(total.ab, games), 2, false);
+      row.team_hits_per_game = rate(safeDiv(total.h, games), 2, false);
+      row.team_1b_per_game = rate(safeDiv(total.singles, games), 2, false);
+      row.team_2b_per_game = rate(safeDiv(total.doubles, games), 2, false);
+      row.team_3b_per_game = rate(safeDiv(total.triples, games), 2, false);
+      row.team_hr_per_game = rate(safeDiv(total.hr, games), 3, false);
+      row.team_tb_per_game = rate(safeDiv(total.tb, games), 2, false);
+      row.team_rbi_per_game = rate(safeDiv(total.rbi, games), 2, false);
+      row.team_bb_per_game = rate(safeDiv(total.bb, games), 2, false);
+      row.team_k_per_game = rate(safeDiv(total.k, games), 2, false);
+      row.team_hbp_per_game = rate(safeDiv(total.hbp, games), 2, false);
+      row.team_sb_per_game = rate(safeDiv(total.sb, games), 2, false);
+      row.team_cs_per_game = rate(safeDiv(total.cs, games), 2, false);
+      row.team_gidp_per_game = rate(safeDiv(total.gidp, games), 2, false);
+      row.team_lob_per_game = rate(safeDiv(total.lob, games), 2, false);
+      row.team_avg = rate(summary.avg);
+      row.team_obp = rate(summary.obp);
+      row.team_slg = rate(summary.slg);
+      row.team_ops = rate(summary.ops);
+      row.team_iso = rate(summary.iso);
+      row.team_babip = rate(summary.babip);
+      row.team_bb_rate = rate(summary.bbRate);
+      row.team_k_rate = rate(summary.kRate);
+      row.team_bb_minus_k_rate = rate((summary.bbRate ?? 0) - (summary.kRate ?? 0));
+      row.team_hr_rate = rate(summary.hrRate);
+      row.team_xbh_rate = rate(summary.xbhRate);
+      row.team_tb_per_pa = rate(summary.tbPerPa);
+      row.team_runs_per_pa = rate(summary.runsPerPa);
+      row.team_runs_per_hit = rate(summary.runsPerHit, 2, false);
+      row.team_runs_per_times_on_base = rate(summary.runsPerTob, 2, false);
+      row.team_woba = rate(summary.woba);
+      row.team_xwoba = rate(summary.xwoba);
+      row.team_xba = rate(summary.xba);
+      row.team_xslg = rate(summary.xslg);
+      row.team_barrel_rate = rate(summary.barrelRate);
+      row.team_hard_hit_rate = rate(summary.hardHitRate);
+      row.team_avg_exit_velocity = rate(summary.avgEv, 1, false);
+      row.team_launch_angle = rate(summary.launchAngle, 1, false);
+      row.team_sweet_spot_rate = rate(summary.sweetSpotRate);
+      row.team_whiff_rate = rate(summary.whiffRate);
+      row.team_contact_rate = rate(summary.contactRate);
+      return summary;
+    }
+
+    function addWindowColumns(row, logs) {
+      for (const [name, size] of [['l3', 3], ['l5', 5], ['l7', 7], ['l10', 10], ['l15', 15], ['l30', 30]]) {
+        const subset = logs.slice(-size);
+        const total = aggregateBatting(subset);
+        const summary = statSummary(total);
+        row[`team_${name}_runs`] = total.r;
+        row[`team_${name}_runs_per_game`] = rate(safeDiv(total.r, subset.length), 2, false);
+        row[`team_${name}_ops`] = rate(summary.ops);
+        row[`team_${name}_obp`] = rate(summary.obp);
+        row[`team_${name}_slg`] = rate(summary.slg);
+        row[`team_${name}_iso`] = rate(summary.iso);
+        row[`team_${name}_hr_per_game`] = rate(safeDiv(total.hr, subset.length), 3, false);
+        row[`team_${name}_k_rate`] = rate(summary.kRate);
+        row[`team_${name}_bb_rate`] = rate(summary.bbRate);
+        row[`team_${name}_woba`] = rate(summary.woba);
+        row[`team_${name}_hard_hit_rate`] = rate(summary.hardHitRate);
+        row[`team_${name}_barrel_rate`] = rate(summary.barrelRate);
+      }
+    }
+
+    function addHandColumns(row, logs, starterHand, overallSummary) {
+      const lhp = statSummary(aggregateBatting(logs.lhp));
+      const rhp = statSummary(aggregateBatting(logs.rhp));
+      for (const [hand, summary, total] of [['lhp', lhp, aggregateBatting(logs.lhp)], ['rhp', rhp, aggregateBatting(logs.rhp)]]) {
+        row[`team_vs_${hand}_pa`] = summary.pa;
+        row[`team_vs_${hand}_ab`] = summary.ab;
+        row[`team_vs_${hand}_runs`] = summary.runs;
+        row[`team_vs_${hand}_hits`] = summary.hits;
+        row[`team_vs_${hand}_1b`] = summary.singles;
+        row[`team_vs_${hand}_2b`] = summary.doubles;
+        row[`team_vs_${hand}_3b`] = summary.triples;
+        row[`team_vs_${hand}_hr`] = summary.hr;
+        row[`team_vs_${hand}_bb`] = summary.bb;
+        row[`team_vs_${hand}_k`] = summary.k;
+        row[`team_vs_${hand}_hbp`] = summary.hbp;
+        row[`team_vs_${hand}_tb`] = summary.tb;
+        row[`team_vs_${hand}_avg`] = rate(summary.avg);
+        row[`team_vs_${hand}_obp`] = rate(summary.obp);
+        row[`team_vs_${hand}_slg`] = rate(summary.slg);
+        row[`team_vs_${hand}_ops`] = rate(summary.ops);
+        row[`team_vs_${hand}_iso`] = rate(summary.iso);
+        row[`team_vs_${hand}_woba`] = rate(summary.woba);
+        row[`team_vs_${hand}_xwoba`] = rate(summary.xwoba);
+        row[`team_vs_${hand}_k_rate`] = rate(summary.kRate);
+        row[`team_vs_${hand}_bb_rate`] = rate(summary.bbRate);
+        row[`team_vs_${hand}_hr_rate`] = rate(summary.hrRate);
+        row[`team_vs_${hand}_barrel_rate`] = rate(summary.barrelRate);
+        row[`team_vs_${hand}_hard_hit_rate`] = rate(summary.hardHitRate);
+        row[`team_vs_${hand}_avg_ev`] = rate(summary.avgEv, 1, false);
+        row[`team_vs_${hand}_launch_angle`] = rate(summary.launchAngle, 1, false);
+      }
+      const current = starterHand === 'L' ? lhp : rhp;
+      row.opposing_starter_hand = starterHand;
+      row.team_vs_starter_hand_pa = current.pa;
+      row.team_vs_starter_hand_avg = rate(current.avg);
+      row.team_vs_starter_hand_obp = rate(current.obp);
+      row.team_vs_starter_hand_slg = rate(current.slg);
+      row.team_vs_starter_hand_ops = rate(current.ops);
+      row.team_vs_starter_hand_iso = rate(current.iso);
+      row.team_vs_starter_hand_woba = rate(current.woba);
+      row.team_vs_starter_hand_xwoba = rate(current.xwoba);
+      row.team_vs_starter_hand_k_rate = rate(current.kRate);
+      row.team_vs_starter_hand_bb_rate = rate(current.bbRate);
+      row.team_vs_starter_hand_hr_rate = rate(current.hrRate);
+      row.team_vs_starter_hand_barrel_rate = rate(current.barrelRate);
+      row.team_vs_starter_hand_hard_hit_rate = rate(current.hardHitRate);
+      row.team_vs_starter_hand_avg_ev = rate(current.avgEv, 1, false);
+      row.team_vs_starter_hand_launch_angle = rate(current.launchAngle, 1, false);
+      row.team_vs_starter_hand_runs_per_pa = rate(current.runsPerPa);
+      row.team_hand_ops_advantage = rate((current.ops ?? 0) - (overallSummary.ops ?? 0));
+      row.team_hand_woba_advantage = rate((current.woba ?? 0) - (overallSummary.woba ?? 0));
+      row.team_hand_iso_advantage = rate((current.iso ?? 0) - (overallSummary.iso ?? 0));
+      row.team_hand_k_rate_advantage = rate((current.kRate ?? 0) - (overallSummary.kRate ?? 0));
+      row.team_hand_bb_rate_advantage = rate((current.bbRate ?? 0) - (overallSummary.bbRate ?? 0));
+      row.team_hand_hr_rate_advantage = rate((current.hrRate ?? 0) - (overallSummary.hrRate ?? 0));
+      row.team_hand_barrel_rate_advantage = rate((current.barrelRate ?? 0) - (overallSummary.barrelRate ?? 0));
+      row.team_hand_hard_hit_advantage = rate((current.hardHitRate ?? 0) - (overallSummary.hardHitRate ?? 0));
+      row.team_hand_sample_reliability = rate(clamp((current.pa || 0) / 300, 0, 1), 2, false);
+    }
+
+    function addOppPitching(row, oppLogs) {
+      const season = pitchSummary(aggregatePitching(oppLogs));
+      row.opp_pitching_runs_allowed_per_game = rate(safeDiv(oppLogs.reduce((sum, item) => sum + num(item.runs_against), 0), oppLogs.length), 2, false);
+      row.opp_pitching_era = rate(season.era, 2, false);
+      row.opp_pitching_fip = rate(season.fip, 2, false);
+      row.opp_pitching_whip = rate(season.whip, 3, false);
+      row.opp_pitching_hits_allowed_per_game = rate(safeDiv(season.h, oppLogs.length), 2, false);
+      row.opp_pitching_hr_allowed_per_game = rate(safeDiv(season.hr, oppLogs.length), 3, false);
+      row.opp_pitching_bb_per_game = rate(safeDiv(season.bb, oppLogs.length), 2, false);
+      row.opp_pitching_k_per_game = rate(safeDiv(season.k, oppLogs.length), 2, false);
+      row.opp_pitching_k_rate = rate(season.kRate);
+      row.opp_pitching_bb_rate = rate(season.bbRate);
+      row.opp_pitching_hr_rate = rate(season.hrRate);
+      row.opp_pitching_babip_allowed = rate(season.babipAllowed);
+      row.opp_pitching_avg_allowed = rate(season.avgAllowed);
+      row.opp_pitching_obp_allowed = rate(season.obpAllowed);
+      row.opp_pitching_slg_allowed = rate(season.slgAllowed);
+      row.opp_pitching_ops_allowed = rate(season.opsAllowed);
+      row.opp_pitching_xwoba_allowed = rate(season.xwobaAllowed);
+      row.opp_pitching_barrel_rate_allowed = rate(season.barrelRate);
+      row.opp_pitching_hard_hit_rate_allowed = rate(season.hardHitRate);
+      row.opp_pitching_avg_ev_allowed = rate(season.avgEv, 1, false);
+      row.opp_pitching_launch_angle_allowed = rate(season.launchAngle, 1, false);
+      for (const [w, size] of [['l5', 5], ['l10', 10], ['l15', 15], ['l30', 30]]) {
+        const subset = oppLogs.slice(-size);
+        const summary = pitchSummary(aggregatePitching(subset));
+        row[`opp_pitching_${w}_runs_allowed_per_game`] = rate(safeDiv(subset.reduce((sum, item) => sum + num(item.runs_against), 0), subset.length), 2, false);
+        row[`opp_pitching_${w}_era`] = rate(summary.era, 2, false);
+        row[`opp_pitching_${w}_whip`] = rate(summary.whip, 3, false);
+        row[`opp_pitching_${w}_hr_allowed_per_game`] = rate(safeDiv(summary.hr, subset.length), 3, false);
+        row[`opp_pitching_${w}_k_rate`] = rate(summary.kRate);
+        row[`opp_pitching_${w}_bb_rate`] = rate(summary.bbRate);
+      }
+    }
+
+    function addStarterColumns(row, starter, priorStarts, allPriorPitcher, splitLogs, pitchTypeLogs, teamPitchTypeLogs, date) {
+      row.starter_name = starter.name;
+      row.starter_id = starter.id;
+      row.starter_hand = starter.hand;
+      row.starter_age = starter.age || '';
+      row.starter_team = starter.team || '';
+      const allPitch = pitchSummary(aggregatePitching(allPriorPitcher));
+      const startsPitch = pitchSummary(aggregatePitching(priorStarts));
+      row.starter_games_started_to_date = priorStarts.length;
+      row.starter_games_pitched_to_date = allPriorPitcher.length;
+      row.starter_ip_to_date = rate(startsPitch.ip, 1, false);
+      row.starter_batters_faced_to_date = startsPitch.bf;
+      row.starter_pitches_thrown_to_date = startsPitch.pitches;
+      row.starter_era = rate(startsPitch.era, 2, false);
+      row.starter_fip = rate(startsPitch.fip, 2, false);
+      row.starter_whip = rate(startsPitch.whip, 3, false);
+      row.starter_k_per_9 = rate(startsPitch.k9, 2, false);
+      row.starter_bb_per_9 = rate(startsPitch.bb9, 2, false);
+      row.starter_hr_per_9 = rate(startsPitch.hr9, 2, false);
+      row.starter_h_per_9 = rate(startsPitch.h9, 2, false);
+      row.starter_k_rate = rate(startsPitch.kRate);
+      row.starter_bb_rate = rate(startsPitch.bbRate);
+      row.starter_k_minus_bb_rate = rate(startsPitch.kMinusBbRate);
+      row.starter_hr_rate = rate(startsPitch.hrRate);
+      row.starter_groundball_rate = rate(startsPitch.groundballRate);
+      row.starter_flyball_rate = rate(startsPitch.flyballRate);
+      row.starter_line_drive_rate = rate(startsPitch.lineDriveRate);
+      row.starter_popup_rate = rate(startsPitch.popupRate);
+      row.starter_babip_allowed = rate(startsPitch.babipAllowed);
+      row.starter_avg_allowed = rate(startsPitch.avgAllowed);
+      row.starter_obp_allowed = rate(startsPitch.obpAllowed);
+      row.starter_slg_allowed = rate(startsPitch.slgAllowed);
+      row.starter_ops_allowed = rate(startsPitch.opsAllowed);
+      row.starter_xwoba_allowed = rate(startsPitch.xwobaAllowed);
+      row.starter_avg_ev_allowed = rate(startsPitch.avgEv, 1, false);
+      row.starter_hard_hit_rate_allowed = rate(startsPitch.hardHitRate);
+      row.starter_barrel_rate_allowed = rate(startsPitch.barrelRate);
+      row.starter_launch_angle_allowed = rate(startsPitch.launchAngle, 1, false);
+      row.starter_sweet_spot_rate_allowed = rate(startsPitch.sweetSpotRate);
+      row.starter_xba_allowed = rate(startsPitch.xbaAllowed);
+      row.starter_xslg_allowed = rate(startsPitch.xslgAllowed);
+      row.starter_avg_ip_per_start = rate(safeDiv(priorStarts.reduce((sum, item) => sum + item.pitching.outs, 0) / 3, priorStarts.length), 2, false);
+      row.starter_median_ip_per_start = rate(median(priorStarts.map((item) => item.pitching.outs / 3)), 2, false);
+      row.starter_avg_pitches_per_start = rate(safeDiv(priorStarts.reduce((sum, item) => sum + item.pitching.pitches, 0), priorStarts.length), 1, false);
+      const last = priorStarts[priorStarts.length - 1];
+      row.starter_last_start_date = last?.date || '';
+      row.starter_days_rest = last?.date ? diffDays(last.date, date) : '';
+      row.starter_last_start_ip = last ? rate(last.pitching.outs / 3, 2, false) : '';
+      row.starter_last_start_pitches = last?.pitching?.pitches || '';
+      for (const [w, size] of [['l3', 3], ['l5', 5]]) {
+        const subset = priorStarts.slice(-size);
+        const summary = pitchSummary(aggregatePitching(subset));
+        row[`starter_${w}_start_avg_ip`] = rate(safeDiv(subset.reduce((sum, item) => sum + item.pitching.outs, 0) / 3, subset.length), 2, false);
+        row[`starter_${w}_start_avg_pitches`] = rate(safeDiv(subset.reduce((sum, item) => sum + item.pitching.pitches, 0), subset.length), 1, false);
+        row[`starter_${w}_era`] = rate(summary.era, 2, false);
+        row[`starter_${w}_fip`] = rate(summary.fip, 2, false);
+        row[`starter_${w}_whip`] = rate(summary.whip, 3, false);
+        row[`starter_${w}_k_rate`] = rate(summary.kRate);
+        row[`starter_${w}_bb_rate`] = rate(summary.bbRate);
+        row[`starter_${w}_hr_rate`] = rate(summary.hrRate);
+        row[`starter_${w}_avg_ev_allowed`] = rate(summary.avgEv, 1, false);
+        row[`starter_${w}_hard_hit_rate_allowed`] = rate(summary.hardHitRate);
+        row[`starter_${w}_barrel_rate_allowed`] = rate(summary.barrelRate);
+      }
+      for (const [hand, key] of [['lhb', 'L'], ['rhb', 'R']]) {
+        const summary = pitchSummary(aggregatePitching(splitLogs[key] || []));
+        row[`starter_vs_${hand}_pa`] = summary.bf;
+        row[`starter_vs_${hand}_avg_allowed`] = rate(summary.avgAllowed);
+        row[`starter_vs_${hand}_obp_allowed`] = rate(summary.obpAllowed);
+        row[`starter_vs_${hand}_slg_allowed`] = rate(summary.slgAllowed);
+        row[`starter_vs_${hand}_ops_allowed`] = rate(summary.opsAllowed);
+        row[`starter_vs_${hand}_xwoba_allowed`] = rate(summary.xwobaAllowed);
+        row[`starter_vs_${hand}_k_rate`] = rate(summary.kRate);
+        row[`starter_vs_${hand}_bb_rate`] = rate(summary.bbRate);
+        row[`starter_vs_${hand}_hr_rate`] = rate(summary.hrRate);
+        row[`starter_vs_${hand}_hard_hit_rate_allowed`] = rate(summary.hardHitRate);
+        row[`starter_vs_${hand}_barrel_rate_allowed`] = rate(summary.barrelRate);
+      }
+      addArsenalColumns(row, pitchTypeLogs, teamPitchTypeLogs);
+    }
+
+    function addArsenalColumns(row, pitchTypeLogs, teamPitchTypeLogs) {
+      const pitchSummaries = [];
+      for (const [pitch, logs] of Object.entries(pitchTypeLogs || {})) {
+        const total = aggregatePitching(logs);
+        const summary = pitchSummary(total);
+        pitchSummaries.push({ pitch, total, summary });
+      }
+      pitchSummaries.sort((a, b) => b.total.pitches - a.total.pitches);
+      row.starter_pitch_count = pitchSummaries.reduce((sum, item) => sum + item.total.pitches, 0);
+      row.starter_primary_pitch = pitchSummaries[0]?.pitch || '';
+      row.starter_secondary_pitch = pitchSummaries[1]?.pitch || '';
+      row.starter_tertiary_pitch = pitchSummaries[2]?.pitch || '';
+      row.starter_fourth_pitch = pitchSummaries[3]?.pitch || '';
+      row.starter_has_four_seam = pitchSummaries.some((item) => item.pitch === 'ff') ? 1 : 0;
+      row.starter_has_sinkers = pitchSummaries.some((item) => item.pitch === 'si') ? 1 : 0;
+      row.starter_has_slider = pitchSummaries.some((item) => item.pitch === 'sl') ? 1 : 0;
+      row.starter_has_sweeper = pitchSummaries.some((item) => item.pitch === 'st') ? 1 : 0;
+      row.starter_has_curveball = pitchSummaries.some((item) => item.pitch === 'cu') ? 1 : 0;
+      row.starter_has_changeup = pitchSummaries.some((item) => item.pitch === 'ch') ? 1 : 0;
+      row.starter_has_splitter = pitchSummaries.some((item) => item.pitch === 'fs') ? 1 : 0;
+      row.starter_has_cutter = pitchSummaries.some((item) => item.pitch === 'fc') ? 1 : 0;
+      row.starter_has_knuckle_curve = pitchSummaries.some((item) => item.pitch === 'kc') ? 1 : 0;
+      for (const item of pitchSummaries) {
+        const p = item.pitch;
+        const totalPitches = row.starter_pitch_count || 0;
+        row[`starter_${p}_usage`] = rate(safeDiv(item.total.pitches, totalPitches));
+        row[`starter_${p}_ba_allowed`] = rate(item.summary.avgAllowed);
+        row[`starter_${p}_slg_allowed`] = rate(item.summary.slgAllowed);
+        row[`starter_${p}_xwoba_allowed`] = rate(item.summary.xwobaAllowed);
+        row[`starter_${p}_whiff_rate`] = rate(safeDiv(item.total.whiffs, item.total.swings));
+        row[`starter_${p}_hard_hit_rate_allowed`] = rate(item.summary.hardHitRate);
+        row[`starter_${p}_barrel_rate_allowed`] = rate(item.summary.barrelRate);
+        row[`starter_${p}_hr_allowed`] = item.total.hr;
+        const teamSummary = statSummary(aggregateBatting(teamPitchTypeLogs?.[p] || []));
+        row[`team_vs_${p}_ba`] = rate(teamSummary.avg);
+        row[`team_vs_${p}_slg`] = rate(teamSummary.slg);
+        row[`team_vs_${p}_woba`] = rate(teamSummary.woba);
+        row[`team_vs_${p}_xwoba`] = rate(teamSummary.xwoba);
+        row[`team_vs_${p}_whiff_rate`] = rate(teamSummary.whiffRate);
+        row[`team_vs_${p}_hard_hit_rate`] = rate(teamSummary.hardHitRate);
+        row[`team_vs_${p}_barrel_rate`] = rate(teamSummary.barrelRate);
+      }
+      const primary = row.starter_primary_pitch;
+      const secondary = row.starter_secondary_pitch;
+      row.team_vs_starter_primary_pitch_woba = primary ? row[`team_vs_${primary}_woba`] : '';
+      row.team_vs_starter_primary_pitch_xwoba = primary ? row[`team_vs_${primary}_xwoba`] : '';
+      row.team_vs_starter_primary_pitch_slg = primary ? row[`team_vs_${primary}_slg`] : '';
+      row.team_vs_starter_primary_pitch_whiff_rate = primary ? row[`team_vs_${primary}_whiff_rate`] : '';
+      row.team_vs_starter_primary_pitch_barrel_rate = primary ? row[`team_vs_${primary}_barrel_rate`] : '';
+      row.team_vs_starter_secondary_pitch_woba = secondary ? row[`team_vs_${secondary}_woba`] : '';
+      row.team_vs_starter_secondary_pitch_xwoba = secondary ? row[`team_vs_${secondary}_xwoba`] : '';
+      row.team_vs_starter_secondary_pitch_slg = secondary ? row[`team_vs_${secondary}_slg`] : '';
+      row.team_vs_starter_secondary_pitch_whiff_rate = secondary ? row[`team_vs_${secondary}_whiff_rate`] : '';
+      row.team_vs_starter_secondary_pitch_barrel_rate = secondary ? row[`team_vs_${secondary}_barrel_rate`] : '';
+    }
+
+    function addBullpenColumns(row, bullpenLogs, allRelieverLogs, date) {
+      const season = pitchSummary(aggregatePitching(bullpenLogs));
+      row.opp_bullpen_ip_to_date = rate(season.ip, 1, false);
+      row.opp_bullpen_era = rate(season.era, 2, false);
+      row.opp_bullpen_fip = rate(season.fip, 2, false);
+      row.opp_bullpen_whip = rate(season.whip, 3, false);
+      row.opp_bullpen_k_rate = rate(season.kRate);
+      row.opp_bullpen_bb_rate = rate(season.bbRate);
+      row.opp_bullpen_hr_rate = rate(season.hrRate);
+      row.opp_bullpen_k_minus_bb_rate = rate(season.kMinusBbRate);
+      row.opp_bullpen_avg_allowed = rate(season.avgAllowed);
+      row.opp_bullpen_obp_allowed = rate(season.obpAllowed);
+      row.opp_bullpen_slg_allowed = rate(season.slgAllowed);
+      row.opp_bullpen_ops_allowed = rate(season.opsAllowed);
+      row.opp_bullpen_xwoba_allowed = rate(season.xwobaAllowed);
+      row.opp_bullpen_babip_allowed = rate(season.babipAllowed);
+      row.opp_bullpen_groundball_rate = rate(season.groundballRate);
+      row.opp_bullpen_flyball_rate = rate(season.flyballRate);
+      row.opp_bullpen_hard_hit_rate_allowed = rate(season.hardHitRate);
+      row.opp_bullpen_barrel_rate_allowed = rate(season.barrelRate);
+      row.opp_bullpen_avg_ev_allowed = rate(season.avgEv, 1, false);
+      for (const [w, size] of [['l3', 3], ['l5', 5], ['l10', 10], ['l15', 15], ['l30', 30]]) {
+        const subset = bullpenLogs.slice(-size);
+        const summary = pitchSummary(aggregatePitching(subset));
+        row[`opp_bullpen_${w}_era`] = rate(summary.era, 2, false);
+        row[`opp_bullpen_${w}_whip`] = rate(summary.whip, 3, false);
+        row[`opp_bullpen_${w}_hr_rate`] = rate(summary.hrRate);
+        row[`opp_bullpen_${w}_k_rate`] = rate(summary.kRate);
+        row[`opp_bullpen_${w}_bb_rate`] = rate(summary.bbRate);
+      }
+      for (const days of [1, 2, 3, 5]) {
+        const since = addDays(date, -days);
+        const recent = bullpenLogs.filter((item) => item.date >= since && item.date < date);
+        row[`opp_bullpen_ip_${days === 1 ? 'yesterday' : `last_${days}_days`}`] = rate(recent.reduce((sum, item) => sum + item.pitching.outs, 0) / 3, 2, false);
+        row[`opp_bullpen_pitches_${days === 1 ? 'yesterday' : `last_${days}_days`}`] = recent.reduce((sum, item) => sum + item.pitching.pitches, 0);
+      }
+      const byPitcher = new Map();
+      for (const item of bullpenLogs) {
+        if (!byPitcher.has(item.pitcher_id)) byPitcher.set(item.pitcher_id, []);
+        byPitcher.get(item.pitcher_id).push(item);
+      }
+      const arms = [...byPitcher.entries()].map(([id, logs]) => {
+        const summary = pitchSummary(aggregatePitching(logs));
+        const last = logs[logs.length - 1];
+        return { id, logs, summary, last, pitches: logs.reduce((sum, item) => sum + item.pitching.pitches, 0) };
+      }).sort((a, b) => b.pitches - a.pitches).slice(0, 8);
+      row.opp_bullpen_available_relievers_count = arms.length;
+      row.opp_bullpen_fresh_relievers_count = arms.filter((arm) => !arm.last?.date || diffDays(arm.last.date, date) >= 2).length;
+      row.opp_bullpen_tired_relievers_count = arms.filter((arm) => arm.last?.date && diffDays(arm.last.date, date) <= 1).length;
+      arms.forEach((arm, index) => {
+        const n = index + 1;
+        row[`opp_reliever_${n}_name`] = arm.last?.pitcher_name || '';
+        row[`opp_reliever_${n}_hand`] = arm.last?.hand || '';
+        row[`opp_reliever_${n}_role`] = n === 1 ? 'high-usage' : '';
+        row[`opp_reliever_${n}_era`] = rate(arm.summary.era, 2, false);
+        row[`opp_reliever_${n}_fip`] = rate(arm.summary.fip, 2, false);
+        row[`opp_reliever_${n}_whip`] = rate(arm.summary.whip, 3, false);
+        row[`opp_reliever_${n}_k_rate`] = rate(arm.summary.kRate);
+        row[`opp_reliever_${n}_bb_rate`] = rate(arm.summary.bbRate);
+        row[`opp_reliever_${n}_hr_rate`] = rate(arm.summary.hrRate);
+        row[`opp_reliever_${n}_xwoba_allowed`] = rate(arm.summary.xwobaAllowed);
+        row[`opp_reliever_${n}_days_rest`] = arm.last?.date ? diffDays(arm.last.date, date) : '';
+        row[`opp_reliever_${n}_pitches_last_1_day`] = arm.logs.filter((item) => item.date >= addDays(date, -1) && item.date < date).reduce((sum, item) => sum + item.pitching.pitches, 0);
+        row[`opp_reliever_${n}_pitches_last_3_days`] = arm.logs.filter((item) => item.date >= addDays(date, -3) && item.date < date).reduce((sum, item) => sum + item.pitching.pitches, 0);
+        row[`opp_reliever_${n}_available`] = Number(row[`opp_reliever_${n}_pitches_last_1_day`]) > 30 ? 0 : 1;
+      });
+      row.opp_bullpen_back_to_back_pitchers_used = arms.filter((arm) => arm.logs.some((item) => item.date === addDays(date, -1))).length;
+      row.opp_bullpen_three_in_four_pitchers_used = arms.filter((arm) => arm.logs.filter((item) => item.date >= addDays(date, -4) && item.date < date).length >= 3).length;
+    }
+
+    function lineupPlayers(live, boxscore, side) {
+      return (boxscore?.teams?.[side]?.batters || [])
+        .map((id) => playerBox(boxscore, side, id))
+        .filter(Boolean)
+        .filter(isStartingBatter)
+        .sort((a, b) => battingOrderSpot(a) - battingOrderSpot(b));
+    }
+
+    function addLineupColumns(row, live, lineup, playerLogs, playerSplits, batterPitcherLogs, starterHand, starterId, date, gamePk) {
+      row.lineup_confirmed = lineup.length === 9 ? 1 : 0;
+      row.lineup_confirmed_time = '';
+      const aggregateSeason = emptyBatting();
+      const aggregateSplit = emptyBatting();
+      const aggregateL7 = emptyBatting();
+      const aggregateL15 = emptyBatting();
+      const aggregateVsStarter = emptyBatting();
+      let left = 0;
+      let right = 0;
+      let sw = 0;
+      lineup.forEach((player, index) => {
+        const order = index + 1;
+        const id = Number(player?.person?.id);
+        const bats = playerBats(live, player, id);
+        if (bats === 'L') left += 1;
+        else if (bats === 'R') right += 1;
+        else if (bats === 'S') sw += 1;
+        row[`batting_order_${order}_player_id`] = id || '';
+        row[`batting_order_${order}_name`] = clean(player?.person?.fullName);
+        row[`batting_order_${order}_hand`] = bats;
+        row[`batting_order_${order}_position`] = clean(player?.position?.abbreviation);
+        const prior = priorLogs(playerLogs, id, date, gamePk);
+        const split = priorLogs(playerSplits, `${id}:${starterHand}`, date, gamePk);
+        const vsStarter = priorLogs(batterPitcherLogs, `${id}:${starterId}`, date, gamePk);
+        addBatting(aggregateSeason, aggregateBatting(prior));
+        addBatting(aggregateSplit, aggregateBatting(split));
+        addBatting(aggregateL7, aggregateBatting(prior.slice(-7)));
+        addBatting(aggregateL15, aggregateBatting(prior.slice(-15)));
+        addBatting(aggregateVsStarter, aggregateBatting(vsStarter));
+      });
+      const season = statSummary(aggregateSeason);
+      const split = statSummary(aggregateSplit);
+      const l7 = statSummary(aggregateL7);
+      const l15 = statSummary(aggregateL15);
+      const vsStarter = statSummary(aggregateVsStarter);
+      row.lineup_season_avg = rate(season.avg);
+      row.lineup_season_obp = rate(season.obp);
+      row.lineup_season_slg = rate(season.slg);
+      row.lineup_season_ops = rate(season.ops);
+      row.lineup_season_iso = rate(season.iso);
+      row.lineup_season_woba = rate(season.woba);
+      row.lineup_season_xwoba = rate(season.xwoba);
+      row.lineup_season_hr_rate = rate(season.hrRate);
+      row.lineup_season_k_rate = rate(season.kRate);
+      row.lineup_season_bb_rate = rate(season.bbRate);
+      row.lineup_season_barrel_rate = rate(season.barrelRate);
+      row.lineup_season_hard_hit_rate = rate(season.hardHitRate);
+      row.lineup_vs_starter_hand_avg = rate(split.avg);
+      row.lineup_vs_starter_hand_obp = rate(split.obp);
+      row.lineup_vs_starter_hand_slg = rate(split.slg);
+      row.lineup_vs_starter_hand_ops = rate(split.ops);
+      row.lineup_vs_starter_hand_iso = rate(split.iso);
+      row.lineup_vs_starter_hand_woba = rate(split.woba);
+      row.lineup_vs_starter_hand_xwoba = rate(split.xwoba);
+      row.lineup_vs_starter_hand_k_rate = rate(split.kRate);
+      row.lineup_vs_starter_hand_bb_rate = rate(split.bbRate);
+      row.lineup_vs_starter_hand_hr_rate = rate(split.hrRate);
+      row.lineup_vs_starter_hand_barrel_rate = rate(split.barrelRate);
+      row.lineup_vs_starter_hand_hard_hit_rate = rate(split.hardHitRate);
+      row.lineup_vs_starter_hand_pa = split.pa;
+      for (const [name, summary, total] of [['l7', l7, aggregateL7], ['l15', l15, aggregateL15]]) {
+        row[`lineup_${name}_avg`] = rate(summary.avg);
+        row[`lineup_${name}_obp`] = rate(summary.obp);
+        row[`lineup_${name}_slg`] = rate(summary.slg);
+        row[`lineup_${name}_ops`] = rate(summary.ops);
+        row[`lineup_${name}_woba`] = rate(summary.woba);
+        row[`lineup_${name}_hr`] = total.hr;
+        row[`lineup_${name}_k_rate`] = rate(summary.kRate);
+        row[`lineup_${name}_bb_rate`] = rate(summary.bbRate);
+      }
+      row.lefty_batters_count = left;
+      row.righty_batters_count = right;
+      row.switch_hitters_count = sw;
+      row.same_side_batters_vs_starter_count = lineup.filter((player) => playerBats(live, player, player?.person?.id) === starterHand).length;
+      row.opposite_side_batters_vs_starter_count = lineup.length - row.same_side_batters_vs_starter_count;
+      row.lineup_vs_starter_total_pa = vsStarter.pa;
+      row.lineup_vs_starter_total_ab = vsStarter.ab;
+      row.lineup_vs_starter_total_hits = vsStarter.hits;
+      row.lineup_vs_starter_total_2b = vsStarter.doubles;
+      row.lineup_vs_starter_total_3b = vsStarter.triples;
+      row.lineup_vs_starter_total_hr = vsStarter.hr;
+      row.lineup_vs_starter_total_bb = vsStarter.bb;
+      row.lineup_vs_starter_total_k = vsStarter.k;
+      row.lineup_vs_starter_total_avg = rate(vsStarter.avg);
+      row.lineup_vs_starter_total_obp = rate(vsStarter.obp);
+      row.lineup_vs_starter_total_slg = rate(vsStarter.slg);
+      row.lineup_vs_starter_total_ops = rate(vsStarter.ops);
+      row.lineup_vs_starter_total_woba = rate(vsStarter.woba);
+    }
+
+    function playerLineupRows(base, live, lineup, logs, starterHand, starterId, date, gamePk) {
+      return lineup.map((player, index) => {
+        const id = Number(player?.person?.id);
+        const prior = priorLogs(logs.player, id, date, gamePk);
+        const split = priorLogs(logs.playerSplit, `${id}:${starterHand}`, date, gamePk);
+        const vsStarter = priorLogs(logs.batterPitcher, `${id}:${starterId}`, date, gamePk);
+        const season = statSummary(aggregateBatting(prior));
+        const splitStats = statSummary(aggregateBatting(split));
+        const l7 = statSummary(aggregateBatting(prior.slice(-7)));
+        const l15 = statSummary(aggregateBatting(prior.slice(-15)));
+        const l30 = statSummary(aggregateBatting(prior.slice(-30)));
+        const vs = statSummary(aggregateBatting(vsStarter));
+        const row = {
+          game_id: base.game_id,
+          date,
+          team: base.team,
+          opponent: base.opponent,
+          starter_id: starterId,
+          starter_hand: starterHand,
+          batting_order: index + 1,
+          player_id: id || '',
+          name: clean(player?.person?.fullName),
+          bats: playerBats(live, player, id),
+          position: clean(player?.position?.abbreviation),
+          season_pa: season.pa,
+          season_avg: rate(season.avg),
+          season_obp: rate(season.obp),
+          season_slg: rate(season.slg),
+          season_ops: rate(season.ops),
+          season_iso: rate(season.iso),
+          season_woba: rate(season.woba),
+          season_xwoba: rate(season.xwoba),
+          season_hr: season.hr,
+          season_hr_rate: rate(season.hrRate),
+          season_k_rate: rate(season.kRate),
+          season_bb_rate: rate(season.bbRate),
+          season_barrel_rate: rate(season.barrelRate),
+          season_hard_hit_rate: rate(season.hardHitRate),
+          season_avg_ev: rate(season.avgEv, 1, false),
+          season_launch_angle: rate(season.launchAngle, 1, false),
+          vs_starter_hand_pa: splitStats.pa,
+          vs_starter_hand_avg: rate(splitStats.avg),
+          vs_starter_hand_obp: rate(splitStats.obp),
+          vs_starter_hand_slg: rate(splitStats.slg),
+          vs_starter_hand_ops: rate(splitStats.ops),
+          vs_starter_hand_iso: rate(splitStats.iso),
+          vs_starter_hand_woba: rate(splitStats.woba),
+          vs_starter_hand_xwoba: rate(splitStats.xwoba),
+          vs_starter_hand_hr_rate: rate(splitStats.hrRate),
+          vs_starter_hand_k_rate: rate(splitStats.kRate),
+          vs_starter_hand_bb_rate: rate(splitStats.bbRate),
+          vs_starter_hand_barrel_rate: rate(splitStats.barrelRate),
+          vs_starter_hand_hard_hit_rate: rate(splitStats.hardHitRate),
+          l7_ops: rate(l7.ops),
+          l15_ops: rate(l15.ops),
+          l30_ops: rate(l30.ops),
+          l7_woba: rate(l7.woba),
+          l15_woba: rate(l15.woba),
+          l30_woba: rate(l30.woba),
+          l7_hr: l7.hr,
+          l15_hr: l15.hr,
+          l30_hr: l30.hr,
+          vs_starter_pa: vs.pa,
+          vs_starter_hits: vs.hits,
+          vs_starter_hr: vs.hr,
+          vs_starter_bb: vs.bb,
+          vs_starter_k: vs.k,
+          vs_starter_avg: rate(vs.avg),
+          vs_starter_slg: rate(vs.slg),
+          vs_starter_ops: rate(vs.ops),
+        };
+        return fillBlankColumns(row, LINEUP_PLAYER_COLUMNS);
+      });
+    }
+
+    function addRestSchedule(row, teamPrior, oppPrior, date, venue, isHome) {
+      const add = (prefix, prior) => {
+        const last = prior[prior.length - 1];
+        row[`${prefix}_days_since_last_game`] = last ? diffDays(last.date, date) : '';
+        for (const n of [3, 5, 7, 10]) {
+          row[`${prefix}_games_last_${n}_days`] = prior.filter((game) => game.date >= addDays(date, -n) && game.date < date).length;
+        }
+        row[`${prefix}_is_on_back_to_back`] = row[`${prefix}_days_since_last_game`] === 1 ? 1 : 0;
+        row[`${prefix}_is_on_3_games_in_3_days`] = prior.filter((game) => game.date >= addDays(date, -3) && game.date < date).length >= 2 ? 1 : 0;
+        row[`${prefix}_is_on_6_games_in_7_days`] = prior.filter((game) => game.date >= addDays(date, -7) && game.date < date).length >= 5 ? 1 : 0;
+        row[`${prefix}_previous_city`] = last?.venue || '';
+      };
+      add('team', teamPrior);
+      add('opp', oppPrior);
+      const sameVenueStreak = [...teamPrior].reverse().findIndex((game) => game.venue !== venue);
+      row.team_home_stand_game_number = isHome ? (sameVenueStreak === -1 ? teamPrior.length + 1 : sameVenueStreak + 1) : '';
+      row.team_road_trip_game_number = !isHome ? (sameVenueStreak === -1 ? teamPrior.length + 1 : sameVenueStreak + 1) : '';
+      row.getaway_day = isHome && teamPrior.length ? 0 : '';
+    }
+
+    function addQualityFlags(row) {
+      row.lineup_was_confirmed_pre_game = '';
+      row.starter_was_confirmed_pre_game = '';
+      row.starter_changed_after_collection = '';
+      row.game_was_postponed = '';
+      row.game_was_suspended = '';
+      row.game_was_resumed_later = '';
+      row.game_was_shortened = Number(row.innings_played) < 9 ? 1 : 0;
+      row.weather_missing = 1;
+      row.park_factor_missing = 1;
+      row.bullpen_data_missing = row.opp_bullpen_ip_to_date ? 0 : 1;
+      row.lineup_data_missing = row.lineup_confirmed ? 0 : 1;
+      row.statcast_data_missing = row.team_xba ? 0 : 1;
+      row.betting_data_missing = 1;
+      row.data_collection_timestamp = new Date().toISOString();
+      row.data_version = SPONGE_VERSION;
+      row.sponge_version = SPONGE_VERSION;
+      row.source_mlb_stats = 1;
+      row.source_statcast = 0;
+      row.source_weather = 0;
+      row.source_odds = 0;
+      row.source_lineups = 1;
+    }
+
+    function actualColumns(row, line, oppPitchingActual, first5For, first5Against) {
+      const batting = statSummary(line.batting);
+      const starter = pitchSummary(oppPitchingActual.starter);
+      const bullpen = pitchSummary(oppPitchingActual.bullpen);
+      row.actual_team_runs = line.runs_for;
+      row.actual_opponent_runs = line.runs_against;
+      row.actual_total_runs = line.runs_for + line.runs_against;
+      row.actual_team_win = line.win;
+      row.actual_team_hits = batting.hits;
+      row.actual_team_1b = batting.singles;
+      row.actual_team_2b = batting.doubles;
+      row.actual_team_3b = batting.triples;
+      row.actual_team_hr = batting.hr;
+      row.actual_team_bb = batting.bb;
+      row.actual_team_k = batting.k;
+      row.actual_team_hbp = batting.hbp;
+      row.actual_team_tb = batting.tb;
+      row.actual_team_lob = batting.lob;
+      row.actual_team_risp_hits = batting.rispH;
+      row.actual_team_risp_ab = batting.rispAb;
+      row.actual_team_gidp = batting.gidp;
+      row.actual_team_sb = batting.sb;
+      row.actual_team_cs = batting.cs;
+      row.actual_team_avg = rate(batting.avg);
+      row.actual_team_obp = rate(batting.obp);
+      row.actual_team_slg = rate(batting.slg);
+      row.actual_team_ops = rate(batting.ops);
+      row.actual_opp_starter_ip = rate(starter.ip, 1, false);
+      row.actual_opp_starter_runs_allowed = oppPitchingActual.starter.r;
+      row.actual_opp_starter_er_allowed = oppPitchingActual.starter.er;
+      row.actual_opp_starter_hits_allowed = oppPitchingActual.starter.h;
+      row.actual_opp_starter_hr_allowed = oppPitchingActual.starter.hr;
+      row.actual_opp_starter_bb = oppPitchingActual.starter.bb;
+      row.actual_opp_starter_k = oppPitchingActual.starter.k;
+      row.actual_opp_starter_pitches = oppPitchingActual.starter.pitches;
+      row.actual_opp_starter_strikes = oppPitchingActual.starter.strikes;
+      row.actual_opp_bullpen_ip = rate(bullpen.ip, 1, false);
+      row.actual_opp_bullpen_runs_allowed = oppPitchingActual.bullpen.r;
+      row.actual_opp_bullpen_er_allowed = oppPitchingActual.bullpen.er;
+      row.actual_opp_bullpen_hits_allowed = oppPitchingActual.bullpen.h;
+      row.actual_opp_bullpen_hr_allowed = oppPitchingActual.bullpen.hr;
+      row.actual_opp_bullpen_bb = oppPitchingActual.bullpen.bb;
+      row.actual_opp_bullpen_k = oppPitchingActual.bullpen.k;
+      row.actual_opp_bullpen_pitches = oppPitchingActual.bullpen.pitches;
+      row.actual_team_runs_first_5 = first5For;
+      row.actual_opp_runs_first_5 = first5Against;
+    }
+
+    function buildGameRow(game, live, away, home) {
+      const awayRuns = lineScoreRuns(live, 'away');
+      const homeRuns = lineScoreRuns(live, 'home');
+      const first5Away = lineScoreRuns(live, 'away', 5);
+      const first5Home = lineScoreRuns(live, 'home', 5);
+      const night = isNightGame(game.gameDate || live?.gameData?.datetime?.dateTime);
+      return fillBlankColumns({
+        game_id: game.gamePk,
+        date: dateOnly(game.date || live?.gameData?.datetime?.officialDate),
+        season: seasonForDate(game.date),
+        home_team: home,
+        away_team: away,
+        venue: clean(live?.gameData?.venue?.name || game.venue?.name),
+        stadium_id: live?.gameData?.venue?.id || game.venue?.id || '',
+        division_game: '',
+        interleague_game: '',
+        doubleheader_game: game?.doubleHeader && game.doubleHeader !== 'N' ? 1 : 0,
+        doubleheader_game_number: game?.gameNumber || '',
+        day_game: night === '' ? '' : night ? 0 : 1,
+        night_game: night,
+        start_time_local: localEtTime(game.gameDate || live?.gameData?.datetime?.dateTime),
+        start_time_et: localEtTime(game.gameDate || live?.gameData?.datetime?.dateTime),
+        home_runs: homeRuns,
+        away_runs: awayRuns,
+        total_runs: awayRuns + homeRuns,
+        home_win: homeRuns > awayRuns ? 1 : 0,
+        game_went_extra_innings: inningsPlayed(live) > 9 ? 1 : 0,
+        innings_played: inningsPlayed(live),
+        first_5_home_runs: first5Home,
+        first_5_away_runs: first5Away,
+        first_5_total_runs: first5Home + first5Away,
+      }, GAME_COLUMNS);
+    }
+
+    function buildPostgameRow(base, row) {
+      const out = { game_id: base.game_id, date: base.date, team: base.team, opponent: base.opponent };
+      for (const col of ACTUAL_COLUMNS) out[col] = row[col] ?? '';
+      return fillBlankColumns(out, POSTGAME_COLUMNS);
+    }
+
+    function buildParkWeatherRow(gameRow) {
+      return fillBlankColumns({
+        game_id: gameRow.game_id,
+        date: gameRow.date,
+        venue: gameRow.venue,
+        stadium_id: gameRow.stadium_id,
+        weather_missing: 1,
+        park_factor_missing: 1,
+        data_collection_timestamp: new Date().toISOString(),
+        data_version: SPONGE_VERSION,
+        sponge_version: SPONGE_VERSION,
+        source_mlb_stats: 1,
+        source_statcast: 0,
+        source_weather: 0,
+        source_odds: 0,
+        source_lineups: 0,
+      }, PARK_TABLE_COLUMNS);
+    }
+
+    async function mapWithConcurrency(items, limit, worker) {
+      const results = new Array(items.length);
+      let next = 0;
+      async function run() {
+        while (next < items.length) {
+          const index = next;
+          next += 1;
+          results[index] = await worker(items[index], index);
+        }
+      }
+      await Promise.all(Array.from({ length: Math.min(limit, items.length) }, run));
+      return results;
+    }
+
+    function renderPreview(rows) {
+      if (!rows.length) {
+        els.preview.innerHTML = '<div class="empty">No rows yet.</div>';
+        return;
+      }
+      const cols = [
+        'date', 'team', 'opponent', 'is_home', 'team_runs', 'opponent_runs',
+        'team_games_played_to_date', 'team_ops', 'team_l10_ops', 'team_vs_starter_hand_ops',
+        'starter_name', 'starter_hand', 'starter_era', 'starter_whip',
+        'opp_bullpen_era', 'lineup_vs_starter_hand_ops', 'weather_missing',
+      ];
+      els.preview.innerHTML = `
+        <table>
+          <thead><tr>${cols.map((col) => `<th>${col}</th>`).join('')}</tr></thead>
+          <tbody>${rows.slice(0, 80).map((row) => `<tr>${cols.map((col) => `<td>${String(row[col] ?? '')}</td>`).join('')}</tr>`).join('')}</tbody>
+        </table>
+      `;
+    }
+
+    function updateMetrics(warnings = []) {
+      els.gamesMetric.textContent = tables.games.length.toLocaleString();
+      els.rowsMetric.textContent = tables.team_game_context.length.toLocaleString();
+      els.lineupsMetric.textContent = tables.lineups.length.toLocaleString();
+      els.playersMetric.textContent = tables.player_lineup_stats.length.toLocaleString();
+      els.warningsMetric.textContent = warnings.length.toLocaleString();
+    }
+
+    function buildValidation() {
+      const warnings = [];
+      const rows = tables.team_game_context;
+      const missingLineups = rows.filter((row) => Number(row.lineup_data_missing) === 1).length;
+      const missingWeather = rows.filter((row) => Number(row.weather_missing) === 1).length;
+      const duplicateKeys = new Set();
+      let duplicateCount = 0;
+      for (const row of rows) {
+        const key = `${row.game_id}:${row.team}`;
+        if (duplicateKeys.has(key)) duplicateCount += 1;
+        duplicateKeys.add(key);
+      }
+      if (duplicateCount) warnings.push(`${duplicateCount} duplicate game/team rows`);
+      if (missingLineups) warnings.push(`${missingLineups} rows missing confirmed 9-man lineup`);
+      if (missingWeather) warnings.push(`${missingWeather} rows have weather placeholders`);
+      return warnings;
+    }
+
+    function addTableRowsForSide(ctx) {
+      const {
+        game, live, boxscore, side, oppSide, teamLine, oppLine, gameRow, logs, season, date,
+      } = ctx;
+      const teamPrior = teamAggregateRows(logs.team.get(teamLine.team) || [], date, game.gamePk, season);
+      const oppPrior = teamAggregateRows(logs.team.get(teamLine.opponent) || [], date, game.gamePk, season);
+      const starterId = oppLine.starter_id;
+      const starter = { ...oppLine.starter, team: teamLine.opponent };
+      const starterHand = starter.hand;
+      const priorStarts = teamAggregateRows(logs.pitcherStarts.get(starterId) || [], date, game.gamePk, season);
+      const allPriorPitcher = teamAggregateRows(logs.pitcherAll.get(starterId) || [], date, game.gamePk, season);
+      const pitcherSplits = {
+        L: teamAggregateRows(logs.pitcherSplit.get(`${starterId}:L`) || [], date, game.gamePk, season),
+        R: teamAggregateRows(logs.pitcherSplit.get(`${starterId}:R`) || [], date, game.gamePk, season),
+      };
+      const pitchTypeLogs = {};
+      const teamPitchTypeLogs = {};
+      for (const pitch of ['ff', 'si', 'sl', 'st', 'cu', 'ch', 'fs', 'fc', 'kc']) {
+        pitchTypeLogs[pitch] = teamAggregateRows(logs.pitcherPitchType.get(`${starterId}:${pitch}`) || [], date, game.gamePk, season);
+        teamPitchTypeLogs[pitch] = teamAggregateRows(logs.teamPitchType.get(`${teamLine.team}:${pitch}`) || [], date, game.gamePk, season);
+      }
+      const teamHandLogs = {
+        lhp: teamAggregateRows(logs.teamHand.get(`${teamLine.team}:L`) || [], date, game.gamePk, season),
+        rhp: teamAggregateRows(logs.teamHand.get(`${teamLine.team}:R`) || [], date, game.gamePk, season),
+      };
+      const homeAwayPrior = teamPrior.filter((item) => Number(item.is_home) === Number(teamLine.is_home));
+      const venuePrior = teamPrior.filter((item) => item.venue === teamLine.venue);
+      const oppBullpenLogs = teamAggregateRows(logs.bullpen.get(teamLine.opponent) || [], date, game.gamePk, season);
+      const lineup = lineupPlayers(live, boxscore, side);
+      const oppPitchingActual = buildActualPitching(live, boxscore, oppSide);
+      const first5For = lineScoreRuns(live, side, 5);
+      const first5Against = lineScoreRuns(live, oppSide, 5);
+      const row = {
+        game_id: game.gamePk,
+        date,
+        season,
+        game_number_for_team: teamPrior.length + 1,
+        team: teamLine.team,
+        opponent: teamLine.opponent,
+        home_team: gameRow.home_team,
+        away_team: gameRow.away_team,
+        is_home: teamLine.is_home,
+        venue: teamLine.venue,
+        stadium_id: teamLine.stadium_id,
+        division_game: gameRow.division_game,
+        interleague_game: gameRow.interleague_game,
+        doubleheader_game: gameRow.doubleheader_game,
+        doubleheader_game_number: gameRow.doubleheader_game_number,
+        day_game: gameRow.day_game,
+        night_game: gameRow.night_game,
+        start_time_local: gameRow.start_time_local,
+        start_time_et: gameRow.start_time_et,
+        team_runs: teamLine.runs_for,
+        opponent_runs: teamLine.runs_against,
+        total_runs: teamLine.runs_for + teamLine.runs_against,
+        team_win: teamLine.win,
+        team_margin: teamLine.runs_for - teamLine.runs_against,
+        game_went_extra_innings: gameRow.game_went_extra_innings,
+        innings_played: gameRow.innings_played,
+        first_5_team_runs: first5For,
+        first_5_opponent_runs: first5Against,
+        first_5_total_runs: first5For + first5Against,
+        first_5_team_win: first5For > first5Against ? 1 : 0,
+        first_5_margin: first5For - first5Against,
+      };
+      const overallSummary = addMainOffense(row, teamPrior);
+      addWindowColumns(row, teamPrior);
+      addHandColumns(row, teamHandLogs, starterHand, overallSummary);
+      for (const [prefix, subset] of [['team_home', teamPrior.filter((item) => item.is_home)], ['team_away', teamPrior.filter((item) => !item.is_home)]]) {
+        const summary = statSummary(aggregateBatting(subset));
+        addOffenseColumns(row, prefix, summary, subset.length);
+      }
+      const currentHaSummary = statSummary(aggregateBatting(homeAwayPrior));
+      row.team_current_home_away_runs_per_game = rate(safeDiv(currentHaSummary.runs, homeAwayPrior.length), 2, false);
+      row.team_current_home_away_ops = rate(currentHaSummary.ops);
+      row.team_current_home_away_iso = rate(currentHaSummary.iso);
+      row.team_current_home_away_woba = rate(currentHaSummary.woba);
+      row.team_current_home_away_hr_per_game = rate(safeDiv(currentHaSummary.hr, homeAwayPrior.length), 3, false);
+      row.team_current_home_away_k_rate = rate(currentHaSummary.kRate);
+      row.team_current_home_away_bb_rate = rate(currentHaSummary.bbRate);
+      const venueSummary = statSummary(aggregateBatting(venuePrior));
+      row.team_venue_games = venuePrior.length;
+      row.team_venue_runs_per_game = rate(safeDiv(venueSummary.runs, venuePrior.length), 2, false);
+      row.team_venue_avg = rate(venueSummary.avg);
+      row.team_venue_obp = rate(venueSummary.obp);
+      row.team_venue_slg = rate(venueSummary.slg);
+      row.team_venue_ops = rate(venueSummary.ops);
+      row.team_venue_iso = rate(venueSummary.iso);
+      row.team_venue_hr_per_game = rate(safeDiv(venueSummary.hr, venuePrior.length), 3, false);
+      row.team_venue_woba = rate(venueSummary.woba);
+      row.team_venue_k_rate = rate(venueSummary.kRate);
+      row.team_venue_bb_rate = rate(venueSummary.bbRate);
+      row.team_prior_games_at_this_venue = venuePrior.length;
+      row.team_prior_runs_per_game_at_this_venue = row.team_venue_runs_per_game;
+      row.team_prior_ops_at_this_venue = row.team_venue_ops;
+      row.team_prior_hr_per_game_at_this_venue = row.team_venue_hr_per_game;
+      addOppPitching(row, oppPrior);
+      addStarterColumns(row, starter, priorStarts, allPriorPitcher, pitcherSplits, pitchTypeLogs, teamPitchTypeLogs, date);
+      addBullpenColumns(row, oppBullpenLogs, logs.relieverAll, date);
+      addLineupColumns(row, live, lineup, logs.player, logs.playerSplit, logs.batterPitcher, starterHand, starterId, date, game.gamePk);
+      addRestSchedule(row, teamPrior, oppPrior, date, teamLine.venue, teamLine.is_home);
+      actualColumns(row, teamLine, oppPitchingActual, first5For, first5Against);
+      addQualityFlags(row);
+      fillBlankColumns(row, TEAM_CONTEXT_COLUMNS);
+      tables.team_game_context.push(row);
+      tables.starter_context.push(fillBlankColumns(Object.fromEntries(SIMPLE_CONTEXT_COLUMNS.map((col) => [col, row[col] ?? ''])), SIMPLE_CONTEXT_COLUMNS));
+      tables.bullpen_context.push(fillBlankColumns(Object.fromEntries(BULLPEN_TABLE_COLUMNS.map((col) => [col, row[col] ?? ''])), BULLPEN_TABLE_COLUMNS));
+      tables.lineups.push(fillBlankColumns(Object.fromEntries(LINEUP_TABLE_COLUMNS.map((col) => [col, row[col] ?? ''])), LINEUP_TABLE_COLUMNS));
+      tables.player_lineup_stats.push(...playerLineupRows(row, live, lineup, logs, starterHand, starterId, date, game.gamePk));
+      tables.postgame_results.push(buildPostgameRow(row, row));
+    }
+
+    function updateLogsAfterGame({ game, live, boxscore, awayLine, homeLine }) {
+      const date = dateOnly(game.date);
+      const addTeam = (line) => {
+        pushLog(logs.team, line.team, {
+          date,
+          game_id: game.gamePk,
+          is_home: line.is_home,
+          venue: line.venue,
+          batting: line.batting,
+          pitching: line.pitching,
+          runs_against: line.runs_against,
+        });
+      };
+      addTeam(awayLine);
+      addTeam(homeLine);
+      updatePlayDerivedLogs({ live, game, awayTeam: awayLine.team, homeTeam: homeLine.team, logs });
+      for (const side of ['away', 'home']) {
+        const teamLine = side === 'away' ? awayLine : homeLine;
+        const teamBox = boxscore?.teams?.[side] || {};
+        const starterId = actualStarterId(boxscore, side);
+        for (const id of teamBox.pitchers || []) {
+          const player = playerBox(boxscore, side, id);
+          const pitching = pitchingWithExtras(live, player, id);
+          const entry = {
+            date,
+            game_id: game.gamePk,
+            pitcher_id: Number(id),
+            pitcher_name: clean(player?.person?.fullName),
+            hand: playerThrows(live, player, id),
+            team: teamLine.team,
+            pitching,
+          };
+          pushLog(logs.pitcherAll, id, entry);
+          if (Number(id) === Number(starterId)) pushLog(logs.pitcherStarts, id, entry);
+          else {
+            pushLog(logs.bullpen, teamLine.team, entry);
+            pushLog(logs.relieverAll, id, entry);
+          }
+        }
+        for (const id of teamBox.batters || []) {
+          const player = playerBox(boxscore, side, id);
+          if (!player) continue;
+          const batting = battingFromStats(player?.stats?.batting || {});
+          if (!batting.pa) continue;
+          pushLog(logs.player, id, {
+            date,
+            game_id: game.gamePk,
+            batting,
+            is_start: isStartingBatter(player),
+            batting_order: battingOrderSpot(player),
+          });
+        }
+      }
+    }
+
+    let logs = {};
+
+    function resetLogs() {
+      logs = {
+        team: new Map(),
+        teamHand: new Map(),
+        teamPitchType: new Map(),
+        pitcherAll: new Map(),
+        pitcherStarts: new Map(),
+        pitcherSplit: new Map(),
+        pitcherPitchType: new Map(),
+        bullpen: new Map(),
+        relieverAll: new Map(),
+        player: new Map(),
+        playerSplit: new Map(),
+        batterPitcher: new Map(),
+      };
+    }
+
+    async function build() {
+      cancelRequested = false;
+      tables = emptyTables();
+      resetLogs();
+      els.buildBtn.disabled = true;
+      els.stopBtn.disabled = false;
+      els.downloadAllBtn.disabled = true;
+      els.downloadCombinedBtn.disabled = true;
+      els.log.textContent = '';
+      setProgress(0, 1);
+      updateMetrics();
+      renderPreview([]);
+
+      const range = resolvedRange();
+      const contextStart = seasonStart(seasonForDate(range.start));
+      const chunks = scheduleChunks(contextStart, range.end);
+      let scheduleGames = [];
+      for (const chunk of chunks) {
+        if (cancelRequested) break;
+        setStatus(`Loading schedule ${chunk.start} to ${chunk.end}...`);
+        scheduleGames.push(...await getScheduleGames(chunk.start, chunk.end));
+      }
+      const byPk = new Map(scheduleGames.map((game) => [String(game.gamePk), game]));
+      scheduleGames = [...byPk.values()].filter(isFinal).sort((a, b) => String(a.gameDate).localeCompare(String(b.gameDate)) || Number(a.gamePk) - Number(b.gamePk));
+      log(`Final games loaded: ${scheduleGames.length.toLocaleString()} (${contextStart} through ${range.end}); output starts ${range.start}.`);
+
+      let done = 0;
+      for (const game of scheduleGames) {
+        if (cancelRequested) break;
+        done += 1;
+        setProgress(done, scheduleGames.length);
+        setStatus(`Absorbing ${game.date} game ${done.toLocaleString()} of ${scheduleGames.length.toLocaleString()}...`);
+        let live = null;
+        try {
+          live = await getLive(game.gamePk);
+        } catch (error) {
+          log(`Skipped ${game.gamePk}: ${error.message || error}`);
+          continue;
+        }
+        const boxscore = live?.liveData?.boxscore || {};
+        const away = teamAbbrevFromLive(live, 'away', game);
+        const home = teamAbbrevFromLive(live, 'home', game);
+        const gameRow = buildGameRow(game, live, away, home);
+        const awayLine = buildTeamLine(live, boxscore, game, 'away');
+        const homeLine = buildTeamLine(live, boxscore, game, 'home');
+        const season = seasonForDate(gameRow.date);
+        const inTargetWindow = compareDate(gameRow.date, range.start) >= 0 && compareDate(gameRow.date, range.end) <= 0;
+        if (inTargetWindow) {
+          tables.games.push(gameRow);
+          tables.weather.push(buildParkWeatherRow(gameRow));
+          tables.parks.push(buildParkWeatherRow(gameRow));
+          addTableRowsForSide({ game, live, boxscore, side: 'away', oppSide: 'home', teamLine: awayLine, oppLine: homeLine, gameRow, logs, season, date: gameRow.date });
+          addTableRowsForSide({ game, live, boxscore, side: 'home', oppSide: 'away', teamLine: homeLine, oppLine: awayLine, gameRow, logs, season, date: gameRow.date });
+        }
+        updateLogsAfterGame({ game, live, boxscore, awayLine, homeLine });
+        if (done % 10 === 0) {
+          updateMetrics();
+          renderPreview(tables.team_game_context);
+        }
+      }
+
+      const warnings = buildValidation();
+      log([
+        'Validation report',
+        `Games: ${tables.games.length.toLocaleString()}`,
+        `Team rows: ${tables.team_game_context.length.toLocaleString()}`,
+        `Lineup rows: ${tables.lineups.length.toLocaleString()}`,
+        `Player lineup rows: ${tables.player_lineup_stats.length.toLocaleString()}`,
+        `Warnings: ${warnings.length ? warnings.join('; ') : 'none'}`,
+      ].join('\n'));
+      updateMetrics(warnings);
+      renderPreview(tables.team_game_context);
+      setProgress(1, 1);
+      setStatus(cancelRequested ? 'Stopped. Partial tables are available.' : 'Built intense sponge tables.');
+      els.buildBtn.disabled = false;
+      els.stopBtn.disabled = true;
+      els.downloadAllBtn.disabled = tables.team_game_context.length === 0;
+      els.downloadCombinedBtn.disabled = tables.team_game_context.length === 0;
+    }
+
+    function tableDefinitions() {
+      return {
+        games: [tables.games, GAME_COLUMNS],
+        team_game_context: [tables.team_game_context, TEAM_CONTEXT_COLUMNS],
+        starter_context: [tables.starter_context, SIMPLE_CONTEXT_COLUMNS],
+        bullpen_context: [tables.bullpen_context, BULLPEN_TABLE_COLUMNS],
+        lineups: [tables.lineups, LINEUP_TABLE_COLUMNS],
+        player_lineup_stats: [tables.player_lineup_stats, LINEUP_PLAYER_COLUMNS],
+        weather: [tables.weather, PARK_TABLE_COLUMNS],
+        parks: [tables.parks, PARK_TABLE_COLUMNS],
+        postgame_results: [tables.postgame_results, POSTGAME_COLUMNS],
+      };
+    }
+
+    function downloadAll() {
+      const range = resolvedRange();
+      const suffix = `${range.start}_to_${range.end}`;
+      for (const [name, [rows, columns]] of Object.entries(tableDefinitions())) {
+        if (!rows.length) continue;
+        download(`intense-sponge-${name}-${suffix}.csv`, rows, columns);
+      }
+    }
+
+    function initDates() {
+      const today = todayIso();
+      const season = seasonForDate(today);
+      els.startSeason.value = String(season);
+      els.endSeason.value = String(season);
+      els.startDate.value = addDays(today, -7);
+      els.endDate.value = addDays(today, -1);
+    }
+
+    els.buildBtn.addEventListener('click', () => {
+      build().catch((error) => {
+        els.buildBtn.disabled = false;
+        els.stopBtn.disabled = true;
+        setStatus(`<span style="color:var(--bad)">Build failed: ${String(error.message || error)}</span>`);
+        log(`ERROR: ${error.stack || error.message || error}`);
+      });
+    });
+    els.stopBtn.addEventListener('click', () => {
+      cancelRequested = true;
+      els.stopBtn.disabled = true;
+      setStatus('Stopping after the current game finishes...');
+    });
+    els.downloadCombinedBtn.addEventListener('click', () => {
+      const range = resolvedRange();
+      download(`intense-sponge-team-game-context-${range.start}_to_${range.end}.csv`, tables.team_game_context, TEAM_CONTEXT_COLUMNS);
+    });
+    els.downloadAllBtn.addEventListener('click', downloadAll);
+
+    initDates();
+  </script>
+</body>
+</html>
