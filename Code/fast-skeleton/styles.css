@@ -6107,7 +6107,7 @@ body[data-overlay-dock='bottom'] .score {
 .lineup-dashboard-stats { display: none; }
 .lineup-sub-split {
   display: grid;
-  grid-template-columns: 1fr 1fr;
+  grid-template-columns: repeat(var(--sub-count, 2), minmax(0, 1fr));
   gap: 4px;
   width: 100%;
   min-width: 0;
@@ -6134,7 +6134,7 @@ body[data-overlay-dock='bottom'] .score {
   text-decoration: underline;
 }
 
-.lineup-sub-player:first-child {
+.lineup-sub-player:not(:last-child) {
   padding-right: 5px;
   border-right: 1px solid color-mix(in srgb, var(--team-color, var(--line)) 45%, transparent);
 }
@@ -11150,4 +11150,20 @@ body[data-overlay-dock='bottom'] .player-stat-overlay {
     padding: 1px 1px;
     font-size: 0.42rem;
   }
+}
+
+dialog.player-stat-modal.play-by-play-modal[open] {
+  display: grid;
+  grid-template-rows: auto minmax(0, 1fr);
+  max-height: calc(100dvh - 32px);
+  overflow: hidden;
+}
+
+dialog.player-stat-modal.play-by-play-modal[open] .pbp-text {
+  min-height: 0;
+  max-height: none;
+  overflow-y: auto;
+  overscroll-behavior: contain;
+  touch-action: pan-y;
+  -webkit-overflow-scrolling: touch;
 }

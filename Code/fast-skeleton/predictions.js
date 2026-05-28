@@ -1994,6 +1994,48 @@ function lineupGameStatsHasAction(stats = {}) {
     .some((key) => statNumber(stats?.[key]) > 0);
 }
 
+function lineupGameBattingStatsFromPlayer(player = {}) {
+  return lineupGameBattingStats({ gameBatting: player?.gameBatting || player?.stats?.batting || {} });
+}
+
+function combineLineupGameBattingStats(players = []) {
+  const totals = {
+    atBats: 0,
+    hits: 0,
+    doubles: 0,
+    triples: 0,
+    homeRuns: 0,
+    runs: 0,
+    rbi: 0,
+    walks: 0,
+    strikeOuts: 0,
+    totalBases: 0,
+  };
+  for (const player of players || []) {
+    const stats = lineupGameBattingStatsFromPlayer(player);
+    for (const key of Object.keys(totals)) {
+      totals[key] += statNumber(stats?.[key]);
+    }
+  }
+  return totals;
+}
+
+function battingTodaySummaryFromGameStats(stats = {}) {
+  const gameStats = lineupGameBattingStats(stats?.gameBatting ? stats : { gameBatting: stats });
+  const parts = [];
+  if (statNumber(gameStats.atBats) > 0 || statNumber(gameStats.hits) > 0) {
+    parts.push(`${statNumber(gameStats.hits)}-${statNumber(gameStats.atBats)}`);
+  }
+  if (statNumber(gameStats.doubles) > 0) parts.push(`${statNumber(gameStats.doubles)} 2B`);
+  if (statNumber(gameStats.triples) > 0) parts.push(`${statNumber(gameStats.triples)} 3B`);
+  if (statNumber(gameStats.homeRuns) > 0) parts.push(`${statNumber(gameStats.homeRuns)} HR`);
+  if (statNumber(gameStats.runs) > 0) parts.push(`${statNumber(gameStats.runs)} R`);
+  if (statNumber(gameStats.rbi) > 0) parts.push(`${statNumber(gameStats.rbi)} RBI`);
+  if (statNumber(gameStats.walks) > 0) parts.push(`${statNumber(gameStats.walks)} BB`);
+  if (statNumber(gameStats.strikeOuts) > 0) parts.push(`${statNumber(gameStats.strikeOuts)} K`);
+  return parts.join(' ') || '0-0';
+}
+
 function lineupRecentBattingStatsFromDetails(details) {
   if (!details?.totals) return null;
   return {
@@ -6326,12 +6368,34 @@ function pitcherOpponentHandPaProxy(stat = {}) {
   );
 }
 
+function pitcherOpponentHandDoublePlayOuts(stat = {}) {
+  return statNumber(
+    stat?.groundIntoDoublePlay
+      ?? stat?.groundIntoDoublePlays
+      ?? stat?.groundedIntoDoublePlay
+      ?? stat?.groundedIntoDoublePlays
+      ?? stat?.gidp
+      ?? stat?.gdp
+      ?? stat?.doublePlays,
+  );
+}
+
+function pitcherOpponentHandOutsProxy(stat = {}) {
+  const statOuts = statNumber(stat?.outsPitched ?? stat?.outs);
+  if (statOuts > 0) return statOuts;
+  const directOuts = inningsToOuts(stat?.inningsPitched ?? stat?.ip);
+  if (directOuts > 0) return directOuts;
+  const plateAppearances = pitcherOpponentHandPaProxy(stat);
+  const hits = pitcherOpponentHandHits(stat);
+  return Math.max(0, plateAppearances - hits + pitcherOpponentHandDoublePlayOuts(stat));
+}
+
 function pitcherOpponentHandHr9(stat = {}) {
   if (!stat) return null;
-  const plateAppearances = pitcherOpponentHandPaProxy(stat);
+  const official = rateNumber(stat?.homeRunsPer9 ?? stat?.homeRunsPer9Inn ?? stat?.hr9);
+  if (Number.isFinite(official)) return official;
   const homeRuns = statNumber(stat?.homeRuns ?? stat?.hrAllowed ?? stat?.hr);
-  const hits = pitcherOpponentHandHits(stat);
-  const outsProxy = Math.max(0, plateAppearances - hits);
+  const outsProxy = pitcherOpponentHandOutsProxy(stat);
   const ipProxy = outsProxy / 3;
   return ipProxy > 0 ? (homeRuns * 9) / ipProxy : null;
 }
@@ -7366,7 +7430,7 @@ function buildLineup(players, activeBatterId, battingOrderIds = [], nextBatterId
       .filter(([id]) => Number.isFinite(id)),
   );
 
-  if (Array.isArray(battingOrderIds) && battingOrderIds.length) {
+  if (Array.isArray(battingOrderIds) && battingOrderIds.length && battingOrderIds.length <= 9) {
     for (let i = 0; i < battingOrderIds.length; i += 1) {
       const id = numericPlayerId(battingOrderIds[i]);
       if (!Number.isFinite(id)) continue;
@@ -7392,13 +7456,27 @@ function buildLineup(players, activeBatterId, battingOrderIds = [], nextBatterId
   return [...bySlot.entries()]
     .sort((a, b) => a[0] - b[0])
     .map(([slot, player]) => {
-      const gameBatting = player?.stats?.batting || {};
       const slotPlayers = (substitutionsBySlot.get(slot) || [player])
         .slice()
         .sort((a, b) => (Number(a?.battingOrder) || 0) - (Number(b?.battingOrder) || 0));
       const starter = slotPlayers[0] || player;
       const hasSubstitution = Number(starter?.person?.id) !== Number(player?.person?.id);
-      const starterBatting = starter?.stats?.batting || {};
+      const currentGameBatting = lineupGameBattingStatsFromPlayer(player);
+      const slotGameBatting = hasSubstitution ? combineLineupGameBattingStats(slotPlayers) : currentGameBatting;
+      const substitutionPlayers = hasSubstitution ? slotPlayers.map((slotPlayer) => {
+        const playerGameBatting = lineupGameBattingStatsFromPlayer(slotPlayer);
+        return {
+          id: slotPlayer?.person?.id ?? null,
+          name: lastName(slotPlayer?.person?.fullName || slotPlayer?.person?.lastName || 'Unknown'),
+          fullName: slotPlayer?.person?.fullName || 'Unknown',
+          position: shortPosition(slotPlayer),
+          bats: slotPlayer?.person?.batSide?.code || slotPlayer?.batSide?.code || slotPlayer?.batSide?.description || '',
+          avg: battingAverage(slotPlayer),
+          today: battingTodaySummaryFromGameStats(playerGameBatting),
+          gameBatting: playerGameBatting,
+          source: 'mlb-boxscore-lineup',
+        };
+      }) : [];
       return {
         slot,
         id: player?.person?.id ?? null,
@@ -7408,23 +7486,15 @@ function buildLineup(players, activeBatterId, battingOrderIds = [], nextBatterId
         bats: player?.person?.batSide?.code || player?.batSide?.code || player?.batSide?.description || '',
         throws: player?.person?.pitchHand?.code || player?.pitchHand?.code || player?.pitchHand?.description || '',
         avg: battingAverage(player),
-        today: battingTodaySummary(player),
-        gameBatting: lineupGameBattingStats({ gameBatting }),
+        today: hasSubstitution ? battingTodaySummaryFromGameStats(slotGameBatting) : battingTodaySummary(player),
+        substitutionLineToday: battingTodaySummaryFromGameStats(currentGameBatting),
+        gameBatting: slotGameBatting,
         batting: player?.seasonStats?.batting || {},
         isActive: Number(player?.person?.id) === Number(activeBatterId),
         isNextUp: Number(player?.person?.id) === Number(nextBatterId),
         source: 'mlb-boxscore-lineup',
-        substitutionStarter: hasSubstitution ? {
-          id: starter?.person?.id ?? null,
-          name: lastName(starter?.person?.fullName || starter?.person?.lastName || 'Unknown'),
-          fullName: starter?.person?.fullName || 'Unknown',
-          position: shortPosition(starter),
-          bats: starter?.person?.batSide?.code || starter?.batSide?.code || starter?.batSide?.description || '',
-          avg: battingAverage(starter),
-          today: battingTodaySummary(starter),
-          gameBatting: lineupGameBattingStats({ gameBatting: starterBatting }),
-          source: 'mlb-boxscore-lineup',
-        } : null,
+        substitutionStarter: hasSubstitution ? substitutionPlayers[0] : null,
+        substitutionPlayers,
       };
     });
 }
@@ -7505,7 +7575,13 @@ function nextBatterIdsFromPlayLog(allPlays = [], awayOrder = [], homeOrder = [])
 
 
 function buildBench(players, lineup) {
-  const lineupIds = new Set((lineup || []).map((entry) => Number(entry.id)).filter(Number.isFinite));
+  const lineupIds = new Set();
+  for (const entry of lineup || []) {
+    [entry, entry?.substitutionStarter, ...(Array.isArray(entry?.substitutionPlayers) ? entry.substitutionPlayers : [])]
+      .map((value) => Number(value?.id))
+      .filter(Number.isFinite)
+      .forEach((id) => lineupIds.add(id));
+  }
   return Object.values(players || {})
     .filter((player) => !isPitcherPlayer(player))
     .filter((player) => !lineupIds.has(Number(player?.person?.id)))
@@ -25143,6 +25219,10 @@ function normalizedLineupEntry(entry, slot) {
     isNextUp: Boolean(entry?.isNextUp),
     source: entry?.source || '',
     substitutionStarter: entry?.substitutionStarter ? normalizedLineupEntry(entry.substitutionStarter, slot) : null,
+    substitutionLineToday: normalizeLineupTodayValue(entry?.substitutionLineToday),
+    substitutionPlayers: Array.isArray(entry?.substitutionPlayers)
+      ? entry.substitutionPlayers.map((player) => normalizedLineupEntry(player, slot))
+      : [],
   };
 }
 
@@ -26236,6 +26316,9 @@ function renderLineupList(listEl, lineup, color, teamCode = '', hotPlayerIds = n
         dueBadgeMap?.get?.(id)?.xbh || '',
         recent ? `${recent.atBats}:${recent.hits}:${recent.avg}:${recent.slg}:${recent.ops}:${recent.extraBaseHits}:${recent.homeRuns}:${recent.walks}:${recent.strikeOuts}` : '',
         entry?.substitutionStarter ? `${entry.substitutionStarter.id}:${entry.substitutionStarter.fullName}:${entry.substitutionStarter.today}` : '',
+        Array.isArray(entry?.substitutionPlayers)
+          ? entry.substitutionPlayers.map((player) => `${player?.id}:${player?.fullName}:${player?.today}`).join(';')
+          : '',
       ];
     }),
   });
@@ -26313,18 +26396,20 @@ function renderLineupList(listEl, lineup, color, teamCode = '', hotPlayerIds = n
     const emojiHtml = `${indicatorHtml}${nextUpHtml}${hotEmojiHtml}${coldEmojiHtml}${avgBurstHtml}${powerBurstHtml}${slugBurstHtml}${handedSplitHtml}${eliteMatchupHtml}${dueBadgeHtml}${hitStreakHtml}`;
     const displayLastName = lineupBatterLastName(entry);
     const starter = entry?.substitutionStarter || null;
-    const starterToday = normalizeLineupTodayValue(starter?.today);
-    const subToday = normalizeLineupTodayValue(entry.today);
-    const nameBlockHtml = starter ? `
-        <span class="lineup-sub-split">
-          <span class="lineup-sub-player" data-player-id="${Number.isFinite(Number(starter.id)) ? String(starter.id) : ''}" role="button" tabindex="0" title="${escapeHtml(starter.fullName || starter.name || 'Starter')}">
-            <span class="lineup-name-text">${escapeHtml(lineupBatterLastName(starter))}</span>${handednessHtml(starter?.bats)}
-            <span class="lineup-sub-today">${escapeHtml(starterToday)}</span>
+    const substitutionPlayers = Array.isArray(entry?.substitutionPlayers) && entry.substitutionPlayers.length > 1
+      ? entry.substitutionPlayers
+      : (starter ? [starter, { ...entry, today: entry?.substitutionLineToday || entry?.today }] : []);
+    const hasSubstitutionChain = substitutionPlayers.length > 1;
+    const subToday = normalizeLineupTodayValue(entry?.substitutionLineToday || entry.today);
+    const substitutionHtml = substitutionPlayers.map((subPlayer) => `
+          <span class="lineup-sub-player" data-player-id="${Number.isFinite(Number(subPlayer?.id)) ? String(subPlayer.id) : ''}" role="button" tabindex="0" title="${escapeHtml(subPlayer?.fullName || subPlayer?.name || 'Substitution')}">
+            <span class="lineup-name-text">${escapeHtml(lineupBatterLastName(subPlayer))}</span>${handednessHtml(subPlayer?.bats)}
+            <span class="lineup-sub-today">${escapeHtml(normalizeLineupTodayValue(subPlayer?.today))}</span>
           </span>
-          <span class="lineup-sub-player" data-player-id="${Number.isFinite(Number(entry.id)) ? String(entry.id) : ''}" role="button" tabindex="0" title="${escapeHtml(entry.fullName || entry.name || 'Substitution')}">
-            <span class="lineup-name-text">${escapeHtml(displayLastName)}</span>${batterHandHtml}
-            <span class="lineup-sub-today">${escapeHtml(subToday)}</span>
-          </span>
+      `).join('');
+    const nameBlockHtml = hasSubstitutionChain ? `
+        <span class="lineup-sub-split" style="--sub-count:${Math.min(4, substitutionPlayers.length)}">
+          ${substitutionHtml}
         </span>
       ` : `
         <span class="lineup-name-text">${escapeHtml(displayLastName)}</span>${batterHandHtml}
@@ -26334,7 +26419,7 @@ function renderLineupList(listEl, lineup, color, teamCode = '', hotPlayerIds = n
 
     const li = document.createElement('li');
     li.className = rowClasses.join(' ');
-    if (starter) li.classList.add('lineup-row-substitution');
+    if (hasSubstitutionChain) li.classList.add('lineup-row-substitution');
     li.dataset.playerId = Number.isFinite(Number(entry.id)) && Number(entry.id) > 0 ? String(entry.id) : '';
     li.dataset.team = teamCode;
     li.dataset.hot = isHot ? '1' : '0';
@@ -26345,7 +26430,7 @@ function renderLineupList(listEl, lineup, color, teamCode = '', hotPlayerIds = n
       </span>
       <span class="lineup-pos">${escapeHtml(entry.position || '')}</span>
       <span class="lineup-avg">AVG ${escapeHtml(entry.avg || '---')}</span>
-      <span class="lineup-today">${starter ? '' : escapeHtml(subToday)}</span>
+      <span class="lineup-today">${hasSubstitutionChain ? '' : escapeHtml(subToday)}</span>
     `;
     const markerImg = li.querySelector('.lineup-indicator');
     if (markerImg) {
