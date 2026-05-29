@@ -1,0 +1,1603 @@
+
+body.dashboard-page .lineup-modal-body {
+  min-height: 0;
+  overflow: hidden;
+}
+
+body.dashboard-page .lineup-overlay.is-live-view .lineup-modal-header {
+  background:
+    linear-gradient(90deg, rgba(var(--live-away-rgb, 102, 217, 255), 0.22), transparent 32%, transparent 68%, rgba(var(--live-home-rgb, 255, 209, 102), 0.2)),
+    color-mix(in srgb, var(--panel-head) 78%, transparent);
+}
+
+body.dashboard-page .lineup-overlay.is-live-view .lineup-modal {
+  box-shadow:
+    inset 3px 0 0 color-mix(in srgb, var(--live-away-color, var(--accent)) 72%, transparent),
+    inset -3px 0 0 color-mix(in srgb, var(--live-home-color, var(--accent)) 72%, transparent),
+    0 16px 40px rgba(0,0,0,0.42),
+    0 0 0 1px color-mix(in srgb, var(--line) 40%, transparent) inset;
+}
+
+body.dashboard-page .lineup-live-lab-grid {
+  min-height: 0;
+  height: 100%;
+  display: grid;
+  grid-template-columns: minmax(190px, 220px) minmax(0, 1fr) minmax(190px, 220px);
+  grid-template-areas: "away center home";
+  gap: 6px;
+  padding: 6px;
+  overflow: hidden;
+  border-top: 1px solid color-mix(in srgb, var(--line) 70%, transparent);
+  background:
+    radial-gradient(circle at 7% 12%, rgba(var(--live-away-rgb, 102, 217, 255), 0.18), transparent 28%),
+    radial-gradient(circle at 93% 12%, rgba(var(--live-home-rgb, 255, 209, 102), 0.16), transparent 28%),
+    linear-gradient(180deg, color-mix(in srgb, var(--panel-head) 28%, transparent), transparent 28%),
+    repeating-linear-gradient(90deg, rgba(255,255,255,0.018) 0 1px, transparent 1px 68px),
+    color-mix(in srgb, var(--panel-bg) 76%, transparent);
+  box-sizing: border-box;
+}
+
+body.dashboard-page .lineup-live-lab-grid > * {
+  min-width: 0;
+}
+
+body.dashboard-page .player-search-btn {
+  width: 32px;
+  min-width: 32px;
+  height: 32px;
+  padding: 0;
+  border-radius: 999px;
+  font-size: 0.82rem;
+}
+
+body.dashboard-page .global-player-search-overlay {
+  position: fixed;
+  inset: 0;
+  z-index: 1400;
+  display: grid;
+  place-items: start center;
+  padding: min(14vh, 112px) 16px 16px;
+}
+
+body.dashboard-page .global-player-search-overlay[hidden] {
+  display: none;
+}
+
+body.dashboard-page .global-player-search-backdrop {
+  position: absolute;
+  inset: 0;
+  background: rgba(2, 9, 16, 0.62);
+  backdrop-filter: blur(8px);
+}
+
+body.dashboard-page .global-player-search-panel {
+  position: relative;
+  z-index: 1;
+  width: min(560px, 94vw);
+  display: grid;
+  gap: 10px;
+  padding: 14px;
+  border: 1px solid color-mix(in srgb, var(--accent) 48%, var(--line) 52%);
+  border-radius: 10px;
+  background:
+    linear-gradient(180deg, rgba(255,255,255,0.08), transparent 56%),
+    color-mix(in srgb, var(--panel-bg) 88%, #071421 12%);
+  box-shadow: 0 28px 90px rgba(0,0,0,0.58), inset 0 1px 0 rgba(255,255,255,0.08);
+}
+
+body.dashboard-page .global-player-search-panel label {
+  color: var(--muted);
+  font: 950 0.68rem var(--font-ui);
+  letter-spacing: 0.08em;
+}
+
+body.dashboard-page .global-player-search-panel input {
+  width: 100%;
+  height: 42px;
+  padding: 0 40px 0 12px;
+  border-radius: 8px;
+  font: 850 1rem var(--font-ui);
+}
+
+body.dashboard-page .global-player-search-close {
+  position: absolute;
+  right: 18px;
+  top: 39px;
+  width: 28px;
+  height: 28px;
+  border: 1px solid color-mix(in srgb, var(--line) 76%, transparent);
+  border-radius: 999px;
+  background: rgba(255,255,255,0.045);
+  color: var(--text);
+  font: 950 0.78rem var(--font-ui);
+  cursor: pointer;
+}
+
+body.dashboard-page .global-player-search-results {
+  display: grid;
+  gap: 6px;
+  max-height: min(56vh, 480px);
+  overflow: auto;
+}
+
+body.dashboard-page .global-player-search-result {
+  display: grid;
+  grid-template-columns: 46px minmax(0, 1fr) auto;
+  align-items: center;
+  gap: 10px;
+  min-height: 54px;
+  padding: 5px 9px 5px 5px;
+  border: 1px solid color-mix(in srgb, var(--result-team-color, var(--accent)) 42%, var(--line) 58%);
+  border-radius: 8px;
+  background:
+    linear-gradient(90deg, color-mix(in srgb, var(--result-team-color, var(--accent)) 16%, transparent), transparent 76%),
+    rgba(255,255,255,0.04);
+  color: var(--text);
+  text-align: left;
+  cursor: pointer;
+}
+
+body.dashboard-page .global-player-search-result:hover,
+body.dashboard-page .global-player-search-result:focus-visible {
+  border-color: var(--result-team-color, var(--accent));
+  box-shadow: 0 0 18px color-mix(in srgb, var(--result-team-color, var(--accent)) 24%, transparent);
+}
+
+body.dashboard-page .global-player-search-result img {
+  width: 42px;
+  height: 42px;
+  border-radius: 7px;
+  object-fit: cover;
+  background: rgba(255,255,255,0.08);
+}
+
+body.dashboard-page .global-player-search-result strong {
+  min-width: 0;
+  overflow: hidden;
+  font: 950 0.9rem var(--font-ui);
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+body.dashboard-page .global-player-search-result span {
+  color: var(--muted);
+  font: 950 0.72rem var(--font-ui);
+  letter-spacing: 0.06em;
+}
+
+body.dashboard-page .global-player-search-empty {
+  min-height: 52px;
+  display: grid;
+  place-items: center;
+  border: 1px dashed color-mix(in srgb, var(--line) 72%, transparent);
+  border-radius: 8px;
+  color: var(--muted);
+  font: 900 0.72rem var(--font-ui);
+  letter-spacing: 0.04em;
+  text-transform: uppercase;
+}
+
+body.dashboard-page .live-lab-away-side {
+  grid-area: away;
+}
+
+body.dashboard-page .live-lab-center {
+  grid-area: center;
+}
+
+body.dashboard-page .live-lab-home-side {
+  grid-area: home;
+}
+
+body.dashboard-page .lineup-live-lab-grid[hidden] {
+  display: none;
+}
+
+body.dashboard-page .live-lab-lineup,
+body.dashboard-page .live-lab-center,
+body.dashboard-page .live-lab-field-shell,
+body.dashboard-page .live-lab-play,
+body.dashboard-page .live-lab-zone-card,
+body.dashboard-page .live-lab-metrics {
+  border: 1px solid color-mix(in srgb, var(--line) 86%, transparent);
+  border-radius: 8px;
+  background:
+    linear-gradient(180deg, rgba(255,255,255,0.06), transparent 56%),
+    color-mix(in srgb, var(--panel-bg) 82%, transparent);
+  box-shadow:
+    inset 0 1px 0 rgba(255,255,255,0.07),
+    0 10px 24px rgba(0,0,0,0.18);
+}
+
+body.dashboard-page .live-lab-lineup {
+  position: relative;
+  isolation: isolate;
+  min-width: 0;
+  min-height: 0;
+  overflow: hidden;
+  padding: 6px 8px;
+  box-shadow:
+    inset 3px 0 0 color-mix(in srgb, var(--live-team-color, var(--accent)) 82%, transparent),
+    inset 0 1px 0 rgba(255,255,255,0.07);
+}
+
+body.dashboard-page .live-lab-lineup::before {
+  content: "";
+  position: absolute;
+  inset: 42px 8px 8px;
+  z-index: 0;
+  background-image: var(--team-logo-bg);
+  background-repeat: no-repeat;
+  background-position: center;
+  background-size: min(82%, 150px) auto;
+  opacity: 0.2;
+  pointer-events: none;
+}
+
+body.dashboard-page .live-lab-lineup > * {
+  position: relative;
+  z-index: 1;
+}
+
+body.dashboard-page .live-lab-lineup header {
+  display: flex;
+  align-items: baseline;
+  justify-content: space-between;
+  gap: 8px;
+  color: var(--muted);
+  font: 900 0.68rem var(--font-ui);
+  letter-spacing: 0.07em;
+  text-transform: uppercase;
+  padding: 0 0 5px 4px;
+  border-bottom: 1px solid color-mix(in srgb, var(--line) 56%, transparent);
+}
+
+body.dashboard-page .live-lab-lineup-list {
+  display: grid;
+  gap: 1px;
+  margin: 5px 0 0;
+  padding: 0;
+  list-style: none;
+}
+
+body.dashboard-page .live-lab-lineup-list li {
+  display: grid;
+  grid-template-columns: 18px minmax(0, 1fr) minmax(42px, auto);
+  gap: 5px;
+  align-items: center;
+  min-height: 27px;
+  padding: 0 4px 0 2px;
+  border-bottom: 1px dashed color-mix(in srgb, var(--line) 68%, transparent);
+  border-radius: 4px;
+  color: var(--muted);
+  background: linear-gradient(90deg, rgba(255,255,255,0.025), transparent 70%);
+}
+
+body.dashboard-page .live-lab-lineup-list li.is-current {
+  color: var(--text);
+  background:
+    linear-gradient(90deg, color-mix(in srgb, var(--live-team-color, var(--accent)) 42%, transparent), rgba(255,255,255,0.06) 70%, transparent);
+  box-shadow:
+    inset 3px 0 0 var(--live-team-color, var(--accent)),
+    0 0 14px color-mix(in srgb, var(--live-team-color, var(--accent)) 24%, transparent);
+}
+
+body.dashboard-page .live-lab-lineup-list li.is-current strong {
+  color: color-mix(in srgb, var(--live-team-color, var(--accent)) 32%, var(--text) 68%);
+  text-shadow: 0 0 10px color-mix(in srgb, var(--live-team-color, var(--accent)) 38%, transparent);
+}
+
+body.dashboard-page .live-lab-lineup-list li.is-selected {
+  color: var(--text);
+  background:
+    linear-gradient(90deg, rgba(255,209,102,0.24), rgba(255,209,102,0.06) 68%, transparent);
+}
+
+body.dashboard-page .live-lab-lineup-list strong {
+  min-width: 0;
+  overflow: hidden;
+  font-size: 0.78rem;
+  font-weight: 950;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+body.dashboard-page .live-lab-lineup-list em {
+  min-width: 0;
+  max-width: 64px;
+  overflow: hidden;
+  color: var(--muted);
+  font: 900 0.53rem var(--font-ui);
+  font-style: normal;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+body.dashboard-page .live-lab-center {
+  min-width: 0;
+  min-height: 0;
+  display: grid;
+  grid-template-rows: 32px minmax(270px, 1fr) 78px minmax(108px, 126px);
+  gap: 6px;
+  padding: 0;
+  border: 0;
+  background: transparent;
+}
+
+body.dashboard-page .live-lab-score-strip {
+  display: grid;
+  grid-template-columns: 1fr auto 1fr;
+  align-items: center;
+  gap: 8px;
+  min-height: 32px;
+  border: 1px solid var(--line);
+  border-radius: 8px;
+  background:
+    linear-gradient(180deg, color-mix(in srgb, var(--panel-head) 70%, rgba(255,255,255,0.04)), color-mix(in srgb, var(--panel-bg) 88%, transparent));
+  box-shadow: inset 0 1px 0 rgba(255,255,255,0.06);
+  text-align: center;
+}
+
+body.dashboard-page .live-lab-score {
+  color: var(--text);
+  font: 950 1.12rem var(--font-ui);
+}
+
+body.dashboard-page .live-lab-score-strip strong {
+  color: var(--muted);
+  font: 900 0.72rem var(--font-ui);
+  letter-spacing: 0.07em;
+  text-transform: uppercase;
+}
+
+body.dashboard-page .live-lab-field-shell {
+  position: relative;
+  isolation: isolate;
+  min-height: 270px;
+  display: grid;
+  place-items: center;
+  overflow: hidden;
+  background:
+    linear-gradient(180deg, color-mix(in srgb, var(--panel-head) 22%, transparent), transparent 42%),
+    color-mix(in srgb, var(--panel-bg) 86%, transparent);
+  perspective: 920px;
+}
+
+body.dashboard-page .live-lab-field-shell::before {
+  content: "";
+  position: absolute;
+  inset: 7px;
+  z-index: 0;
+  border-radius: 7px;
+  background:
+    linear-gradient(90deg, rgba(255,255,255,0.055), transparent 18%, transparent 82%, rgba(255,255,255,0.055)),
+    repeating-linear-gradient(90deg, transparent 0 74px, rgba(255,255,255,0.028) 74px 75px),
+    radial-gradient(ellipse at 50% 104%, rgba(123,208,255,0.12), transparent 45%);
+  opacity: 0.82;
+  pointer-events: none;
+}
+
+body.dashboard-page .live-lab-replay-btn {
+  position: absolute;
+  right: 10px;
+  bottom: 10px;
+  z-index: 7;
+  min-height: 28px;
+  padding: 0 11px;
+  border: 1px solid color-mix(in srgb, #ffd166 72%, var(--line) 28%);
+  border-radius: 7px;
+  background:
+    linear-gradient(180deg, rgba(255,255,255,0.12), transparent 60%),
+    color-mix(in srgb, var(--panel-head) 70%, black 30%);
+  color: var(--text);
+  font: 950 0.63rem var(--font-ui);
+  letter-spacing: 0.05em;
+  text-transform: uppercase;
+  box-shadow: 0 8px 20px rgba(0,0,0,0.34), 0 0 16px rgba(255,209,102,0.14);
+  cursor: pointer;
+}
+
+body.dashboard-page .live-lab-replay-pause-btn {
+  position: absolute;
+  right: 10px;
+  bottom: 46px;
+  z-index: 7;
+  min-height: 27px;
+  min-width: 72px;
+  padding: 0 10px;
+  border: 1px solid color-mix(in srgb, #7bd0ff 70%, var(--line) 30%);
+  border-radius: 7px;
+  background:
+    linear-gradient(180deg, rgba(255,255,255,0.12), transparent 60%),
+    color-mix(in srgb, var(--panel-head) 74%, black 26%);
+  color: var(--text);
+  font: 950 0.62rem var(--font-ui);
+  letter-spacing: 0.05em;
+  text-transform: uppercase;
+  box-shadow: 0 8px 20px rgba(0,0,0,0.3), 0 0 15px rgba(123,208,255,0.16);
+  cursor: pointer;
+}
+
+body.dashboard-page .live-lab-replay-speed-controls {
+  position: absolute;
+  right: 10px;
+  bottom: 82px;
+  z-index: 7;
+  display: grid;
+  grid-template-columns: repeat(4, 34px);
+  gap: 4px;
+  padding: 4px;
+  border: 1px solid color-mix(in srgb, var(--line) 78%, transparent);
+  border-radius: 8px;
+  background:
+    linear-gradient(180deg, rgba(255,255,255,0.1), transparent 58%),
+    color-mix(in srgb, var(--panel-head) 68%, black 32%);
+  box-shadow: 0 8px 18px rgba(0,0,0,0.32);
+}
+
+body.dashboard-page .live-lab-replay-speed-controls[hidden] {
+  display: none;
+}
+
+body.dashboard-page .live-lab-replay-speed-controls button {
+  height: 24px;
+  min-width: 0;
+  padding: 0;
+  border: 1px solid color-mix(in srgb, #7bd0ff 42%, var(--line) 58%);
+  border-radius: 6px;
+  background: rgba(255,255,255,0.045);
+  color: var(--muted);
+  font: 950 0.56rem var(--font-ui);
+  letter-spacing: 0.02em;
+  cursor: pointer;
+}
+
+body.dashboard-page .live-lab-replay-speed-controls button:hover,
+body.dashboard-page .live-lab-replay-speed-controls button:focus-visible,
+body.dashboard-page .live-lab-replay-speed-controls button.is-active,
+body.dashboard-page .live-lab-replay-speed-controls button[aria-pressed='true'] {
+  border-color: #7bd0ff;
+  background: color-mix(in srgb, #7bd0ff 28%, rgba(255,255,255,0.06) 72%);
+  color: var(--text);
+  box-shadow: 0 0 12px rgba(123,208,255,0.3);
+}
+
+body.dashboard-page .live-lab-replay-pause-btn[hidden] {
+  display: none;
+}
+
+body.dashboard-page .live-lab-replay-pause-btn:hover,
+body.dashboard-page .live-lab-replay-pause-btn:focus-visible,
+body.dashboard-page .live-lab-replay-pause-btn[aria-pressed='true'] {
+  border-color: #7bd0ff;
+  background:
+    linear-gradient(180deg, rgba(255,255,255,0.17), transparent 60%),
+    color-mix(in srgb, #124a61 52%, var(--panel-head) 48%);
+  box-shadow: 0 8px 20px rgba(0,0,0,0.32), 0 0 22px rgba(123,208,255,0.34);
+}
+
+body.dashboard-page .live-lab-replay-btn:hover,
+body.dashboard-page .live-lab-replay-btn:focus-visible,
+body.dashboard-page .live-lab-replay-btn[aria-pressed='true'] {
+  border-color: #ffd166;
+  background:
+    linear-gradient(180deg, rgba(255,255,255,0.16), transparent 60%),
+    color-mix(in srgb, #6a4e12 54%, var(--panel-head) 46%);
+  box-shadow: 0 8px 20px rgba(0,0,0,0.34), 0 0 22px rgba(255,209,102,0.34);
+}
+
+body.dashboard-page .live-lab-replay-overlay {
+  position: absolute;
+  inset: 7px;
+  z-index: 6;
+  display: grid;
+  place-items: center;
+  align-content: center;
+  gap: 4px;
+  border-radius: 7px;
+  background:
+    radial-gradient(circle at 50% 44%, rgba(255,255,255,0.2), transparent 16%),
+    radial-gradient(circle at 50% 48%, rgba(255,209,102,0.18), transparent 34%),
+    rgba(0,0,0,0.2);
+  text-align: center;
+  pointer-events: none;
+  text-shadow: 0 0 18px rgba(255,255,255,0.45), 0 2px 3px rgba(0,0,0,0.7);
+}
+
+body.dashboard-page .live-lab-replay-overlay[hidden] {
+  display: none;
+}
+
+body.dashboard-page .live-lab-replay-overlay strong {
+  color: #fff4c7;
+  font: 950 clamp(2rem, 6vw, 4.8rem) var(--font-ui);
+  letter-spacing: 0.06em;
+  text-transform: uppercase;
+}
+
+body.dashboard-page .live-lab-replay-overlay span {
+  color: var(--text);
+  font: 950 clamp(0.82rem, 1.7vw, 1.28rem) var(--font-ui);
+}
+
+body.dashboard-page .live-lab-replay-overlay em {
+  color: #ffd166;
+  font: 950 clamp(0.78rem, 1.5vw, 1.12rem) var(--font-ui);
+  font-style: normal;
+  letter-spacing: 0.08em;
+  text-transform: uppercase;
+}
+
+body.dashboard-page .live-lab-replay-overlay.is-hr {
+  background:
+    radial-gradient(circle at 50% 42%, rgba(255,244,190,0.34), transparent 18%),
+    radial-gradient(circle at 50% 50%, rgba(255,209,102,0.26), transparent 42%),
+    rgba(0,0,0,0.18);
+}
+
+body.dashboard-page .live-lab-replay-overlay.is-hr strong {
+  color: #ffe58f;
+  font-size: clamp(2.8rem, 7.8vw, 6.3rem);
+}
+
+body.dashboard-page .live-lab-field {
+  position: relative;
+  z-index: 1;
+  width: 100%;
+  height: 100%;
+  min-height: 270px;
+  transform: rotateX(23deg) translateY(0);
+  transform-origin: 50% 82%;
+  transform-style: preserve-3d;
+  border-radius: 46% 46% 8% 8%;
+  background: transparent;
+  box-shadow:
+    0 34px 44px rgba(0,0,0,0.36),
+    inset 0 0 0 1px rgba(255,255,255,0.04);
+}
+
+body.dashboard-page .lineup-live-lab-grid.is-replaying #liveLabTraceLayer {
+  opacity: 0.14;
+}
+
+body.dashboard-page .lineup-live-lab-grid.is-replay-paused .live-lab-field-shell *,
+body.dashboard-page .lineup-live-lab-grid.is-replay-paused .live-lab-score-strip,
+body.dashboard-page .lineup-live-lab-grid.is-replay-paused .live-lab-pitch-marker {
+  animation-play-state: paused !important;
+}
+
+body.dashboard-page .live-lab-field::before {
+  display: none;
+  content: "";
+  position: absolute;
+  left: 8%;
+  top: 2.5%;
+  z-index: 2;
+  width: 84%;
+  height: 14%;
+  border-top: 5px solid #263f39;
+  border-radius: 52% 52% 0 0;
+  background:
+    repeating-linear-gradient(90deg, rgba(255,255,255,0.14) 0 1px, transparent 1px 38px);
+  opacity: 0.86;
+  box-shadow: 0 -1px 0 rgba(255,255,255,0.18), 0 5px 12px rgba(0,0,0,0.22);
+  pointer-events: none;
+}
+
+body.dashboard-page .live-lab-field::after {
+  display: none;
+  content: "";
+  position: absolute;
+  left: 12%;
+  top: 4.5%;
+  z-index: 2;
+  width: 76%;
+  height: 8%;
+  border-top: 1px solid rgba(255,255,255,0.24);
+  border-radius: 52% 52% 0 0;
+  pointer-events: none;
+}
+
+body.dashboard-page .live-lab-field-svg {
+  position: absolute;
+  inset: 0;
+  width: 100%;
+  height: 100%;
+  overflow: visible;
+  font-family: var(--font-ui);
+}
+
+body.dashboard-page .live-lab-svg-outfield {
+  fill: #173f2a;
+  filter: drop-shadow(0 18px 18px rgba(0,0,0,0.26));
+}
+
+body.dashboard-page .live-lab-svg-outfield-mow {
+  fill: url(#liveLabMowPattern);
+  opacity: 1;
+}
+
+body.dashboard-page .live-lab-svg-outfield + * {
+  pointer-events: none;
+}
+
+body.dashboard-page .live-lab-svg-warning-track {
+  fill: rgba(151, 111, 67, 0.52);
+}
+
+body.dashboard-page .live-lab-svg-wall-face {
+  stroke: rgba(255,255,255,0.08);
+  stroke-width: 0.8;
+  vector-effect: non-scaling-stroke;
+  filter: drop-shadow(0 -1px 2px rgba(0,0,0,0.22));
+}
+
+body.dashboard-page .live-lab-svg-wall-top {
+  stroke: rgba(210, 229, 219, 0.52);
+  stroke-width: 1.2;
+  vector-effect: non-scaling-stroke;
+}
+
+body.dashboard-page .live-lab-svg-wall-segment {
+  stroke-linecap: round;
+  filter: drop-shadow(0 2px 3px rgba(0,0,0,0.34));
+}
+
+body.dashboard-page .live-lab-svg-foul {
+  stroke: rgba(235, 241, 238, 0.78);
+  stroke-width: 2.2;
+  vector-effect: non-scaling-stroke;
+}
+
+body.dashboard-page .live-lab-svg-infield-grass {
+  fill: url(#liveLabInfieldGrassGradient);
+}
+
+body.dashboard-page .live-lab-svg-basepath {
+  fill: none;
+  stroke: rgba(160, 96, 48, 0.96);
+  stroke-width: 15;
+  stroke-linejoin: round;
+  stroke-linecap: round;
+}
+
+body.dashboard-page .live-lab-svg-mound-dirt,
+body.dashboard-page .live-lab-svg-home-dirt {
+  fill: rgba(160, 96, 48, 0.92);
+}
+
+body.dashboard-page .live-lab-svg-rubber,
+body.dashboard-page .live-lab-svg-base {
+  fill: #fff1db;
+  stroke: rgba(0,0,0,0.35);
+  stroke-width: 1.2;
+}
+
+body.dashboard-page .live-lab-svg-base-group.is-on .live-lab-svg-base {
+  fill: #ffd166;
+  filter: drop-shadow(0 0 7px rgba(255,209,102,0.9));
+}
+
+body.dashboard-page .live-lab-svg-base-group.is-replay .live-lab-svg-base-halo {
+  fill: var(--runner-color, #ffd166);
+  opacity: 0.22;
+  stroke: var(--runner-color, #ffd166);
+  stroke-width: 2.4;
+  transform-box: fill-box;
+  transform-origin: center;
+  filter: drop-shadow(0 0 9px var(--runner-color, #ffd166));
+  animation: liveLabBasePulse 1.35s ease-in-out infinite;
+}
+
+body.dashboard-page .live-lab-svg-base-group.is-replay .live-lab-svg-base {
+  fill: var(--runner-color, #ffd166);
+  stroke: rgba(0,0,0,0.5);
+  stroke-width: 1.5;
+  filter: drop-shadow(0 0 8px var(--runner-color, #ffd166));
+}
+
+body.dashboard-page .live-lab-svg-base-code,
+body.dashboard-page .live-lab-svg-base-name {
+  fill: #edf6ff;
+  stroke: rgba(0,0,0,0.62);
+  stroke-width: 3;
+  paint-order: stroke;
+  pointer-events: none;
+}
+
+body.dashboard-page .live-lab-svg-base-code {
+  font: 950 13px var(--font-ui);
+  letter-spacing: 0.06em;
+}
+
+body.dashboard-page .live-lab-svg-base-name {
+  font: 950 16px var(--font-ui);
+}
+
+#liveLabTraceLayer {
+  pointer-events: all;
+}
+
+body.dashboard-page .live-lab-svg-contact path {
+  fill: none;
+  stroke: rgba(255, 220, 120, 0.78);
+  stroke-width: 2.4;
+  stroke-linecap: round;
+  stroke-dasharray: 5 4;
+  filter: drop-shadow(0 0 5px rgba(255,220,120,0.65));
+}
+
+body.dashboard-page .live-lab-svg-contact circle,
+body.dashboard-page .live-lab-svg-plate-result circle {
+  fill: rgba(235, 244, 255, 0.92);
+  stroke: rgba(0,0,0,0.38);
+  stroke-width: 1.2;
+}
+
+body.dashboard-page .live-lab-svg-contact text,
+body.dashboard-page .live-lab-svg-plate-result text {
+  fill: #06111b;
+  font: 950 11px var(--font-ui);
+  text-anchor: middle;
+  pointer-events: none;
+}
+
+body.dashboard-page .live-lab-svg-contact .live-lab-svg-distance-label {
+  fill: #ffe08a;
+  stroke: rgba(0,0,0,0.48);
+  stroke-width: 3.8;
+  paint-order: stroke;
+  font: 950 23px var(--font-ui);
+  letter-spacing: 0.04em;
+}
+
+body.dashboard-page .live-lab-svg-contact,
+body.dashboard-page .live-lab-svg-plate-result {
+  cursor: pointer;
+}
+
+body.dashboard-page .live-lab-svg-contact.is-current path {
+  stroke: #7bd0ff;
+}
+
+body.dashboard-page .live-lab-svg-contact.is-selected path {
+  stroke: #ffd166;
+  stroke-width: 3.2;
+  filter: drop-shadow(0 0 8px rgba(255,209,102,0.88));
+}
+
+body.dashboard-page .live-lab-svg-contact.is-selected circle,
+body.dashboard-page .live-lab-svg-plate-result.is-selected circle {
+  fill: #ffd166;
+}
+
+#liveLabReplayTraceLayer,
+#liveLabReplayRunnerLayer {
+  pointer-events: none;
+}
+
+body.dashboard-page .live-lab-replay-contact path {
+  fill: none;
+  stroke: #ffe68f;
+  stroke-width: 4.2;
+  stroke-linecap: round;
+  stroke-dasharray: 100;
+  stroke-dashoffset: 100;
+  filter: drop-shadow(0 0 8px rgba(255,230,143,0.9));
+  animation: liveLabReplayTraceDraw var(--replay-trace-duration, 1.5s) linear both;
+}
+
+body.dashboard-page .live-lab-replay-contact.is-hr path {
+  stroke: #ffd166;
+  stroke-width: 5.2;
+  filter: drop-shadow(0 0 11px rgba(255,209,102,0.96));
+}
+
+body.dashboard-page .live-lab-replay-contact circle,
+body.dashboard-page .live-lab-replay-plate-result circle {
+  fill: #fff7d8;
+  stroke: rgba(0,0,0,0.42);
+  stroke-width: 1.4;
+  filter: drop-shadow(0 0 8px rgba(255,235,170,0.9));
+}
+
+body.dashboard-page .live-lab-replay-contact .live-lab-replay-ball {
+  fill: #fffdf1;
+  stroke: rgba(0,0,0,0.5);
+  stroke-width: 1.1;
+  filter: drop-shadow(0 0 9px rgba(255,255,225,0.95));
+}
+
+body.dashboard-page .live-lab-replay-contact .live-lab-replay-landing {
+  opacity: 0;
+  transform-box: fill-box;
+  transform-origin: center;
+  animation: liveLabReplayLandingPop 0.22s ease-out var(--replay-trace-duration, 1.5s) forwards;
+}
+
+body.dashboard-page .live-lab-replay-plate-result text {
+  fill: #06111b;
+  font: 950 10px var(--font-ui);
+  text-anchor: middle;
+}
+
+body.dashboard-page .live-lab-replay-distance-label {
+  fill: #ffe58f;
+  stroke: rgba(0,0,0,0.58);
+  stroke-width: 4.2;
+  paint-order: stroke;
+  font: 950 25px var(--font-ui);
+  text-anchor: middle;
+}
+
+body.dashboard-page .live-lab-replay-runner-path {
+  fill: none;
+  stroke: var(--runner-color, #7bd0ff);
+  stroke-width: 3;
+  stroke-linecap: round;
+  stroke-dasharray: 4 4;
+  opacity: 0.72;
+  filter: drop-shadow(0 0 6px var(--runner-color, #7bd0ff));
+}
+
+body.dashboard-page .live-lab-replay-runner {
+  fill: var(--runner-color, #7bd0ff);
+  stroke: #06111b;
+  stroke-width: 1.4;
+  filter: drop-shadow(0 0 7px var(--runner-color, #7bd0ff));
+}
+
+body.dashboard-page .live-lab-replay-runner-move.is-out .live-lab-replay-runner,
+body.dashboard-page .live-lab-replay-runner-move.is-out .live-lab-replay-runner-path {
+  fill: #ff5f73;
+  stroke: rgba(255,95,115,0.8);
+}
+
+body.dashboard-page .live-lab-replay-runner-label {
+  fill: #dbeaff;
+  stroke: rgba(0,0,0,0.5);
+  stroke-width: 2;
+  paint-order: stroke;
+  font: 950 13px var(--font-ui);
+  text-anchor: middle;
+}
+
+body.dashboard-page .live-lab-field-shell.is-replay-run-burst {
+  animation: liveLabRunFieldBurst 1.15s ease-out both;
+}
+
+body.dashboard-page .live-lab-field-shell.is-replay-hr-burst {
+  animation: liveLabHrFieldBurst 2.1s ease-out both;
+}
+
+body.dashboard-page .live-lab-field-shell.is-replay-run-burst::after,
+body.dashboard-page .live-lab-field-shell.is-replay-hr-burst::after {
+  content: "";
+  position: absolute;
+  inset: 8px;
+  z-index: 5;
+  border-radius: 8px;
+  pointer-events: none;
+}
+
+body.dashboard-page .live-lab-field-shell.is-replay-run-burst::after {
+  background:
+    radial-gradient(circle at 50% 82%, rgba(255,209,102,0.38), transparent 22%),
+    linear-gradient(90deg, transparent, rgba(255,209,102,0.2), transparent);
+  animation: liveLabRunSweep 1.05s ease-out both;
+}
+
+body.dashboard-page .live-lab-field-shell.is-replay-hr-burst::after {
+  background:
+    radial-gradient(circle at 50% 78%, rgba(255,246,188,0.45), transparent 18%),
+    radial-gradient(circle at 34% 28%, rgba(255,209,102,0.4), transparent 12%),
+    radial-gradient(circle at 66% 30%, rgba(123,208,255,0.28), transparent 13%),
+    radial-gradient(ellipse at 50% 55%, rgba(255,209,102,0.28), transparent 48%);
+  animation: liveLabHrBlast 2s ease-out both;
+}
+
+body.dashboard-page .live-lab-score-strip.is-replay-run-burst,
+body.dashboard-page .live-lab-score-strip.is-replay-hr-burst {
+  animation: liveLabScorePop 0.95s ease-out both;
+}
+
+body.dashboard-page .live-lab-score-strip.is-replay-hr-burst {
+  animation-duration: 1.65s;
+  box-shadow:
+    inset 0 0 0 1px rgba(255,229,143,0.62),
+    0 0 28px rgba(255,209,102,0.34);
+}
+
+@keyframes liveLabReplayTraceDraw {
+  from {
+    opacity: 0.2;
+    stroke-dashoffset: 100;
+  }
+  18% {
+    opacity: 1;
+  }
+  to {
+    opacity: 1;
+    stroke-dashoffset: 0;
+  }
+}
+
+@keyframes liveLabBasePulse {
+  0%, 100% {
+    opacity: 0.18;
+    transform: scale(0.92);
+  }
+  50% {
+    opacity: 0.34;
+    transform: scale(1.08);
+  }
+}
+
+@keyframes liveLabRunFieldBurst {
+  0% {
+    box-shadow: inset 0 0 0 1px rgba(255,209,102,0.22), 0 0 0 rgba(255,209,102,0);
+  }
+  34% {
+    box-shadow: inset 0 0 0 2px rgba(255,209,102,0.75), 0 0 34px rgba(255,209,102,0.28);
+  }
+  100% {
+    box-shadow: inset 0 0 0 1px rgba(255,209,102,0.12), 0 0 0 rgba(255,209,102,0);
+  }
+}
+
+@keyframes liveLabHrFieldBurst {
+  0% {
+    box-shadow: inset 0 0 0 1px rgba(255,209,102,0.25), 0 0 0 rgba(255,209,102,0);
+  }
+  26% {
+    box-shadow: inset 0 0 0 3px rgba(255,229,143,0.92), 0 0 48px rgba(255,209,102,0.5);
+  }
+  64% {
+    box-shadow: inset 0 0 0 2px rgba(123,208,255,0.44), 0 0 36px rgba(123,208,255,0.24);
+  }
+  100% {
+    box-shadow: inset 0 0 0 1px rgba(255,209,102,0.08), 0 0 0 rgba(255,209,102,0);
+  }
+}
+
+@keyframes liveLabRunSweep {
+  from {
+    opacity: 0;
+    transform: translateY(16px) scale(0.96);
+  }
+  32% {
+    opacity: 1;
+  }
+  to {
+    opacity: 0;
+    transform: translateY(-10px) scale(1.04);
+  }
+}
+
+@keyframes liveLabHrBlast {
+  from {
+    opacity: 0;
+    transform: scale(0.86);
+  }
+  18% {
+    opacity: 1;
+  }
+  to {
+    opacity: 0;
+    transform: scale(1.16);
+  }
+}
+
+@keyframes liveLabScorePop {
+  0% {
+    transform: scale(1);
+    filter: brightness(1);
+  }
+  34% {
+    transform: scale(1.018);
+    filter: brightness(1.35);
+  }
+  100% {
+    transform: scale(1);
+    filter: brightness(1);
+  }
+}
+
+@keyframes liveLabReplayLandingPop {
+  from {
+    opacity: 0;
+    transform: scale(0.72);
+  }
+  to {
+    opacity: 1;
+    transform: scale(1);
+  }
+}
+
+body.dashboard-page .live-lab-outfield {
+  position: absolute;
+  inset: 1% 6% 36%;
+  border-top: 1px solid rgba(255,255,255,0.18);
+  border-radius: 50% 50% 18% 18%;
+  background:
+    radial-gradient(ellipse at 50% 102%, rgba(22, 65, 37, 0.68), transparent 48%),
+    repeating-linear-gradient(104deg, rgba(255,255,255,0.04) 0 22px, transparent 22px 48px),
+    radial-gradient(ellipse at 50% 0%, rgba(255,255,255,0.08), transparent 52%);
+}
+
+body.dashboard-page .live-lab-foul-line {
+  position: absolute;
+  left: 50%;
+  bottom: 9%;
+  z-index: 5;
+  width: 2px;
+  height: 88%;
+  background: rgba(255,255,255,0.72);
+  transform-origin: bottom;
+}
+
+body.dashboard-page .live-lab-foul-left {
+  transform: rotate(-50deg);
+}
+
+body.dashboard-page .live-lab-foul-right {
+  transform: rotate(50deg);
+}
+
+body.dashboard-page .live-lab-infield {
+  position: absolute;
+  left: 50%;
+  bottom: 6.5%;
+  z-index: 3;
+  width: 27%;
+  aspect-ratio: 1;
+  background: transparent;
+  transform: translateX(-50%) rotate(45deg);
+  box-shadow: none;
+  pointer-events: none;
+}
+
+body.dashboard-page .live-lab-infield::before {
+  content: "";
+  position: absolute;
+  inset: 8%;
+  border: clamp(5px, 0.62vw, 9px) solid rgba(160, 96, 48, 0.92);
+  border-radius: 5px;
+  background: transparent;
+  box-shadow: inset 0 0 0 1px rgba(255,255,255,0.12), 0 0 0 1px rgba(0,0,0,0.14);
+}
+
+body.dashboard-page .live-lab-mound {
+  position: absolute;
+  left: 50%;
+  bottom: 28%;
+  z-index: 4;
+  width: 6.5%;
+  aspect-ratio: 1;
+  border-radius: 50%;
+  background: #a66d3c;
+  transform: translateX(-50%);
+  box-shadow: inset 0 0 0 2px rgba(255,255,255,0.14);
+}
+
+body.dashboard-page .live-lab-base {
+  position: absolute;
+  z-index: 6;
+  width: 13px;
+  height: 13px;
+  background: #fff1db;
+  transform: rotate(45deg);
+  box-shadow: 0 0 0 1px rgba(0,0,0,0.32), 0 0 12px rgba(255,255,255,0.34);
+}
+
+body.dashboard-page .live-lab-base::before {
+  content: "";
+  position: absolute;
+  inset: -12px;
+  z-index: -1;
+  border-radius: 50%;
+  background: radial-gradient(circle, rgba(158,99,52,0.82) 0 42%, transparent 54%);
+  transform: rotate(-45deg);
+}
+
+body.dashboard-page .live-lab-home::before {
+  inset: -17px -23px -12px;
+  border-radius: 46% 46% 42% 42%;
+}
+
+body.dashboard-page .live-lab-home {
+  left: calc(50% - 6px);
+  bottom: 9%;
+}
+
+body.dashboard-page .live-lab-first {
+  right: 34%;
+  bottom: 24%;
+}
+
+body.dashboard-page .live-lab-second {
+  left: calc(50% - 6px);
+  bottom: 39%;
+}
+
+body.dashboard-page .live-lab-third {
+  left: 34%;
+  bottom: 24%;
+}
+
+body.dashboard-page .live-lab-base.is-on {
+  background: #ffd166;
+  box-shadow: 0 0 0 2px rgba(0,0,0,0.28), 0 0 22px #ffd166;
+}
+
+body.dashboard-page .live-lab-ball,
+body.dashboard-page .live-lab-flight {
+  position: absolute;
+  left: 50%;
+  bottom: 9%;
+  z-index: 9;
+  opacity: 0;
+}
+
+body.dashboard-page .live-lab-ball {
+  width: 12px;
+  height: 12px;
+  border-radius: 50%;
+  background: #fff7d8;
+  box-shadow: 0 0 0 2px rgba(0,0,0,0.24), 0 0 20px rgba(255, 235, 170, 0.92);
+}
+
+body.dashboard-page .live-lab-flight {
+  width: var(--hit-length, 44%);
+  height: var(--hit-apex, 24%);
+  background: transparent;
+  border-top: 2px solid rgba(255,242,169,0.86);
+  border-radius: 50% 50% 0 0;
+  filter: drop-shadow(0 0 8px rgba(255,242,169,0.85));
+  transform-origin: left bottom;
+}
+
+body.dashboard-page .live-lab-field.has-hit .live-lab-ball {
+  opacity: 1;
+  animation: liveLabHitBall var(--hit-duration, 1.6s) cubic-bezier(.2,.66,.18,1) 1 forwards;
+}
+
+body.dashboard-page .live-lab-field.has-hit .live-lab-flight {
+  opacity: 0.72;
+  transform: rotate(var(--hit-rotate, -18deg));
+  animation: liveLabHitFlight var(--hit-duration, 1.6s) ease-out 1 forwards;
+}
+
+body.dashboard-page .live-lab-play {
+  display: grid;
+  grid-template-columns: minmax(210px, 0.38fr) minmax(0, 1fr);
+  gap: 6px;
+  align-items: center;
+  min-height: 0;
+  padding: 5px 8px;
+  overflow: hidden;
+  box-shadow:
+    inset 3px 0 0 color-mix(in srgb, #ffd166 66%, transparent),
+    inset 0 1px 0 rgba(255,255,255,0.07);
+}
+
+body.dashboard-page .live-lab-play > div,
+body.dashboard-page .live-lab-play p {
+  min-width: 0;
+}
+
+body.dashboard-page .live-lab-outcomes {
+  grid-column: 1 / -1;
+  display: flex;
+  gap: 4px;
+  min-width: 0;
+  overflow-x: auto;
+  padding-top: 0;
+}
+
+body.dashboard-page .live-lab-outcome-btn {
+  flex: 0 0 auto;
+  min-height: 20px;
+  max-width: 132px;
+  overflow: hidden;
+  padding: 0 6px;
+  border: 1px solid color-mix(in srgb, var(--line) 68%, transparent);
+  border-radius: 6px;
+  background:
+    linear-gradient(180deg, rgba(255,255,255,0.07), transparent 65%),
+    rgba(255,255,255,0.045);
+  color: var(--muted);
+  font: 900 0.54rem var(--font-ui);
+  text-overflow: ellipsis;
+  text-transform: uppercase;
+  white-space: nowrap;
+  cursor: pointer;
+}
+
+body.dashboard-page .live-lab-outcome-btn.is-current {
+  border-color: color-mix(in srgb, #7bd0ff 64%, transparent);
+}
+
+body.dashboard-page .live-lab-outcome-btn.is-selected {
+  color: var(--text);
+  border-color: #ffd166;
+  background:
+    linear-gradient(180deg, rgba(255,255,255,0.09), transparent 62%),
+    rgba(255,209,102,0.16);
+}
+
+body.dashboard-page .live-lab-outcome-empty {
+  color: var(--muted);
+  font: 900 0.62rem var(--font-ui);
+  letter-spacing: 0.04em;
+  text-transform: uppercase;
+}
+
+body.dashboard-page .live-lab-play h3 {
+  margin: 1px 0 0;
+  color: var(--text);
+  font-size: 0.8rem;
+  letter-spacing: 0;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+body.dashboard-page .live-lab-play p {
+  margin: 0;
+  color: var(--muted);
+  font-size: 0.74rem;
+  line-height: 1.25;
+  display: -webkit-box;
+  max-height: 2.5em;
+  overflow: hidden;
+  -webkit-box-orient: vertical;
+  -webkit-line-clamp: 2;
+}
+
+body.dashboard-page .live-lab-pitch-row {
+  min-height: 0;
+  display: grid;
+  grid-template-columns: minmax(154px, 210px) minmax(0, 1fr);
+  gap: 6px;
+}
+
+body.dashboard-page .live-lab-zone-card {
+  display: grid;
+  grid-template-columns: 64px minmax(72px, 1fr);
+  gap: 6px;
+  padding: 6px;
+  overflow: hidden;
+}
+
+body.dashboard-page .live-lab-counts {
+  display: grid;
+  grid-template-columns: 16px 1fr;
+  gap: 6px 5px;
+  align-content: center;
+  color: var(--muted);
+  font: 950 0.76rem var(--font-ui);
+}
+
+body.dashboard-page .live-lab-dots {
+  display: flex;
+  gap: 4px;
+  align-items: center;
+}
+
+body.dashboard-page .live-lab-dot {
+  width: 10px;
+  height: 10px;
+  border-radius: 50%;
+  background: rgba(255,255,255,0.12);
+}
+
+body.dashboard-page .live-lab-dot.is-on.ball {
+  background: #6ecbff;
+}
+
+body.dashboard-page .live-lab-dot.is-on.strike {
+  background: #ff5f73;
+}
+
+body.dashboard-page .live-lab-dot.is-on.out {
+  background: #ff5f73;
+}
+
+body.dashboard-page .live-lab-zone {
+  position: relative;
+  width: min(100%, 72px);
+  aspect-ratio: 17 / 25;
+  justify-self: center;
+  min-height: 0;
+  border: 1px solid color-mix(in srgb, var(--line) 78%, transparent);
+  background:
+    linear-gradient(180deg, rgba(255,255,255,0.035), transparent 58%),
+    rgba(0,0,0,0.22);
+  box-shadow: inset 0 0 18px rgba(123,208,255,0.08);
+}
+
+body.dashboard-page .live-lab-zone::before {
+  content: "";
+  position: absolute;
+  left: 18%;
+  top: 18%;
+  z-index: 1;
+  width: 64%;
+  height: 64%;
+  border: 2px solid rgba(255,255,255,0.48);
+  pointer-events: none;
+}
+
+body.dashboard-page .live-lab-pitch-dot {
+  position: absolute;
+  z-index: 2;
+  left: 50%;
+  top: 50%;
+  width: 13px;
+  height: 13px;
+  border-radius: 50%;
+  background: #fff7d8;
+  transform: translate(-50%, -50%);
+  box-shadow: 0 0 0 2px rgba(0,0,0,0.28), 0 0 18px var(--accent);
+  animation: liveLabPitchPulse 1.25s ease-out infinite;
+}
+
+body.dashboard-page .live-lab-pitch-marker {
+  position: absolute;
+  z-index: 2;
+  width: 18px;
+  height: 18px;
+  display: grid;
+  place-items: center;
+  border: 1px solid rgba(255,255,255,0.5);
+  border-radius: 50%;
+  background: rgba(231, 238, 222, 0.92);
+  color: #05111b;
+  font: 950 0.53rem var(--font-ui);
+  transform: translate(-50%, -50%);
+  box-shadow: 0 2px 8px rgba(0,0,0,0.34);
+  cursor: pointer;
+}
+
+body.dashboard-page .live-lab-pitch-marker.is-ball {
+  border-color: rgba(126, 216, 255, 0.95);
+  background: #62cfff;
+  color: #03121d;
+  box-shadow: 0 0 0 1px rgba(0,0,0,0.34), 0 0 12px rgba(98,207,255,0.58);
+}
+
+body.dashboard-page .live-lab-pitch-marker.is-strike {
+  border-color: rgba(255, 120, 135, 0.95);
+  background: #ff5f73;
+  color: #150307;
+  box-shadow: 0 0 0 1px rgba(0,0,0,0.34), 0 0 12px rgba(255,95,115,0.58);
+}
+
+body.dashboard-page .live-lab-pitch-marker.is-hbp {
+  border-color: rgba(188, 145, 255, 0.95);
+  background: #a987ff;
+  color: #0b0618;
+}
+
+body.dashboard-page .live-lab-pitch-marker.is-terminal {
+  min-width: 25px;
+  height: 20px;
+  padding: 0 5px;
+  border-radius: 999px;
+  font-size: 0.52rem;
+}
+
+body.dashboard-page .live-lab-pitch-marker.is-current {
+  z-index: 4;
+  box-shadow:
+    0 0 0 2px rgba(255,255,255,0.32),
+    0 0 15px rgba(255,255,255,0.58),
+    0 2px 8px rgba(0,0,0,0.34);
+}
+
+body.dashboard-page .live-lab-pitch-marker.is-selected {
+  border-color: #ffd166;
+  z-index: 5;
+  box-shadow:
+    0 0 0 2px rgba(255,209,102,0.52),
+    0 0 16px rgba(255,209,102,0.82),
+    0 2px 8px rgba(0,0,0,0.34);
+}
+
+body.dashboard-page .live-lab-lineup-list li {
+  cursor: pointer;
+}
+
+body.dashboard-page .live-lab-lineup-list li.is-selected {
+  outline: 1px solid color-mix(in srgb, #ffd166 68%, transparent);
+  outline-offset: -1px;
+}
+
+body.dashboard-page .live-lab-contact-trace {
+  position: absolute;
+  left: 50%;
+  bottom: 9%;
+  z-index: 8;
+  width: var(--trace-length, 42%);
+  height: var(--trace-apex, 22%);
+  padding: 0;
+  border: 0;
+  border-top: 2px solid rgba(255, 242, 169, 0.72);
+  border-radius: 50% 50% 0 0;
+  background: transparent;
+  color: transparent;
+  transform: rotate(var(--trace-rotate, -18deg));
+  transform-origin: left bottom;
+  filter: drop-shadow(0 0 7px rgba(255,242,169,0.58));
+  cursor: pointer;
+}
+
+body.dashboard-page .live-lab-contact-trace::after,
+body.dashboard-page .live-lab-plate-result::after {
+  content: attr(data-trace-label);
+  position: absolute;
+  display: grid;
+  place-items: center;
+  width: 17px;
+  height: 17px;
+  border-radius: 50%;
+  background: rgba(235, 244, 255, 0.9);
+  color: #06111b;
+  font: 950 0.54rem var(--font-ui);
+  box-shadow: 0 0 0 1px rgba(0,0,0,0.28), 0 2px 9px rgba(0,0,0,0.42);
+}
+
+body.dashboard-page .live-lab-contact-trace::after {
+  right: -8px;
+  top: -10px;
+}
+
+body.dashboard-page .live-lab-contact-trace.is-current {
+  border-top-color: #7bd0ff;
+  filter: drop-shadow(0 0 9px rgba(123,208,255,0.82));
+}
+
+body.dashboard-page .live-lab-contact-trace.is-selected {
+  z-index: 10;
+  border-top-color: #ffd166;
+  filter: drop-shadow(0 0 11px rgba(255,209,102,0.9));
+}
+
+body.dashboard-page .live-lab-plate-result {
+  position: absolute;
+  left: calc(50% + var(--plate-offset, 0px));
+  bottom: 4.5%;
+  z-index: 8;
+  width: 18px;
+  height: 18px;
+  padding: 0;
+  border: 0;
+  border-radius: 50%;
+  background: transparent;
+  color: transparent;
+  cursor: pointer;
+}
+
+body.dashboard-page .live-lab-plate-result::after {
+  left: 0;
+  top: 0;
+  background: rgba(160, 185, 205, 0.92);
+}
+
+body.dashboard-page .live-lab-plate-result.is-selected::after {
+  background: #ffd166;
+}
+
+body.dashboard-page .live-lab-metrics {
+  display: grid;
+  grid-template-columns: repeat(5, minmax(66px, 1fr));
+  gap: 5px;
+  padding: 6px;
+  overflow: hidden;
+}
+
+body.dashboard-page .live-lab-metric {
+  min-width: 0;
+  display: grid;
+  gap: 2px;
+  min-height: 34px;
+  padding: 4px 6px;
+  border: 1px solid color-mix(in srgb, var(--line) 72%, transparent);
+  border-radius: 7px;
+  background:
+    linear-gradient(180deg, rgba(255,255,255,0.055), transparent 62%),
+    rgba(0,0,0,0.16);
+}
+
+body.dashboard-page .live-lab-metric span {
+  overflow: hidden;
+  color: var(--muted);
+  font: 900 0.49rem var(--font-ui);
+  letter-spacing: 0.06em;
+  text-overflow: ellipsis;
+  text-transform: uppercase;
+  white-space: nowrap;
+}
+
+body.dashboard-page .live-lab-metric strong {
+  overflow: hidden;
+  color: var(--text);
+  font: 950 0.64rem var(--font-ui);
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+@keyframes liveLabHitBall {
+  0% {
+    left: 50%;
+    bottom: 9%;
+    opacity: 0;
+    transform: translate(-50%, 0) scale(0.78);
+  }
+  16% {
+    left: var(--hit-mid-x, 50%);
+    bottom: var(--hit-mid-y, 76%);
+    opacity: 1;
+    transform: translate(-50%, 0) scale(0.9);
+  }
+  72%,
+  100% {
+    left: var(--hit-x, 50%);
+    bottom: var(--hit-y, 58%);
+    opacity: 1;
+    transform: translate(-50%, 0) scale(1);
+  }
+}
+
+@keyframes liveLabHitFlight {
+  0%,
+  14% {
+    clip-path: inset(0 100% 0 0);
+    opacity: 0;
+  }
+  72%,
+  100% {
+    clip-path: inset(0 0 0 0);
+    opacity: 0.7;
+  }
+}
+
+@keyframes liveLabPitchPulse {
+  0% {
+    transform: translate(-50%, -50%) scale(0.75);
+    opacity: 0.45;
+  }
+  48%,
+  100% {
+    transform: translate(-50%, -50%) scale(1);
+    opacity: 1;
+  }
+}
+
+@media (max-width: 980px) {
+  body.dashboard-page .lineup-live-lab-grid {
+    height: auto;
+    max-height: 100%;
+    grid-template-columns: 1fr;
+    grid-template-areas:
+      "center"
+      "away"
+      "home";
+    overflow: auto;
+  }
+
+  body.dashboard-page .live-lab-center {
+    grid-row: 1;
+    grid-template-rows: auto minmax(260px, 360px) auto auto;
+  }
+
+  body.dashboard-page .live-lab-pitch-row,
+  body.dashboard-page .live-lab-play {
+    grid-template-columns: 1fr;
+  }
+
+  body.dashboard-page .live-lab-metrics {
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+  }
+}

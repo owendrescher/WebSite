@@ -9,6 +9,13 @@ const overlayResizeHandleEl = document.getElementById('overlayResizeHandle');
 const overlayDockToggleBtnEl = document.getElementById('overlayDockToggleBtn');
 const scoreboardColumnsBtnEl = document.getElementById('scoreboardColumnsBtn');
 const clearPendingPicksBtnEl = document.getElementById('clearPendingPicksBtn');
+const globalPlayerSearchBtnEl = document.getElementById('globalPlayerSearchBtn');
+const globalPlayerSearchOverlayEl = document.getElementById('globalPlayerSearchOverlay');
+const globalPlayerSearchBackdropEl = document.getElementById('globalPlayerSearchBackdrop');
+const globalPlayerSearchFormEl = document.getElementById('globalPlayerSearchForm');
+const globalPlayerSearchInputEl = document.getElementById('globalPlayerSearchInput');
+const globalPlayerSearchResultsEl = document.getElementById('globalPlayerSearchResults');
+const globalPlayerSearchCloseBtnEl = document.getElementById('globalPlayerSearchCloseBtn');
 const siteHelpDialogEl = document.getElementById('siteHelpDialog');
 const siteHelpCloseBtnEl = document.getElementById('siteHelpCloseBtn');
 const pageToggleBtnEl = document.getElementById('pageToggleBtn');
@@ -40,6 +47,33 @@ const lineupDiamondEl = document.getElementById('lineupDiamond');
 const lineupBallsDotsEl = document.getElementById('lineupBallsDots');
 const lineupStrikesDotsEl = document.getElementById('lineupStrikesDots');
 const lineupOutsDotsEl = document.getElementById('lineupOutsDots');
+const liveLabAwayLineupEl = document.getElementById('liveLabAwayLineup');
+const liveLabHomeLineupEl = document.getElementById('liveLabHomeLineup');
+const liveLabAwayScoreEl = document.getElementById('liveLabAwayScore');
+const liveLabHomeScoreEl = document.getElementById('liveLabHomeScore');
+const liveLabInningEl = document.getElementById('liveLabInning');
+const liveLabFieldEl = document.getElementById('liveLabField');
+const liveLabFieldSvgEl = document.getElementById('liveLabFieldSvg');
+const liveLabFieldGeometryEl = document.getElementById('liveLabFieldGeometry');
+const liveLabTraceLayerEl = document.getElementById('liveLabTraceLayer');
+const liveLabBaseLayerEl = document.getElementById('liveLabBaseLayer');
+const liveLabReplayTraceLayerEl = document.getElementById('liveLabReplayTraceLayer');
+const liveLabReplayRunnerLayerEl = document.getElementById('liveLabReplayRunnerLayer');
+const liveLabReplayOverlayEl = document.getElementById('liveLabReplayOverlay');
+const liveLabReplayTitleEl = document.getElementById('liveLabReplayTitle');
+const liveLabReplayPlayerEl = document.getElementById('liveLabReplayPlayer');
+const liveLabReplayMetaEl = document.getElementById('liveLabReplayMeta');
+const liveLabReplaySpeedControlsEl = document.getElementById('liveLabReplaySpeedControls');
+const liveLabReplayPauseBtnEl = document.getElementById('liveLabReplayPauseBtn');
+const liveLabReplayBtnEl = document.getElementById('liveLabReplayBtn');
+const liveLabMatchupEl = document.getElementById('liveLabMatchup');
+const liveLabPlayTextEl = document.getElementById('liveLabPlayText');
+const liveLabOutcomeListEl = document.getElementById('liveLabOutcomeList');
+const liveLabBallsEl = document.getElementById('liveLabBalls');
+const liveLabStrikesEl = document.getElementById('liveLabStrikes');
+const liveLabOutsEl = document.getElementById('liveLabOuts');
+const liveLabMetricsEl = document.getElementById('liveLabMetrics');
+const liveLabPitchDotEl = document.getElementById('liveLabPitchDot');
 const playerStatOverlayEl = document.getElementById('playerStatOverlay');
 const playerStatBackdropEl = document.getElementById('playerStatBackdrop');
 const playerStatCloseBtnEl = document.getElementById('playerStatCloseBtn');
@@ -149,6 +183,18 @@ let loadGamesStartedAt = 0;
 let initialGamesLoadingShown = false;
 let goalCompletePulseTimeout = null;
 let focusedGamePk = null;
+let liveLabSelectedPitchKey = '';
+let liveLabPitchFingerprint = '';
+let liveLabCurrentPitchKey = '';
+let liveLabHitKey = '';
+let liveLabSelectedPlayerId = '';
+let liveLabSelectedOutcomeKey = '';
+let liveLabOutcomeFingerprint = '';
+let liveLabReplayActive = false;
+let liveLabReplayToken = 0;
+let liveLabReplayPaused = false;
+let liveLabReplayPauseResolvers = [];
+let liveLabReplaySpeed = 1;
 const focusedMatchupSideByGame = new Map();
 const tossupScoreboardGamePks = new Set();
 let draftBetLegs = [];
@@ -298,6 +344,7 @@ const teamRecentFormCache = new Map();
 const oddstraderWeatherCache = new Map();
 const teamBullpenRanksCache = new Map();
 const teamRecentBullpenCache = new Map();
+const liveLabFeedCache = new Map();
 const teamStandingRecordCache = new Map();
 const lineupRecentBattingCache = new Map();
 const fireworkControllers = new WeakMap();
@@ -314,6 +361,57 @@ const THEMES = [
   { value: 'black-ice', label: 'Black Ice' },
   { value: 'paper-scorebook', label: 'Paper Scorebook' },
 ];
+
+const LIVE_LAB_FIELD_CENTER = { x: 500, y: 650 };
+const LIVE_LAB_FIELD_SCALE = 1.35;
+const LIVE_LAB_BASE_DISTANCE_FT = 90;
+const LIVE_LAB_MOUND_DISTANCE_FT = 60.5;
+const LIVE_LAB_ZONE_WIDTH_FT = 17 / 12;
+const LIVE_LAB_ZONE_HEIGHT_FT = 25 / 12;
+const LIVE_LAB_ZONE_RECT = { left: 18, top: 18, width: 64, height: 64 };
+const LIVE_LAB_GENERIC_BALLPARK = {
+  key: 'generic',
+  label: 'MLB Generic',
+  dimensions: [
+    { key: 'lf', angle: -45, distance: 330, height: 8 },
+    { key: 'lcf', angle: -25, distance: 375, height: 8 },
+    { key: 'cf', angle: 0, distance: 400, height: 8 },
+    { key: 'rcf', angle: 25, distance: 375, height: 8 },
+    { key: 'rf', angle: 45, distance: 330, height: 8 },
+  ],
+};
+const LIVE_LAB_BALLPARKS = {
+  BOS: {
+    key: 'BOS',
+    label: 'Fenway Park',
+    source: 'Seamheads BOS07 2025',
+    dimensions: [
+      { key: 'lf', angle: -45, distance: 310, height: 37 },
+      { key: 'lfa', angle: -35, distance: 335, height: 37 },
+      { key: 'lcf', angle: -24, distance: 379, height: 18 },
+      { key: 'lcc', angle: -12, distance: 388, height: 18 },
+      { key: 'cf', angle: 0, distance: 390, height: 9 },
+      { key: 'rcc', angle: 12, distance: 420, height: 5 },
+      { key: 'rcf', angle: 24, distance: 383, height: 5 },
+      { key: 'rfa', angle: 35, distance: 380, height: 3 },
+      { key: 'rf', angle: 45, distance: 302, height: 3 },
+    ],
+  },
+  CHW: {
+    key: 'CHW',
+    label: 'Rate Field',
+    source: 'Seamheads CHI12 2025',
+    dimensions: [
+      { key: 'lf', angle: -45, distance: 330, height: 8 },
+      { key: 'slf', angle: -36, distance: 352, height: 8 },
+      { key: 'lcf', angle: -23, distance: 372, height: 8 },
+      { key: 'cf', angle: 0, distance: 400, height: 8 },
+      { key: 'rcf', angle: 23, distance: 372, height: 8 },
+      { key: 'srf', angle: 36, distance: 352, height: 8 },
+      { key: 'rf', angle: 45, distance: 335, height: 8 },
+    ],
+  },
+};
 
 const FANGRAPHS_PITCHER_HAND_SPLIT_SEEDS = {
   [normalizeNameKey('Sandy Alcantara')]: {
@@ -1212,6 +1310,30 @@ function initScoreboardColumnsControl() {
   });
 }
 
+function initGlobalPlayerSearch() {
+  globalPlayerSearchBtnEl?.addEventListener('click', openGlobalPlayerSearch);
+  globalPlayerSearchCloseBtnEl?.addEventListener('click', closeGlobalPlayerSearch);
+  globalPlayerSearchBackdropEl?.addEventListener('click', closeGlobalPlayerSearch);
+  globalPlayerSearchInputEl?.addEventListener('input', () => renderGlobalPlayerSearchResults(globalPlayerSearchInputEl.value));
+  globalPlayerSearchResultsEl?.addEventListener('click', (e) => {
+    const result = e.target.closest('[data-global-player-id]');
+    if (!result) return;
+    e.preventDefault();
+    selectGlobalPlayerSearchResult(result);
+  });
+  globalPlayerSearchFormEl?.addEventListener('submit', (e) => {
+    e.preventDefault();
+    const first = globalPlayerSearchResultsEl?.querySelector?.('[data-global-player-id]');
+    if (first) selectGlobalPlayerSearchResult(first);
+  });
+  globalPlayerSearchOverlayEl?.addEventListener('keydown', (e) => {
+    if (e.key === 'Escape') {
+      e.preventDefault();
+      closeGlobalPlayerSearch();
+    }
+  });
+}
+
 function initOverlayResizeControl() {
   applyOverlaySize(getOverlaySizeState(), { persist: false, resolvePanels: false });
   if (!overlayResizeHandleEl) return;
@@ -1796,7 +1918,7 @@ function setLineupOpen(gamePk) {
 function savedLineupView() {
   try {
     const saved = localStorage.getItem(storageKey(LINEUP_VIEW_KEY));
-    return ['lineups', 'roster', 'pitching'].includes(saved) ? saved : 'lineups';
+    return ['lineups', 'roster', 'pitching', 'live'].includes(saved) ? saved : 'lineups';
   } catch {
     return 'lineups';
   }
@@ -1804,7 +1926,7 @@ function savedLineupView() {
 
 function saveLineupView(view) {
   try {
-    localStorage.setItem(storageKey(LINEUP_VIEW_KEY), ['lineups', 'roster', 'pitching'].includes(view) ? view : 'lineups');
+    localStorage.setItem(storageKey(LINEUP_VIEW_KEY), ['lineups', 'roster', 'pitching', 'live'].includes(view) ? view : 'lineups');
   } catch {}
 }
 
@@ -1867,6 +1989,7 @@ function syncPlayerStatRecentToggle() {
 }
 
 function closeLineupOverlay() {
+  stopLiveLabReplay({ restore: false });
   saveOpenLineupGamePk('');
   nonLiveLineupRenderSignature = '';
   lineupOverlayEl.hidden = true;
@@ -9581,6 +9704,144 @@ function getBetSearchPool(games = latestRenderedGames) {
     String(a.playerName || '').localeCompare(String(b.playerName || ''))
     || String(a.teamAbbrev || '').localeCompare(String(b.teamAbbrev || ''))
   ));
+}
+
+function globalPlayerSearchGames() {
+  const map = new Map();
+  for (const game of [...(latestRenderedGames || []), ...getCachedGames()]) {
+    const key = String(game?.gamePk || '');
+    if (key && !map.has(key)) map.set(key, game);
+  }
+  return [...map.values()];
+}
+
+function globalPlayerSearchPool(games = globalPlayerSearchGames()) {
+  const map = new Map();
+  const upsert = (player, game, sourceRank = 0) => {
+    const id = Number(player?.id ?? player?.playerId);
+    if (!Number.isFinite(id) || id <= 0) return;
+    const existing = map.get(String(id));
+    const fullName = cleanSummary(player?.fullName || player?.playerName || player?.name || existing?.fullName || 'Unknown');
+    const teamAbbrev = cleanSummary(player?.teamAbbrev || existing?.teamAbbrev || '');
+    const next = {
+      id,
+      fullName,
+      nameKey: normalizeNameKey(fullName),
+      position: cleanSummary(player?.position || existing?.position || '-'),
+      teamAbbrev,
+      teamColor: player?.teamColor || existing?.teamColor || getTeamColor(teamAbbrev),
+      headshot: player?.headshot || existing?.headshot || playerHeadshotUrl(id),
+      game: game || existing?.game || null,
+      sourceRank: Math.max(sourceRank, existing?.sourceRank || 0),
+    };
+    map.set(String(id), next);
+  };
+  for (const game of games || []) {
+    for (const profile of Object.values(game?.playerLookup || {})) {
+      upsert(profile, game, 2);
+    }
+    for (const entry of [
+      ...(game?.lineup?.away || []),
+      ...(game?.lineup?.home || []),
+      ...(game?.lineup?.awayBench || []),
+      ...(game?.lineup?.homeBench || []),
+    ]) {
+      upsert({
+        id: entry?.id,
+        fullName: entry?.fullName || entry?.name,
+        position: entry?.position,
+        teamAbbrev: entry?.teamAbbrev || entry?.team,
+      }, game, 1);
+    }
+  }
+  return [...map.values()].filter((player) => player.nameKey && player.nameKey !== 'unknown');
+}
+
+function globalPlayerSearchScore(player, query) {
+  const raw = cleanSummary(query).toLowerCase();
+  const q = normalizeNameKey(raw);
+  const parts = q.split(' ').filter(Boolean);
+  if (!q) return 0;
+  const name = player.nameKey || normalizeNameKey(player.fullName);
+  const nameParts = name.split(' ').filter(Boolean);
+  const first = nameParts[0] || '';
+  const last = nameParts[nameParts.length - 1] || '';
+  if (parts.length >= 2) {
+    const firstNeedle = parts[0];
+    const lastNeedle = parts[parts.length - 1];
+    if (first.startsWith(firstNeedle) && last.startsWith(lastNeedle)) return 100 - Math.min(40, name.length / 2);
+    if (nameParts.some((part) => part.startsWith(firstNeedle)) && nameParts.some((part) => part.startsWith(lastNeedle))) return 78;
+    return 0;
+  }
+  if (q.length < 3) return 0;
+  if (first.startsWith(q)) return 95;
+  if (last.startsWith(q)) return 90;
+  if (name.startsWith(q)) return 86;
+  if (nameParts.some((part) => part.startsWith(q))) return 76;
+  if (name.includes(q)) return 58;
+  return 0;
+}
+
+function renderGlobalPlayerSearchResults(query = '') {
+  if (!globalPlayerSearchResultsEl) return;
+  const q = cleanSummary(query);
+  const normalized = normalizeNameKey(q);
+  const parts = normalized.split(' ').filter(Boolean);
+  const ready = normalized.length >= 3 || parts.length >= 2;
+  if (!ready) {
+    globalPlayerSearchResultsEl.innerHTML = '<div class="global-player-search-empty">Type 3 letters, or initials like r d</div>';
+    return;
+  }
+  const results = globalPlayerSearchPool()
+    .map((player) => ({ player, score: globalPlayerSearchScore(player, q) }))
+    .filter((entry) => entry.score > 0)
+    .sort((a, b) => (
+      b.score - a.score
+      || b.player.sourceRank - a.player.sourceRank
+      || String(a.player.fullName).localeCompare(String(b.player.fullName))
+    ))
+    .slice(0, 12);
+  if (!results.length) {
+    globalPlayerSearchResultsEl.innerHTML = '<div class="global-player-search-empty">No matching players</div>';
+    return;
+  }
+  globalPlayerSearchResultsEl.innerHTML = results.map(({ player }, index) => `
+    <button type="button" class="global-player-search-result" role="option" data-global-player-id="${player.id}" data-game-pk="${escapeHtml(player.game?.gamePk || '')}" style="--result-team-color:${escapeHtml(player.teamColor || getTeamColor(player.teamAbbrev) || '#7bd0ff')}">
+      <img src="${escapeHtml(player.headshot || playerHeadshotUrl(player.id))}" alt="" loading="lazy" />
+      <strong>${escapeHtml(player.fullName)}</strong>
+      <span>${escapeHtml(player.position || '-')}</span>
+    </button>
+  `).join('');
+}
+
+function openGlobalPlayerSearch() {
+  if (!globalPlayerSearchOverlayEl || !globalPlayerSearchInputEl) return;
+  globalPlayerSearchOverlayEl.hidden = false;
+  globalPlayerSearchInputEl.value = '';
+  renderGlobalPlayerSearchResults('');
+  window.setTimeout(() => globalPlayerSearchInputEl.focus(), 0);
+}
+
+function closeGlobalPlayerSearch() {
+  if (!globalPlayerSearchOverlayEl) return;
+  globalPlayerSearchOverlayEl.hidden = true;
+}
+
+function selectGlobalPlayerSearchResult(button) {
+  const playerId = Number(button?.dataset?.globalPlayerId);
+  if (!Number.isFinite(playerId) || playerId <= 0) return;
+  const gamePk = button?.dataset?.gamePk || '';
+  const games = globalPlayerSearchGames();
+  const game = games.find((candidate) => String(candidate?.gamePk || '') === String(gamePk))
+    || games.find((candidate) => Boolean(candidate?.playerLookup?.[String(playerId)]))
+    || games.find((candidate) => [
+      ...(candidate?.lineup?.away || []),
+      ...(candidate?.lineup?.home || []),
+      ...(candidate?.lineup?.awayBench || []),
+      ...(candidate?.lineup?.homeBench || []),
+    ].some((entry) => Number(entry?.id) === playerId));
+  closeGlobalPlayerSearch();
+  if (game) openPlayerStatOverlay(playerId, game);
 }
 
 function getBetTeamSearchPool(games = latestRenderedGames) {
@@ -20788,8 +21049,10 @@ function animateScoreChange(card, flashColor, isHomeRun) {
 }
 
 function setLineupView(view, options = {}) {
-  currentLineupView = ['lineups', 'roster', 'pitching'].includes(view) ? view : 'lineups';
+  currentLineupView = ['lineups', 'roster', 'pitching', 'live'].includes(view) ? view : 'lineups';
   if (options.persist !== false) saveLineupView(currentLineupView);
+  lineupOverlayEl?.classList?.toggle('is-live-view', currentLineupView === 'live');
+  if (currentLineupView !== 'live' && liveLabReplayActive) stopLiveLabReplay({ restore: false });
   for (const btn of lineupViewBtns) {
     const active = btn.dataset.lineupView === currentLineupView;
     btn.classList.toggle('active', active);
@@ -20801,7 +21064,11 @@ function setLineupView(view, options = {}) {
     panel.setAttribute('aria-hidden', show ? 'false' : 'true');
   }
   const liveDetails = lineupOverlayEl.querySelector('.lineup-live-details');
-  if (liveDetails) liveDetails.hidden = currentLineupView !== 'lineups';
+  if (liveDetails) {
+    const showLiveDetails = currentLineupView === 'lineups';
+    liveDetails.hidden = !showLiveDetails;
+    liveDetails.setAttribute('aria-hidden', showLiveDetails ? 'false' : 'true');
+  }
 }
 
 function renderLineupLiveDetails(game) {
@@ -20837,6 +21104,1607 @@ function renderLineupLiveDetails(game) {
   renderCountDots(lineupBallsDotsEl, 4, pregame ? 0 : game.balls, 'ball');
   renderCountDots(lineupStrikesDotsEl, 3, pregame ? 0 : game.strikes, 'strike');
   renderCountDots(lineupOutsDotsEl, 3, pregame ? 0 : game.outs, 'out');
+}
+
+function liveLabBallparkForGame(game) {
+  const home = canonicalTeamAbbrev(game?.home || '');
+  return LIVE_LAB_BALLPARKS[home] || LIVE_LAB_GENERIC_BALLPARK;
+}
+
+function liveLabPoint(angleDegrees, distanceFeet, scale = LIVE_LAB_FIELD_SCALE) {
+  const radians = angleDegrees * (Math.PI / 180);
+  return {
+    x: LIVE_LAB_FIELD_CENTER.x + Math.sin(radians) * distanceFeet * scale,
+    y: LIVE_LAB_FIELD_CENTER.y - Math.cos(radians) * distanceFeet * scale,
+  };
+}
+
+function liveLabPointAttr(point) {
+  return `${point.x.toFixed(1)},${point.y.toFixed(1)}`;
+}
+
+function liveLabPath(points) {
+  return points.map((point, index) => `${index ? 'L' : 'M'} ${liveLabPointAttr(point)}`).join(' ');
+}
+
+function liveLabFieldModel(game) {
+  const ballpark = liveLabBallparkForGame(game);
+  const wall = ballpark.dimensions.map((dim) => ({
+    ...dim,
+    point: liveLabPoint(dim.angle, dim.distance),
+  }));
+  const warningTrack = ballpark.dimensions.map((dim) => ({
+    ...dim,
+    point: liveLabPoint(dim.angle, Math.max(240, dim.distance - 24)),
+  }));
+  return {
+    ballpark,
+    home: LIVE_LAB_FIELD_CENTER,
+    first: liveLabPoint(45, LIVE_LAB_BASE_DISTANCE_FT),
+    second: liveLabPoint(0, Math.sqrt(2) * LIVE_LAB_BASE_DISTANCE_FT),
+    third: liveLabPoint(-45, LIVE_LAB_BASE_DISTANCE_FT),
+    mound: liveLabPoint(0, LIVE_LAB_MOUND_DISTANCE_FT),
+    wall,
+    warningTrack,
+  };
+}
+
+function liveLabWallStroke(height = 8) {
+  if (height >= 30) return '#315847';
+  if (height >= 12) return '#42594e';
+  return '#596463';
+}
+
+function liveLabWallHeightPx(height = 8) {
+  const numeric = Number(height);
+  const feet = Number.isFinite(numeric) && numeric > 0 ? numeric : 8;
+  return Math.max(8, Math.min(50, feet * 1.2));
+}
+
+function liveLabWallFaceFill(height = 8) {
+  if (height >= 30) return '#284f3c';
+  if (height >= 12) return '#354e45';
+  return '#4b5555';
+}
+
+function renderLiveLabFieldGeometry(game) {
+  if (!liveLabFieldGeometryEl || !liveLabBaseLayerEl) return null;
+  const model = liveLabFieldModel(game);
+  const geometryKey = `${model.ballpark.key}:${JSON.stringify(model.ballpark.dimensions)}`;
+  if (liveLabFieldGeometryEl.dataset.geometryKey !== geometryKey) {
+    liveLabFieldGeometryEl.dataset.geometryKey = geometryKey;
+    const wallPath = liveLabPath(model.wall.map((entry) => entry.point));
+    const trackPath = `${liveLabPath(model.wall.map((entry) => entry.point))} ${[...model.warningTrack].reverse().map((entry) => `L ${liveLabPointAttr(entry.point)}`).join(' ')} Z`;
+    const infieldGrass = [model.home, model.first, model.second, model.third];
+    const basePath = [model.home, model.first, model.second, model.third, model.home];
+    const wallFaces = model.wall.slice(0, -1).map((entry, index) => {
+      const next = model.wall[index + 1];
+      const entryLift = liveLabWallHeightPx(entry.height);
+      const nextLift = liveLabWallHeightPx(next.height);
+      const topA = { x: entry.point.x, y: entry.point.y - entryLift };
+      const topB = { x: next.point.x, y: next.point.y - nextLift };
+      const maxHeight = Math.max(entry.height || 0, next.height || 0);
+      return `
+        <polygon class="live-lab-svg-wall-face" points="${[
+          entry.point,
+          next.point,
+          topB,
+          topA,
+        ].map(liveLabPointAttr).join(' ')}" fill="${liveLabWallFaceFill(maxHeight)}" />
+        <line class="live-lab-svg-wall-top" x1="${topA.x.toFixed(1)}" y1="${topA.y.toFixed(1)}" x2="${topB.x.toFixed(1)}" y2="${topB.y.toFixed(1)}" />
+      `;
+    }).join('');
+    const wallSegments = model.wall.slice(0, -1).map((entry, index) => {
+      const next = model.wall[index + 1];
+      const stroke = liveLabWallStroke(Math.max(entry.height || 0, next.height || 0));
+      const width = Math.max(3, Math.min(7, ((entry.height || next.height || 8) / 7) + 2));
+      return `<line class="live-lab-svg-wall-segment" x1="${entry.point.x.toFixed(1)}" y1="${entry.point.y.toFixed(1)}" x2="${next.point.x.toFixed(1)}" y2="${next.point.y.toFixed(1)}" stroke="${stroke}" stroke-width="${width.toFixed(1)}" />`;
+    }).join('');
+    liveLabFieldGeometryEl.innerHTML = `
+      <defs>
+        <pattern id="liveLabMowPattern" width="70" height="720" patternUnits="userSpaceOnUse" patternTransform="rotate(10 500 650)">
+          <rect width="35" height="720" fill="#ffffff" opacity="0.035" />
+          <rect x="35" width="35" height="720" fill="#000000" opacity="0.035" />
+        </pattern>
+        <radialGradient id="liveLabInfieldGrassGradient" cx="50%" cy="78%" r="62%">
+          <stop offset="0%" stop-color="#2f7a49" stop-opacity="0.98" />
+          <stop offset="100%" stop-color="#1b5735" stop-opacity="0.96" />
+        </radialGradient>
+      </defs>
+      <path class="live-lab-svg-outfield" d="M ${liveLabPointAttr(model.home)} L ${wallPath.slice(2)} Z" />
+      <path class="live-lab-svg-outfield-mow" d="M ${liveLabPointAttr(model.home)} L ${wallPath.slice(2)} Z" />
+      <path class="live-lab-svg-warning-track" d="${trackPath}" />
+      ${wallFaces}
+      ${wallSegments}
+      <path class="live-lab-svg-foul" d="M ${liveLabPointAttr(model.home)} L ${liveLabPointAttr(model.wall[0].point)}" />
+      <path class="live-lab-svg-foul" d="M ${liveLabPointAttr(model.home)} L ${liveLabPointAttr(model.wall[model.wall.length - 1].point)}" />
+      <polygon class="live-lab-svg-infield-grass" points="${infieldGrass.map(liveLabPointAttr).join(' ')}" />
+      <polyline class="live-lab-svg-basepath" points="${basePath.map(liveLabPointAttr).join(' ')}" />
+      <circle class="live-lab-svg-mound-dirt" cx="${model.mound.x.toFixed(1)}" cy="${model.mound.y.toFixed(1)}" r="${(9 * LIVE_LAB_FIELD_SCALE).toFixed(1)}" />
+      <rect class="live-lab-svg-rubber" x="${(model.mound.x - 10).toFixed(1)}" y="${(model.mound.y - 3).toFixed(1)}" width="20" height="6" rx="1.5" />
+      <path class="live-lab-svg-home-dirt" d="M ${liveLabPointAttr(liveLabPoint(-45, 18))} Q ${LIVE_LAB_FIELD_CENTER.x},${LIVE_LAB_FIELD_CENTER.y + 22} ${liveLabPointAttr(liveLabPoint(45, 18))} Q ${LIVE_LAB_FIELD_CENTER.x},${LIVE_LAB_FIELD_CENTER.y - 12} ${liveLabPointAttr(liveLabPoint(-45, 18))}" />
+    `;
+  }
+
+  const bases = [
+    ['first', model.first],
+    ['second', model.second],
+    ['third', model.third],
+    ['home', model.home],
+  ];
+  liveLabBaseLayerEl.innerHTML = bases.map(([base, point]) => {
+    const on = base !== 'home' && Boolean(game?.bases?.[base]);
+    return `
+      <g class="live-lab-svg-base-group${on ? ' is-on' : ''}" data-live-base="${base}" transform="translate(${point.x.toFixed(1)} ${point.y.toFixed(1)})">
+        <rect class="live-lab-svg-base" x="-7" y="-7" width="14" height="14" transform="rotate(45)" />
+      </g>
+    `;
+  }).join('');
+  return model;
+}
+
+function liveLabHasFullPlayData(game) {
+  return Boolean(game?.activePlay?.matchup && Array.isArray(game?.activePlay?.playEvents));
+}
+
+async function hydrateLiveLabGame(game) {
+  if (!game?.gamePk) return game;
+  const key = String(game.gamePk);
+  const cached = liveLabFeedCache.get(key);
+  if (cached && Date.now() - cached.at < 4500) return cached.game;
+  const live = await getLiveGameFeed(game.gamePk);
+  const linescore = live?.liveData?.linescore || {};
+  const boxscore = live?.liveData?.boxscore || {};
+  const allPlays = listify(live?.liveData?.plays?.allPlays);
+  const currentPlay = live?.liveData?.plays?.currentPlay || null;
+  const activePlay = resolveActivePlay(game, currentPlay, allPlays);
+  const count = countForGame(linescore, activePlay);
+  const awayPlayers = boxscore?.teams?.away?.players || {};
+  const homePlayers = boxscore?.teams?.home?.players || {};
+  const gamePlayers = live?.gameData?.players || {};
+  const awayAbbrev = live?.gameData?.teams?.away?.abbreviation || game.away;
+  const homeAbbrev = live?.gameData?.teams?.home?.abbreviation || game.home;
+  const awayColor = game.awayColor || getTeamColor(awayAbbrev);
+  const homeColor = game.homeColor || getTeamColor(homeAbbrev);
+  const ppl = currentPeople(activePlay, linescore, game, awayPlayers, homePlayers);
+  const inning = inningDisplay(linescore, game, activePlay);
+  const derived = buildGameDataFromBoxscore(boxscore, game, {
+    activePlay,
+    gamePlayers,
+    awayAbbrev,
+    homeAbbrev,
+    awayColor,
+    homeColor,
+    battingSide: ppl.battingSide,
+    probablePitchers: game.probablePitchers,
+    currentPitcherId: ppl.currentPitcherId,
+    allPlays,
+  });
+  const hydrated = {
+    ...game,
+    away: awayAbbrev,
+    home: homeAbbrev,
+    awayColor,
+    homeColor,
+    awayScore: gameScoreForSide(game, linescore, allPlays, 'away'),
+    homeScore: gameScoreForSide(game, linescore, allPlays, 'home'),
+    awayHits: gameHitsForSide(linescore, 'away'),
+    homeHits: gameHitsForSide(linescore, 'home'),
+    inning: inning.long,
+    inningShort: inning.short,
+    balls: count.balls,
+    strikes: count.strikes,
+    outs: count.outs,
+    bases: baseState(linescore),
+    lineScoreInnings: Array.isArray(linescore?.innings) ? linescore.innings : [],
+    activePlay,
+    allPlays,
+    activeBatterId: activePlay?.matchup?.batter?.id || game.activeBatterId || null,
+    battingSide: ppl.battingSide || game.battingSide,
+    awayPitcher: ppl.awayPitcher || game.awayPitcher,
+    homePitcher: ppl.homePitcher || game.homePitcher,
+    awayHitter: ppl.awayHitter || game.awayHitter,
+    homeHitter: ppl.homeHitter || game.homeHitter,
+    lastPlay: activePlay ? playByPlayDescription(activePlay) : game.lastPlay,
+    lineup: chooseBetterLineup(derived.lineup, game.lineup),
+    pitching: chooseBetterPitching(derived.pitching, game.pitching),
+    playerLookup: { ...(game.playerLookup || {}), ...(derived.playerLookup || {}) },
+  };
+  liveLabFeedCache.set(key, { at: Date.now(), game: hydrated });
+  return hydrated;
+}
+
+function liveLabFinite(value) {
+  const parsed = Number(value);
+  return Number.isFinite(parsed) ? parsed : null;
+}
+
+function liveLabMetricValue(value, suffix = '', decimals = 0) {
+  const parsed = liveLabFinite(value);
+  return parsed == null ? '--' : `${parsed.toFixed(decimals)}${suffix}`;
+}
+
+function liveLabPitchTypeLabel(value) {
+  const text = cleanSummary(value || '');
+  const normalized = text.toLowerCase().replace(/[-\s]+/g, ' ').trim();
+  if (/^(four|4) seam fastball$/.test(normalized)) return '4SFB';
+  if (/^(two|2) seam fastball$/.test(normalized)) return '2SFB';
+  return text || '--';
+}
+
+function liveLabPitchResultClass(pitch) {
+  const code = String(pitch?.code || '').toUpperCase();
+  const call = String(pitch?.call || '').toLowerCase();
+  if (call.includes('hit by pitch')) return 'is-hbp';
+  if (call.includes('ball') || ['B', 'I', 'P', 'V'].includes(code)) return 'is-ball';
+  if (
+    call.includes('strike')
+    || call.includes('foul')
+    || call.includes('swinging')
+    || call.includes('missed')
+    || ['C', 'S', 'F', 'T', 'L', 'W', 'M', 'Q', 'R'].includes(code)
+  ) {
+    return 'is-strike';
+  }
+  return '';
+}
+
+function liveLabTerminalPitchLabel(play, pitch) {
+  if (!pitch) return '';
+  const resultText = `${play?.result?.event || ''} ${play?.result?.eventType || ''} ${play?.result?.description || ''}`.toLowerCase();
+  const code = String(pitch?.code || '').toUpperCase();
+  const call = String(pitch?.call || '').toLowerCase();
+  if (resultText.includes('hit by pitch')) return 'HBP';
+  if (resultText.includes('walk') || resultText.includes('base on balls')) return 'BB';
+  if (resultText.includes('strikeout') || resultText.includes('strikes out')) {
+    return code === 'C' || call.includes('called strike') ? 'ꓘ' : 'K';
+  }
+  return '';
+}
+
+function liveLabPitchZoneX(pX) {
+  if (pX == null) return 50;
+  const halfZone = LIVE_LAB_ZONE_WIDTH_FT / 2;
+  const center = LIVE_LAB_ZONE_RECT.left + (LIVE_LAB_ZONE_RECT.width / 2);
+  const halfRect = LIVE_LAB_ZONE_RECT.width / 2;
+  return clamp(center + (pX / halfZone) * halfRect, 2, 98);
+}
+
+function liveLabPitchZoneY(pZ, strikeZoneTop, strikeZoneBottom) {
+  if (pZ == null) return 50;
+  const top = liveLabFinite(strikeZoneTop);
+  const bottom = liveLabFinite(strikeZoneBottom);
+  const centerZ = top != null && bottom != null ? (top + bottom) / 2 : 2.55;
+  const displayTop = centerZ + (LIVE_LAB_ZONE_HEIGHT_FT / 2);
+  const pctFromTop = (displayTop - pZ) / LIVE_LAB_ZONE_HEIGHT_FT;
+  return clamp(LIVE_LAB_ZONE_RECT.top + pctFromTop * LIVE_LAB_ZONE_RECT.height, 2, 98);
+}
+
+function liveLabLastEvent(play, predicate) {
+  return [...listify(play?.playEvents)].reverse().find(predicate) || null;
+}
+
+function liveLabPitchDetail(play) {
+  const event = liveLabLastEvent(play, (candidate) => candidate?.isPitch || candidate?.pitchData);
+  if (!event) return null;
+  return liveLabPitchDetailFromEvent(event, play);
+}
+
+function liveLabPitchDetailFromEvent(event, play = null) {
+  const data = event.pitchData || {};
+  const coordinates = data.coordinates || {};
+  const breaks = data.breaks || {};
+  const pX = liveLabFinite(coordinates.pX);
+  const pZ = liveLabFinite(coordinates.pZ);
+  const strikeZoneTop = liveLabFinite(data.strikeZoneTop);
+  const strikeZoneBottom = liveLabFinite(data.strikeZoneBottom);
+  const playIndex = play?.about?.atBatIndex ?? '';
+  const pitchIndex = event?.pitchNumber ?? event?.index ?? '';
+  const key = [
+    playIndex,
+    pitchIndex,
+    event?.details?.code || event?.details?.description || '',
+    data.startSpeed ?? '',
+    pX ?? '',
+    pZ ?? '',
+  ].join(':');
+  return {
+    key,
+    pitchNumber: event?.pitchNumber || '',
+    code: event?.details?.code || '',
+    type: liveLabPitchTypeLabel(event?.details?.type?.description || event?.details?.description || 'Pitch'),
+    call: cleanSummary(event?.details?.description || ''),
+    speed: liveLabFinite(data.startSpeed),
+    endSpeed: liveLabFinite(data.endSpeed),
+    spin: liveLabFinite(breaks.spinRate),
+    breakLength: liveLabFinite(breaks.breakLength),
+    balls: liveLabFinite(event?.count?.balls),
+    strikes: liveLabFinite(event?.count?.strikes),
+    outs: liveLabFinite(event?.count?.outs),
+    pX,
+    pZ,
+    strikeZoneTop,
+    strikeZoneBottom,
+    zoneX: liveLabPitchZoneX(pX),
+    zoneY: liveLabPitchZoneY(pZ, strikeZoneTop, strikeZoneBottom),
+  };
+}
+
+function liveLabPitchDetails(play) {
+  const seen = new Map();
+  return listify(play?.playEvents)
+    .filter((event) => event?.isPitch || event?.pitchData)
+    .map((event, index) => {
+      const pitch = liveLabPitchDetailFromEvent(event, play);
+      const bucket = `${Math.round(pitch.zoneX / 4)}:${Math.round(pitch.zoneY / 4)}`;
+      const offsetIndex = seen.get(bucket) || 0;
+      seen.set(bucket, offsetIndex + 1);
+      if (offsetIndex) {
+        const angle = offsetIndex * 2.25;
+        pitch.zoneX = Math.max(4, Math.min(96, pitch.zoneX + Math.cos(angle) * 3.2));
+        pitch.zoneY = Math.max(4, Math.min(96, pitch.zoneY + Math.sin(angle) * 3.2));
+      }
+      pitch.pitchNumber = pitch.pitchNumber || index + 1;
+      return pitch;
+    });
+}
+
+function liveLabPlaysForGame(game) {
+  const plays = listify(game?.allPlays);
+  const active = game?.activePlay?.matchup ? game.activePlay : null;
+  if (!active) return plays;
+  const activeIndex = active?.about?.atBatIndex;
+  const merged = [...plays];
+  const existingIndex = merged.findIndex((play) => String(play?.about?.atBatIndex ?? '') === String(activeIndex ?? ''));
+  if (existingIndex >= 0) merged[existingIndex] = active;
+  else merged.push(active);
+  return merged;
+}
+
+function liveLabHitDetail(play) {
+  const event = liveLabLastEvent(play, (candidate) => candidate?.hitData);
+  if (!event) return null;
+  const data = event.hitData || {};
+  const coordinates = data.coordinates || {};
+  const coordX = liveLabFinite(coordinates.coordX);
+  const coordY = liveLabFinite(coordinates.coordY);
+  const distance = liveLabFinite(data.totalDistance);
+  const exitVelocity = liveLabFinite(data.launchSpeed);
+  const launchAngle = liveLabFinite(data.launchAngle);
+  const key = [
+    play?.about?.atBatIndex ?? '',
+    event?.index ?? '',
+    exitVelocity ?? '',
+    launchAngle ?? '',
+    distance ?? '',
+    coordX ?? '',
+    coordY ?? '',
+  ].join(':');
+  const fieldX = coordX == null ? 50 : Math.max(10, Math.min(90, (coordX / 250) * 100));
+  const fieldY = coordY == null
+    ? Math.max(37, 78 - ((distance || 180) / 450) * 40)
+    : Math.max(28, Math.min(78, 100 - (coordY / 250) * 74));
+  const apex = Math.max(16, Math.min(46, 16 + Math.max(0, launchAngle || 0) * 0.72));
+  const duration = Math.max(0.9, Math.min(2.8, ((distance || 160) / Math.max(70, exitVelocity || 88)) * 0.62));
+  const dx = fieldX - 50;
+  const dy = fieldY - 16;
+  const sprayAngle = Math.max(-45, Math.min(45, dx * 1.05));
+  const length = Math.max(32, Math.min(82, Math.hypot(dx, dy) * 1.08));
+  const rotate = Math.atan2(-dy, dx) * (180 / Math.PI);
+  const midX = 50 + (dx * 0.5);
+  const midY = Math.min(92, fieldY + apex);
+  return {
+    key,
+    exitVelocity,
+    launchAngle,
+    distance,
+    trajectory: cleanSummary(data.trajectory || ''),
+    hardness: cleanSummary(data.hardness || ''),
+    sprayAngle,
+    fieldX,
+    fieldY,
+    apex,
+    duration,
+    length,
+    rotate,
+    midX,
+    midY,
+  };
+}
+
+function liveLabOutcomeKey(play) {
+  return [
+    play?.about?.atBatIndex ?? '',
+    play?.about?.inning ?? '',
+    play?.about?.halfInning ?? '',
+    play?.matchup?.batter?.id ?? '',
+    play?.result?.eventType || play?.result?.event || '',
+  ].join(':');
+}
+
+function liveLabOutcomeLabel(play) {
+  const inning = `${play?.about?.halfInning === 'top' ? 'T' : play?.about?.halfInning === 'bottom' ? 'B' : ''}${play?.about?.inning || ''}`;
+  const event = cleanSummary(play?.result?.event || 'PA');
+  return `${inning} ${event}`.trim();
+}
+
+function liveLabOutcomesForPlayer(game, playerId) {
+  const target = Number(playerId);
+  if (!Number.isFinite(target) || target <= 0) return [];
+  return liveLabPlaysForGame(game)
+    .filter((play) => Number(play?.matchup?.batter?.id) === target)
+    .map((play) => ({
+      key: liveLabOutcomeKey(play),
+      play,
+      label: liveLabOutcomeLabel(play),
+      description: cleanPlayText(play?.result?.description || play?.result?.event || ''),
+      hit: liveLabHitDetail(play),
+      pitches: liveLabPitchDetails(play),
+      isCurrent: String(play?.about?.atBatIndex ?? '') === String(game?.activePlay?.about?.atBatIndex ?? ''),
+    }));
+}
+
+function liveLabPlayerDay(entry) {
+  const stats = lineupGameBattingStatsFromPlayer(entry);
+  const ab = statNumber(stats.atBats);
+  const hits = statNumber(stats.hits);
+  const rbi = statNumber(stats.rbi);
+  const hr = statNumber(stats.hr ?? stats.homeRuns);
+  const walks = statNumber(stats.walks);
+  const strikeOuts = statNumber(stats.strikeOuts);
+  const parts = [`${hits}-${ab}`];
+  if (rbi) parts.push(`RBI ${rbi}`);
+  if (hr) parts.push(`HR ${hr}`);
+  if (walks) parts.push(`BB ${walks}`);
+  if (strikeOuts) parts.push(`K ${strikeOuts}`);
+  return parts.join(', ');
+}
+
+function renderLiveLabLineup(listEl, lineup = [], activeBatterId = null, color = '', teamLogo = '', options = {}) {
+  if (!listEl) return;
+  const panel = listEl.closest?.('.live-lab-lineup');
+  if (panel) {
+    panel.style.setProperty('--live-team-color', color || '#7bd0ff');
+    if (teamLogo) {
+      panel.style.setProperty('--team-logo-bg', `url("${String(teamLogo).replace(/"/g, '%22')}")`);
+    } else {
+      panel.style.removeProperty('--team-logo-bg');
+    }
+  }
+  listEl.replaceChildren();
+  if (!lineup.length) {
+    const empty = document.createElement('li');
+    empty.className = 'live-lab-empty';
+    empty.textContent = 'Lineup unavailable';
+    listEl.appendChild(empty);
+    return;
+  }
+  lineup.slice(0, 9).forEach((entry, index) => {
+    const row = document.createElement('li');
+    row.className = [
+      Number(entry?.id) === Number(activeBatterId) ? 'is-current' : '',
+      options.showSelection === false ? '' : (String(entry?.id || '') === String(liveLabSelectedPlayerId || '') ? 'is-selected' : ''),
+    ].filter(Boolean).join(' ');
+    row.dataset.livePlayerId = String(entry?.id || '');
+    row.style.setProperty('--live-team-color', color || '#7bd0ff');
+    row.innerHTML = `
+      <span class="live-lab-order">${escapeHtml(entry?.slot || index + 1)}</span>
+      <strong>${escapeHtml(lineupBatterLastName(entry))}</strong>
+      <em>${escapeHtml(liveLabPlayerDay(entry))}</em>
+    `;
+    listEl.appendChild(row);
+  });
+}
+
+function renderLiveLabDots(container, total, active, className) {
+  if (!container) return;
+  container.replaceChildren();
+  for (let i = 0; i < total; i += 1) {
+    const dot = document.createElement('span');
+    dot.className = `live-lab-dot${i < active ? ` is-on ${className}` : ''}`;
+    container.appendChild(dot);
+  }
+}
+
+function liveLabMetric(label, value) {
+  return `
+    <div class="live-lab-metric">
+      <span>${escapeHtml(label)}</span>
+      <strong>${escapeHtml(value)}</strong>
+    </div>
+  `;
+}
+
+function renderLiveLabMetrics(pitch, hit) {
+  if (!liveLabMetricsEl) return;
+  liveLabMetricsEl.innerHTML = [
+    liveLabMetric('No.', pitch?.pitchNumber ? `#${pitch.pitchNumber}` : '--'),
+    liveLabMetric('Count', pitch?.balls != null && pitch?.strikes != null ? `${pitch.balls}-${pitch.strikes}` : '--'),
+    liveLabMetric('Pitch', pitch?.type || '--'),
+    liveLabMetric('Velo', liveLabMetricValue(pitch?.speed, ' mph', 1)),
+    liveLabMetric('Spin', liveLabMetricValue(pitch?.spin)),
+    liveLabMetric('Break', liveLabMetricValue(pitch?.breakLength, '"', 1)),
+    liveLabMetric('EV', liveLabMetricValue(hit?.exitVelocity, ' mph', 1)),
+    liveLabMetric('LA', liveLabMetricValue(hit?.launchAngle, ' deg')),
+    liveLabMetric('Dist', liveLabMetricValue(hit?.distance, ' ft')),
+  ].join('');
+}
+
+function renderLiveLabPitchMarkers(pitches, selectedPitch, play) {
+  const zone = document.getElementById('liveLabZone');
+  if (!zone) return;
+  const finalPitch = pitches[pitches.length - 1] || null;
+  const terminalLabel = liveLabTerminalPitchLabel(play, finalPitch);
+  const renderKey = `${pitches.map((pitch) => `${pitch.key}:${pitch.code || ''}:${pitch.call || ''}`).join('|')}::${selectedPitch?.key || ''}::${terminalLabel}`;
+  if (zone.dataset.renderKey === renderKey) return;
+  zone.dataset.renderKey = renderKey;
+  zone.querySelectorAll('.live-lab-pitch-marker').forEach((marker) => marker.remove());
+  pitches.forEach((pitch, index) => {
+    const marker = document.createElement('button');
+    marker.type = 'button';
+    const resultClass = liveLabPitchResultClass(pitch);
+    marker.className = ['live-lab-pitch-marker', resultClass].filter(Boolean).join(' ');
+    if (pitch.key === selectedPitch?.key) marker.classList.add('is-selected');
+    if (pitch.key === liveLabCurrentPitchKey) marker.classList.add('is-current');
+    const isTerminalPitch = terminalLabel && finalPitch && pitch.key === finalPitch.key;
+    if (isTerminalPitch) marker.classList.add('is-terminal');
+    marker.dataset.livePitchKey = pitch.key;
+    marker.style.left = `${pitch.zoneX}%`;
+    marker.style.top = `${pitch.zoneY}%`;
+    marker.title = `Pitch ${pitch.pitchNumber || index + 1}: ${pitch.type} ${pitch.call}`;
+    marker.setAttribute('aria-label', marker.title);
+    marker.textContent = isTerminalPitch ? terminalLabel : String(pitch.pitchNumber || index + 1);
+    zone.appendChild(marker);
+  });
+}
+
+function renderLiveLabOutcomeList(outcomes, selectedOutcome) {
+  if (!liveLabOutcomeListEl) return;
+  const renderKey = `${outcomes.map((outcome) => outcome.key).join('|')}::${selectedOutcome?.key || ''}`;
+  if (liveLabOutcomeListEl.dataset.renderKey === renderKey) return;
+  liveLabOutcomeListEl.dataset.renderKey = renderKey;
+  liveLabOutcomeListEl.replaceChildren();
+  if (!outcomes.length) {
+    const empty = document.createElement('span');
+    empty.className = 'live-lab-outcome-empty';
+    empty.textContent = 'No plate appearances yet';
+    liveLabOutcomeListEl.appendChild(empty);
+    return;
+  }
+  outcomes.forEach((outcome, index) => {
+    const button = document.createElement('button');
+    button.type = 'button';
+    button.className = 'live-lab-outcome-btn';
+    if (outcome.key === selectedOutcome?.key) button.classList.add('is-selected');
+    if (outcome.isCurrent) button.classList.add('is-current');
+    button.dataset.liveOutcomeKey = outcome.key;
+    button.dataset.traceLabel = String(index + 1);
+    button.title = outcome.description || outcome.label;
+    button.textContent = `${index + 1}. ${outcome.label}`;
+    liveLabOutcomeListEl.appendChild(button);
+  });
+}
+
+function renderLiveLabContactTraces(outcomes, selectedOutcome, model) {
+  if (!liveLabTraceLayerEl || !model) return;
+  const renderKey = `${model.ballpark.key}::${outcomes.map((outcome) => `${outcome.key}:${outcome.hit?.key || 'none'}:${outcome.hit?.distance ?? ''}`).join('|')}::${selectedOutcome?.key || ''}`;
+  if (liveLabOutcomeFingerprint === renderKey) return;
+  liveLabOutcomeFingerprint = renderKey;
+  liveLabTraceLayerEl.replaceChildren();
+  liveLabTraceLayerEl.innerHTML = outcomes.map((outcome, index) => {
+    const hit = outcome.hit;
+    const classes = [
+      hit ? 'live-lab-svg-contact' : 'live-lab-svg-plate-result',
+      outcome.key === selectedOutcome?.key ? 'is-selected' : '',
+      outcome.isCurrent ? 'is-current' : '',
+    ].filter(Boolean).join(' ');
+    const title = escapeHtml(outcome.description || outcome.label || 'Outcome');
+    if (hit) {
+      const distance = Math.max(30, Math.min(470, hit.distance || (180 + (50 - hit.fieldY) * 4.8)));
+      const end = liveLabPoint(hit.sprayAngle || 0, distance);
+      const control = {
+        x: model.home.x + ((end.x - model.home.x) * 0.5),
+        y: Math.min(model.home.y, end.y) - Math.max(34, (hit.apex || 24) * 2.25),
+      };
+      const isHomeRun = /home\s*run|homer/i.test(`${outcome.label || ''} ${outcome.description || ''} ${outcome.play?.result?.event || ''}`);
+      const distanceLabel = isHomeRun && hit.distance ? `${Math.round(hit.distance)} ft` : '';
+      return `
+        <g class="${classes}" data-live-outcome-key="${escapeHtml(outcome.key)}" tabindex="0" role="button" aria-label="${title}">
+          <title>${title}</title>
+          <path d="M ${liveLabPointAttr(model.home)} Q ${liveLabPointAttr(control)} ${liveLabPointAttr(end)}" />
+          ${distanceLabel ? `<text class="live-lab-svg-distance-label" x="${end.x.toFixed(1)}" y="${(end.y - 18).toFixed(1)}">${escapeHtml(distanceLabel)}</text>` : ''}
+          <circle cx="${end.x.toFixed(1)}" cy="${end.y.toFixed(1)}" r="8" />
+          <text x="${end.x.toFixed(1)}" y="${(end.y + 3.5).toFixed(1)}">${index + 1}</text>
+        </g>
+      `;
+    }
+    const offset = (index % 5) * 18 - 36;
+    const point = { x: model.home.x + offset, y: model.home.y + 26 };
+    return `
+      <g class="${classes}" data-live-outcome-key="${escapeHtml(outcome.key)}" tabindex="0" role="button" aria-label="${title}">
+        <title>${title}</title>
+        <circle cx="${point.x.toFixed(1)}" cy="${point.y.toFixed(1)}" r="9" />
+        <text x="${point.x.toFixed(1)}" y="${(point.y + 3.5).toFixed(1)}">${index + 1}</text>
+      </g>
+    `;
+  }).join('');
+}
+
+function liveLabReplayResolvePauseWaiters() {
+  const waiters = liveLabReplayPauseResolvers;
+  liveLabReplayPauseResolvers = [];
+  waiters.forEach((resolve) => resolve());
+}
+
+function liveLabReplaySpeedRate() {
+  const rate = Number(liveLabReplaySpeed);
+  return Number.isFinite(rate) && rate > 0 ? rate : 1;
+}
+
+function liveLabReplayScaledSeconds(seconds) {
+  return Math.max(0.05, (Number(seconds) || 0) / liveLabReplaySpeedRate());
+}
+
+function syncLiveLabReplaySpeedControls() {
+  liveLabReplaySpeedControlsEl?.querySelectorAll?.('[data-live-replay-speed]').forEach((button) => {
+    const active = Number(button.dataset.liveReplaySpeed) === Number(liveLabReplaySpeed);
+    button.classList.toggle('is-active', active);
+    button.setAttribute('aria-pressed', active ? 'true' : 'false');
+  });
+}
+
+function setLiveLabReplaySpeed(value) {
+  const parsed = Number(value);
+  liveLabReplaySpeed = [0.5, 1, 2, 3].includes(parsed) ? parsed : 1;
+  syncLiveLabReplaySpeedControls();
+}
+
+function liveLabReplayWaitForResume() {
+  if (!liveLabReplayPaused || !liveLabReplayActive) return Promise.resolve();
+  return new Promise((resolve) => liveLabReplayPauseResolvers.push(resolve));
+}
+
+function liveLabReplaySetPaused(paused) {
+  liveLabReplayPaused = Boolean(paused && liveLabReplayActive);
+  const liveGrid = lineupOverlayEl?.querySelector('.lineup-live-lab-grid');
+  liveGrid?.classList.toggle('is-replay-paused', liveLabReplayPaused);
+  liveLabReplayPauseBtnEl?.setAttribute('aria-pressed', liveLabReplayPaused ? 'true' : 'false');
+  if (liveLabReplayPauseBtnEl) liveLabReplayPauseBtnEl.textContent = liveLabReplayPaused ? 'Play' : 'Pause';
+  try {
+    if (liveLabReplayPaused) liveLabFieldSvgEl?.pauseAnimations?.();
+    else liveLabFieldSvgEl?.unpauseAnimations?.();
+  } catch {}
+  if (!liveLabReplayPaused) liveLabReplayResolvePauseWaiters();
+}
+
+function toggleLiveLabReplayPause() {
+  if (!liveLabReplayActive) return;
+  liveLabReplaySetPaused(!liveLabReplayPaused);
+}
+
+async function liveLabReplaySleep(ms) {
+  let remaining = Math.max(0, Number(ms) || 0);
+  while (remaining > 0 && liveLabReplayActive) {
+    if (liveLabReplayPaused) {
+      await liveLabReplayWaitForResume();
+      continue;
+    }
+    const slice = Math.min(remaining, 80);
+    const started = performance.now();
+    await new Promise((resolve) => window.setTimeout(resolve, slice));
+    if (!liveLabReplayPaused) remaining -= Math.max(0, performance.now() - started) * liveLabReplaySpeedRate();
+  }
+}
+
+function liveLabReplayStillActive(token) {
+  return liveLabReplayActive && token === liveLabReplayToken;
+}
+
+function liveLabClearReplayArtifacts() {
+  liveLabReplayTraceLayerEl?.replaceChildren();
+  liveLabReplayRunnerLayerEl?.replaceChildren();
+  liveLabReplayOverlayEl?.setAttribute('hidden', '');
+  liveLabReplayOverlayEl?.classList.remove('is-hr', 'is-out');
+  document.getElementById('liveLabZone')?.querySelectorAll('.live-lab-replay-pitch').forEach((marker) => marker.remove());
+}
+
+function stopLiveLabReplay(options = {}) {
+  if (!liveLabReplayActive && !options.force) return;
+  liveLabReplayToken += 1;
+  liveLabReplayActive = false;
+  liveLabReplayPaused = false;
+  liveLabReplayResolvePauseWaiters();
+  liveLabFieldEl?.classList.remove('is-replaying');
+  liveLabFieldEl?.closest?.('.live-lab-field-shell')?.classList.remove('is-replay-run-burst', 'is-replay-hr-burst');
+  liveLabAwayScoreEl?.closest?.('.live-lab-score-strip')?.classList.remove('is-replay-run-burst', 'is-replay-hr-burst');
+  lineupOverlayEl?.querySelector('.lineup-live-lab-grid')?.classList.remove('is-replaying', 'is-replay-paused', 'is-replay-run-burst', 'is-replay-hr-burst');
+  try { liveLabFieldSvgEl?.unpauseAnimations?.(); } catch {}
+  if (liveLabReplaySpeedControlsEl) liveLabReplaySpeedControlsEl.hidden = true;
+  if (liveLabReplayPauseBtnEl) {
+    liveLabReplayPauseBtnEl.hidden = true;
+    liveLabReplayPauseBtnEl.textContent = 'Pause';
+    liveLabReplayPauseBtnEl.setAttribute('aria-pressed', 'false');
+  }
+  if (liveLabReplayBtnEl) {
+    liveLabReplayBtnEl.textContent = 'Game Replay';
+    liveLabReplayBtnEl.setAttribute('aria-pressed', 'false');
+  }
+  liveLabClearReplayArtifacts();
+  if (options.restore !== false && activeLineupGame && currentLineupView === 'live') {
+    liveLabPitchFingerprint = '';
+    liveLabOutcomeFingerprint = '';
+    renderLineupLiveLab(activeLineupGame);
+  }
+}
+
+function liveLabReplayBlankBattingStats() {
+  return {
+    atBats: 0,
+    hits: 0,
+    doubles: 0,
+    triples: 0,
+    homeRuns: 0,
+    runs: 0,
+    rbi: 0,
+    walks: 0,
+    strikeOuts: 0,
+    totalBases: 0,
+  };
+}
+
+function liveLabReplayBlankLineup(lineup = []) {
+  return lineup.map((entry) => ({
+    ...entry,
+    today: '0-0',
+    gameBatting: liveLabReplayBlankBattingStats(),
+    isActive: false,
+    isNextUp: false,
+  }));
+}
+
+function liveLabReplaySnapshot(game) {
+  return {
+    game,
+    awayLineup: liveLabReplayBlankLineup(normalizeLineupCollectionForSide(game, 'away', game?.lineup?.away || [])),
+    homeLineup: liveLabReplayBlankLineup(normalizeLineupCollectionForSide(game, 'home', game?.lineup?.home || [])),
+    bases: { first: null, second: null, third: null },
+    awayScore: 0,
+    homeScore: 0,
+    inning: 'START',
+    halfKey: '',
+  };
+}
+
+function liveLabReplayBaseKey(ordinal) {
+  if (ordinal === 1) return 'first';
+  if (ordinal === 2) return 'second';
+  if (ordinal === 3) return 'third';
+  return '';
+}
+
+function liveLabReplayBattingSide(play) {
+  return play?.about?.halfInning === 'bottom' ? 'home' : 'away';
+}
+
+function liveLabReplayHalfKey(play) {
+  const inning = play?.about?.inning ?? '';
+  const half = play?.about?.halfInning || '';
+  return inning || half ? `${inning}:${half}` : '';
+}
+
+function liveLabReplayClearBases(snapshot) {
+  if (!snapshot) return;
+  snapshot.bases = { first: null, second: null, third: null };
+}
+
+function liveLabReplayPrepareHalfInning(snapshot, play) {
+  if (!snapshot) return;
+  const nextKey = liveLabReplayHalfKey(play);
+  if (nextKey && snapshot.halfKey && snapshot.halfKey !== nextKey) liveLabReplayClearBases(snapshot);
+  if (nextKey) snapshot.halfKey = nextKey;
+}
+
+function liveLabReplaySideColor(snapshot, side) {
+  const game = snapshot?.game || {};
+  return side === 'home'
+    ? (game.homeColor || getTeamColor(game.home))
+    : (game.awayColor || getTeamColor(game.away));
+}
+
+function liveLabReplayPersonId(person) {
+  return Number(person?.id ?? person?.person?.id ?? person?.player?.id ?? person?.runner?.id ?? person?.details?.runner?.id) || null;
+}
+
+function liveLabReplayEntryRunner(entry) {
+  return entry?.runner || entry?.details?.runner || entry?.details?.person || entry?.person || null;
+}
+
+function liveLabReplayLineupEntryById(snapshot, playerId, side = '') {
+  const id = Number(playerId);
+  if (!Number.isFinite(id) || id <= 0) return null;
+  const primary = liveLabReplayLineupForSide(snapshot, side) || [];
+  const secondary = side === 'home' ? (snapshot?.awayLineup || []) : (snapshot?.homeLineup || []);
+  return [...primary, ...secondary].find((entry) => Number(entry?.id) === id) || null;
+}
+
+function liveLabReplayRunnerInfo(snapshot, runner, side, fallback = null) {
+  const playerId = liveLabReplayPersonId(runner) || fallback?.id || null;
+  const lineupEntry = liveLabReplayLineupEntryById(snapshot, playerId, side);
+  const lookup = playerId ? snapshot?.game?.playerLookup?.[String(playerId)] : null;
+  const fullName = cleanSummary(
+    runner?.fullName
+    || runner?.name
+    || runner?.boxscoreName
+    || runner?.person?.fullName
+    || runner?.player?.fullName
+    || lineupEntry?.fullName
+    || lineupEntry?.name
+    || lookup?.fullName
+    || fallback?.fullName
+    || fallback?.name
+    || 'Runner',
+  );
+  return {
+    id: playerId,
+    fullName,
+    name: fullName === 'Runner' ? 'Runner' : lastName(fullName),
+    side: side || fallback?.side || '',
+    color: liveLabReplaySideColor(snapshot, side || fallback?.side) || fallback?.color,
+  };
+}
+
+function liveLabReplayLineupForSide(snapshot, side) {
+  return side === 'home' ? snapshot?.homeLineup : snapshot?.awayLineup;
+}
+
+function liveLabReplayFindLineupEntry(snapshot, play, side = liveLabReplayBattingSide(play)) {
+  const lineup = liveLabReplayLineupForSide(snapshot, side) || [];
+  const batterId = Number(play?.matchup?.batter?.id);
+  if (Number.isFinite(batterId) && batterId > 0) {
+    const byId = lineup.find((entry) => Number(entry?.id) === batterId);
+    if (byId) return byId;
+  }
+  const batterKey = normalizeNameKey(play?.matchup?.batter?.fullName || '');
+  return batterKey ? lineup.find((entry) => normalizeNameKey(entry?.fullName || entry?.name || '') === batterKey) || null : null;
+}
+
+function liveLabReplayRenderLineups(snapshot, activePlay = null) {
+  if (!snapshot) return;
+  const game = snapshot.game || {};
+  const activeBatterId = Number(activePlay?.matchup?.batter?.id || 0);
+  renderLiveLabLineup(liveLabAwayLineupEl, snapshot.awayLineup, activeBatterId, game.awayColor, game.awayLogo || getLogoPath(game.away), { showSelection: false });
+  renderLiveLabLineup(liveLabHomeLineupEl, snapshot.homeLineup, activeBatterId, game.homeColor, game.homeLogo || getLogoPath(game.home), { showSelection: false });
+  if (liveLabAwayScoreEl) liveLabAwayScoreEl.textContent = lineupRunDisplay(snapshot.awayScore);
+  if (liveLabHomeScoreEl) liveLabHomeScoreEl.textContent = lineupRunDisplay(snapshot.homeScore);
+  if (liveLabInningEl) {
+    const inning = activePlay?.about?.inning;
+    const half = activePlay?.about?.halfInning;
+    liveLabInningEl.textContent = inning ? `${half === 'bottom' ? 'BOT' : 'TOP'} ${inning}` : snapshot.inning;
+  }
+}
+
+function liveLabReplayRenderBases(snapshot, model) {
+  if (!snapshot || !model || !liveLabBaseLayerEl) return;
+  const bases = [
+    ['first', 1, model.first, 28, -4, 'start', '1B'],
+    ['second', 2, model.second, 0, -25, 'middle', '2B'],
+    ['third', 3, model.third, -28, -4, 'end', '3B'],
+    ['home', 0, model.home, 0, 0, 'middle', ''],
+  ];
+  liveLabBaseLayerEl.innerHTML = bases.map(([base, ordinal, point, labelX, labelY, anchor, code]) => {
+    const runner = ordinal ? snapshot.bases?.[base] : null;
+    const color = runner?.color || '#ffd166';
+    return `
+      <g class="live-lab-svg-base-group${runner ? ' is-on is-replay' : ''}" data-live-base="${base}" transform="translate(${point.x.toFixed(1)} ${point.y.toFixed(1)})" style="--runner-color:${escapeHtml(color)}">
+        ${runner ? `<circle class="live-lab-svg-base-halo" cx="0" cy="0" r="23" />` : ''}
+        <rect class="live-lab-svg-base" x="-7" y="-7" width="14" height="14" transform="rotate(45)" />
+        ${runner ? `
+          <text class="live-lab-svg-base-code" x="${labelX}" y="${labelY - 10}" text-anchor="${anchor}">${code}</text>
+          <text class="live-lab-svg-base-name" x="${labelX}" y="${labelY + 5}" text-anchor="${anchor}">${escapeHtml(runner.name || 'Runner')}</text>
+        ` : ''}
+      </g>
+    `;
+  }).join('');
+}
+
+function liveLabReplayRenderOutcomeChip(play, outcome = null) {
+  if (!liveLabOutcomeListEl) return;
+  const inning = `${play?.about?.halfInning === 'bottom' ? 'B' : 'T'}${play?.about?.inning || ''}`;
+  const label = outcome ? `${inning} ${outcome.title}`.trim() : `${inning} PA`.trim();
+  liveLabOutcomeListEl.dataset.renderKey = `replay:${play?.about?.atBatIndex ?? ''}:${label}`;
+  liveLabOutcomeListEl.innerHTML = `
+    <button type="button" class="live-lab-outcome-btn${outcome ? ' is-selected' : ' is-current'}" disabled>${escapeHtml(label)}</button>
+  `;
+}
+
+function liveLabReplayScoringRunners(play) {
+  return listify(play?.runners).filter((entry) => {
+    const movement = entry?.movement || {};
+    return !movement.isOut && liveLabReplayBaseOrdinal(movement.end || movement.outBase, null) === 4;
+  });
+}
+
+function liveLabReplayRunTotal(play) {
+  const scored = liveLabReplayScoringRunners(play).length;
+  if (scored) return scored;
+  const rbi = statNumber(play?.result?.rbi);
+  if (rbi) return rbi;
+  return liveLabReplayHitBases(play) === 4 ? 1 : 0;
+}
+
+function liveLabReplayOutsAfterPlay(play) {
+  const countOuts = liveLabFinite(play?.count?.outs);
+  if (countOuts != null) return countOuts;
+  const aboutOuts = liveLabFinite(play?.about?.outs);
+  return aboutOuts == null ? 0 : aboutOuts;
+}
+
+function liveLabReplayIsWalk(play) {
+  const text = `${play?.result?.event || ''} ${play?.result?.eventType || ''} ${play?.result?.description || ''}`.toLowerCase();
+  return /intent walk|base on balls|\bwalk\b/.test(text);
+}
+
+function liveLabReplayIsHitByPitch(play) {
+  const text = `${play?.result?.event || ''} ${play?.result?.eventType || ''} ${play?.result?.description || ''}`.toLowerCase();
+  return /hit by pitch/.test(text);
+}
+
+function liveLabReplayIsSacrifice(play) {
+  const eventType = String(play?.result?.eventType || '').toLowerCase();
+  const text = `${play?.result?.event || ''} ${play?.result?.description || ''}`.toLowerCase();
+  return eventType.includes('sac') || /sacrifice|sac fly|sac bunt/.test(text);
+}
+
+function liveLabReplayHitBases(play) {
+  const eventType = String(play?.result?.eventType || '').toLowerCase();
+  const text = `${play?.result?.event || ''} ${play?.result?.description || ''}`.toLowerCase();
+  if (eventType.includes('double_play') || /double play/.test(text)) return 0;
+  if (eventType === 'home_run' || /home run|homer/.test(text)) return 4;
+  if (eventType === 'triple' || /\btriples?\b/.test(text)) return 3;
+  if (eventType === 'double' || /\bdoubles?\b/.test(text)) return 2;
+  if (eventType === 'single' || /\bsingles?\b/.test(text)) return 1;
+  return 0;
+}
+
+function liveLabReplayApplyFallbackBases(snapshot, play, side, hitBases, isWalk, isHbp) {
+  if (!snapshot?.bases) return;
+  const batter = liveLabReplayRunnerInfo(snapshot, play?.matchup?.batter, side);
+  if (hitBases === 4) {
+    snapshot.bases = { first: null, second: null, third: null };
+    return;
+  }
+  if (hitBases > 0) {
+    const next = { first: null, second: null, third: null };
+    for (let ordinal = 3; ordinal >= 1; ordinal -= 1) {
+      const base = liveLabReplayBaseKey(ordinal);
+      const runner = snapshot.bases[base];
+      if (!runner) continue;
+      const target = ordinal + hitBases;
+      const targetBase = liveLabReplayBaseKey(target);
+      if (targetBase) next[targetBase] = runner;
+    }
+    const batterBase = liveLabReplayBaseKey(hitBases);
+    if (batterBase) next[batterBase] = batter;
+    snapshot.bases = next;
+    return;
+  }
+  if (isWalk || isHbp) {
+    const next = { ...snapshot.bases };
+    if (next.first && next.second && next.third) next.third = null;
+    if (next.first && next.second) next.third = next.second;
+    if (next.first) next.second = next.first;
+    next.first = batter;
+    snapshot.bases = next;
+  }
+}
+
+function liveLabReplayApplyBaseState(snapshot, play, side, hitBases, isWalk, isHbp) {
+  if (!snapshot?.bases) return;
+  const runners = listify(play?.runners);
+  if (!runners.length) {
+    liveLabReplayApplyFallbackBases(snapshot, play, side, hitBases, isWalk, isHbp);
+    return;
+  }
+  const next = { ...snapshot.bases };
+  const clearedBases = new Set();
+  const placements = [];
+  for (const entry of runners) {
+    const movement = entry?.movement || {};
+    const entryRunner = liveLabReplayEntryRunner(entry);
+    const isBatter = liveLabReplayRunnerEntryIsBatter(entry, play);
+    const start = liveLabReplayRunnerStartOrdinal(movement, isBatter);
+    const end = liveLabReplayBaseOrdinal(movement.end || movement.outBase, null);
+    const startBase = liveLabReplayBaseKey(start);
+    const endBase = liveLabReplayBaseKey(end);
+    const priorRunner = startBase ? snapshot.bases[startBase] : null;
+    const runner = liveLabReplayRunnerInfo(snapshot, isBatter ? play?.matchup?.batter : entryRunner, priorRunner?.side || side, priorRunner);
+    if (startBase) clearedBases.add(startBase);
+    if (!movement.isOut && endBase) placements.push({ base: endBase, runner });
+  }
+  for (const base of clearedBases) next[base] = null;
+  for (const placement of placements) next[placement.base] = placement.runner;
+  if (hitBases === 4) {
+    snapshot.bases = { first: null, second: null, third: null };
+    return;
+  }
+  snapshot.bases = next;
+}
+
+function liveLabReplayRunnerEntryIsBatter(entry, play) {
+  const movement = entry?.movement || {};
+  const batterId = Number(play?.matchup?.batter?.id);
+  const entryRunner = liveLabReplayEntryRunner(entry);
+  const runnerId = Number(entryRunner?.id ?? entryRunner?.person?.id);
+  if (Number.isFinite(batterId) && batterId > 0 && Number.isFinite(runnerId) && runnerId === batterId) return true;
+  const runnerName = normalizeNameKey(entryRunner?.fullName || entryRunner?.name || entryRunner?.person?.fullName || '');
+  const batterName = normalizeNameKey(play?.matchup?.batter?.fullName || '');
+  if (runnerName && batterName && runnerName === batterName) return true;
+  const start = cleanSummary(movement.start || movement.originBase || '');
+  const end = cleanSummary(movement.end || movement.outBase || '');
+  return !start && Boolean(end);
+}
+
+function liveLabReplayRunnerStartOrdinal(movement, isBatter) {
+  const raw = cleanSummary(movement?.start || movement?.originBase || '');
+  if (isBatter && /^(home|home plate|batter)$/i.test(raw)) return 0;
+  return liveLabReplayBaseOrdinal(raw, isBatter ? 0 : null);
+}
+
+function liveLabReplayApplyPlay(snapshot, play) {
+  if (!snapshot || !play) return;
+  const side = liveLabReplayBattingSide(play);
+  const battingEntry = liveLabReplayFindLineupEntry(snapshot, play, side);
+  const stats = battingEntry?.gameBatting || null;
+  const hitBases = liveLabReplayHitBases(play);
+  const isWalk = liveLabReplayIsWalk(play);
+  const isHbp = liveLabReplayIsHitByPitch(play);
+  const isSacrifice = liveLabReplayIsSacrifice(play);
+  const text = `${play?.result?.event || ''} ${play?.result?.eventType || ''} ${play?.result?.description || ''}`.toLowerCase();
+  const runsScored = liveLabReplayRunTotal(play);
+
+  if (stats) {
+    if (hitBases) {
+      stats.atBats += 1;
+      stats.hits += 1;
+      stats.totalBases += hitBases;
+      if (hitBases === 2) stats.doubles += 1;
+      if (hitBases === 3) stats.triples += 1;
+      if (hitBases === 4) stats.homeRuns += 1;
+    } else if (isWalk) {
+      stats.walks += 1;
+    } else if (!isHbp && !isSacrifice) {
+      stats.atBats += 1;
+    }
+    if (/strikeout|strikes out/.test(text)) stats.strikeOuts += 1;
+    stats.rbi += statNumber(play?.result?.rbi);
+    battingEntry.today = battingTodaySummaryFromGameStats(stats);
+  }
+
+  const scoredRunnerIds = new Set();
+  for (const runner of liveLabReplayScoringRunners(play)) {
+    const runnerSide = side;
+    const scoredRunner = liveLabReplayEntryRunner(runner);
+    const runnerEntry = liveLabReplayFindLineupEntry(snapshot, { matchup: { batter: scoredRunner } }, runnerSide);
+    const runnerId = Number(scoredRunner?.id);
+    if (Number.isFinite(runnerId)) scoredRunnerIds.add(runnerId);
+    if (runnerEntry?.gameBatting) {
+      runnerEntry.gameBatting.runs += 1;
+      runnerEntry.today = battingTodaySummaryFromGameStats(runnerEntry.gameBatting);
+    }
+  }
+  const batterId = Number(play?.matchup?.batter?.id);
+  if (hitBases === 4 && battingEntry?.gameBatting && !scoredRunnerIds.has(batterId)) {
+    battingEntry.gameBatting.runs += 1;
+    battingEntry.today = battingTodaySummaryFromGameStats(battingEntry.gameBatting);
+  }
+
+  const awayScore = liveLabFinite(play?.result?.awayScore);
+  const homeScore = liveLabFinite(play?.result?.homeScore);
+  if (awayScore != null) snapshot.awayScore = awayScore;
+  if (homeScore != null) snapshot.homeScore = homeScore;
+  if (awayScore == null && homeScore == null) {
+    if (side === 'home') snapshot.homeScore += runsScored;
+    else snapshot.awayScore += runsScored;
+  }
+  liveLabReplayApplyBaseState(snapshot, play, side, hitBases, isWalk, isHbp);
+  if (liveLabReplayOutsAfterPlay(play) >= 3) liveLabReplayClearBases(snapshot);
+  return { runs: runsScored, isHomeRun: hitBases === 4 };
+}
+
+function liveLabReplayPositionNumber(text) {
+  const value = String(text || '').toLowerCase();
+  if (/\bpitcher\b/.test(value)) return '1';
+  if (/\bcatcher\b/.test(value)) return '2';
+  if (/\bfirst baseman\b|\bfirst base\b/.test(value)) return '3';
+  if (/\bsecond baseman\b|\bsecond base\b/.test(value)) return '4';
+  if (/\bthird baseman\b|\bthird base\b/.test(value)) return '5';
+  if (/\bshortstop\b/.test(value)) return '6';
+  if (/\bleft fielder\b|\bleft field\b/.test(value)) return '7';
+  if (/\bcenter fielder\b|\bcenter field\b/.test(value)) return '8';
+  if (/\bright fielder\b|\bright field\b/.test(value)) return '9';
+  return '';
+}
+
+function liveLabReplayErrorCode(play) {
+  const eventType = String(play?.result?.eventType || '').toLowerCase();
+  const event = String(play?.result?.event || '').toLowerCase();
+  const description = String(play?.result?.description || '').toLowerCase();
+  const text = `${event} ${eventType} ${description}`;
+  if (!/error|field_error/.test(text)) return '';
+  const explicit = description.match(/(?:error|interference)\s+by\s+(?:the\s+)?([^.,;]+)/i);
+  const positionText = explicit?.[1] || description;
+  const position = liveLabReplayPositionNumber(positionText);
+  return `E${position || ''}`.trim();
+}
+
+function liveLabReplayOutcomeCode(play) {
+  const eventType = String(play?.result?.eventType || '').toLowerCase();
+  const event = String(play?.result?.event || '').toLowerCase();
+  const description = String(play?.result?.description || '').toLowerCase();
+  const text = `${event} ${eventType} ${description}`;
+  const errorCode = liveLabReplayErrorCode(play);
+  if (errorCode) return errorCode;
+  if (eventType.includes('double_play') || /double play/.test(text)) return 'GIDP';
+  if (eventType === 'home_run' || /home run|homer/.test(text)) return 'HOMERUN';
+  if (eventType === 'double' || /\bdoubles?\b/.test(text)) return '2B';
+  if (eventType === 'triple' || /\btriples?\b/.test(text)) return '3B';
+  if (eventType === 'single' || /\bsingles?\b/.test(text)) return '1B';
+  if (/hit by pitch/.test(text)) return 'HBP';
+  if (/intent walk|base on balls|\bwalk\b/.test(text)) return 'BB';
+  if (/strikeout|strikes out/.test(text)) {
+    const replayPitches = liveLabPitchDetails(play);
+    const finalPitch = replayPitches[replayPitches.length - 1] || null;
+    return liveLabTerminalPitchLabel(play, finalPitch) || 'K';
+  }
+  const pos = liveLabReplayPositionNumber(description);
+  if (/pop|pops|popped/.test(text)) return `P${pos || ''}`.trim();
+  if (/fly|flies|flied/.test(text)) return `F${pos || ''}`.trim();
+  if (/line|lines|lined/.test(text)) return `L${pos || ''}`.trim();
+  if (/ground|grounds|grounded/.test(text)) return `G${pos || ''}`.trim();
+  return cleanSummary(play?.result?.event || 'OUT').toUpperCase();
+}
+
+function liveLabReplayOutcome(play) {
+  const hit = liveLabHitDetail(play);
+  const title = liveLabReplayOutcomeCode(play);
+  const isHomeRun = title === 'HOMERUN';
+  const player = cleanSummary(play?.matchup?.batter?.fullName || 'Batter');
+  const distance = hit?.distance ? `${Math.round(hit.distance)} FT` : '';
+  const event = cleanSummary(play?.result?.event || '');
+  return {
+    title,
+    player,
+    meta: isHomeRun ? distance : event,
+    hit,
+    isHomeRun,
+  };
+}
+
+function liveLabShowReplayOverlay(outcome) {
+  if (!liveLabReplayOverlayEl) return;
+  if (liveLabReplayTitleEl) liveLabReplayTitleEl.textContent = outcome.title || 'PLAY';
+  if (liveLabReplayPlayerEl) liveLabReplayPlayerEl.textContent = outcome.player || '';
+  if (liveLabReplayMetaEl) liveLabReplayMetaEl.textContent = outcome.meta || '';
+  liveLabReplayOverlayEl.hidden = false;
+  liveLabReplayOverlayEl.classList.toggle('is-hr', Boolean(outcome.isHomeRun));
+  liveLabReplayOverlayEl.classList.toggle('is-out', !outcome.isHomeRun);
+}
+
+function liveLabReplayTriggerScoreBurst(outcome, runs = 0) {
+  if (!runs) return;
+  const shell = liveLabFieldEl?.closest?.('.live-lab-field-shell');
+  const scoreStrip = liveLabAwayScoreEl?.closest?.('.live-lab-score-strip');
+  const grid = lineupOverlayEl?.querySelector?.('.lineup-live-lab-grid');
+  const className = outcome?.isHomeRun ? 'is-replay-hr-burst' : 'is-replay-run-burst';
+  const nodes = [shell, scoreStrip, grid].filter(Boolean);
+  for (const node of nodes) {
+    node.classList.remove('is-replay-run-burst', 'is-replay-hr-burst');
+    void node.offsetWidth;
+    node.classList.add(className);
+  }
+  window.setTimeout(() => {
+    for (const node of nodes) node.classList.remove(className);
+  }, outcome?.isHomeRun ? 2300 : 1250);
+}
+
+function liveLabReplayBaseOrdinal(code, fallback = null) {
+  const value = String(code || '').toLowerCase();
+  if (!value) return fallback;
+  if (value === '1b' || value.includes('first')) return 1;
+  if (value === '2b' || value.includes('second')) return 2;
+  if (value === '3b' || value.includes('third')) return 3;
+  if (value === 'score' || value === '4b' || value.includes('home')) return 4;
+  return fallback;
+}
+
+function liveLabReplayBasePoint(model, ordinal) {
+  if (ordinal === 1) return model.first;
+  if (ordinal === 2) return model.second;
+  if (ordinal === 3) return model.third;
+  return model.home;
+}
+
+function liveLabReplayMovePath(model, startOrdinal, endOrdinal) {
+  const start = Number.isFinite(startOrdinal) ? startOrdinal : 0;
+  const end = Number.isFinite(endOrdinal) ? endOrdinal : start;
+  const points = [];
+  for (let ordinal = start; ordinal <= end; ordinal += 1) {
+    points.push(liveLabReplayBasePoint(model, ordinal));
+  }
+  if (points.length < 2) return '';
+  return points.map((point, index) => `${index ? 'L' : 'M'} ${liveLabPointAttr(point)}`).join(' ');
+}
+
+function liveLabFallbackRunnerMoves(play, snapshot = null) {
+  const eventType = String(play?.result?.eventType || '').toLowerCase();
+  const map = {
+    single: 1,
+    double: 2,
+    triple: 3,
+    home_run: 4,
+    walk: 1,
+    intent_walk: 1,
+    hit_by_pitch: 1,
+  };
+  const end = map[eventType];
+  const side = liveLabReplayBattingSide(play);
+  const batter = liveLabReplayRunnerInfo(snapshot, play?.matchup?.batter, side);
+  return end ? [{
+    start: 0,
+    end,
+    label: batter.name || 'Batter',
+    color: batter.color || liveLabReplaySideColor(snapshot, side),
+  }] : [];
+}
+
+function liveLabReplayRunnerMoves(play, snapshot = null) {
+  const side = liveLabReplayBattingSide(play);
+  const color = liveLabReplaySideColor(snapshot, side);
+  const moves = listify(play?.runners).map((entry) => {
+    const movement = entry?.movement || {};
+    const entryRunner = liveLabReplayEntryRunner(entry);
+    const isBatter = liveLabReplayRunnerEntryIsBatter(entry, play);
+    const start = liveLabReplayRunnerStartOrdinal(movement, isBatter);
+    const end = liveLabReplayBaseOrdinal(movement.end || movement.outBase, null);
+    if (!Number.isFinite(start) || !Number.isFinite(end) || start === end) return null;
+    const startBase = liveLabReplayBaseKey(start);
+    const priorRunner = startBase ? snapshot?.bases?.[startBase] : null;
+    const runner = liveLabReplayRunnerInfo(snapshot, isBatter ? play?.matchup?.batter : entryRunner, priorRunner?.side || side, priorRunner);
+    return {
+      start,
+      end,
+      label: runner.name || 'Runner',
+      color: runner.color || color,
+      isOut: Boolean(movement.isOut),
+    };
+  }).filter(Boolean);
+  return moves.length ? moves : liveLabFallbackRunnerMoves(play, snapshot);
+}
+
+function renderLiveLabReplayRunners(play, model, durationMs, snapshot = null) {
+  if (!liveLabReplayRunnerLayerEl || !model) return;
+  const moves = liveLabReplayRunnerMoves(play, snapshot);
+  liveLabReplayRunnerLayerEl.innerHTML = moves.map((move, index) => {
+    const path = liveLabReplayMovePath(model, move.start, move.end);
+    if (!path) return '';
+    const seconds = liveLabReplayScaledSeconds(Math.max(0.65, (durationMs / 1000) * 0.72));
+    const label = escapeHtml(move.label);
+    const color = escapeHtml(move.color || '#7bd0ff');
+    return `
+      <g class="live-lab-replay-runner-move${move.isOut ? ' is-out' : ''}" style="--runner-color:${color}">
+        <path class="live-lab-replay-runner-path" d="${path}" />
+        <g class="live-lab-replay-runner-token">
+          <circle class="live-lab-replay-runner" r="7"></circle>
+          <text class="live-lab-replay-runner-label" x="0" y="-12">${label}</text>
+          <animateMotion dur="${seconds.toFixed(2)}s" fill="freeze" path="${path}" />
+        </g>
+      </g>
+    `;
+  }).join('');
+}
+
+function liveLabReplayFlightSeconds(hit, outcome) {
+  if (!hit) return 0;
+  const distance = Math.max(30, hit.distance || 160);
+  const exitVelocity = Math.max(55, hit.exitVelocity || (outcome?.isHomeRun ? 100 : 84));
+  const launchAngle = Number.isFinite(Number(hit.launchAngle)) ? Number(hit.launchAngle) : 15;
+  const airDragFactor = outcome?.isHomeRun ? 0.62 : 0.72;
+  const baseSeconds = distance / (exitVelocity * 1.4667 * airDragFactor);
+  const hangBonus = Math.max(0, launchAngle - 14) * 0.018;
+  const cap = outcome?.isHomeRun ? 4.85 : 3.4;
+  return Math.max(0.55, Math.min(cap, baseSeconds + hangBonus));
+}
+
+function renderLiveLabReplayOutcomeTrace(play, model, outcome, durationMs, flightSeconds = null) {
+  if (!liveLabReplayTraceLayerEl || !model) return;
+  const hit = outcome.hit;
+  if (!hit) {
+    const point = { x: model.home.x, y: model.home.y + 24 };
+    liveLabReplayTraceLayerEl.innerHTML = `
+      <g class="live-lab-replay-plate-result">
+        <circle cx="${point.x.toFixed(1)}" cy="${point.y.toFixed(1)}" r="11" />
+        <text x="${point.x.toFixed(1)}" y="${(point.y + 4).toFixed(1)}">${escapeHtml(outcome.title)}</text>
+      </g>
+    `;
+    return;
+  }
+  const distance = Math.max(30, Math.min(470, hit.distance || (180 + (50 - hit.fieldY) * 4.8)));
+  const end = liveLabPoint(hit.sprayAngle || 0, distance);
+  const control = {
+    x: model.home.x + ((end.x - model.home.x) * 0.5),
+    y: Math.min(model.home.y, end.y) - Math.max(34, (hit.apex || 24) * 2.25),
+  };
+  const path = `M ${liveLabPointAttr(model.home)} Q ${liveLabPointAttr(control)} ${liveLabPointAttr(end)}`;
+  const flight = liveLabReplayScaledSeconds(flightSeconds || liveLabReplayFlightSeconds(hit, outcome));
+  liveLabReplayTraceLayerEl.innerHTML = `
+    <g class="live-lab-replay-contact${outcome.isHomeRun ? ' is-hr' : ''}" style="--replay-trace-duration:${flight.toFixed(2)}s">
+      <path pathLength="100" d="${path}" />
+      <circle class="live-lab-replay-ball" r="${outcome.isHomeRun ? 6.4 : 5.4}">
+        <animateMotion dur="${flight.toFixed(2)}s" fill="freeze" path="${path}" />
+      </circle>
+      <circle class="live-lab-replay-landing" cx="${end.x.toFixed(1)}" cy="${end.y.toFixed(1)}" r="${outcome.isHomeRun ? 11 : 8}" />
+      ${outcome.isHomeRun && hit.distance ? `<text class="live-lab-replay-distance-label" x="${end.x.toFixed(1)}" y="${(end.y - 22).toFixed(1)}">${Math.round(hit.distance)} FT</text>` : ''}
+    </g>
+  `;
+}
+
+function renderLiveLabReplayPitch(pitch, index, terminalLabel = '') {
+  const zone = document.getElementById('liveLabZone');
+  if (!zone || !pitch) return;
+  const marker = document.createElement('button');
+  marker.type = 'button';
+  const resultClass = liveLabPitchResultClass(pitch);
+  marker.className = ['live-lab-pitch-marker', 'live-lab-replay-pitch', resultClass].filter(Boolean).join(' ');
+  if (terminalLabel) marker.classList.add('is-terminal');
+  marker.style.left = `${pitch.zoneX}%`;
+  marker.style.top = `${pitch.zoneY}%`;
+  marker.textContent = terminalLabel || String(pitch.pitchNumber || index + 1);
+  marker.title = `Pitch ${pitch.pitchNumber || index + 1}: ${pitch.type} ${pitch.call}`;
+  marker.setAttribute('aria-label', marker.title);
+  zone.appendChild(marker);
+  renderLiveLabMetrics(pitch, null);
+  renderLiveLabDots(liveLabBallsEl, 4, pitch.balls ?? 0, 'ball');
+  renderLiveLabDots(liveLabStrikesEl, 3, pitch.strikes ?? 0, 'strike');
+  renderLiveLabDots(liveLabOutsEl, 3, pitch.outs ?? 0, 'out');
+  if (liveLabPitchDotEl) liveLabPitchDotEl.hidden = true;
+}
+
+async function replayLiveLabAtBat(play, game, token, replaySnapshot = null) {
+  const model = renderLiveLabFieldGeometry(game);
+  if (!model) return;
+  liveLabClearReplayArtifacts();
+  liveLabReplayPrepareHalfInning(replaySnapshot, play);
+  liveLabReplayRenderBases(replaySnapshot, model);
+  liveLabReplayRenderLineups(replaySnapshot, play);
+  renderLiveLabMetrics(null, null);
+  renderLiveLabDots(liveLabBallsEl, 4, 0, 'ball');
+  renderLiveLabDots(liveLabStrikesEl, 3, 0, 'strike');
+  renderLiveLabDots(liveLabOutsEl, 3, play?.count?.outs ?? 0, 'out');
+  const pitches = liveLabPitchDetails(play);
+  const pitchWindowMs = 3000;
+  const perPitchMs = pitches.length ? pitchWindowMs / pitches.length : pitchWindowMs;
+  if (liveLabMatchupEl) {
+    const matchup = `${play?.matchup?.batter?.fullName || 'Batter'} vs ${play?.matchup?.pitcher?.fullName || 'Pitcher'}`;
+    liveLabMatchupEl.textContent = matchup;
+    liveLabMatchupEl.title = matchup;
+  }
+  liveLabReplayRenderOutcomeChip(play, null);
+  if (liveLabPlayTextEl) {
+    const batter = cleanSummary(play?.matchup?.batter?.fullName || 'Batter');
+    const text = `${batter} at bat`;
+    liveLabPlayTextEl.textContent = text;
+    liveLabPlayTextEl.title = text;
+  }
+  if (pitches.length) {
+    for (let index = 0; index < pitches.length; index += 1) {
+      if (!liveLabReplayStillActive(token)) return;
+      renderLiveLabReplayPitch(pitches[index], index);
+      await liveLabReplaySleep(perPitchMs);
+    }
+  } else {
+    await liveLabReplaySleep(pitchWindowMs);
+  }
+  if (!liveLabReplayStillActive(token)) return;
+  const outcome = liveLabReplayOutcome(play);
+  liveLabReplayRenderOutcomeChip(play, outcome);
+  const finalPitch = pitches[pitches.length - 1] || null;
+  const terminalLabel = liveLabTerminalPitchLabel(play, finalPitch);
+  if (liveLabPlayTextEl) {
+    const text = cleanPlayText(play?.result?.description || play?.result?.event || outcome.title);
+    liveLabPlayTextEl.textContent = text;
+    liveLabPlayTextEl.title = text;
+  }
+  renderLiveLabMetrics(finalPitch, outcome.hit);
+  if (terminalLabel && finalPitch) {
+    document.getElementById('liveLabZone')?.querySelectorAll('.live-lab-replay-pitch').forEach((marker, index) => {
+      if (index === pitches.length - 1) {
+        marker.textContent = terminalLabel;
+        marker.classList.add('is-terminal');
+      }
+    });
+  }
+  const flightSeconds = liveLabReplayFlightSeconds(outcome.hit, outcome);
+  const outcomeMs = outcome.isHomeRun ? 5000 : Math.max(1500, Math.ceil((flightSeconds + 0.35) * 1000));
+  liveLabShowReplayOverlay(outcome);
+  renderLiveLabReplayOutcomeTrace(play, model, outcome, outcomeMs, flightSeconds);
+  renderLiveLabReplayRunners(play, model, outcomeMs, replaySnapshot);
+  const scoring = liveLabReplayApplyPlay(replaySnapshot, play) || {};
+  liveLabReplayTriggerScoreBurst(outcome, scoring.runs || 0);
+  liveLabReplayRenderBases(replaySnapshot, model);
+  liveLabReplayRenderLineups(replaySnapshot, play);
+  await liveLabReplaySleep(outcomeMs);
+}
+
+async function startLiveLabReplay() {
+  if (liveLabReplayActive) {
+    stopLiveLabReplay();
+    return;
+  }
+  if (!activeLineupGame) return;
+  const token = liveLabReplayToken + 1;
+  liveLabReplayToken = token;
+  liveLabReplayActive = true;
+  liveLabReplayPaused = false;
+  liveLabReplayResolvePauseWaiters();
+  setLiveLabReplaySpeed(1);
+  liveLabFieldEl?.classList.add('is-replaying');
+  lineupOverlayEl?.querySelector('.lineup-live-lab-grid')?.classList.remove('is-replay-paused');
+  lineupOverlayEl?.querySelector('.lineup-live-lab-grid')?.classList.add('is-replaying');
+  if (liveLabReplayBtnEl) {
+    liveLabReplayBtnEl.textContent = 'Stop Replay';
+    liveLabReplayBtnEl.setAttribute('aria-pressed', 'true');
+  }
+  if (liveLabReplaySpeedControlsEl) {
+    liveLabReplaySpeedControlsEl.hidden = false;
+    syncLiveLabReplaySpeedControls();
+  }
+  if (liveLabReplayPauseBtnEl) {
+    liveLabReplayPauseBtnEl.hidden = false;
+    liveLabReplayPauseBtnEl.textContent = 'Pause';
+    liveLabReplayPauseBtnEl.setAttribute('aria-pressed', 'false');
+  }
+  try {
+    const game = await hydrateLiveLabGame(activeLineupGame).catch(() => activeLineupGame);
+    if (!liveLabReplayStillActive(token)) return;
+    activeLineupGame = game || activeLineupGame;
+    const plays = listify(activeLineupGame?.allPlays).filter((play) => play?.matchup?.batter && play?.result);
+    if (!plays.length) {
+      liveLabShowReplayOverlay({ title: 'NO PLAYS', player: '', meta: 'Full game feed unavailable', isHomeRun: false });
+      await liveLabReplaySleep(1500);
+      return;
+    }
+    liveLabPitchFingerprint = '';
+    liveLabOutcomeFingerprint = '';
+    renderLiveLabPitchMarkers([], null, null);
+    liveLabTraceLayerEl?.replaceChildren();
+    const replaySnapshot = liveLabReplaySnapshot(activeLineupGame);
+    const replayModel = renderLiveLabFieldGeometry(activeLineupGame);
+    liveLabReplayRenderBases(replaySnapshot, replayModel);
+    liveLabReplayRenderLineups(replaySnapshot, null);
+    if (liveLabOutcomeListEl) {
+      liveLabOutcomeListEl.dataset.renderKey = 'replay-start';
+      liveLabOutcomeListEl.innerHTML = '<span class="live-lab-outcome-empty">Replay ready</span>';
+    }
+    for (const play of plays) {
+      if (!liveLabReplayStillActive(token)) return;
+      await replayLiveLabAtBat(play, activeLineupGame, token, replaySnapshot);
+    }
+  } finally {
+    if (liveLabReplayStillActive(token)) stopLiveLabReplay();
+  }
+}
+
+function renderLineupLiveLab(game) {
+  if (!lineupOverlayEl || !liveLabFieldEl) return;
+  if (liveLabReplayActive) return;
+  const liveGrid = lineupOverlayEl.querySelector('.lineup-live-lab-grid');
+  if (liveGrid) {
+    const awayColor = game?.awayColor || getTeamColor(game?.away);
+    const homeColor = game?.homeColor || getTeamColor(game?.home);
+    liveGrid.style.setProperty('--live-away-color', awayColor);
+    liveGrid.style.setProperty('--live-home-color', homeColor);
+    liveGrid.style.setProperty('--live-away-rgb', hexToRgb(awayColor));
+    liveGrid.style.setProperty('--live-home-rgb', hexToRgb(homeColor));
+    lineupOverlayEl.style.setProperty('--live-away-color', awayColor);
+    lineupOverlayEl.style.setProperty('--live-home-color', homeColor);
+    lineupOverlayEl.style.setProperty('--live-away-rgb', hexToRgb(awayColor));
+    lineupOverlayEl.style.setProperty('--live-home-rgb', hexToRgb(homeColor));
+  }
+  const activePlay = game?.activePlay?.matchup ? game.activePlay : resolveActivePlay(game, null, listify(game?.allPlays));
+  const activeBatterId = Number(activePlay?.matchup?.batter?.id || game?.activeBatterId || 0);
+  const awayLineup = normalizeLineupCollectionForSide(game, 'away', game?.lineup?.away || []);
+  const homeLineup = normalizeLineupCollectionForSide(game, 'home', game?.lineup?.home || []);
+  const lineupIds = new Set([...awayLineup, ...homeLineup].map((entry) => String(entry?.id || '')).filter(Boolean));
+  const fieldModel = renderLiveLabFieldGeometry(game);
+  if ((!liveLabSelectedPlayerId || !lineupIds.has(String(liveLabSelectedPlayerId))) && Number.isFinite(activeBatterId) && activeBatterId > 0) {
+    liveLabSelectedPlayerId = String(activeBatterId);
+    liveLabSelectedOutcomeKey = '';
+    liveLabSelectedPitchKey = '';
+    liveLabPitchFingerprint = '';
+    liveLabOutcomeFingerprint = '';
+  }
+  const selectedPlayerId = Number(liveLabSelectedPlayerId || activeBatterId || 0);
+  const outcomes = liveLabOutcomesForPlayer(game, selectedPlayerId);
+  if (liveLabSelectedOutcomeKey && !outcomes.some((outcome) => outcome.key === liveLabSelectedOutcomeKey)) {
+    liveLabSelectedOutcomeKey = '';
+    liveLabSelectedPitchKey = '';
+  }
+  const selectedOutcome = outcomes.find((outcome) => outcome.key === liveLabSelectedOutcomeKey)
+    || outcomes.find((outcome) => outcome.isCurrent)
+    || outcomes[outcomes.length - 1]
+    || { play: activePlay, pitches: liveLabPitchDetails(activePlay), hit: liveLabHitDetail(activePlay), key: '' };
+  const play = selectedOutcome.play || activePlay;
+  const hasFullPlayData = Boolean(play?.matchup && Array.isArray(play?.playEvents));
+  const pitches = selectedOutcome.pitches || liveLabPitchDetails(play);
+  const currentPitch = pitches[pitches.length - 1] || liveLabPitchDetail(play);
+  const pitchFingerprint = pitches.map((pitch) => pitch.key).join('|');
+  if (pitchFingerprint !== liveLabPitchFingerprint) {
+    liveLabPitchFingerprint = pitchFingerprint;
+    liveLabCurrentPitchKey = currentPitch?.key || '';
+    if (liveLabSelectedPitchKey && !pitches.some((pitch) => pitch.key === liveLabSelectedPitchKey)) {
+      liveLabSelectedPitchKey = '';
+    }
+  }
+  const selectedPitch = pitches.find((pitch) => pitch.key === liveLabSelectedPitchKey) || currentPitch || null;
+  const hit = selectedOutcome.hit || liveLabHitDetail(play);
+
+  if (liveLabAwayScoreEl) liveLabAwayScoreEl.textContent = lineupRunDisplay(game?.awayScore);
+  if (liveLabHomeScoreEl) liveLabHomeScoreEl.textContent = lineupRunDisplay(game?.homeScore);
+  if (liveLabInningEl) liveLabInningEl.textContent = game?.inningShort || game?.inning || game?.status || 'PRE';
+  if (liveLabMatchupEl) {
+    const batter = play?.matchup?.batter?.fullName || (Number(selectedPlayerId) === Number(game?.activeBatterId) ? (game?.battingSide === 'home' ? game?.homeHitter : game?.awayHitter) : '') || 'Batter';
+    const pitcher = play?.matchup?.pitcher?.fullName || (game?.battingSide === 'home' ? game?.awayPitcher : game?.homePitcher) || 'Pitcher';
+    const matchupText = `${batter} vs ${pitcher}`;
+    liveLabMatchupEl.textContent = matchupText;
+    liveLabMatchupEl.title = matchupText;
+  }
+  if (liveLabPlayTextEl) {
+    const playText = cleanPlayText(play?.result?.description || game?.lastPlay || defaultPlayText(game));
+    liveLabPlayTextEl.textContent = playText;
+    liveLabPlayTextEl.title = playText;
+  }
+  if (!hasFullPlayData && liveLabPlayTextEl) {
+    const loadingText = game?.liveLabError || 'Loading full live pitch data...';
+    liveLabPlayTextEl.textContent = loadingText;
+    liveLabPlayTextEl.title = loadingText;
+  }
+
+  renderLiveLabLineup(liveLabAwayLineupEl, awayLineup, activeBatterId, game?.awayColor, game?.awayLogo || getLogoPath(game?.away));
+  renderLiveLabLineup(liveLabHomeLineupEl, homeLineup, activeBatterId, game?.homeColor, game?.homeLogo || getLogoPath(game?.home));
+  renderLiveLabMetrics(selectedPitch, hit);
+  renderLiveLabPitchMarkers(pitches, selectedPitch, play);
+  renderLiveLabOutcomeList(outcomes, selectedOutcome);
+  renderLiveLabContactTraces(outcomes, selectedOutcome, fieldModel);
+  if (!hasFullPlayData && liveLabOutcomeListEl && !outcomes.length) {
+    liveLabOutcomeListEl.dataset.renderKey = 'loading-live-feed';
+    liveLabOutcomeListEl.innerHTML = '<span class="live-lab-outcome-empty">Waiting for full at-bat pitch feed</span>';
+  }
+  renderLiveLabDots(liveLabBallsEl, 4, selectedPitch?.balls ?? statNumber(game?.balls), 'ball');
+  renderLiveLabDots(liveLabStrikesEl, 3, selectedPitch?.strikes ?? statNumber(game?.strikes), 'strike');
+  renderLiveLabDots(liveLabOutsEl, 3, selectedPitch?.outs ?? statNumber(game?.outs), 'out');
+
+  if (liveLabPitchDotEl) {
+    liveLabPitchDotEl.style.left = `${selectedPitch?.zoneX ?? 50}%`;
+    liveLabPitchDotEl.style.top = `${selectedPitch?.zoneY ?? 50}%`;
+    liveLabPitchDotEl.hidden = Boolean(pitches.length);
+  }
+  if (!hit) {
+    liveLabHitKey = '';
+    liveLabFieldEl.classList.remove('has-hit');
+  } else if (hit.key !== liveLabHitKey) {
+    liveLabHitKey = hit.key;
+    liveLabFieldEl.classList.remove('has-hit');
+    void liveLabFieldEl.offsetWidth;
+    liveLabFieldEl.classList.add('has-hit');
+  }
+  liveLabFieldEl.style.setProperty('--hit-x', `${hit?.fieldX ?? 50}%`);
+  liveLabFieldEl.style.setProperty('--hit-y', `${hit?.fieldY ?? 58}%`);
+  liveLabFieldEl.style.setProperty('--hit-apex', `${hit?.apex ?? 24}%`);
+  liveLabFieldEl.style.setProperty('--hit-duration', `${hit?.duration ?? 1.6}s`);
+  liveLabFieldEl.style.setProperty('--hit-length', `${hit?.length ?? 44}%`);
+  liveLabFieldEl.style.setProperty('--hit-rotate', `${hit?.rotate ?? -18}deg`);
+  liveLabFieldEl.style.setProperty('--hit-mid-x', `${hit?.midX ?? 50}%`);
+  liveLabFieldEl.style.setProperty('--hit-mid-y', `${hit?.midY ?? 76}%`);
 }
 
 function boldNamesInPlayText(text) {
@@ -23642,6 +25510,14 @@ async function syncLineupOverlay(game, options = {}) {
   if (stateHomeCode) stateHomeCode.style.color = game.homeColor;
 
   renderLineupLiveDetails(game);
+  renderLineupLiveLab(game);
+  hydrateLiveLabGame(game).then((liveGame) => {
+    if (!liveGame || String(activeLineupGame?.gamePk || '') !== String(game.gamePk || '')) return;
+    activeLineupGame = liveGame;
+    renderLineupLiveLab(liveGame);
+  }).catch(() => {
+    renderLineupLiveLab({ ...game, liveLabError: 'Full live feed unavailable.' });
+  });
 
   setLogo(lineupOverlayEl.querySelector('.away-lineup-logo'), game.awayLogo, `${game.away} logo`);
   setLogo(lineupOverlayEl.querySelector('.home-lineup-logo'), game.homeLogo, `${game.home} logo`);
@@ -23936,6 +25812,71 @@ function initLineupOverlay() {
   }, { passive: false });
   let lineupTouchStart = null;
   lineupOverlayEl.addEventListener('click', (e) => {
+    const speedBtn = e.target.closest('[data-live-replay-speed]');
+    if (speedBtn) {
+      e.preventDefault();
+      e.stopPropagation();
+      setLiveLabReplaySpeed(speedBtn.dataset.liveReplaySpeed);
+      return;
+    }
+    const pauseBtn = e.target.closest('#liveLabReplayPauseBtn');
+    if (pauseBtn) {
+      e.preventDefault();
+      e.stopPropagation();
+      toggleLiveLabReplayPause();
+      return;
+    }
+    const replayBtn = e.target.closest('#liveLabReplayBtn');
+    if (replayBtn) {
+      e.preventDefault();
+      e.stopPropagation();
+      startLiveLabReplay();
+      return;
+    }
+    if (liveLabReplayActive && e.target.closest('.lineup-live-lab-grid')) {
+      e.preventDefault();
+      e.stopPropagation();
+      return;
+    }
+    const livePlayer = e.target.closest('[data-live-player-id]');
+    if (livePlayer) {
+      e.preventDefault();
+      e.stopPropagation();
+      liveLabSelectedPlayerId = livePlayer.dataset.livePlayerId || '';
+      liveLabSelectedOutcomeKey = '';
+      liveLabSelectedPitchKey = '';
+      liveLabPitchFingerprint = '';
+      liveLabOutcomeFingerprint = '';
+      if (activeLineupGame) renderLineupLiveLab(activeLineupGame);
+      return;
+    }
+    const liveOutcome = e.target.closest('[data-live-outcome-key]');
+    if (liveOutcome) {
+      e.preventDefault();
+      e.stopPropagation();
+      liveLabSelectedOutcomeKey = liveOutcome.dataset.liveOutcomeKey || '';
+      liveLabSelectedPitchKey = '';
+      liveLabPitchFingerprint = '';
+      liveLabOutcomeFingerprint = '';
+      if (activeLineupGame) renderLineupLiveLab(activeLineupGame);
+      return;
+    }
+    const livePitchMarker = e.target.closest('[data-live-pitch-key]');
+    if (livePitchMarker) {
+      e.preventDefault();
+      e.stopPropagation();
+      liveLabSelectedPitchKey = livePitchMarker.dataset.livePitchKey || '';
+      if (activeLineupGame) renderLineupLiveLab(activeLineupGame);
+      return;
+    }
+    const liveZone = e.target.closest('#liveLabZone');
+    if (liveZone) {
+      e.preventDefault();
+      e.stopPropagation();
+      liveLabSelectedPitchKey = '';
+      if (activeLineupGame) renderLineupLiveLab(activeLineupGame);
+      return;
+    }
     const statWindowToggle = e.target.closest('[data-lineup-stat-window]');
     if (statWindowToggle) {
       e.preventDefault();
@@ -24900,6 +26841,7 @@ initOverlayKeyboardShortcuts();
 initDateKeyboardShortcuts();
 initOverlayDockControl();
 initScoreboardColumnsControl();
+initGlobalPlayerSearch();
 initOverlayResizeControl();
 initLineupOverlay();
 initScoreboardLineupShortcuts();
