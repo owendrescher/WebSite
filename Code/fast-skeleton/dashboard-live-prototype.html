@@ -17,9 +17,9 @@
     <meta name="twitter:description" content="Live MLB scoreboard, lineups, pitcher trends, hot players, and betting stat tools." />
     <link rel="icon" type="image/png" href="baseball.png" />
     <link rel="apple-touch-icon" href="baseball.png" />
-    <link rel="stylesheet" href="styles.css?v=20260527qol3" />
+    <link rel="stylesheet" href="styles.css?v=20260601live6" />
     <link rel="stylesheet" href="dashboard.css?v=20260525moneyline2" />
-    <link rel="stylesheet" href="live-prototype.css?v=20260528live1" />
+    <link rel="stylesheet" href="live-prototype.css?v=20260601live6" />
   </head>
   <body class="dashboard-page">
     <a class="owentools-home-link" href="../index.html" aria-label="Back to owentools" title="Back to owentools">ot</a>
@@ -190,9 +190,15 @@
                   <div class="lineup-matchup-strip">
                     <div class="lineup-team-header">
                       <img class="lineup-logo away-lineup-logo lineup-logo-pick-trigger" data-lineup-pick-side="away" role="button" tabindex="0" src="placeholder.png" alt="Away logo" title="Pick away team to win" />
-                      <span class="away-lineup-team"></span>
-                      <span class="team-streak lineup-team-streak away-lineup-streak"></span>
-                      <button type="button" class="lineup-prediction-chip away-lineup-prediction" data-lineup-prediction-side="away" hidden>--</button>
+                      <div class="lineup-team-lines">
+                        <div class="lineup-team-info-line">
+                          <span class="team-streak lineup-team-streak away-lineup-streak"></span>
+                        </div>
+                        <div class="lineup-team-score-line">
+                          <span class="away-lineup-team"></span>
+                          <button type="button" class="lineup-prediction-chip away-lineup-prediction" data-lineup-prediction-side="away" hidden>--</button>
+                        </div>
+                      </div>
                     </div>
                     <div class="lineup-state-scoreboard">
                       <span id="lineupStateAwayCode" class="lineup-state-away-code"></span>
@@ -202,9 +208,15 @@
                       <span id="lineupStateHomeCode" class="lineup-state-home-code"></span>
                     </div>
                     <div class="lineup-team-header lineup-team-header-home">
-                      <span class="home-lineup-team"></span>
-                      <span class="team-streak lineup-team-streak home-lineup-streak"></span>
-                      <button type="button" class="lineup-prediction-chip home-lineup-prediction" data-lineup-prediction-side="home" hidden>--</button>
+                      <div class="lineup-team-lines lineup-team-lines-home">
+                        <div class="lineup-team-info-line">
+                          <span class="team-streak lineup-team-streak home-lineup-streak"></span>
+                        </div>
+                        <div class="lineup-team-score-line">
+                          <span class="home-lineup-team"></span>
+                          <button type="button" class="lineup-prediction-chip home-lineup-prediction" data-lineup-prediction-side="home" hidden>--</button>
+                        </div>
+                      </div>
                       <img class="lineup-logo home-lineup-logo lineup-logo-pick-trigger" data-lineup-pick-side="home" role="button" tabindex="0" src="placeholder.png" alt="Home logo" title="Pick home team to win" />
                     </div>
                   </div>
@@ -284,12 +296,13 @@
                         <strong id="liveLabReplayTitle"></strong>
                         <span id="liveLabReplayPlayer"></span>
                         <em id="liveLabReplayMeta"></em>
+                        <small id="liveLabReplayScore"></small>
                       </div>
                       <div id="liveLabReplaySpeedControls" class="live-lab-replay-speed-controls" hidden aria-label="Replay speed">
                         <button type="button" data-live-replay-speed="0.5">0.5x</button>
                         <button type="button" data-live-replay-speed="1" aria-pressed="true">1x</button>
-                        <button type="button" data-live-replay-speed="2">2x</button>
                         <button type="button" data-live-replay-speed="3">3x</button>
+                        <button type="button" data-live-replay-speed="5">5x</button>
                       </div>
                       <button id="liveLabReplayPauseBtn" class="live-lab-replay-pause-btn" type="button" hidden>Pause</button>
                       <button id="liveLabReplayBtn" class="live-lab-replay-btn" type="button">Game Replay</button>
@@ -300,6 +313,7 @@
                         <h3 id="liveLabMatchup"></h3>
                       </div>
                       <p id="liveLabPlayText"></p>
+                      <div id="liveLabPitchTimeline" class="live-lab-pitch-timeline"></div>
                       <div id="liveLabOutcomeList" class="live-lab-outcomes"></div>
                     </section>
                     <section class="live-lab-pitch-row">
@@ -402,11 +416,12 @@
           <header class="panel-header">
             <div class="panel-tabs">
               <button id="playerTrackerTabBtn" class="panel-tab-btn is-active" type="button">PLAYER TRACKER</button>
-              <button id="betInputTabBtn" class="panel-tab-btn" type="button">BET INPUT</button>
-              <button id="betLogTabBtn" class="panel-tab-btn" type="button">BET LOG</button>
+              <button id="betInputTabBtn" class="panel-tab-btn" type="button" hidden>BET INPUT</button>
+              <button id="betLogTabBtn" class="panel-tab-btn" type="button" hidden>BET LOG</button>
             </div>
             <div class="panel-header-actions">
               <span class="hint">DAY: <span id="betDayLabel"></span></span>
+              <button id="playerTrackerSortBtn" class="hint panel-sort-toggle" type="button">time added</button>
               <button id="clearBetsBtn" class="panel-action-btn" type="button">CLEAR</button>
             </div>
           </header>
@@ -540,6 +555,6 @@
       };
     </script>
     <script src="../shared/owentools-sync.js?v=20260511a"></script>
-    <script src="live-dashboard-prototype.js?v=20260528live1"></script>
+    <script src="live-dashboard-prototype.js?v=20260601live6"></script>
   </body>
 </html>
