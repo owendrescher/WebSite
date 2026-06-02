@@ -15,7 +15,7 @@ const tools = [
   },
   {
     title: "Baseball",
-    href: "fast-skeleton/dashboard-live-prototype.html",
+    href: "fast-skeleton/dashboard.html",
     preview: "baseballtrack.png",
     previewType: "image",
     description: "Baseball tracking dashboard and overlays",

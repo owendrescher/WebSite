@@ -24411,13 +24411,6 @@ function initScoreboardLineupShortcuts() {
     const card = cardFromEvent(e);
     if (card) rememberScoreboardCard(card);
   }, true);
-  document.addEventListener('keydown', (e) => {
-    if (e.defaultPrevented || e.ctrlKey || e.metaKey || e.altKey) return;
-    if (String(e.key || '').toLowerCase() !== 'l') return;
-    const card = cardForGamePk(hoveredScoreboardGamePk) || cardFromEvent(e);
-    if (isTextEntryTarget(e.target) && !card) return;
-    if (card) openLineupFromCard(card, e);
-  }, true);
   for (const target of [gamesEl, document]) {
     target.addEventListener('mousedown', handle, true);
     target.addEventListener('mouseup', handle, true);

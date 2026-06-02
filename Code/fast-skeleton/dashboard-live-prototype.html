@@ -17,9 +17,9 @@
     <meta name="twitter:description" content="Live MLB scoreboard, lineups, pitcher trends, hot players, and betting stat tools." />
     <link rel="icon" type="image/png" href="baseball.png" />
     <link rel="apple-touch-icon" href="baseball.png" />
-    <link rel="stylesheet" href="styles.css?v=20260601live6" />
+    <link rel="stylesheet" href="styles.css?v=20260602live15" />
     <link rel="stylesheet" href="dashboard.css?v=20260525moneyline2" />
-    <link rel="stylesheet" href="live-prototype.css?v=20260601live6" />
+    <link rel="stylesheet" href="live-prototype.css?v=20260602live15" />
   </head>
   <body class="dashboard-page">
     <a class="owentools-home-link" href="../index.html" aria-label="Back to owentools" title="Back to owentools">ot</a>
@@ -282,6 +282,7 @@
                       <strong id="liveLabInning"></strong>
                       <span id="liveLabHomeScore" class="live-lab-score"></span>
                     </div>
+                    <section id="liveLabMobileMatchups" class="live-lab-mobile-matchups" aria-label="Current live matchup queue"></section>
                     <section class="live-lab-field-shell" aria-label="Live field view">
                       <div id="liveLabField" class="live-lab-field">
                         <svg id="liveLabFieldSvg" class="live-lab-field-svg" viewBox="-50 95 1100 595" role="img" aria-label="Scaled ballpark geometry">
@@ -292,6 +293,9 @@
                           <g id="liveLabReplayRunnerLayer"></g>
                         </svg>
                       </div>
+                      <div id="liveLabMobileStatcast" class="live-lab-mobile-field-chip live-lab-mobile-statcast" hidden></div>
+                      <div id="liveLabMobilePitchInfo" class="live-lab-mobile-field-chip live-lab-mobile-pitch-info" hidden></div>
+                      <div id="liveLabMobileCounts" class="live-lab-mobile-counts" hidden></div>
                       <div id="liveLabReplayOverlay" class="live-lab-replay-overlay" hidden>
                         <strong id="liveLabReplayTitle"></strong>
                         <span id="liveLabReplayPlayer"></span>
@@ -422,6 +426,7 @@
             <div class="panel-header-actions">
               <span class="hint">DAY: <span id="betDayLabel"></span></span>
               <button id="playerTrackerSortBtn" class="hint panel-sort-toggle" type="button">time added</button>
+              <div id="playerTrackerCounts" class="player-tracker-summary player-tracker-summary-header" aria-label="Player tracker counts" hidden></div>
               <button id="clearBetsBtn" class="panel-action-btn" type="button">CLEAR</button>
             </div>
           </header>
@@ -555,6 +560,6 @@
       };
     </script>
     <script src="../shared/owentools-sync.js?v=20260511a"></script>
-    <script src="live-dashboard-prototype.js?v=20260601live6"></script>
+    <script src="live-dashboard-prototype.js?v=20260602live15"></script>
   </body>
 </html>

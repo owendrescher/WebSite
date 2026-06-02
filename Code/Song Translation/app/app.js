@@ -47,6 +47,8 @@ const state = {
   followActiveLine: true,
   lastAutoCenteredKey: "",
   suppressScrollTrackingUntilMs: 0,
+  scrollAnimationFrame: 0,
+  scrollAnimationTargetTop: null,
   fullscreenLyrics: false,
   manualMode: false,
   playback: {
@@ -170,6 +172,7 @@ function getLatinLanguageHint(text) {
   const tokens = normalized.split(" ").filter(Boolean);
   if (!tokens.length) return "";
 
+  const fillerTokens = ["ah", "ay", "da", "eh", "ha", "hey", "hm", "hmm", "la", "mm", "na", "oh", "ooh", "uh", "woo", "yeah", "yo"];
   const markers = {
     en: ["and", "for", "from", "like", "the", "with", "you"],
     fr: ["avec", "dans", "des", "du", "est", "et", "jamais", "je", "mais", "mon", "pas", "pour", "que", "qui", "sur", "tous", "une", "vous"],
@@ -185,10 +188,16 @@ function getLatinLanguageHint(text) {
 
   Object.entries(markers).forEach(([language, words]) => {
     let score = 0;
+    const matchedWords = new Set();
     tokens.forEach((token) => {
-      if (words.includes(token)) score += 1;
+      const isRepeatedFiller = /^(la|na|da|ha|ah|oh|ooh|uh|mm|hm)+$/.test(token);
+      if (!fillerTokens.includes(token) && !isRepeatedFiller && words.includes(token)) {
+        score += 1;
+        matchedWords.add(token);
+      }
     });
 
+    if (matchedWords.size < 2) score = 0;
     if (score > bestScore) {
       runnerUp = bestScore;
       bestScore = score;
@@ -742,6 +751,58 @@ function getCurrentActiveLineKey() {
   return `${state.payload?.track?.trackKey || "idle"}|${state.activeIndex}`;
 }
 
+function easeOutCubic(value) {
+  return 1 - Math.pow(1 - value, 3);
+}
+
+function scrollLyricsTo(top, options = {}) {
+  const { behavior = "smooth" } = options;
+  const maxTop = Math.max(0, els.scroll.scrollHeight - els.scroll.clientHeight);
+  const targetTop = Math.max(0, Math.min(maxTop, top));
+
+  state.scrollAnimationTargetTop = targetTop;
+  state.suppressScrollTrackingUntilMs = Date.now() + 650;
+
+  if (behavior !== "smooth") {
+    if (state.scrollAnimationFrame) {
+      window.cancelAnimationFrame(state.scrollAnimationFrame);
+      state.scrollAnimationFrame = 0;
+    }
+    els.scroll.scrollTop = targetTop;
+    return;
+  }
+
+  if (state.scrollAnimationFrame) return;
+
+  const durationMs = state.fullscreenLyrics ? 420 : 360;
+  const animate = (startedAt, startTop) => {
+    const elapsed = performance.now() - startedAt;
+    const progress = Math.min(1, elapsed / durationMs);
+    const currentTarget = state.scrollAnimationTargetTop ?? targetTop;
+    els.scroll.scrollTop = startTop + ((currentTarget - startTop) * easeOutCubic(progress));
+
+    if (progress < 1 && Math.abs(els.scroll.scrollTop - currentTarget) > 0.5) {
+      state.scrollAnimationFrame = window.requestAnimationFrame(() => animate(startedAt, startTop));
+      return;
+    }
+
+    els.scroll.scrollTop = currentTarget;
+    state.scrollAnimationFrame = 0;
+    state.scrollAnimationTargetTop = null;
+    state.suppressScrollTrackingUntilMs = Date.now() + 150;
+  };
+
+  const startTop = els.scroll.scrollTop;
+  const startedAt = performance.now();
+  state.scrollAnimationFrame = window.requestAnimationFrame(() => animate(startedAt, startTop));
+}
+
+function getStandardFollowTop(active) {
+  const activeCenter = active.offsetTop + (active.offsetHeight / 2);
+  const viewportCenter = els.scroll.clientHeight / 2;
+  return activeCenter - viewportCenter;
+}
+
 function centerActiveLine(options = {}) {
   const { behavior = "smooth", forceFollow = false } = options;
   const active = els.list.querySelector(".lyric-line.active");
@@ -753,14 +814,13 @@ function centerActiveLine(options = {}) {
   }
 
   state.lastAutoCenteredKey = getCurrentActiveLineKey();
-  state.suppressScrollTrackingUntilMs = Date.now() + 500;
   if (state.fullscreenLyrics) {
     const desiredTop = Math.max(0, active.offsetTop - getFullscreenFollowOffset(active));
-    els.scroll.scrollTo({ top: desiredTop, behavior });
+    scrollLyricsTo(desiredTop, { behavior });
     return;
   }
 
-  active.scrollIntoView({ behavior, block: "center" });
+  scrollLyricsTo(getStandardFollowTop(active), { behavior });
 }
 
 function maybeAutoCenterActiveLine() {
@@ -774,31 +834,18 @@ function maybeAutoCenterActiveLine() {
 function handleLyricsScroll() {
   if (Date.now() < state.suppressScrollTrackingUntilMs) return;
   if (!state.followActiveLine) return;
+  maybeAutoCenterActiveLine();
+}
 
-  const active = els.list.querySelector(".lyric-line.active");
-  if (!active) return;
-
-  let centerDrift = 0;
-  let allowedDrift = 0;
-
-  if (state.fullscreenLyrics) {
-    const activeTop = active.offsetTop - els.scroll.scrollTop;
-    const desiredTop = getFullscreenFollowOffset(active);
-    centerDrift = Math.abs(activeTop - desiredTop);
-    allowedDrift = Math.max(18, active.clientHeight * 0.12);
-  } else {
-    const scrollBox = els.scroll.getBoundingClientRect();
-    const activeBox = active.getBoundingClientRect();
-    const scrollCenter = scrollBox.top + (scrollBox.height / 2);
-    const activeCenter = activeBox.top + (activeBox.height / 2);
-    centerDrift = Math.abs(activeCenter - scrollCenter);
-    allowedDrift = Math.max(96, scrollBox.height * 0.16);
+function markManualLyricsScroll() {
+  if (!state.followActiveLine) return;
+  state.followActiveLine = false;
+  if (state.scrollAnimationFrame) {
+    window.cancelAnimationFrame(state.scrollAnimationFrame);
+    state.scrollAnimationFrame = 0;
+    state.scrollAnimationTargetTop = null;
   }
-
-  if (centerDrift > allowedDrift) {
-    state.followActiveLine = false;
-    updateJumpButton();
-  }
+  updateJumpButton();
 }
 
 function getRawActiveIndex(payload) {
@@ -1092,7 +1139,14 @@ els.manualTranslate.addEventListener("click", async () => {
     els.manualTranslate.disabled = false;
   }
 });
+els.scroll.addEventListener("wheel", markManualLyricsScroll, { passive: true });
+els.scroll.addEventListener("touchstart", markManualLyricsScroll, { passive: true });
 els.scroll.addEventListener("scroll", handleLyricsScroll, { passive: true });
+els.scroll.addEventListener("keydown", (event) => {
+  if (["ArrowDown", "ArrowUp", "End", "Home", "PageDown", "PageUp", "Space"].includes(event.code)) {
+    markManualLyricsScroll();
+  }
+});
 window.addEventListener("resize", () => {
   state.lastRenderKey = "";
   syncFullscreenSizing();

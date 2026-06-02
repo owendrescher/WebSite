@@ -241,7 +241,8 @@ function Test-LyricTextHasReliableLanguageSignal {
 
     $meaningfulTokens = @(
         foreach ($token in $normalizedTokens) {
-            if (-not $fillerTokens.Contains($token)) {
+            $isRepeatedFiller = $token -match '^(la|na|da|ha|ah|oh|ooh|uh|mm|hm)+$'
+            if ((-not $fillerTokens.Contains($token)) -and (-not $isRepeatedFiller)) {
                 $token
             }
         }
@@ -317,6 +318,133 @@ function Test-LyricTextMatchesDetectedLanguage {
         '^ko$' { return ($fixedText -match '\p{IsHangulSyllables}|\p{IsHangulJamo}') }
         '^zh($|[-_])' { return ($fixedText -match '\p{IsCJKUnifiedIdeographs}') }
         default { return $true }
+    }
+}
+
+function Normalize-LanguageEvidenceText {
+    param(
+        [string]$Text
+    )
+
+    if ([string]::IsNullOrWhiteSpace($Text)) {
+        return ""
+    }
+
+    $value = (Repair-Mojibake -Text $Text).Normalize([System.Text.NormalizationForm]::FormD).ToLowerInvariant()
+    $value = [regex]::Replace($value, '\p{Mn}', '')
+    $value = [regex]::Replace($value, '[^\p{L}\p{Nd}\s]', ' ')
+    return [regex]::Replace($value, '\s+', ' ').Trim()
+}
+
+function Get-LanguageEvidenceTokens {
+    param(
+        [string]$Text,
+        [string]$Language
+    )
+
+    $languageCode = ""
+    if (-not [string]::IsNullOrWhiteSpace($Language) -and $Language -match '^[a-z]{2}') {
+        $languageCode = $matches[0]
+    }
+
+    if ([string]::IsNullOrWhiteSpace($languageCode)) {
+        return @()
+    }
+
+    $markerMap = @{
+        en = @("and", "from", "like", "the", "with", "you")
+        es = @("ahora", "aqui", "asi", "corazon", "eres", "esta", "estoy", "los", "mas", "mi", "nada", "pero", "quiero", "sin", "todo")
+        fr = @("avec", "dans", "est", "jamais", "je", "mais", "mon", "pas", "pour", "qui", "sur", "tous", "vous")
+        it = @("anche", "anni", "della", "gli", "nella", "non", "per", "sono", "tutti")
+        pt = @("agora", "aqui", "assim", "comigo", "coracao", "dos", "estou", "jamais", "nao", "sempre", "uma", "voce")
+        de = @("auf", "das", "dem", "den", "der", "die", "ein", "eine", "ich", "ist", "mit", "nicht", "und", "wir")
+    }
+
+    if (-not $markerMap.ContainsKey($languageCode)) {
+        return @()
+    }
+
+    $tokens = @((Normalize-LanguageEvidenceText -Text $Text).Split(" ", [System.StringSplitOptions]::RemoveEmptyEntries))
+    if ($tokens.Count -eq 0) {
+        return @()
+    }
+
+    $markers = [System.Collections.Generic.HashSet[string]]::new([System.StringComparer]::OrdinalIgnoreCase)
+    $markerMap[$languageCode] | ForEach-Object { [void]$markers.Add($_) }
+
+    return @(
+        foreach ($token in $tokens) {
+            if ($markers.Contains($token)) {
+                $token
+            }
+        }
+    )
+}
+
+function Update-LyricsLanguageConfidence {
+    param(
+        [object[]]$Entries
+    )
+
+    $entriesWithLanguage = @(
+        foreach ($entry in @($Entries)) {
+            if ($null -eq $entry -or [string]::IsNullOrWhiteSpace([string]$entry.SourceLanguage)) { continue }
+            if ([string]$entry.SourceLanguage -match '^[a-z]{2}') {
+                [pscustomobject]@{
+                    Entry = $entry
+                    Language = $matches[0]
+                    Text = [string]$entry.Text
+                }
+            }
+        }
+    )
+
+    if ($entriesWithLanguage.Count -eq 0) {
+        return
+    }
+
+    $languageGroups = @($entriesWithLanguage | Group-Object -Property Language | Sort-Object Count -Descending)
+    $dominantLanguage = [string]$languageGroups[0].Name
+    $confirmed = [System.Collections.Generic.HashSet[string]]::new([System.StringComparer]::OrdinalIgnoreCase)
+    [void]$confirmed.Add($dominantLanguage)
+
+    foreach ($group in $languageGroups) {
+        $language = [string]$group.Name
+        if ($language -eq $dominantLanguage) {
+            continue
+        }
+
+        $groupEntries = @($group.Group)
+        $scriptConfirmed = $false
+        foreach ($item in $groupEntries) {
+            if (Test-LyricTextMatchesDetectedLanguage -Text ([string]$item.Text) -DetectedSourceLanguage $language) {
+                if ($language -match '^(ru|uk|bg|sr|mk|be|ar|fa|ur|el|ja|ko|zh)$') {
+                    $scriptConfirmed = $true
+                    break
+                }
+            }
+        }
+
+        if ($scriptConfirmed) {
+            [void]$confirmed.Add($language)
+            continue
+        }
+
+        $evidenceTokens = @(
+            foreach ($item in $groupEntries) {
+                Get-LanguageEvidenceTokens -Text ([string]$item.Text) -Language $language
+            }
+        )
+        $uniqueEvidenceTokens = @($evidenceTokens | Select-Object -Unique)
+        if ($group.Count -ge 2 -and $uniqueEvidenceTokens.Count -ge 2) {
+            [void]$confirmed.Add($language)
+        }
+    }
+
+    foreach ($item in $entriesWithLanguage) {
+        if (-not $confirmed.Contains([string]$item.Language)) {
+            $item.Entry.SourceLanguage = $dominantLanguage
+        }
     }
 }
 
@@ -2397,6 +2525,7 @@ function Add-TranslationsToLyrics {
         }
     }
 
+    Update-LyricsLanguageConfidence -Entries (@($synced) + @($plain))
     $allLanguages = @(Get-DistinctLyricsLanguages -SyncedEntries $synced -PlainEntries $plain)
 
     $sourceLanguage = ""
@@ -2448,6 +2577,7 @@ function Convert-LyricsDataToDisplayData {
         }
     }
 
+    Update-LyricsLanguageConfidence -Entries (@($synced) + @($plain))
     $allLanguages = @(Get-DistinctLyricsLanguages -SyncedEntries $synced -PlainEntries $plain)
 
     $sourceLanguage = ""
