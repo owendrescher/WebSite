@@ -25,6 +25,9 @@ const els = {
   manualLyrics: document.getElementById("manual-lyrics"),
   manualFile: document.getElementById("manual-file"),
   manualTranslate: document.getElementById("manual-translate"),
+  youtubeUrl: document.getElementById("youtube-url"),
+  youtubeLanguage: document.getElementById("youtube-language"),
+  youtubeImport: document.getElementById("youtube-import"),
   manualNote: document.getElementById("manual-note")
 };
 
@@ -51,6 +54,7 @@ const state = {
   scrollAnimationTargetTop: null,
   fullscreenLyrics: false,
   manualMode: false,
+  importedCaptionMeta: null,
   playback: {
     trackKey: "",
     anchorPositionMs: 0,
@@ -100,7 +104,13 @@ function getApiUrl(path, base = state.apiBase) {
 async function requestJson(url) {
   const response = await fetch(url, { cache: "no-store" });
   if (!response.ok) {
-    throw new Error(`Request failed (${response.status})`);
+    let errorMessage = `Request failed (${response.status})`;
+    try {
+      const errorPayload = await response.json();
+      if (errorPayload?.error) errorMessage = errorPayload.error;
+    } catch {
+    }
+    throw new Error(errorMessage);
   }
 
   return response.json();
@@ -321,7 +331,7 @@ function parseManualLyrics(text) {
     .map((line, index) => {
       const lrc = line.match(/^\[(\d{1,2}):(\d{2})(?:[.:](\d{1,3}))?\]\s*(.*)$/);
       if (!lrc) {
-        return { text: line, timestampMs: index * 4200, sourceLanguage: normalizeLanguageCode(els.manualSource.value) };
+        return { text: line, timestampMs: index * 4200, timed: false, sourceLanguage: normalizeLanguageCode(els.manualSource.value) };
       }
 
       const minutes = Number(lrc[1]);
@@ -330,10 +340,43 @@ function parseManualLyrics(text) {
       return {
         text: lrc[4].trim(),
         timestampMs: ((minutes * 60) + seconds) * 1000 + Number(fraction),
+        timed: true,
         sourceLanguage: normalizeLanguageCode(els.manualSource.value)
       };
     })
     .filter((line) => line.text);
+}
+
+function getCaptionLanguageCode(languagePattern) {
+  const normalized = normalizeLanguageTag(languagePattern).replace(/\.\*$/, "");
+  return normalizeLanguageCode(normalized);
+}
+
+async function importYouTubeCaptions() {
+  const url = els.youtubeUrl.value.trim();
+  const language = els.youtubeLanguage.value.trim() || "en.*";
+  if (!url) {
+    throw new Error("Paste a YouTube URL first.");
+  }
+
+  els.manualNote.textContent = "Importing timed YouTube captions...";
+  const payload = await apiGetJson(`/api/youtube-captions?url=${encodeURIComponent(url)}&language=${encodeURIComponent(language)}`);
+  if (!payload?.lrc_text) {
+    throw new Error(payload?.error || "No timed captions were returned.");
+  }
+
+  els.manualLyrics.value = payload.lrc_text;
+  state.importedCaptionMeta = payload;
+  const sourceLanguage = getCaptionLanguageCode(payload.language || language);
+  if (sourceLanguage && [...els.manualSource.options].some((option) => option.value === sourceLanguage)) {
+    els.manualSource.value = sourceLanguage;
+  }
+
+  if (!els.manualTitle.value.trim() && payload.video_id) {
+    els.manualTitle.value = `YouTube captions ${payload.video_id}`;
+  }
+
+  els.manualNote.textContent = `Imported ${payload.segments?.length || 0} timed caption lines from YouTube. Click Translate pasted lyrics to view them in sync.`;
 }
 
 function guessManualSourceLanguage(lines) {
@@ -363,6 +406,7 @@ async function buildManualPayload() {
   const targetLanguage = getCurrentTargetLanguage();
   const sourceLanguage = guessManualSourceLanguage(lines);
   const translated = [];
+  const hasTimedLines = lines.some((line) => line.timed);
 
   for (let i = 0; i < lines.length; i += 1) {
     const line = lines[i];
@@ -375,7 +419,30 @@ async function buildManualPayload() {
     });
   }
 
-  const durationMs = Math.max(60000, (translated.at(-1)?.timestampMs || (translated.length * 4200)) + 5000);
+  const liveTrack = state.importedCaptionMeta && state.payload?.track ? state.payload.track : null;
+  const durationMs = Math.max(
+    liveTrack?.endTimeMs || 0,
+    60000,
+    (translated.at(-1)?.timestampMs || (translated.length * 4200)) + 5000
+  );
+  const track = liveTrack
+    ? {
+        ...liveTrack,
+        trackKey: `youtube-${liveTrack.trackKey || Date.now()}-${state.importedCaptionMeta.video_id || "captions"}`,
+        endTimeMs: durationMs
+      }
+    : {
+        trackKey: `manual-${Date.now()}`,
+        title: els.manualTitle.value.trim() || "Manual Lyrics",
+        artist: els.manualArtist.value.trim() || "Browser translation",
+        album: "",
+        sourceApp: state.importedCaptionMeta ? "youtube-captions" : "browser",
+        playbackStatus: "Paused",
+        positionMs: 0,
+        endTimeMs: durationMs,
+        lastUpdatedIso: new Date().toISOString()
+      };
+
   return {
     status: "active",
     settings: {
@@ -383,24 +450,14 @@ async function buildManualPayload() {
       translationProvider: "browser",
       languageChoices: FALLBACK_LANGUAGE_CHOICES
     },
-    track: {
-      trackKey: `manual-${Date.now()}`,
-      title: els.manualTitle.value.trim() || "Manual Lyrics",
-      artist: els.manualArtist.value.trim() || "Browser translation",
-      album: "",
-      sourceApp: "browser",
-      playbackStatus: "Paused",
-      positionMs: 0,
-      endTimeMs: durationMs,
-      lastUpdatedIso: new Date().toISOString()
-    },
+    track,
     lyrics: {
-      mode: "plain",
-      synced: [],
-      plain: translated,
+      mode: hasTimedLines ? "synced" : "plain",
+      synced: hasTimedLines ? translated : [],
+      plain: hasTimedLines ? [] : translated,
       sourceLanguage,
       translationVisible: true,
-      provider: "browser"
+      provider: state.importedCaptionMeta ? "youtube" : "browser"
     }
   };
 }
@@ -1123,9 +1180,23 @@ els.manualToggle.addEventListener("click", () => {
 els.manualFile.addEventListener("change", async (event) => {
   const file = event.target.files?.[0];
   if (!file) return;
+  state.importedCaptionMeta = null;
   els.manualLyrics.value = await file.text();
   if (!els.manualTitle.value.trim()) {
     els.manualTitle.value = file.name.replace(/\.[^.]+$/, "");
+  }
+});
+els.manualLyrics.addEventListener("input", () => {
+  state.importedCaptionMeta = null;
+});
+els.youtubeImport.addEventListener("click", async () => {
+  els.youtubeImport.disabled = true;
+  try {
+    await importYouTubeCaptions();
+  } catch (error) {
+    els.manualNote.textContent = error.message;
+  } finally {
+    els.youtubeImport.disabled = false;
   }
 });
 els.manualTranslate.addEventListener("click", async () => {

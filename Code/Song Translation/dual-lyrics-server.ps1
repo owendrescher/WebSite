@@ -193,6 +193,238 @@ function Test-SongNeedsTranslation {
     return $false
 }
 
+function Convert-VttTimestampToMilliseconds {
+    param(
+        [string]$Value
+    )
+
+    if ([string]::IsNullOrWhiteSpace($Value)) {
+        return 0
+    }
+
+    $normalized = ([string]$Value).Trim().Replace(",", ".")
+    $match = [regex]::Match($normalized, '^(?:(\d{1,2}):)?(\d{1,2}):(\d{2})(?:\.(\d{1,3}))?$')
+    if (-not $match.Success) {
+        return 0
+    }
+
+    $hours = if ($match.Groups[1].Success) { [int]$match.Groups[1].Value } else { 0 }
+    $minutes = [int]$match.Groups[2].Value
+    $seconds = [int]$match.Groups[3].Value
+    $fraction = $match.Groups[4].Value
+    $milliseconds = 0
+    if (-not [string]::IsNullOrWhiteSpace($fraction)) {
+        $milliseconds = [int]($fraction.PadRight(3, "0").Substring(0, 3))
+    }
+
+    return ($hours * 3600000) + ($minutes * 60000) + ($seconds * 1000) + $milliseconds
+}
+
+function Convert-HtmlCaptionTextToPlainText {
+    param(
+        [string]$Text
+    )
+
+    if ([string]::IsNullOrWhiteSpace($Text)) {
+        return ""
+    }
+
+    $value = [System.Net.WebUtility]::HtmlDecode([string]$Text)
+    $value = [regex]::Replace($value, '<[^>]+>', '')
+    $value = [regex]::Replace($value, '\s+', ' ').Trim()
+    return $value
+}
+
+function Convert-VttFileToCaptionSegments {
+    param(
+        [string]$Path
+    )
+
+    if (-not (Test-Path -LiteralPath $Path -PathType Leaf)) {
+        return @()
+    }
+
+    $segments = New-Object System.Collections.Generic.List[object]
+    $lines = Get-Content -LiteralPath $Path -Encoding UTF8
+    for ($index = 0; $index -lt $lines.Count; $index++) {
+        $line = [string]$lines[$index]
+        if ($line -notmatch '-->') {
+            continue
+        }
+
+        $timingParts = $line -split '\s+-->\s+', 2
+        if ($timingParts.Count -lt 2) {
+            continue
+        }
+
+        $startText = $timingParts[0].Trim()
+        $endText = (($timingParts[1] -split '\s+')[0]).Trim()
+        $textLines = New-Object System.Collections.Generic.List[string]
+        $index += 1
+        while ($index -lt $lines.Count -and -not [string]::IsNullOrWhiteSpace([string]$lines[$index])) {
+            $captionLine = [string]$lines[$index]
+            if ($captionLine -notmatch '^(NOTE|STYLE|REGION)\b') {
+                $clean = Convert-HtmlCaptionTextToPlainText -Text $captionLine
+                if (-not [string]::IsNullOrWhiteSpace($clean)) {
+                    [void]$textLines.Add($clean)
+                }
+            }
+            $index += 1
+        }
+
+        $text = Convert-HtmlCaptionTextToPlainText -Text ($textLines -join " ")
+        if ([string]::IsNullOrWhiteSpace($text)) {
+            continue
+        }
+
+        $startMs = Convert-VttTimestampToMilliseconds -Value $startText
+        $endMs = Convert-VttTimestampToMilliseconds -Value $endText
+        if ($endMs -lt $startMs) {
+            $endMs = $startMs
+        }
+
+        $segments.Add([pscustomobject]@{
+            start = [Math]::Round($startMs / 1000, 3)
+            end = [Math]::Round($endMs / 1000, 3)
+            duration = [Math]::Round(($endMs - $startMs) / 1000, 3)
+            startMs = $startMs
+            endMs = $endMs
+            text = $text
+        })
+    }
+
+    return @($segments.ToArray())
+}
+
+function Get-YouTubeVideoId {
+    param(
+        [string]$UrlOrId
+    )
+
+    if ([string]::IsNullOrWhiteSpace($UrlOrId)) {
+        return ""
+    }
+
+    $value = ([string]$UrlOrId).Trim()
+    if ($value -match '^[A-Za-z0-9_-]{11}$') {
+        return $value
+    }
+
+    try {
+        $uri = [uri]$value
+        if ($uri.Host -match 'youtu\.be$') {
+            return $uri.AbsolutePath.Trim("/").Split("/")[0]
+        }
+
+        $query = [System.Web.HttpUtility]::ParseQueryString($uri.Query)
+        $videoId = [string]$query["v"]
+        if ($videoId -match '^[A-Za-z0-9_-]{11}$') {
+            return $videoId
+        }
+    }
+    catch {
+    }
+
+    return ""
+}
+
+function Convert-CaptionsToLrc {
+    param(
+        [object[]]$Segments
+    )
+
+    return @(
+        foreach ($segment in @($Segments)) {
+            $timestampMs = [int]$segment.startMs
+            $minutes = [Math]::Floor($timestampMs / 60000)
+            $seconds = [Math]::Floor(($timestampMs % 60000) / 1000)
+            $centiseconds = [Math]::Floor(($timestampMs % 1000) / 10)
+            "[{0:00}:{1:00}.{2:00}] {3}" -f $minutes, $seconds, $centiseconds, ([string]$segment.text)
+        }
+    ) -join "`n"
+}
+
+function Get-YouTubeCaptionPayload {
+    param(
+        [string]$Url,
+        [string]$Language = "en.*"
+    )
+
+    if ([string]::IsNullOrWhiteSpace($Url)) {
+        throw "YouTube URL is required."
+    }
+
+    $ytDlp = Get-Command "yt-dlp" -ErrorAction SilentlyContinue
+    $python = $null
+    if ($null -eq $ytDlp) {
+        $python = Get-Command "python" -ErrorAction SilentlyContinue
+    }
+    if ($null -eq $ytDlp -and $null -eq $python) {
+        throw "yt-dlp is not installed or available. Install it with: python -m pip install yt-dlp"
+    }
+    $ytDlpPath = if ($null -ne $ytDlp) { [string]$ytDlp.Source } else { "" }
+    $pythonPath = if ($null -ne $python) { [string]$python.Source } else { "" }
+
+    $videoId = Get-YouTubeVideoId -UrlOrId $Url
+    $safeLanguage = if ([string]::IsNullOrWhiteSpace($Language)) { "en.*" } else { [string]$Language }
+    $tempDir = Join-Path ([IO.Path]::GetTempPath()) ("dual-lyrics-youtube-{0}" -f ([guid]::NewGuid().ToString("N")))
+
+    New-Item -ItemType Directory -Path $tempDir -Force | Out-Null
+    try {
+        $outputTemplate = Join-Path $tempDir "%(id)s.%(ext)s"
+        $arguments = @(
+            "--skip-download",
+            "--write-subs",
+            "--write-auto-subs",
+            "--sub-lang", $safeLanguage,
+            "--sub-format", "vtt",
+            "--convert-subs", "vtt",
+            "-o", $outputTemplate,
+            $Url
+        )
+
+        $output = if (-not [string]::IsNullOrWhiteSpace($ytDlpPath)) {
+            & $ytDlpPath @arguments 2>&1
+        }
+        else {
+            & $pythonPath -m yt_dlp @arguments 2>&1
+        }
+        $captionFiles = @(Get-ChildItem -LiteralPath $tempDir -Filter "*.vtt" -File | Sort-Object Length -Descending)
+        if ($captionFiles.Count -eq 0) {
+            throw ("No usable VTT captions were found. yt-dlp output: {0}" -f (($output | Select-Object -Last 6) -join " "))
+        }
+
+        $selectedFile = $captionFiles[0]
+        $segments = @(Convert-VttFileToCaptionSegments -Path $selectedFile.FullName)
+        if ($segments.Count -eq 0) {
+            throw "The downloaded caption file did not contain timed caption segments."
+        }
+
+        $plainText = [regex]::Replace((($segments | ForEach-Object { [string]$_.text }) -join " "), '\s+', ' ').Trim()
+        $wordCount = if ([string]::IsNullOrWhiteSpace($plainText)) {
+            0
+        }
+        else {
+            ([regex]::Matches($plainText, '\S+')).Count
+        }
+
+        return [pscustomobject]@{
+            video_id = $videoId
+            source = "youtube"
+            language = $safeLanguage
+            caption_type = if ($selectedFile.Name -match '\.auto\.|automatic') { "auto" } else { "manual_or_available" }
+            file_name = $selectedFile.Name
+            segments = $segments
+            plain_text = $plainText
+            lrc_text = Convert-CaptionsToLrc -Segments $segments
+            word_count = $wordCount
+        }
+    }
+    finally {
+        Remove-Item -LiteralPath $tempDir -Recurse -Force -ErrorAction SilentlyContinue
+    }
+}
+
 function Convert-DisplayLyricsToApiPayload {
     param(
         [object]$LyricsData,
@@ -830,6 +1062,22 @@ try {
                     -DurationMs $durationMs
 
                 Write-JsonResponse -Stream $stream -Data $payload
+                continue
+            }
+
+            if ($path -eq "/api/youtube-captions") {
+                $uri = [uri]("http://localhost:$Port" + $rawPath)
+                $query = [System.Web.HttpUtility]::ParseQueryString($uri.Query)
+                try {
+                    $payload = Get-YouTubeCaptionPayload `
+                        -Url ([string]$query["url"]) `
+                        -Language ([string]$query["language"])
+
+                    Write-JsonResponse -Stream $stream -Data $payload
+                }
+                catch {
+                    Write-JsonResponse -Stream $stream -Data @{ error = $_.Exception.Message } -StatusCode 502 -StatusText "Bad Gateway"
+                }
                 continue
             }
 

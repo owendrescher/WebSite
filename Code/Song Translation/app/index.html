@@ -106,15 +106,25 @@
               <option value="it">Italian</option>
               <option value="de">German</option>
               <option value="pt">Portuguese</option>
+              <option value="ru">Russian</option>
               <option value="ja">Japanese</option>
               <option value="ko">Korean</option>
               <option value="zh">Chinese</option>
             </select>
           </label>
+          <label>
+            YouTube URL
+            <input id="youtube-url" type="text" placeholder="https://www.youtube.com/watch?v=...">
+          </label>
+          <label>
+            Captions
+            <input id="youtube-language" type="text" value="en.*" placeholder="en.*, ru, es">
+          </label>
         </div>
         <textarea id="manual-lyrics" placeholder="Paste lyrics here, or import a .txt/.lrc file."></textarea>
         <div class="manual-actions">
           <input id="manual-file" type="file" accept=".txt,.lrc,text/plain">
+          <button class="ghost-button" id="youtube-import" type="button">Import YouTube captions</button>
           <button class="ghost-button attention" id="manual-translate" type="button">Translate pasted lyrics</button>
         </div>
         <p class="manual-note" id="manual-note">Works fully in the browser. Spotify live sync still uses the optional local bridge.</p>

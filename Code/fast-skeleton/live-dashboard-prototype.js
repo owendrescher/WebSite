@@ -23375,12 +23375,60 @@ function liveLabOutcomeLabel(play) {
   return `${inning} ${event}`.trim();
 }
 
-function liveLabOutcomesForPlayer(game, playerId) {
+function liveLabLineupEntryForPlayerId(awayLineup = [], homeLineup = [], playerId = null) {
   const target = Number(playerId);
-  if (!Number.isFinite(target) || target <= 0) return [];
+  if (!Number.isFinite(target) || target <= 0) return null;
+  return [...awayLineup, ...homeLineup].find((entry) => Number(entry?.id) === target) || null;
+}
+
+function liveLabPlayerNameKeys(game, playerId, entry = null) {
+  const target = Number(playerId);
+  const profile = Number.isFinite(target) && target > 0 ? game?.playerLookup?.[String(target)] || null : null;
+  const names = [
+    entry?.fullName,
+    entry?.name,
+    profile?.fullName,
+    profile?.name,
+  ].map(cleanSummary).filter(Boolean);
+  const keys = new Set();
+  names.forEach((name) => {
+    const fullKey = normalizeNameKey(name);
+    const lastKey = normalizeNameKey(lastName(name));
+    if (fullKey) keys.add(fullKey);
+    if (lastKey) keys.add(lastKey);
+  });
+  return keys;
+}
+
+function liveLabPlayMatchesBatter(game, play, playerId, entry = null) {
+  const target = Number(playerId);
+  const batterId = Number(play?.matchup?.batter?.id);
+  if (Number.isFinite(target) && target > 0 && Number.isFinite(batterId) && batterId === target) return true;
+  const batterName = cleanSummary(play?.matchup?.batter?.fullName || play?.matchup?.batter?.name || '');
+  const batterKey = normalizeNameKey(batterName);
+  const batterLastKey = normalizeNameKey(lastName(batterName));
+  if (!batterKey && !batterLastKey) return false;
+  const playerKeys = liveLabPlayerNameKeys(game, playerId, entry);
+  if (!playerKeys.size) return false;
+  if (playerKeys.has(batterKey) || playerKeys.has(batterLastKey)) return true;
+  return [...playerKeys].some((key) => key && key.length >= 4 && (batterKey.endsWith(key) || key.endsWith(batterLastKey)));
+}
+
+function liveLabDefaultReviewPlayerId(game, awayLineup = [], homeLineup = []) {
+  const firstPlay = liveLabPlaysForGame(game).find((play) => Number(play?.matchup?.batter?.id) > 0);
+  const firstPlayBatterId = Number(firstPlay?.matchup?.batter?.id);
+  if (Number.isFinite(firstPlayBatterId) && firstPlayBatterId > 0) return firstPlayBatterId;
+  const firstLineupId = lineupEntryId([...awayLineup, ...homeLineup].find(Boolean));
+  return firstLineupId || null;
+}
+
+function liveLabOutcomesForPlayer(game, playerId, entry = null) {
+  const target = Number(playerId);
+  const playerKeys = liveLabPlayerNameKeys(game, target, entry);
+  if ((!Number.isFinite(target) || target <= 0) && !playerKeys.size) return [];
   return liveLabPlaysForGame(game)
     .filter((play) => !isBattingOrDefensiveSubstitutionPlay(play))
-    .filter((play) => Number(play?.matchup?.batter?.id) === target)
+    .filter((play) => liveLabPlayMatchesBatter(game, play, target, entry))
     .map((play) => ({
       key: liveLabOutcomeKey(play),
       play,
@@ -25097,10 +25145,36 @@ function renderLineupLiveLab(game) {
     liveLabPitchFingerprint = '';
     liveLabOutcomeFingerprint = '';
   }
+  const finalReviewMode = isCompletedGameCard(game) || gameIsFinalForTeamRecord(game);
+  if (!liveLabSelectedPlayerId && !activeBatterId && finalReviewMode) {
+    const reviewPlayerId = liveLabDefaultReviewPlayerId(game, awayLineup, homeLineup);
+    if (reviewPlayerId) {
+      liveLabSelectedPlayerId = String(reviewPlayerId);
+      liveLabSelectedOutcomeKey = '';
+      liveLabSelectedPitchKey = '';
+      liveLabPitchFingerprint = '';
+      liveLabOutcomeFingerprint = '';
+    }
+  }
   if (activePlayKey) liveLabFollowPlayKey = activePlayKey;
-  const selectedPlayerId = Number(liveLabSelectedPlayerId || activeBatterId || 0);
-  const playerOutcomeSnapshotKey = liveLabPlayerOutcomeSnapshotKey(game, selectedPlayerId);
-  let playerOutcomes = liveLabOutcomesForPlayer(game, selectedPlayerId);
+  let selectedPlayerId = Number(liveLabSelectedPlayerId || activeBatterId || 0);
+  let selectedLineupEntry = liveLabLineupEntryForPlayerId(awayLineup, homeLineup, selectedPlayerId);
+  let playerOutcomeSnapshotKey = liveLabPlayerOutcomeSnapshotKey(game, selectedPlayerId);
+  let playerOutcomes = liveLabOutcomesForPlayer(game, selectedPlayerId, selectedLineupEntry);
+  if (finalReviewMode && !liveLabManualPlayerSelection && !playerOutcomes.length && liveLabPlaysForGame(game).length) {
+    const reviewPlayerId = liveLabDefaultReviewPlayerId(game, awayLineup, homeLineup);
+    if (reviewPlayerId && Number(reviewPlayerId) !== Number(selectedPlayerId)) {
+      liveLabSelectedPlayerId = String(reviewPlayerId);
+      selectedPlayerId = Number(reviewPlayerId);
+      selectedLineupEntry = liveLabLineupEntryForPlayerId(awayLineup, homeLineup, selectedPlayerId);
+      playerOutcomeSnapshotKey = liveLabPlayerOutcomeSnapshotKey(game, selectedPlayerId);
+      playerOutcomes = liveLabOutcomesForPlayer(game, selectedPlayerId, selectedLineupEntry);
+      liveLabSelectedOutcomeKey = '';
+      liveLabSelectedPitchKey = '';
+      liveLabPitchFingerprint = '';
+      liveLabOutcomeFingerprint = '';
+    }
+  }
   const cachedPlayerOutcomes = liveLabSnapshotGet(liveLabPlayerOutcomeSnapshots, playerOutcomeSnapshotKey);
   if (!playerOutcomes.length && cachedPlayerOutcomes?.outcomes?.length) {
     playerOutcomes = cachedPlayerOutcomes.outcomes;
