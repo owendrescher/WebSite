@@ -97,6 +97,7 @@ const playerStatSeasonEl = document.getElementById('playerStatSeason');
 const playerStatExtraEl = document.getElementById('playerStatExtra');
 const playerStatMatchupEl = document.getElementById('playerStatMatchup');
 const playerStatHeatmapEl = document.getElementById('playerStatHeatmap');
+const playerStatPitchMatchupEl = document.getElementById('playerStatPitchMatchup');
 const playerStatTabBtns = Array.from(document.querySelectorAll('.player-stat-tab'));
 
 const betFormEl = document.getElementById('betForm');
@@ -6804,6 +6805,13 @@ async function getSavantExactPitchBreakdown(playerId, playerType = 'batter', sea
   return promise;
 }
 
+async function getVisiblePitchBreakdown(playerId, playerType = 'batter', timeoutMs = 4200) {
+  const exactRows = await withTimeoutValue(getSavantExactPitchBreakdown(playerId, playerType), timeoutMs, null);
+  if (Array.isArray(exactRows) && exactRows.length) return exactRows;
+  const broadRows = await withTimeoutValue(getSavantPitchStrength(playerId, playerType), Math.max(1800, timeoutMs - 1000), []);
+  return Array.isArray(broadRows) ? broadRows : [];
+}
+
 function pitchStrengthTableHtml(rows = null, playerType = 'batter') {
   const title = playerType === 'pitcher' ? 'PITCH ARSENAL' : 'PITCH STRENGTH';
   if (!Array.isArray(rows)) {
@@ -7541,14 +7549,14 @@ function hydrateVisiblePlayerCardPitchTables(profile, game, token) {
     (async () => {
       try {
         if (kind === 'pitcher') {
-          const rows = await withTimeoutValue(getSavantExactPitchBreakdown(playerId, 'pitcher'), 4200, []);
+          const rows = await getVisiblePitchBreakdown(playerId, 'pitcher', 4200);
           return visiblePlayerCardPitchStripHtml(rows, 'pitcher');
         }
         const pitcherRows = Number.isFinite(pitcherId) && pitcherId > 0
-          ? await withTimeoutValue(getSavantExactPitchBreakdown(pitcherId, 'pitcher'), 2600, [])
+          ? await getVisiblePitchBreakdown(pitcherId, 'pitcher', 2600)
           : [];
         const pitcherOrder = pitcherRows.map((item) => ({ category: item.category, pct: item.pct })).filter((item) => item.category);
-        const rows = await withTimeoutValue(getSavantExactPitchBreakdown(playerId, 'batter'), 4200, []);
+        const rows = await getVisiblePitchBreakdown(playerId, 'batter', 4200);
         return visiblePlayerCardPitchStripHtml(rows, 'batter', pitcherOrder);
       } catch {
         return visiblePlayerCardPitchStripHtml([], kind === 'pitcher' ? 'pitcher' : 'batter');
@@ -28972,14 +28980,14 @@ function playerStatHeatMapSavantShell(side, playerId) {
 
 async function hydratePlayerStatHeatMapSavant(profile, row = {}) {
   const shells = [...(playerStatHeatmapEl?.querySelectorAll?.('[data-player-heatmap-savant]') || [])];
-  const pitcherRows = row.starter_id ? await withTimeoutValue(getSavantExactPitchBreakdown(row.starter_id, 'pitcher'), 3200, []) : [];
+  const pitcherRows = row.starter_id ? await getVisiblePitchBreakdown(row.starter_id, 'pitcher', 3200) : [];
   const pitcherOrder = pitcherRows.map((item) => ({ category: item.category, pct: item.pct })).filter((item) => item.category);
   await Promise.allSettled(shells.map(async (shell) => {
     const side = shell.dataset.playerHeatmapSavant === 'pitcher' ? 'pitcher' : 'batter';
     const shellPlayerId = shell.dataset.playerId;
     const playerId = side === 'pitcher' ? (shellPlayerId || row.starter_id) : (shellPlayerId || profile?.id || row.batter_id);
     try {
-      const rows = side === 'pitcher' ? pitcherRows : await withTimeoutValue(getSavantExactPitchBreakdown(playerId, side), 4200, []);
+      const rows = side === 'pitcher' ? pitcherRows : await getVisiblePitchBreakdown(playerId, side, 4200);
       shell.innerHTML = playerStatHeatMapSavantRows(rows, side, side === 'batter' ? pitcherOrder : null);
     } catch {
       shell.innerHTML = playerStatHeatMapSavantRows([], side);
@@ -31539,7 +31547,8 @@ function syncGameCardDomOrder(games = []) {
 
 async function finalizeRenderedGames(cards, homeRuns = []) {
   const selectedDate = dateInput.value || formatDate(new Date());
-  const dedupedCards = await hydrateTeamLastSevenRecords(dedupeGameCards(cards, selectedDate), selectedDate);
+  const initialCards = dedupeGameCards(cards, selectedDate);
+  const dedupedCards = await withTimeoutValue(hydrateTeamLastSevenRecords(initialCards, selectedDate), 2500, initialCards);
   latestRenderedGames = dedupedCards;
   prewarmRotowireLineupsForGames(dedupedCards);
   restorePendingGamePicks();
