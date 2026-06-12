@@ -20,6 +20,16 @@ const siteHelpDialogEl = document.getElementById('siteHelpDialog');
 const siteHelpCloseBtnEl = document.getElementById('siteHelpCloseBtn');
 const pageToggleBtnEl = document.getElementById('pageToggleBtn');
 const themeSelectEl = document.getElementById('themeSelect');
+const pitchMatchupExportBtnEl = document.getElementById('pitchMatchupExportBtn');
+const pitchMatchupExportDialogEl = document.getElementById('pitchMatchupExportDialog');
+const pitchMatchupExportFormEl = document.getElementById('pitchMatchupExportForm');
+const pitchMatchupExportStartInputEl = document.getElementById('pitchMatchupExportStartInput');
+const pitchMatchupExportEndInputEl = document.getElementById('pitchMatchupExportEndInput');
+const pitchMatchupExportStatusEl = document.getElementById('pitchMatchupExportStatus');
+const pitchMatchupExportProgressEl = document.getElementById('pitchMatchupExportProgress');
+const pitchMatchupExportCloseBtnEl = document.getElementById('pitchMatchupExportCloseBtn');
+const pitchMatchupExportCancelBtnEl = document.getElementById('pitchMatchupExportCancelBtn');
+const pitchMatchupExportRunBtnEl = document.getElementById('pitchMatchupExportRunBtn');
 const leadersToolbarEl = document.getElementById('leadersToolbar');
 const leadersPageEl = document.getElementById('leadersPage');
 const hotPageEl = document.getElementById('hotPage');
@@ -97,6 +107,7 @@ const playerStatSeasonEl = document.getElementById('playerStatSeason');
 const playerStatExtraEl = document.getElementById('playerStatExtra');
 const playerStatMatchupEl = document.getElementById('playerStatMatchup');
 const playerStatHeatmapEl = document.getElementById('playerStatHeatmap');
+const playerStatPitchMatchupEl = document.getElementById('playerStatPitchMatchup');
 const playerStatTabBtns = Array.from(document.querySelectorAll('.player-stat-tab'));
 
 const betFormEl = document.getElementById('betForm');
@@ -190,6 +201,7 @@ let playerStatBackStack = [];
 let currentPlayerStatTab = 'stats';
 let playerStatHeatMapDate = '';
 let pitcherHeatMapSelectedBatterId = '';
+let pitchMatchupExportInFlight = false;
 let playerHeatMapRows = [];
 let playerHeatMapSource = '';
 let playerHeatMapDefaultLoadAttempted = false;
@@ -291,6 +303,9 @@ const PREDICTION_SCHEMA_VERSION = 'prediction-schema-v5';
 const PLAYER_HEATMAP_DEFAULT_CSV = 'season_data_0401-0520.csv';
 const PLAYER_HEATMAP_REMOTE_CSV_URL = 'https://dzebznhmnrbtzuqogtnt.supabase.co/storage/v1/object/public/mlb-heatmaps/season_data_0401-0520.csv';
 const PLAYER_HEATMAP_PITCHES = ['fastball', 'sinker', 'cutter', 'slider', 'sweeper', 'curveball', 'changeup', 'splitter', 'knuckle_curve'];
+const PITCH_MATCHUP_CACHE_VERSION = 10;
+const PITCH_MATCHUP_CACHE_TTL_MS = 1000 * 60 * 60 * 24 * 7;
+const PITCH_MATCHUP_DURABLE_CACHE_MAX_BYTES = 180000;
 const ODDSTRADER_MLB_WEATHER_URL = 'https://www.oddstrader.com/mlb/weather/';
 const PREDICTION_HOT_AVG_THRESHOLD = 0.300;
 const PREDICTION_HOT_SLG_THRESHOLD = 0.500;
@@ -383,6 +398,7 @@ const pitcherOpponentHistoryCache = new Map();
 const batterSeriesHistoryCache = new Map();
 const batterGameStartedCache = new Map();
 const savantPitchStrengthCache = new Map();
+const pitchMatchupCache = new Map();
 const savantAirSprayCache = new Map();
 const lineupPredictionCache = new Map();
 const openMeteoWeatherCache = new Map();
@@ -401,6 +417,12 @@ const lineupRecentBattingCache = new Map();
 const fireworkControllers = new WeakMap();
 let latestMatchupExportData = null;
 let activeMatchupLookupKey = '';
+const pitchMatchupRawRowsRunCache = new Map();
+const pitchMatchupContextRunCache = new Map();
+const pitchMatchupSplitRunCache = new Map();
+const pitchMatchupUiSlateRunCache = new Map();
+const pitchMatchupUiSlateProgressByDate = new Map();
+const pitchMatchupUiSlatePrewarmSignatures = new Map();
 
 const THEMES = [
   { value: 'current', label: 'Current' },
@@ -5676,10 +5698,17 @@ function rowsToCsv(rows, columns) {
 }
 
 function rowsToCsvParts(rows, columns) {
-  const header = columns.map((column) => csvEscape(column.header)).join(',');
+  const seenHeaders = new Set();
+  const uniqueColumns = columns.filter((column) => {
+    const headerText = String(column?.header || column?.key || '');
+    if (!headerText || seenHeaders.has(headerText)) return false;
+    seenHeaders.add(headerText);
+    return true;
+  });
+  const header = uniqueColumns.map((column) => csvEscape(column.header)).join(',');
   const parts = [header];
   for (const row of rows || []) {
-    parts.push('\r\n', columns.map((column) => csvEscape(row[column.key])).join(','));
+    parts.push('\r\n', uniqueColumns.map((column) => csvEscape(row[column.key])).join(','));
   }
   return parts;
 }
@@ -9586,49 +9615,6 @@ function firstLiveLabPlayText(...values) {
   return '';
 }
 
-function liveLabBatterNameForDisplay(play = null, game = null, selectedPlayerId = '') {
-  return cleanSummary(
-    play?.matchup?.batter?.fullName
-      || play?.matchup?.batter?.name
-      || (Number(selectedPlayerId) === Number(game?.activeBatterId)
-        ? (game?.battingSide === 'home' ? game?.homeHitter : game?.awayHitter)
-        : '')
-      || (game?.battingSide === 'home' ? game?.homeHitter : game?.awayHitter)
-      || 'Batter',
-  );
-}
-
-function liveLabResultTextForPlay(play = null) {
-  if (!play || !liveLabPitchKnownOutcome(play)) return '';
-  return firstLiveLabPlayText(
-    play?.result?.description,
-    play?.result?.event,
-    play?.result?.eventType,
-  );
-}
-
-function liveLabInningTransitionText(game = null) {
-  const text = cleanSummary(game?.inningShort || game?.inning || game?.status || '');
-  if (!text || /^(live|in progress)$/i.test(text)) return '';
-  if (/\b(mid|middle|end)\b/i.test(text)) return text;
-  return '';
-}
-
-function liveLabDisplayPlayText({ play = null, game = null, selectedPlayerId = '', loadingText = '' } = {}) {
-  const resultText = liveLabResultTextForPlay(play);
-  if (resultText) return resultText;
-  const hasCurrentBatter = Boolean(
-    play?.matchup?.batter?.id
-      || (Number.isFinite(Number(game?.activeBatterId)) && Number(game.activeBatterId) > 0),
-  );
-  if (hasCurrentBatter && gameHasLiveProgress(game)) {
-    return `${liveLabBatterNameForDisplay(play, game, selectedPlayerId)} up to bat`;
-  }
-  return liveLabInningTransitionText(game)
-    || firstLiveLabPlayText(game?.lastPlay, ...(Array.isArray(game?.ticker) ? game.ticker.map((item) => item?.text) : []))
-    || loadingText;
-}
-
 function mergeFinishedGameState(card, cached) {
   if (!cached) return card;
   const sameOfficialDate = calendarDateOnly(card?.officialDate || card?.gameDate || '') === calendarDateOnly(cached?.officialDate || cached?.gameDate || '');
@@ -10942,7 +10928,7 @@ async function getLineupRecentBattingStatsMap(game, lineups = [], gameLimit = 5)
       .filter((id) => Number.isFinite(id) && id > 0),
   )];
   if (!ids.length) return new Map();
-  const pairs = await mapWithConcurrency(ids, 10, async (id) => {
+  const pairs = await mapWithConcurrency(ids, 6, async (id) => {
     const stats = await getLineupRecentBattingStats(id, game, gameLimit).catch(() => null);
     return [String(id), stats];
   });
@@ -14621,15 +14607,25 @@ function resetHomeRunAudioAlerts() {
 }
 
 function syncHomeRunAudioAlerts(homeRuns = []) {
-  const keys = listify(homeRuns)
-    .map(homeRunEventKey)
-    .filter(Boolean);
+  const items = listify(homeRuns);
+  const keys = items.map(homeRunEventKey).filter(Boolean);
   if (!homeRunAudioPrimed) {
     announcedHomeRunAudioKeys = new Set(keys);
     homeRunAudioPrimed = true;
     return;
   }
-  const newKeys = keys.filter((key) => !announcedHomeRunAudioKeys.has(key));
+  const now = Date.now();
+  const newKeys = items
+    .filter((item) => {
+      const key = homeRunEventKey(item);
+      const eventTime = Number(item?.eventTimeMs);
+      return key
+        && !announcedHomeRunAudioKeys.has(key)
+        && Number.isFinite(eventTime)
+        && now - eventTime >= 0
+        && now - eventTime <= 120000;
+    })
+    .map(homeRunEventKey);
   keys.forEach((key) => announcedHomeRunAudioKeys.add(key));
   if (newKeys.length) playHomeRunAudio();
 }
@@ -14870,7 +14866,7 @@ function overlayPageLabel(page) {
     case 'hot': return 'Hot Players';
     case 'teamStats': return 'Team Stats';
     case 'predictions': return 'Predictions';
-    case 'hrLeaderboard': return 'HR Leaderboard';
+    case 'hrLeaderboard': return 'HR Candidates';
     default: return 'Scoreboard';
   }
 }
@@ -15251,135 +15247,161 @@ function renderHrLeaderboardTable(items, emptyText, columns) {
   `;
 }
 
-function renderHrLeaderboardBoard(period = hrLeaderboardPeriod, options = {}) {
-  const hrs = collectStoredHomeRunsForPeriod(period);
-  const topHomeRuns = hrs
-    .slice()
-    .sort((a, b) => homeRunSortValue(b) - homeRunSortValue(a) || (Number(b.eventTimeMs) || 0) - (Number(a.eventTimeMs) || 0))
-    .slice(0, 10)
-    .map((hr) => ({
-      ...hr,
-      title: `${hr.batter || 'Unknown'} ${hr.resultLabel || 'Homerun'}`,
-      meta: [
-        hr.teamAbbr ? displayTeamAbbrev(hr.teamAbbr) : '',
-        hr.inningText || '',
-        hr.distance ? `${hr.distance} ft` : '',
-      ].filter(Boolean).join(' | '),
-      scoreText: hrLeaderboardScore(hr.rating ?? hr.ratingBreakdown?.score),
-      teamColor: hr.teamColor || getTeamColor(hr.teamAbbr),
-    }));
-  const playerTotals = new Map();
-  for (const hr of hrs) {
-    const key = String(hr.batterId || hr.batter || '');
-    if (!key) continue;
-    const breakdown = hr.ratingBreakdown || {};
-    const existing = playerTotals.get(key) || {
-      batter: hr.batter || 'Unknown',
-      teamAbbr: hr.teamAbbr || '',
-      teamLogo: hr.teamLogo || getLogoPath(hr.teamAbbr),
-      teamColor: hr.teamColor || getTeamColor(hr.teamAbbr),
-      total: 0,
-      count: 0,
-      best: 0,
-      breakdown: {
-        walkOff: 0,
-        inning: 0,
-        result: 0,
-        runs: 0,
-        pitcher: 0,
-        distance: 0,
-      },
-    };
-    const score = Number(hr.rating ?? hr.ratingBreakdown?.score) || 0;
-    existing.total += score;
-    existing.count += 1;
-    existing.best = Math.max(existing.best, score);
-    existing.breakdown.walkOff += Number(breakdown.walkOff) || 0;
-    existing.breakdown.inning += Number(breakdown.inning) || 0;
-    existing.breakdown.result += Number(breakdown.result) || 0;
-    existing.breakdown.runs += Number(breakdown.runs) || 0;
-    existing.breakdown.pitcher += Number(breakdown.pitcher) || 0;
-    existing.breakdown.distance += Number(breakdown.distance) || 0;
-    existing.teamAbbr = existing.teamAbbr || hr.teamAbbr || '';
-    existing.teamLogo = existing.teamLogo || hr.teamLogo || getLogoPath(hr.teamAbbr);
-    existing.teamColor = existing.teamColor || hr.teamColor || getTeamColor(hr.teamAbbr);
-    playerTotals.set(key, existing);
+function ensureHrCandidatesStyles() {
+  if (document.getElementById('testingZoneHrCandidatesStyles')) return;
+  const style = document.createElement('style');
+  style.id = 'testingZoneHrCandidatesStyles';
+  style.textContent = `
+    .hr-candidates-shell { display: grid; gap: 12px; }
+    .hr-candidates-header { display: flex; align-items: end; justify-content: space-between; gap: 12px; }
+    .hr-candidates-header h2 { margin: 0; color: #f7fbff; font: 950 18px var(--font-ui); text-transform: uppercase; }
+    .hr-candidates-header p { margin: 3px 0 0; color: rgba(226,242,255,0.66); font-weight: 800; }
+    .hr-candidates-cache-pill { padding: 5px 8px; border: 1px solid rgba(126,231,166,0.26); border-radius: 999px; color: #caffe0; background: rgba(4, 27, 16, 0.32); font: 900 10px var(--font-ui); text-transform: uppercase; white-space: nowrap; }
+    .hr-candidates-loading-wrap { display: grid; gap: 4px; }
+    .hr-candidates-loading-bar { height: 8px; overflow: hidden; border: 1px solid rgba(126,231,166,0.20); border-radius: 999px; background: rgba(2, 9, 16, 0.72); }
+    .hr-candidates-loading-bar span { display: block; width: var(--hr-candidate-progress, 4%); min-width: 4%; height: 100%; border-radius: inherit; background: linear-gradient(90deg, rgba(91,141,239,0.78), rgba(126,231,166,0.94), rgba(255,209,102,0.78)); box-shadow: 0 0 18px rgba(126,231,166,0.34); transition: width 220ms ease; }
+    .hr-candidates-loading-text { color: rgba(226,242,255,0.62); font: 850 10px var(--font-ui); text-transform: uppercase; }
+    .hr-candidates-games { display: grid; gap: 10px; }
+    .hr-candidate-game { border: 1px solid rgba(148,197,255,0.16); border-radius: 7px; background: linear-gradient(180deg, rgba(255,255,255,0.045), transparent 34%), rgba(4, 13, 22, 0.76); overflow: hidden; box-shadow: 0 16px 32px rgba(0,0,0,0.22); }
+    .hr-candidate-game-head { display: flex; align-items: center; justify-content: space-between; gap: 10px; padding: 9px 11px; border-bottom: 1px solid rgba(148,197,255,0.12); background: rgba(10, 30, 46, 0.64); }
+    .hr-candidate-game-head strong { color: #fff; font: 950 13px var(--font-ui); text-transform: uppercase; }
+    .hr-candidate-game-head small { color: rgba(226,242,255,0.64); font-weight: 900; text-transform: uppercase; }
+    .hr-candidate-teams { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 1px; background: rgba(148,197,255,0.10); }
+    .hr-candidate-team { display: grid; gap: 7px; padding: 10px; background: radial-gradient(circle at 0 0, rgba(var(--candidate-team-rgb, 102,217,255),0.16), transparent 38%), rgba(2, 9, 16, 0.84); }
+    .hr-candidate-team-title { display: flex; align-items: center; justify-content: space-between; gap: 8px; color: rgba(226,242,255,0.72); font: 950 11px var(--font-ui); text-transform: uppercase; }
+    .hr-candidate-team-title b { color: #fff; font-size: 14px; }
+    .hr-candidate-list { display: grid; gap: 5px; }
+    .hr-candidate-btn { display: grid; grid-template-columns: 28px 38px minmax(0,1fr) auto; align-items: center; gap: 8px; width: 100%; min-height: 52px; padding: 6px 8px; border: 1px solid rgba(var(--candidate-team-rgb, 102,217,255),0.24); border-radius: 6px; background: rgba(255,255,255,0.035); color: #f7fbff; text-align: left; cursor: pointer; }
+    .hr-candidate-btn:hover { border-color: rgba(var(--candidate-team-rgb, 102,217,255),0.72); background: rgba(var(--candidate-team-rgb, 102,217,255),0.12); transform: translateY(-1px); }
+    .hr-candidate-rank { display: grid; place-items: center; width: 28px; height: 28px; border-radius: 5px; background: rgba(255,255,255,0.08); color: rgba(226,242,255,0.78); font: 950 12px var(--font-ui); }
+    .hr-candidate-headshot { width: 38px; height: 38px; border-radius: 6px; object-fit: cover; background: rgba(255,255,255,0.08); box-shadow: 0 0 0 1px rgba(255,255,255,0.10), 0 7px 15px rgba(0,0,0,0.24); }
+    .hr-candidate-main { min-width: 0; }
+    .hr-candidate-main strong { display: block; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; color: #fff; font: 950 13px var(--font-ui); }
+    .hr-candidate-main small { display: block; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; color: rgba(226,242,255,0.60); font: 850 10px var(--font-ui); text-transform: uppercase; }
+    .hr-candidate-score { display: grid; justify-items: end; gap: 1px; min-width: 58px; }
+    .hr-candidate-score b { color: #fff4c5; font: 950 21px var(--font-ui); line-height: 1; text-shadow: 0 0 12px rgba(255,244,197,0.16); }
+    .hr-candidate-score span { color: rgba(255,244,197,0.68); font: 900 9px var(--font-ui); text-transform: uppercase; }
+    .hr-candidate-score.is-ice b { color: #9dd4ff; text-shadow: 0 0 12px rgba(91,141,239,0.30); }
+    .hr-candidate-score.is-low b { color: color-mix(in srgb, #9dd4ff calc(100% - var(--candidate-low-pct, 0%)), #ffe66d var(--candidate-low-pct, 0%)); }
+    .hr-candidate-score.is-yellow b { color: #ffe66d; text-shadow: 0 0 12px rgba(255,230,109,0.34); }
+    .hr-candidate-score.is-orange b { color: #ffac45; text-shadow: 0 0 14px rgba(255,172,69,0.38); }
+    .hr-candidate-score.is-red b { color: #ff625d; text-shadow: 0 0 16px rgba(255,98,93,0.45); }
+    .hr-candidate-score.is-fire b { color: #fff; background: linear-gradient(180deg, #fff8c7 0%, #ffda55 34%, #ff4f45 68%, #b81419 100%); -webkit-background-clip: text; background-clip: text; color: transparent; text-shadow: 0 0 6px rgba(255,240,176,0.55), 0 0 14px rgba(255,73,59,0.86), 0 0 24px rgba(255,149,43,0.62); animation: hrCandidateFire 1.05s ease-in-out infinite alternate; }
+    @keyframes hrCandidateFire { from { filter: brightness(1); } to { filter: brightness(1.22); } }
+    .hr-candidate-empty { color: rgba(226,242,255,0.56); font-weight: 850; padding: 10px; border: 1px dashed rgba(148,197,255,0.18); border-radius: 6px; }
+    @media (max-width: 760px) { .hr-candidate-teams { grid-template-columns: 1fr; } .hr-candidates-header { align-items: start; flex-direction: column; } }
+  `;
+  document.head.appendChild(style);
+}
+
+function hrCandidateScore(row = {}) {
+  const score = Number(row.hrScoreV10NoZone ?? row.hr_score_v10_no_zone ?? row.hrScoreV9NoZone ?? row.hr_score_v9_no_zone ?? row.hrScoreV820 ?? row.hr_score_v8_20 ?? row.hrScoreV7 ?? row.hr_pick_score_v7);
+  return Number.isFinite(score) ? score : 0;
+}
+
+function hrCandidateScoreClass(score) {
+  const value = Number(score);
+  if (!Number.isFinite(value)) return 'is-ice';
+  if (value >= 90) return 'is-fire';
+  if (value >= 80) return 'is-red';
+  if (value >= 70) return 'is-orange';
+  if (value >= 60) return 'is-yellow';
+  return value <= 0 ? 'is-ice' : 'is-low';
+}
+
+function hrCandidateRowsForTeam(rows = [], game = null, side = '') {
+  const team = displayTeamAbbrev(side === 'home' ? game?.home : game?.away);
+  return listify(rows)
+    .filter((row) => String(row?.gamePk || '') === String(game?.gamePk || ''))
+    .filter((row) => {
+      const rowTeam = displayTeamAbbrev(row?.team || '');
+      return row?.battingSide === side || (team && rowTeam === team);
+    })
+    .sort((a, b) => hrCandidateScore(b) - hrCandidateScore(a) || String(a?.batterName || '').localeCompare(String(b?.batterName || '')))
+    .slice(0, 3);
+}
+
+function renderHrCandidateTeam(game, side, rows) {
+  const team = displayTeamAbbrev(side === 'home' ? game?.home : game?.away);
+  const teamColor = getTeamColor(team) || '#66d9ff';
+  const rgb = hexToRgb(teamColor);
+  const items = rows.length ? rows.map((row, index) => {
+    const score = hrCandidateScore(row);
+    const lowPct = `${Math.max(0, Math.min(100, (score / 60) * 100)).toFixed(0)}%`;
+    const bucket = pitchMatchupHrV7Bucket(score);
+    const meta = [
+      row?.candidateLabelV10 || row?.candidateLabel || bucket?.label || '',
+      row?.hrEruptionScore ? `Eruption ${row.hrEruptionScore}` : '',
+      row?.recentHeatScore ? `Heat ${row.recentHeatScore}` : '',
+      row?.contextFallback === 'daily_profile_fallback' ? 'Fallback profile' : '',
+    ].filter(Boolean).join(' | ');
+    return `<button type="button" class="hr-candidate-btn" data-hr-candidate-player-id="${escapeHtml(row?.batterId || '')}" data-hr-candidate-player-name="${escapeHtml(row?.batterName || '')}" data-hr-candidate-team="${escapeHtml(team || row?.team || '')}" data-hr-candidate-game-pk="${escapeHtml(game?.gamePk || '')}" style="--candidate-team-rgb:${escapeHtml(rgb)}" title="${escapeHtml(row?.hrScoreV9NoZonePrimaryReason || row?.candidateLabelV10 || row?.candidateLabel || 'Right-click to add to player tracker')}">
+      <span class="hr-candidate-rank">${index + 1}</span>
+      <img class="hr-candidate-headshot" src="${playerHeadshotUrl(row?.batterId)}" alt="${escapeHtml(row?.batterName || 'Player')} headshot" loading="lazy" onerror="this.onerror=null;this.src='placeholder.png';" />
+      <span class="hr-candidate-main"><strong>${escapeHtml(row?.batterName || 'Unknown')}</strong><small>${escapeHtml(meta || 'HR v10 no-zone candidate')}</small></span>
+      <span class="hr-candidate-score ${hrCandidateScoreClass(score)}" style="--candidate-low-pct:${escapeHtml(lowPct)}"><b>${escapeHtml(pitchMatchupNumberCsv(score, 1))}</b><span>v10</span></span>
+    </button>`;
+  }).join('') : `<div class="hr-candidate-empty">No eligible HR candidates loaded for ${escapeHtml(team || 'team')}.</div>`;
+  return `<section class="hr-candidate-team" style="--candidate-team-rgb:${escapeHtml(rgb)}">
+    <div class="hr-candidate-team-title"><b>${escapeHtml(team || (side === 'home' ? 'Home' : 'Away'))}</b><span>Top 3</span></div>
+    <div class="hr-candidate-list">${items}</div>
+  </section>`;
+}
+
+function hrCandidateGamesFromRows(rows = []) {
+  const map = new Map();
+  for (const row of listify(rows)) {
+    const gamePk = String(row?.gamePk || '');
+    if (!gamePk || map.has(gamePk)) continue;
+    const parts = String(row?.game || '').split('@').map((part) => displayTeamAbbrev(part.trim()));
+    map.set(gamePk, {
+      gamePk,
+      away: parts[0] || row?.team || '',
+      home: parts[1] || row?.opponent || '',
+      gameDate: row?.gameDate || '',
+      officialDate: row?.date || '',
+    });
   }
-  const topPlayers = [...playerTotals.values()]
-    .sort((a, b) => b.total - a.total || b.count - a.count || a.batter.localeCompare(b.batter))
-    .slice(0, 10)
-    .map((player) => ({
-      teamLogo: player.teamLogo,
-      teamAbbr: player.teamAbbr,
-      teamColor: player.teamColor,
-      title: player.batter,
-      meta: `${displayTeamAbbrev(player.teamAbbr)} | ${player.count} HR`,
-      scoreText: String(Math.round(player.total)),
-      rating: player.total,
-      count: player.count,
-      average: player.count ? player.total / player.count : 0,
-      best: player.best,
-      ratingBreakdown: player.breakdown,
-    }));
-  const label = hrLeaderboardPeriodLabel(period);
-  const hrColumns = [
-    { label: '#', className: 'rank-cell', render: (_item, index) => String(index + 1) },
-    { label: 'Home Run', className: 'name-cell', render: (item) => `
-      <span class="hr-leaderboard-player">
-        <img class="hr-leaderboard-logo" src="${escapeHtml(item.teamLogo || getLogoPath(item.teamAbbr) || 'placeholder.png')}" alt="" />
-        <span><strong>${escapeHtml(item.title || item.batter || 'Unknown')}</strong><small>${escapeHtml(item.meta || '')}</small></span>
-      </span>
-    ` },
-    { label: 'Score', className: 'score-cell', render: (item) => hrLeaderboardScore(item.rating ?? item.ratingBreakdown?.score) },
-    { label: 'WO', render: (item) => hrLeaderboardPoints(item.ratingBreakdown?.walkOff) },
-    { label: 'Inn', render: (item) => hrLeaderboardPoints(item.ratingBreakdown?.inning) },
-    { label: 'Result', render: (item) => hrLeaderboardPoints(item.ratingBreakdown?.result) },
-    { label: 'Runs', render: (item) => hrLeaderboardPoints(item.ratingBreakdown?.runs) },
-    { label: 'Pitcher', render: (item) => hrLeaderboardPoints(item.ratingBreakdown?.pitcher) },
-    { label: 'Dist', render: (item) => hrLeaderboardPoints(item.ratingBreakdown?.distance) },
-  ];
-  const playerColumns = [
-    { label: '#', className: 'rank-cell', render: (_item, index) => String(index + 1) },
-    { label: 'Player', className: 'name-cell', render: (item) => `
-      <span class="hr-leaderboard-player">
-        <img class="hr-leaderboard-logo" src="${escapeHtml(item.teamLogo || getLogoPath(item.teamAbbr) || 'placeholder.png')}" alt="" />
-        <span><strong>${escapeHtml(item.title || item.batter || 'Unknown')}</strong><small>${escapeHtml(item.meta || '')}</small></span>
-      </span>
-    ` },
-    { label: 'Total', className: 'score-cell', render: (item) => hrLeaderboardScore(item.rating) },
-    { label: 'HR', render: (item) => hrLeaderboardPoints(item.count) },
-    { label: 'Avg', render: (item) => hrLeaderboardScore(item.average) },
-    { label: 'Best', render: (item) => hrLeaderboardScore(item.best) },
-    { label: 'WO', render: (item) => hrLeaderboardPoints(item.ratingBreakdown?.walkOff) },
-    { label: 'Inn', render: (item) => hrLeaderboardPoints(item.ratingBreakdown?.inning) },
-    { label: 'Result', render: (item) => hrLeaderboardPoints(item.ratingBreakdown?.result) },
-    { label: 'Runs', render: (item) => hrLeaderboardPoints(item.ratingBreakdown?.runs) },
-    { label: 'Pitcher', render: (item) => hrLeaderboardPoints(item.ratingBreakdown?.pitcher) },
-    { label: 'Dist', render: (item) => hrLeaderboardPoints(item.ratingBreakdown?.distance) },
-  ];
+  return [...map.values()];
+}
+
+function renderHrLeaderboardBoard(_period = hrLeaderboardPeriod, options = {}) {
+  ensureHrCandidatesStyles();
+  const rows = listify(options.rows);
+  const fallbackGames = hrCandidateGamesFromRows(rows);
+  const date = options.date || dateInput.value || formatDate(new Date());
+  const games = (listify(options.games).length ? listify(options.games) : fallbackGames)
+    .filter((game) => !date || !officialDateForGame(game) || officialDateForGame(game) === date)
+    .sort((a, b) => (gameStartTimeMs(a) ?? Number.MAX_SAFE_INTEGER) - (gameStartTimeMs(b) ?? Number.MAX_SAFE_INTEGER)
+      || String(a?.away || '').localeCompare(String(b?.away || '')));
+  const gameCards = games.length ? games.map((game) => {
+    const awayRows = hrCandidateRowsForTeam(rows, game, 'away');
+    const homeRows = hrCandidateRowsForTeam(rows, game, 'home');
+    const time = gameStartTimeMs(game) ? gameStartTimeText(game) : 'Time pending';
+    return `<article class="hr-candidate-game">
+      <header class="hr-candidate-game-head">
+        <strong>${escapeHtml(displayTeamAbbrev(game?.away || '') || 'Away')} @ ${escapeHtml(displayTeamAbbrev(game?.home || '') || 'Home')}</strong>
+        <small>${escapeHtml(time)}</small>
+      </header>
+      <div class="hr-candidate-teams">
+        ${renderHrCandidateTeam(game, 'away', awayRows)}
+        ${renderHrCandidateTeam(game, 'home', homeRows)}
+      </div>
+    </article>`;
+  }).join('') : `<div class="leaders-empty">${escapeHtml(options.loadingText || 'No games loaded for HR candidates yet.')}</div>`;
   const shell = document.createElement('div');
-  shell.className = 'leaders-shell hr-leaderboard-shell';
+  shell.className = 'leaders-shell hr-leaderboard-shell hr-candidates-shell';
   shell.innerHTML = `
-    <section class="leaders-section hr-leaderboard-section">
-      <div class="leaders-section-header">
+    <section class="leaders-section hr-leaderboard-section hr-candidates-section">
+      <div class="leaders-section-header hr-candidates-header">
         <div>
-          <span class="leaders-section-title">HR Leaderboard</span>
-          <span class="leaders-section-subtitle">Top rated home runs and cumulative player scores | ${escapeHtml(label)}${options.loadingText ? ` | ${escapeHtml(options.loadingText)}` : ''}</span>
+          <span class="leaders-section-title">HR Candidates</span>
+          <span class="leaders-section-subtitle">Top 3 HR v8-20 candidates per team, grouped by game time${options.loadingText ? ` | ${escapeHtml(options.loadingText)}` : ''}</span>
         </div>
-        <div class="hr-leaderboard-periods">
-          ${['week', 'month', 'season'].map((value) => `<button type="button" data-hr-period="${value}" class="${value === period ? 'active' : ''}">${value}</button>`).join('')}
-        </div>
+        <span class="hr-candidates-cache-pill">${escapeHtml(options.cacheLabel || 'Daily cache')}</span>
       </div>
-      <div class="hr-leaderboard-grid">
-        <section class="hr-leaderboard-table-section">
-          <h3>Top 10 Home Runs Of The ${escapeHtml(label)}</h3>
-          ${renderHrLeaderboardTable(topHomeRuns, `No rated home runs found for this ${label}.`, hrColumns)}
-        </section>
-        <section class="hr-leaderboard-table-section">
-          <h3>Top 10 Cumulative HR Scores</h3>
-          ${renderHrLeaderboardTable(topPlayers, `No player home run scores found for this ${label}.`, playerColumns)}
-        </section>
-      </div>
+      ${options.loadingText ? `<div class="hr-candidates-loading-wrap"><div class="hr-candidates-loading-bar" aria-hidden="true" style="--hr-candidate-progress:${escapeHtml(options.progressPct || '4%')}"><span></span></div><div class="hr-candidates-loading-text">${escapeHtml(options.progressText || options.loadingText)}</div></div>` : ''}
+      <div class="hr-candidates-games">${gameCards}</div>
     </section>
   `;
   return shell;
@@ -15388,11 +15410,56 @@ function renderHrLeaderboardBoard(period = hrLeaderboardPeriod, options = {}) {
 function refreshHrLeaderboardView() {
   if (!hrLeaderboardPageEl || currentOverlayPage !== 'hrLeaderboard') return;
   updateLeadersContext();
-  const missingDates = hrLeaderboardDatesNeedingLoad(hrLeaderboardPeriod);
-  hrLeaderboardPageEl.replaceChildren(renderHrLeaderboardBoard(hrLeaderboardPeriod, missingDates.length
-    ? { loadingText: `Loading ${missingDates.length} dates...` }
-    : {}));
-  hydrateHrLeaderboardPeriod(hrLeaderboardPeriod).catch(() => {});
+  const date = dateInput.value || formatDate(new Date());
+  const cachedRows = readPitchMatchupUiSlateSummary(date);
+  const existingProgress = pitchMatchupUiSlateProgressByDate.get(date || '') || null;
+  const existingDone = Number(existingProgress?.done) || 0;
+  const existingTotal = Math.max(1, Number(existingProgress?.total) || 1);
+  hrLeaderboardPageEl.replaceChildren(renderHrLeaderboardBoard(hrLeaderboardPeriod, {
+    rows: cachedRows || [],
+    games: latestRenderedGames,
+    date,
+    loadingText: cachedRows ? '' : 'Loading daily HR v8-20 slate...',
+    progressPct: cachedRows ? '' : `${Math.max(4, Math.min(100, Math.round((existingDone / existingTotal) * 100)))}%`,
+    progressText: cachedRows ? '' : (existingProgress ? `${existingDone}/${existingTotal} games evaluated${existingProgress.game ? ` | ${existingProgress.game}` : ''}` : 'Starting daily slate build...'),
+    cacheLabel: cachedRows ? 'Using saved daily slate' : 'Building daily slate',
+  }));
+  pitchMatchupUiSlateSummaryRows(null, date, {
+    onProgress: (progress = {}) => {
+      if (!hrLeaderboardPageEl || currentOverlayPage !== 'hrLeaderboard' || cachedRows) return;
+      const done = Number(progress.done) || 0;
+      const total = Math.max(1, Number(progress.total) || 1);
+      const pct = `${Math.max(4, Math.min(100, Math.round((done / total) * 100)))}%`;
+      hrLeaderboardPageEl.replaceChildren(renderHrLeaderboardBoard(hrLeaderboardPeriod, {
+        rows: [],
+        games: latestRenderedGames,
+        date,
+        loadingText: 'Loading daily HR v8-20 slate...',
+        progressPct: pct,
+        progressText: `${done}/${total} games evaluated${progress.game ? ` | ${progress.game}` : ''}`,
+        cacheLabel: 'Building daily slate',
+      }));
+    },
+  })
+    .then((rows) => {
+      if (!hrLeaderboardPageEl || currentOverlayPage !== 'hrLeaderboard') return;
+      hrLeaderboardPageEl.replaceChildren(renderHrLeaderboardBoard(hrLeaderboardPeriod, {
+        rows,
+        games: latestRenderedGames,
+        date,
+        cacheLabel: 'Saved for today',
+      }));
+    })
+    .catch(() => {
+      if (!hrLeaderboardPageEl || currentOverlayPage !== 'hrLeaderboard') return;
+      hrLeaderboardPageEl.replaceChildren(renderHrLeaderboardBoard(hrLeaderboardPeriod, {
+        rows: cachedRows || [],
+        games: latestRenderedGames,
+        date,
+        loadingText: cachedRows ? 'Refresh failed; showing saved slate.' : 'Could not load HR candidates.',
+        cacheLabel: cachedRows ? 'Saved daily slate' : 'Unavailable',
+      }));
+    });
 }
 
 function updateDashboardSummary(games = latestRenderedGames) {
@@ -15498,6 +15565,7 @@ function firstScrollableElement(candidates = []) {
 function currentOverlayScrollTarget() {
   if (playerStatOverlayEl && !playerStatOverlayEl.hidden) {
     return firstScrollableElement([
+      playerStatOverlayEl.querySelector('#playerStatPitchMatchup'),
       playerStatOverlayEl.querySelector('.player-stat-right'),
       playerStatOverlayEl.querySelector('.player-stat-body'),
       playerStatOverlayEl.querySelector('.player-stat-modal'),
@@ -15575,6 +15643,7 @@ function overlayWheelScrollTarget(event) {
   const target = event.target instanceof Element ? event.target : null;
   const local = target?.closest?.([
     '.player-stat-heatmap',
+    '#playerStatPitchMatchup',
     '.player-stat-body',
     '.player-stat-right',
     '.lineup-modal-team',
@@ -22126,37 +22195,40 @@ async function collectHotMatchupCandidates(games = latestRenderedGames) {
   const filteredGames = games.filter((game) => gameMatchesCurrentFilter(game, games));
   const candidates = [];
   for (const game of filteredGames) {
-    const awayPitcher = resolvePitchingSideForDisplay(game, 'home')?.current || null;
-    const homePitcher = resolvePitchingSideForDisplay(game, 'away')?.current || null;
-    const awayLineup = fallbackTeamLineupFromLookup(game, 'away').slice(0, 6);
-    const homeLineup = fallbackTeamLineupFromLookup(game, 'home').slice(0, 6);
+    const [awayPitcher, homePitcher, awayLineup, homeLineup] = await Promise.all([
+      pitchMatchupStarterForSide(game, 'home'),
+      pitchMatchupStarterForSide(game, 'away'),
+      pitchMatchupHealthyTeamBattersForGame(game, 'away'),
+      pitchMatchupHealthyTeamBattersForGame(game, 'home'),
+    ]);
     for (const batter of awayLineup) {
       if (!awayPitcher?.id || !batter?.id) continue;
-      candidates.push({ game, batterId: batter.id, pitcher: awayPitcher, teamAbbrev: game.away, opponentAbbrev: game.home });
+      candidates.push({ game, batter, batterId: batter.id, pitcher: awayPitcher, teamAbbrev: game.away, opponentAbbrev: game.home });
     }
     for (const batter of homeLineup) {
       if (!homePitcher?.id || !batter?.id) continue;
-      candidates.push({ game, batterId: batter.id, pitcher: homePitcher, teamAbbrev: game.home, opponentAbbrev: game.away });
+      candidates.push({ game, batter, batterId: batter.id, pitcher: homePitcher, teamAbbrev: game.home, opponentAbbrev: game.away });
     }
   }
   const enriched = await Promise.all(candidates.map(async (candidate) => {
-    const profile = candidate.game?.playerLookup?.[String(candidate.batterId)] || null;
-    if (!profile) return null;
-    const recent = getIndexedRecentAggregate(profile.id, dateInput.value || formatDate(new Date()), RECENT_FORM_DAY_WINDOW);
+    const profile = candidate.game?.playerLookup?.[String(candidate.batterId)] || candidate.batter || null;
+    const profileId = Number(profile?.id || candidate.batterId);
+    if (!Number.isFinite(profileId) || profileId <= 0) return null;
+    const recent = getIndexedRecentAggregate(profileId, dateInput.value || formatDate(new Date()), RECENT_FORM_DAY_WINDOW);
     const recentMetrics = recentHitterMetrics(recent);
     const opponentTeam = candidate?.opponentAbbrev ? await getTeamByAbbrev(candidate.opponentAbbrev).catch(() => null) : null;
-    const matchupContext = await getPreferredBatterMatchupHistory(profile.id, candidate.pitcher.id, opponentTeam?.id || null).catch(() => ({ history: null, source: 'none' }));
+    const matchupContext = await getPreferredBatterMatchupHistory(profileId, candidate.pitcher.id, opponentTeam?.id || null).catch(() => ({ history: null, source: 'none' }));
     const history = matchupContext?.history;
     const bvpAvg = history?.atBats > 0 ? history.hits / history.atBats : null;
     const bvpSlg = history?.atBats > 0 ? history.totalBases / history.atBats : null;
     const recentOps = recentMetrics?.ops ?? null;
     const score = ((recentOps ?? 0.65) * 90) + ((bvpAvg ?? 0.24) * 70) + ((bvpSlg ?? 0.35) * 28) + statNumber(history?.homeRuns) * 4;
     return {
-      playerId: profile.id,
-      fullName: profile.fullName,
-      teamAbbrev: profile.teamAbbrev,
-      teamColor: profile.teamColor || getTeamColor(profile.teamAbbrev || ''),
-      teamLogo: profile.teamLogo || getLogoPath(profile.teamAbbrev || ''),
+      playerId: profileId,
+      fullName: profile.fullName || profile.name || 'Unknown',
+      teamAbbrev: profile.teamAbbrev || candidate.teamAbbrev,
+      teamColor: profile.teamColor || getTeamColor(profile.teamAbbrev || candidate.teamAbbrev || ''),
+      teamLogo: profile.teamLogo || getLogoPath(profile.teamAbbrev || candidate.teamAbbrev || ''),
       pitcherId: candidate.pitcher.id,
       pitcherName: candidate.pitcher.fullName || candidate.pitcher.name || 'Opposing pitcher',
       opponentAbbrev: candidate.opponentAbbrev,
@@ -22812,10 +22884,40 @@ function initLeadersControls() {
     if (currentOverlayPage === 'hrLeaderboard') refreshHrLeaderboardView();
   });
   hrLeaderboardPageEl?.addEventListener('click', (e) => {
+    const candidate = e.target.closest('[data-hr-candidate-player-id]');
+    if (candidate) {
+      const playerId = Number(candidate.dataset.hrCandidatePlayerId);
+      if (!Number.isFinite(playerId) || playerId <= 0) return;
+      e.preventDefault();
+      e.stopPropagation();
+      const gamePk = String(candidate.dataset.hrCandidateGamePk || '');
+      const game = latestRenderedGames.find((item) => String(item?.gamePk || '') === gamePk) || buildLeaderOverlayGame({ playerId, gamePk });
+      openPlayerStatOverlay(playerId, game);
+      return;
+    }
     const btn = e.target.closest('[data-hr-period]');
     if (!btn) return;
     hrLeaderboardPeriod = btn.dataset.hrPeriod || 'week';
     refreshHrLeaderboardView();
+  });
+  hrLeaderboardPageEl?.addEventListener('contextmenu', (e) => {
+    const candidate = e.target.closest('[data-hr-candidate-player-id]');
+    if (!candidate) return;
+    const playerId = Number(candidate.dataset.hrCandidatePlayerId);
+    if (!Number.isFinite(playerId) || playerId <= 0) return;
+    e.preventDefault();
+    e.stopPropagation();
+    const teamAbbrev = displayTeamAbbrev(candidate.dataset.hrCandidateTeam || '');
+    const gamePk = String(candidate.dataset.hrCandidateGamePk || '');
+    addPlayerToTracker({
+      playerId,
+      fullName: candidate.dataset.hrCandidatePlayerName || 'Unknown',
+      teamAbbrev,
+      teamColor: getTeamColor(teamAbbrev),
+      teamLogo: getLogoPath(teamAbbrev),
+      gamePk,
+      position: '',
+    });
   });
   predictionsPageEl?.addEventListener('click', async (e) => {
     const tabBtn = e.target.closest('[data-prediction-tab]');
@@ -24314,6 +24416,22 @@ function liveLabPointAttr(point) {
   return `${point.x.toFixed(1)},${point.y.toFixed(1)}`;
 }
 
+function liveLabHitSprayLabel(hit) {
+  const angle = Number(hit?.sprayAngle);
+  if (!Number.isFinite(angle)) return '';
+  const field = angle <= -16 ? 'LF' : angle >= 16 ? 'RF' : 'CF';
+  const sign = angle > 0 ? '+' : '';
+  return `${field} ${sign}${Math.round(angle)} deg`;
+}
+
+function liveLabHitIsGroundStreak(hit) {
+  const trajectory = String(hit?.trajectory || '').toLowerCase();
+  const launchAngle = Number(hit?.launchAngle);
+  return trajectory.includes('ground')
+    || trajectory === 'gb'
+    || (Number.isFinite(launchAngle) && launchAngle <= 10);
+}
+
 function liveLabPath(points) {
   return points.map((point, index) => `${index ? 'L' : 'M'} ${liveLabPointAttr(point)}`).join(' ');
 }
@@ -25773,11 +25891,17 @@ function renderLiveLabContactTraces(outcomes, selectedOutcome, model) {
       };
       const isHomeRun = /home\s*run|homer/i.test(`${outcome.label || ''} ${outcome.description || ''} ${outcome.play?.result?.event || ''}`);
       const distanceLabel = isHomeRun && hit.distance ? `${Math.round(hit.distance)} ft` : '';
+      const sprayLabel = liveLabHitSprayLabel(hit);
+      const groundStreak = liveLabHitIsGroundStreak(hit)
+        ? `<path class="live-lab-svg-ground-streak" d="M ${liveLabPointAttr(model.home)} L ${liveLabPointAttr(end)}" />`
+        : '';
       return `
         <g class="${classes}" data-live-outcome-key="${escapeHtml(outcome.key)}" tabindex="0" role="button" aria-label="${title}">
           <title>${title}</title>
+          ${groundStreak}
           <path d="M ${liveLabPointAttr(model.home)} Q ${liveLabPointAttr(control)} ${liveLabPointAttr(end)}" />
           ${distanceLabel ? `<text class="live-lab-svg-distance-label" x="${end.x.toFixed(1)}" y="${(end.y - 18).toFixed(1)}">${escapeHtml(distanceLabel)}</text>` : ''}
+          ${sprayLabel ? `<text class="live-lab-svg-angle-label" x="${end.x.toFixed(1)}" y="${(end.y + 22).toFixed(1)}">${escapeHtml(sprayLabel)}</text>` : ''}
           <circle cx="${end.x.toFixed(1)}" cy="${end.y.toFixed(1)}" r="8" />
           <text x="${end.x.toFixed(1)}" y="${(end.y + 3.5).toFixed(1)}">${index + 1}</text>
         </g>
@@ -26634,18 +26758,25 @@ function renderLiveLabReplayOutcomeTrace(play, model, outcome, durationMs, fligh
     y: Math.min(model.home.y, end.y) - Math.max(34, (hit.apex || 24) * 2.25),
   };
   const path = `M ${liveLabPointAttr(model.home)} Q ${liveLabPointAttr(control)} ${liveLabPointAttr(end)}`;
+  const groundPath = `M ${liveLabPointAttr(model.home)} L ${liveLabPointAttr(end)}`;
   const baseFlight = flightSeconds || liveLabReplayFlightSeconds(hit, outcome);
   const flight = liveLabReplayActive
     ? liveLabReplayScaledSeconds(baseFlight)
     : Math.max(0.05, Number(baseFlight) || 0);
+  const sprayLabel = liveLabHitSprayLabel(hit);
+  const groundStreak = liveLabHitIsGroundStreak(hit)
+    ? `<path class="live-lab-replay-ground-streak" pathLength="100" d="${groundPath}" />`
+    : '';
   liveLabReplayTraceLayerEl.innerHTML = `
     <g class="live-lab-replay-contact${outcome.isHomeRun ? ' is-hr' : ''}" style="--replay-trace-duration:${flight.toFixed(2)}s">
+      ${groundStreak}
       <path pathLength="100" d="${path}" />
       <circle class="live-lab-replay-ball" r="${outcome.isHomeRun ? 6.4 : 5.4}">
         <animateMotion dur="${flight.toFixed(2)}s" fill="freeze" path="${path}" />
       </circle>
       <circle class="live-lab-replay-landing" cx="${end.x.toFixed(1)}" cy="${end.y.toFixed(1)}" r="${outcome.isHomeRun ? 11 : 8}" />
       ${outcome.isHomeRun && hit.distance ? `<text class="live-lab-replay-distance-label" x="${end.x.toFixed(1)}" y="${(end.y - 22).toFixed(1)}">${Math.round(hit.distance)} FT</text>` : ''}
+      ${sprayLabel ? `<text class="live-lab-replay-angle-label" x="${end.x.toFixed(1)}" y="${(end.y + 24).toFixed(1)}">${escapeHtml(sprayLabel)}</text>` : ''}
     </g>
   `;
 }
@@ -26699,7 +26830,7 @@ async function replayLiveLabAtBat(play, game, token, replaySnapshot = null) {
   liveLabReplayRenderOutcomeChip(play, null);
   if (liveLabPlayTextEl) {
     const batter = cleanSummary(play?.matchup?.batter?.fullName || 'Batter');
-    const text = `${batter} up to bat`;
+    const text = `${batter} at bat`;
     liveLabPlayTextEl.textContent = text;
     liveLabPlayTextEl.title = text;
   }
@@ -26983,13 +27114,18 @@ function renderLineupLiveLab(game) {
     liveLabMatchupEl.title = matchupText;
   }
   if (liveLabPlayTextEl) {
+    const playText = firstLiveLabPlayText(
+      play?.result?.description,
+      play?.result?.event,
+      game?.lastPlay,
+      ...(Array.isArray(game?.ticker) ? game.ticker.map((item) => item?.text) : []),
+    );
     const loadingText = game?.liveLabError || 'Loading full live pitch data...';
-    const nextText = liveLabDisplayPlayText({
-      play,
-      game,
-      selectedPlayerId,
-      loadingText: !gameHasLiveProgress(game) ? loadingText : '',
-    });
+    const existingText = cleanPlayText(liveLabPlayTextEl.textContent || '');
+    const nextText = playText
+      || (!existingText && !gameHasLiveProgress(game)
+        ? loadingText
+        : '');
     if (nextText) {
       liveLabPlayTextEl.textContent = nextText;
       liveLabPlayTextEl.title = nextText;
@@ -28982,6 +29118,4634 @@ async function hydratePlayerStatHeatMapSavant(profile, row = {}) {
   }));
 }
 
+function pitchMatchupStorageKey(key = '') {
+  return `testing-zone:pitch-matchup:v${PITCH_MATCHUP_CACHE_VERSION}:${key}`;
+}
+
+function readPitchMatchupLocalCache(key = '') {
+  if (!key) return null;
+  if (pitchMatchupCache.has(key)) return pitchMatchupCache.get(key);
+  try {
+    const raw = localStorage.getItem(pitchMatchupStorageKey(key));
+    if (!raw) return null;
+    const parsed = JSON.parse(raw);
+    if (!parsed?.savedAt || Date.now() - Number(parsed.savedAt) > PITCH_MATCHUP_CACHE_TTL_MS) return null;
+    pitchMatchupCache.set(key, parsed.payload);
+    return parsed.payload;
+  } catch {
+    return null;
+  }
+}
+
+function writePitchMatchupLocalCache(key = '', payload = null) {
+  if (!key || !payload) return payload;
+  pitchMatchupCache.set(key, payload);
+  if (/_pitch_splits:/.test(key) || /^pitch_matchup:/.test(key)) return payload;
+  try {
+    const serialized = JSON.stringify({ savedAt: Date.now(), payload });
+    if (serialized.length <= PITCH_MATCHUP_DURABLE_CACHE_MAX_BYTES) {
+      localStorage.setItem(pitchMatchupStorageKey(key), serialized);
+    }
+  } catch {}
+  return payload;
+}
+
+function savantPitchMatchupRawUrl(playerId, playerType = 'batter', season = seasonForDate(dateInput.value || formatDate(new Date()))) {
+  const id = Number(playerId);
+  const type = playerType === 'pitcher' ? 'pitcher' : 'batter';
+  const url = new URL('https://baseballsavant.mlb.com/statcast_search/csv');
+  url.searchParams.set('all', 'true');
+  url.searchParams.set('hfGT', 'R|');
+  url.searchParams.set('hfSea', `${season}|`);
+  url.searchParams.set('type', 'details');
+  url.searchParams.set('player_type', type);
+  url.searchParams.set('min_pitches', '0');
+  url.searchParams.set('min_results', '0');
+  url.searchParams.set('min_pas', '0');
+  url.searchParams.append(type === 'pitcher' ? 'pitchers_lookup[]' : 'batters_lookup[]', String(id));
+  return url.toString();
+}
+
+function pitchMatchupValue(row = {}, keys = []) {
+  return csvValue(row, keys);
+}
+
+function pitchMatchupNumber(row = {}, keys = []) {
+  return savantNumber(row, keys);
+}
+
+function pitchMatchupPitchType(row = {}) {
+  return String(pitchMatchupValue(row, ['pitch_type']) || '').toUpperCase();
+}
+
+function pitchMatchupVelocityBucket(pitchType = '', velo = NaN) {
+  if (!Number.isFinite(velo)) return 'unknown_velo';
+  const type = String(pitchType || '').toUpperCase();
+  if (['FF', 'SI'].includes(type)) {
+    if (velo >= 97) return '97_plus';
+    if (velo >= 95) return '95_96';
+    if (velo >= 93) return '93_94';
+    return 'below_93';
+  }
+  if (['SL', 'ST', 'FC'].includes(type)) {
+    if (type === 'FC' && velo >= 97) return '97_plus';
+    if (type === 'FC' && velo >= 95) return '95_96';
+    if (type === 'FC' && velo >= 93) return '93_94';
+    if (type === 'FC') return 'below_93';
+    if (velo >= 90) return '90_plus';
+    if (velo >= 87) return '87_89';
+    if (velo >= 84) return '84_86';
+    return 'below_84';
+  }
+  if (['CH', 'FS'].includes(type)) {
+    if (velo >= 89) return '89_plus';
+    if (velo >= 86) return '86_88';
+    if (velo >= 82) return '82_85';
+    return 'below_82';
+  }
+  if (['CU', 'KC', 'CS'].includes(type)) {
+    if (velo >= 85) return '85_plus';
+    if (velo >= 82) return '82_84';
+    if (velo >= 78) return '78_81';
+    return 'below_78';
+  }
+  return velo >= 95 ? '95_plus' : velo >= 90 ? '90_94' : velo >= 85 ? '85_89' : 'below_85';
+}
+
+function pitchMatchupLocationBucket(row = {}) {
+  const x = pitchMatchupNumber(row, ['plate_x']);
+  const z = pitchMatchupNumber(row, ['plate_z']);
+  const top = pitchMatchupNumber(row, ['sz_top']);
+  const bot = pitchMatchupNumber(row, ['sz_bot']);
+  if (!Number.isFinite(x) || !Number.isFinite(z)) {
+    const zone = pitchMatchupValue(row, ['zone']);
+    return zone ? `zone_${zone}` : 'unknown_location';
+  }
+  const verticalMid = Number.isFinite(top) && Number.isFinite(bot) ? bot + ((top - bot) / 2) : 2.5;
+  const vertical = z >= verticalMid + 0.35 ? 'up' : z <= verticalMid - 0.35 ? 'down' : 'middle';
+  const horizontal = Math.abs(x) <= 0.55 ? 'over' : x < -0.55 ? 'glove_or_in' : 'arm_or_away';
+  return `${vertical}_${horizontal}`;
+}
+
+function pitchMatchupMovementBucket(row = {}) {
+  const x = pitchMatchupNumber(row, ['pfx_x']);
+  const z = pitchMatchupNumber(row, ['pfx_z']);
+  if (!Number.isFinite(x) && !Number.isFinite(z)) return 'unknown_movement';
+  const horizontal = Math.abs(x || 0) < 0.35 ? 'straight' : x > 0 ? 'arm' : 'glove';
+  const vertical = (z || 0) >= 0.9 ? 'ride' : (z || 0) <= 0.25 ? 'drop' : 'average';
+  return `${horizontal}_${vertical}`;
+}
+
+function pitchMatchupSprayAngleFromCoordinates(hcX = NaN, hcY = NaN) {
+  const x = Number(hcX);
+  const y = Number(hcY);
+  if (!Number.isFinite(x) || !Number.isFinite(y)) return NaN;
+  return clamp(Math.atan2(x - 125.42, 198.27 - y) * (180 / Math.PI), -60, 60);
+}
+
+function pitchMatchupSprayDirectionFromAngle(sprayAngle = NaN, batterHand = '') {
+  const angle = Number(sprayAngle);
+  if (!Number.isFinite(angle)) return '';
+  if (Math.abs(angle) < 15) return 'center';
+  const hand = handednessCode(batterHand || '');
+  if (hand === 'L') return angle > 0 ? 'pull' : 'oppo';
+  return angle < 0 ? 'pull' : 'oppo';
+}
+
+function pitchMatchupCountBucket(row = {}) {
+  const balls = Number(pitchMatchupValue(row, ['balls']));
+  const strikes = Number(pitchMatchupValue(row, ['strikes']));
+  if (!Number.isFinite(balls) || !Number.isFinite(strikes)) return 'unknown_count';
+  if (strikes >= 2) return 'two_strike';
+  if (balls >= 3) return 'three_ball';
+  if (strikes > balls) return 'pitcher_ahead';
+  if (balls > strikes) return 'batter_ahead';
+  return 'even';
+}
+
+function pitchMatchupPitchFamily(pitchType = '') {
+  const type = String(pitchType || '').toUpperCase();
+  if (['FF', 'SI', 'FC', 'FA'].includes(type)) return 'fastball_family';
+  if (['SL', 'ST', 'CU', 'KC', 'SV', 'CS'].includes(type)) return 'breaking_family';
+  if (['CH', 'FS', 'FO', 'SC'].includes(type)) return 'offspeed_family';
+  return type ? 'other_family' : 'unknown_family';
+}
+
+function pitchMatchupZoneBucketsFromValues(plateX = NaN, plateZ = NaN, szTop = NaN, szBot = NaN, zone = '', batterHand = '') {
+  const x = Number(plateX);
+  const z = Number(plateZ);
+  const top = Number(szTop);
+  const bot = Number(szBot);
+  const zoneNum = Number(zone);
+  let verticalZone = '';
+  let horizontalZone = '';
+  const plateZNorm = Number.isFinite(z) && Number.isFinite(top) && Number.isFinite(bot) && top > bot
+    ? (z - bot) / (top - bot)
+    : NaN;
+  if (Number.isFinite(z) && Number.isFinite(top) && Number.isFinite(bot) && top > bot) {
+    verticalZone = plateZNorm < 0.33 ? 'low' : plateZNorm < 0.66 ? 'middle' : 'high';
+  } else if ([1, 2, 3, 11, 12].includes(zoneNum)) {
+    verticalZone = 'high';
+  } else if ([7, 8, 9, 13, 14].includes(zoneNum)) {
+    verticalZone = 'low';
+  } else if (Number.isFinite(zoneNum)) {
+    verticalZone = 'middle';
+  }
+  if (Number.isFinite(x)) {
+    const hand = handednessCode(batterHand || '');
+    horizontalZone = Math.abs(x) <= 0.28 ? 'middle'
+      : hand === 'L' ? (x > 0.28 ? 'inside' : 'outside')
+        : x < -0.28 ? 'inside' : 'outside';
+  } else if ([1, 4, 7, 11, 13].includes(zoneNum)) {
+    horizontalZone = 'inside';
+  } else if ([3, 6, 9, 12, 14].includes(zoneNum)) {
+    horizontalZone = 'outside';
+  } else if (Number.isFinite(zoneNum)) {
+    horizontalZone = 'middle';
+  }
+  let attackZone = 'unknown';
+  if ([1, 2, 3, 4, 5, 6, 7, 8, 9].includes(zoneNum)) attackZone = zoneNum === 5 ? 'heart' : 'shadow';
+  else if ([11, 12, 13, 14].includes(zoneNum)) attackZone = 'chase';
+  else if (Number.isFinite(zoneNum)) attackZone = 'waste';
+  if (Number.isFinite(x) && Number.isFinite(z) && Number.isFinite(top) && Number.isFinite(bot) && top > bot) {
+    const inPlate = Math.abs(x) <= 0.83 && z >= bot && z <= top;
+    const nearPlate = Math.abs(x) <= 1.33 && z >= bot - 0.45 && z <= top + 0.45;
+    const heart = Math.abs(x) <= 0.33 && z >= bot + ((top - bot) * 0.33) && z <= bot + ((top - bot) * 0.67);
+    attackZone = heart ? 'heart' : inPlate || nearPlate ? 'shadow' : Math.abs(x) <= 1.75 && z >= bot - 0.95 && z <= top + 0.95 ? 'chase' : 'waste';
+  }
+  return {
+    verticalZone: verticalZone || 'unknown_vertical',
+    horizontalZone: horizontalZone || 'unknown_horizontal',
+    attackZone,
+    plateZNorm,
+    plateXNorm: x,
+  };
+}
+
+function pitchMatchupZoneBuckets(row = {}) {
+  return pitchMatchupZoneBucketsFromValues(
+    pitchMatchupNumber(row, ['plate_x']),
+    pitchMatchupNumber(row, ['plate_z']),
+    pitchMatchupNumber(row, ['sz_top']),
+    pitchMatchupNumber(row, ['sz_bot']),
+    pitchMatchupValue(row, ['zone']),
+    pitchMatchupValue(row, ['stand']),
+  );
+}
+
+function derivePitchMatchupRow(row = {}) {
+  const pitchType = pitchMatchupPitchType(row);
+  const velo = pitchMatchupNumber(row, ['release_speed']);
+  const description = String(pitchMatchupValue(row, ['description']) || '');
+  const event = String(pitchMatchupValue(row, ['events']) || '');
+  const stand = handednessCode(pitchMatchupValue(row, ['stand']) || '');
+  const throwsHand = handednessCode(pitchMatchupValue(row, ['p_throws']) || '');
+  const launchSpeed = pitchMatchupNumber(row, ['launch_speed']);
+  const xslg = pitchMatchupNumber(row, ['estimated_slg_using_speedangle']);
+  const woba = pitchMatchupNumber(row, ['estimated_woba_using_speedangle', 'woba_value']);
+  const launchAngle = pitchMatchupNumber(row, ['launch_angle']);
+  const launchSpeedAngle = pitchMatchupNumber(row, ['launch_speed_angle']);
+  const hcX = pitchMatchupNumber(row, ['hc_x']);
+  const hcY = pitchMatchupNumber(row, ['hc_y']);
+  const sprayAngle = pitchMatchupSprayAngleFromCoordinates(hcX, hcY);
+  const sprayDirection = pitchMatchupSprayDirectionFromAngle(sprayAngle, stand);
+  const swingDescriptions = new Set(['swinging_strike', 'swinging_strike_blocked', 'foul', 'foul_tip', 'foul_bunt', 'hit_into_play']);
+  const whiffDescriptions = new Set(['swinging_strike', 'swinging_strike_blocked']);
+  const contactDescriptions = new Set(['foul', 'foul_tip', 'foul_bunt', 'hit_into_play']);
+  const isHit = ['single', 'double', 'triple', 'home_run'].includes(event);
+  const isPaEvent = Boolean(event && event !== 'null');
+  const isAb = isPaEvent && !['walk', 'intent_walk', 'hit_by_pitch', 'sac_bunt', 'sac_fly', 'catcher_interf'].includes(event);
+  const totalBases = event === 'home_run' ? 4 : event === 'triple' ? 3 : event === 'double' ? 2 : event === 'single' ? 1 : 0;
+  const zoneBuckets = pitchMatchupZoneBuckets(row);
+  return {
+    raw: row,
+    game_date: pitchMatchupValue(row, ['game_date']),
+    game_pk: pitchMatchupValue(row, ['game_pk']),
+    batter: pitchMatchupValue(row, ['batter']),
+    pitcher: pitchMatchupValue(row, ['pitcher']),
+    stand,
+    p_throws: throwsHand,
+    pitch_type: pitchType,
+    pitch_name: pitchMatchupValue(row, ['pitch_name']) || pitchType,
+    release_speed: velo,
+    release_spin_rate: pitchMatchupNumber(row, ['release_spin_rate']),
+    spin_axis: pitchMatchupNumber(row, ['spin_axis']),
+    release_extension: pitchMatchupNumber(row, ['release_extension']),
+    pfx_x: pitchMatchupNumber(row, ['pfx_x']),
+    pfx_z: pitchMatchupNumber(row, ['pfx_z']),
+    plate_x: pitchMatchupNumber(row, ['plate_x']),
+    plate_z: pitchMatchupNumber(row, ['plate_z']),
+    hc_x: hcX,
+    hc_y: hcY,
+    spray_angle: sprayAngle,
+    spray_direction: sprayDirection,
+    sz_top: pitchMatchupNumber(row, ['sz_top']),
+    sz_bot: pitchMatchupNumber(row, ['sz_bot']),
+    zone: pitchMatchupValue(row, ['zone']),
+    balls: pitchMatchupValue(row, ['balls']),
+    strikes: pitchMatchupValue(row, ['strikes']),
+    description,
+    events: event,
+    launch_speed: launchSpeed,
+    launch_angle: launchAngle,
+    bb_type: pitchMatchupValue(row, ['bb_type']),
+    hit_distance_sc: pitchMatchupNumber(row, ['hit_distance_sc']),
+    estimated_ba_using_speedangle: pitchMatchupNumber(row, ['estimated_ba_using_speedangle']),
+    estimated_slg_using_speedangle: xslg,
+    estimated_woba_using_speedangle: woba,
+    launch_speed_angle: launchSpeedAngle,
+    woba_value: pitchMatchupNumber(row, ['woba_value']),
+    woba_denom: pitchMatchupNumber(row, ['woba_denom']),
+    delta_run_exp: pitchMatchupNumber(row, ['delta_run_exp']),
+    pitch_hand_key: `${pitchType}|${throwsHand || 'U'}`,
+    velocity_bucket: pitchMatchupVelocityBucket(pitchType, velo),
+    vertical_zone: zoneBuckets.verticalZone,
+    horizontal_zone: zoneBuckets.horizontalZone,
+    attack_zone: zoneBuckets.attackZone,
+    plate_x_norm: zoneBuckets.plateXNorm,
+    plate_z_norm: zoneBuckets.plateZNorm,
+    pitch_family: pitchMatchupPitchFamily(pitchType),
+    pitch_zone_key: [pitchType || 'UNK', pitchMatchupVelocityBucket(pitchType, velo), zoneBuckets.verticalZone, zoneBuckets.horizontalZone].join('|'),
+    location_bucket: pitchMatchupLocationBucket(row),
+    movement_bucket: pitchMatchupMovementBucket(row),
+    count_bucket: pitchMatchupCountBucket(row),
+    is_97plus_fastball: ['FF', 'SI', 'FC'].includes(pitchType) && Number.isFinite(velo) && velo >= 97,
+    is_97plus_fourseam: pitchType === 'FF' && Number.isFinite(velo) && velo >= 97,
+    is_97plus_sinker: pitchType === 'SI' && Number.isFinite(velo) && velo >= 97,
+    is_97plus_cutter: pitchType === 'FC' && Number.isFinite(velo) && velo >= 97,
+    is_rhp_slider_vs_rhb: throwsHand === 'R' && stand === 'R' && ['SL', 'ST'].includes(pitchType),
+    is_rhp_slider_vs_lhb: throwsHand === 'R' && stand === 'L' && ['SL', 'ST'].includes(pitchType),
+    is_lhp_slider_vs_lhb: throwsHand === 'L' && stand === 'L' && ['SL', 'ST'].includes(pitchType),
+    is_lhp_slider_vs_rhb: throwsHand === 'L' && stand === 'R' && ['SL', 'ST'].includes(pitchType),
+    is_same_hand_matchup: Boolean(throwsHand && stand && throwsHand === stand),
+    is_opposite_hand_matchup: Boolean(throwsHand && stand && throwsHand !== stand),
+    is_swing: swingDescriptions.has(description),
+    is_whiff: whiffDescriptions.has(description),
+    is_contact: contactDescriptions.has(description),
+    is_bip: description === 'hit_into_play' || Number.isFinite(launchSpeed),
+    is_hit: isHit,
+    is_xbh: ['double', 'triple', 'home_run'].includes(event),
+    is_hr: event === 'home_run',
+    is_hardhit: Number.isFinite(launchSpeed) && launchSpeed >= 95,
+    is_barrel: launchSpeedAngle === 6,
+    is_pa: isPaEvent,
+    is_ab: isAb,
+    is_fb: ['fly_ball', 'popup'].includes(String(pitchMatchupValue(row, ['bb_type']) || '').toLowerCase()) || (Number.isFinite(launchAngle) && launchAngle >= 25),
+    total_bases: totalBases,
+  };
+}
+
+function emptyPitchMatchupBucket(key = '', row = {}) {
+  return {
+    key,
+    pitchType: row.pitch_type || '',
+    pitchName: row.pitch_name || row.pitch_type || '',
+    velocityBucket: row.velocity_bucket || '',
+    verticalZone: row.vertical_zone || '',
+    horizontalZone: row.horizontal_zone || '',
+    attackZone: row.attack_zone || '',
+    throwsHand: row.p_throws || '',
+    stand: row.stand || '',
+    pitches: 0,
+    paKeys: new Set(),
+    pa: 0,
+    ab: 0,
+    swings: 0,
+    whiffs: 0,
+    contacts: 0,
+    bip: 0,
+    hardHit: 0,
+    barrel: 0,
+    fb: 0,
+    hits: 0,
+    xbh: 0,
+    hr: 0,
+    totalBases: 0,
+    veloSum: 0,
+    veloCount: 0,
+    evSum: 0,
+    evCount: 0,
+    maxEv: NaN,
+    launchAngleSum: 0,
+    launchAngleCount: 0,
+    xslgSum: 0,
+    xslgCount: 0,
+    wobaSum: 0,
+    wobaCount: 0,
+    contributingEventIds: new Set(),
+    contributingGamePks: new Set(),
+    lastEventDate: '',
+    lastHrDate: '',
+    lastXbhDate: '',
+  };
+}
+
+function addPitchMatchupRow(bucket, row) {
+  bucket.pitches += 1;
+  const eventId = [
+    row.game_pk || '',
+    pitchMatchupValue(row.raw, ['at_bat_number']) || '',
+    pitchMatchupValue(row.raw, ['pitch_number']) || '',
+    row.batter || '',
+    row.pitcher || '',
+  ].join(':');
+  if (eventId.replace(/:/g, '')) bucket.contributingEventIds?.add?.(eventId);
+  if (row.game_pk) bucket.contributingGamePks?.add?.(String(row.game_pk));
+  if (row.game_date && (!bucket.lastEventDate || row.game_date > bucket.lastEventDate)) bucket.lastEventDate = row.game_date;
+  if (row.is_hr && row.game_date && (!bucket.lastHrDate || row.game_date > bucket.lastHrDate)) bucket.lastHrDate = row.game_date;
+  if (row.is_xbh && row.game_date && (!bucket.lastXbhDate || row.game_date > bucket.lastXbhDate)) bucket.lastXbhDate = row.game_date;
+  if (row.is_pa) {
+    const paKey = `${row.game_pk || ''}:${pitchMatchupValue(row.raw, ['at_bat_number']) || ''}:${row.batter || ''}:${row.pitcher || ''}:${row.events || ''}`;
+    if (!bucket.paKeys.has(paKey)) {
+      bucket.paKeys.add(paKey);
+      bucket.pa += 1;
+      if (row.is_ab) bucket.ab += 1;
+    }
+  }
+  if (row.is_swing) bucket.swings += 1;
+  if (row.is_whiff) bucket.whiffs += 1;
+  if (row.is_contact) bucket.contacts += 1;
+  if (row.is_bip) bucket.bip += 1;
+  if (row.is_hardhit) bucket.hardHit += 1;
+  if (row.is_barrel) bucket.barrel += 1;
+  if (row.is_fb) bucket.fb += 1;
+  if (row.is_hit) bucket.hits += 1;
+  if (row.is_xbh) bucket.xbh += 1;
+  if (row.is_hr) bucket.hr += 1;
+  bucket.totalBases += row.total_bases || 0;
+  if (Number.isFinite(row.release_speed)) {
+    bucket.veloSum += row.release_speed;
+    bucket.veloCount += 1;
+  }
+  if (Number.isFinite(row.launch_speed)) {
+    bucket.evSum += row.launch_speed;
+    bucket.evCount += 1;
+    bucket.maxEv = Number.isFinite(bucket.maxEv) ? Math.max(bucket.maxEv, row.launch_speed) : row.launch_speed;
+  }
+  if (Number.isFinite(row.launch_angle)) {
+    bucket.launchAngleSum += row.launch_angle;
+    bucket.launchAngleCount += 1;
+  }
+  if (Number.isFinite(row.estimated_slg_using_speedangle)) {
+    bucket.xslgSum += row.estimated_slg_using_speedangle;
+    bucket.xslgCount += 1;
+  }
+  if (Number.isFinite(row.estimated_woba_using_speedangle)) {
+    bucket.wobaSum += row.estimated_woba_using_speedangle;
+    bucket.wobaCount += 1;
+  }
+}
+
+function finalizePitchMatchupBucket(bucket, totalPitches = 0) {
+  return {
+    ...bucket,
+    paKeys: undefined,
+    contributingEventIds: [...(bucket.contributingEventIds || [])].slice(-75),
+    contributingGamePks: [...(bucket.contributingGamePks || [])].slice(-40),
+    usage: totalPitches ? bucket.pitches / totalPitches : 0,
+    velo: bucket.veloCount ? bucket.veloSum / bucket.veloCount : NaN,
+    whiffRate: bucket.swings ? bucket.whiffs / bucket.swings : NaN,
+    contactRate: bucket.swings ? bucket.contacts / bucket.swings : NaN,
+    hardHitRate: bucket.bip ? bucket.hardHit / bucket.bip : NaN,
+    barrelRate: bucket.bip ? bucket.barrel / bucket.bip : NaN,
+    fbRate: bucket.bip ? bucket.fb / bucket.bip : NaN,
+    avgEv: bucket.evCount ? bucket.evSum / bucket.evCount : NaN,
+    maxEv: Number.isFinite(bucket.maxEv) ? bucket.maxEv : NaN,
+    launchAngleAvg: bucket.launchAngleCount ? bucket.launchAngleSum / bucket.launchAngleCount : NaN,
+    xslg: bucket.xslgCount ? bucket.xslgSum / bucket.xslgCount : NaN,
+    xwoba: bucket.wobaCount ? bucket.wobaSum / bucket.wobaCount : NaN,
+    avg: bucket.ab ? bucket.hits / bucket.ab : NaN,
+    slg: bucket.ab ? bucket.totalBases / bucket.ab : NaN,
+    iso: bucket.ab ? (bucket.totalBases / bucket.ab) - (bucket.hits / bucket.ab) : NaN,
+    hrRate: bucket.pitches ? bucket.hr / bucket.pitches : 0,
+    hrPerPa: bucket.pa ? bucket.hr / bucket.pa : 0,
+    hrPerAb: bucket.ab ? bucket.hr / bucket.ab : 0,
+    hrPerBbe: bucket.bip ? bucket.hr / bucket.bip : 0,
+    tbPerPitch: bucket.pitches ? bucket.totalBases / bucket.pitches : 0,
+  };
+}
+
+function pitchMatchupSplitKey(row = {}, level = 'type') {
+  if (level === 'season') return 'season';
+  if (level === 'hand') return ['hand', row.p_throws || 'U', row.stand || 'U'].join('|');
+  if (level === 'zonePitch') {
+    return [
+      row.pitch_type || 'UNK',
+      row.p_throws || 'U',
+      row.stand || 'U',
+      row.velocity_bucket || 'unknown_velo',
+      row.vertical_zone || 'unknown_vertical',
+      row.horizontal_zone || 'unknown_horizontal',
+    ].join('|');
+  }
+  const parts = [row.pitch_type || 'UNK'];
+  if (['pitchHand', 'handed', 'velocity', 'exact'].includes(level)) parts.push(row.p_throws || 'U');
+  if (['handed', 'velocity', 'exact'].includes(level)) parts.push(row.stand || 'U');
+  if (['velocity', 'exact'].includes(level)) parts.push(row.velocity_bucket || 'unknown_velo');
+  if (level === 'exact') parts.push(row.location_bucket || 'unknown_location', row.movement_bucket || 'unknown_movement');
+  return parts.join('|');
+}
+
+function pitchMatchupRowsBeforeDate(rows = [], asofDate = '') {
+  const target = calendarDateOnly(asofDate || '');
+  if (!target) return rows;
+  return listify(rows).filter((row) => {
+    const rowDate = calendarDateOnly(pitchMatchupValue(row, ['game_date']) || row?.game_date || '');
+    return rowDate && rowDate < target;
+  });
+}
+
+function buildPitchMatchupSplitMaps(rows = [], options = {}) {
+  const sourceRows = pitchMatchupRowsBeforeDate(rows, options.asofDate || '');
+  const derived = sourceRows.map(derivePitchMatchupRow).filter((row) => row.pitch_type);
+  const levels = ['season', 'hand', 'zonePitch', 'exact', 'velocity', 'handed', 'pitchHand', 'type'];
+  const maps = Object.fromEntries(levels.map((level) => [level, new Map()]));
+  for (const row of derived) {
+    for (const level of levels) {
+      const key = pitchMatchupSplitKey(row, level);
+      if (!maps[level].has(key)) maps[level].set(key, emptyPitchMatchupBucket(key, row));
+      addPitchMatchupRow(maps[level].get(key), row);
+    }
+  }
+  for (const level of levels) {
+    const total = level === 'type' ? derived.length : Math.max(1, derived.length);
+    maps[level] = new Map([...maps[level].entries()].map(([key, bucket]) => [key, finalizePitchMatchupBucket(bucket, total)]));
+  }
+  return { derived, maps, asofDate: options.asofDate || '', sourceRowCount: listify(rows).length, asofRowCount: sourceRows.length };
+}
+
+function getPitchMatchupSplitMapsCached(playerId, playerType = 'batter', season = '', rows = [], options = {}) {
+  const asofDate = options.asofDate || '';
+  const key = `${playerType === 'pitcher' ? 'pitcher' : 'batter'}:${season || ''}:${playerId || ''}:asof:${asofDate || 'all'}`;
+  if (pitchMatchupSplitRunCache.has(key)) {
+    return { splits: pitchMatchupSplitRunCache.get(key), cacheHit: true, ms: 0 };
+  }
+  const startedAt = pitchMatchupNowMs();
+  const splits = buildPitchMatchupSplitMaps(rows, { asofDate });
+  const ms = pitchMatchupElapsedMs(startedAt);
+  pitchMatchupSplitRunCache.set(key, splits);
+  return { splits, cacheHit: false, ms };
+}
+
+function pitchMatchupSplitFromMaps(splitMaps = {}, level = '', key = '') {
+  return splitMaps?.maps?.[level]?.get?.(key) || null;
+}
+
+function pitchMatchupSeasonSplit(splitMaps = {}) {
+  return pitchMatchupSplitFromMaps(splitMaps, 'season', 'season') || null;
+}
+
+function pitchMatchupHandSplit(splitMaps = {}, throwsHand = '', stand = '') {
+  return pitchMatchupSplitFromMaps(splitMaps, 'hand', ['hand', throwsHand || 'U', stand || 'U'].join('|')) || null;
+}
+
+function pitchMatchupRecentSplit(derived = [], date = '', days = 30) {
+  const end = new Date(`${date || formatDate(new Date())}T00:00:00`);
+  if (Number.isNaN(end.getTime())) return null;
+  const start = new Date(end);
+  start.setDate(start.getDate() - Math.max(1, Number(days) || 1) + 1);
+  const bucket = emptyPitchMatchupBucket(`last_${days}`, {});
+  for (const row of derived) {
+    const rowDate = new Date(`${row.game_date || ''}T12:00:00`);
+    if (Number.isNaN(rowDate.getTime()) || rowDate < start || rowDate >= end) continue;
+    addPitchMatchupRow(bucket, row);
+  }
+  return finalizePitchMatchupBucket(bucket, derived.length || 1);
+}
+
+function pitchMatchupSprayPowerProfile(derived = [], pitcherHand = '') {
+  const base = {
+    hr: 0,
+    pullHr: 0,
+    barrel: 0,
+    pullBarrel: 0,
+    vsHandHr: 0,
+    vsHandPullHr: 0,
+    vsHandBarrel: 0,
+    vsHandPullBarrel: 0,
+  };
+  const hand = handednessCode(pitcherHand || '');
+  for (const row of listify(derived)) {
+    const direction = row?.spray_direction || '';
+    const isPull = direction === 'pull';
+    if (row?.is_hr) {
+      base.hr += 1;
+      if (isPull) base.pullHr += 1;
+      if (!hand || row?.p_throws === hand) {
+        base.vsHandHr += 1;
+        if (isPull) base.vsHandPullHr += 1;
+      }
+    }
+    if (row?.is_barrel) {
+      base.barrel += 1;
+      if (isPull) base.pullBarrel += 1;
+      if (!hand || row?.p_throws === hand) {
+        base.vsHandBarrel += 1;
+        if (isPull) base.vsHandPullBarrel += 1;
+      }
+    }
+  }
+  return {
+    hrPullPctCurrent: base.hr ? base.pullHr / base.hr : null,
+    barrelPullPctCurrent: base.barrel ? base.pullBarrel / base.barrel : null,
+    vsHandHrPullPctCurrent: base.vsHandHr ? base.vsHandPullHr / base.vsHandHr : null,
+    vsHandBarrelPullPctCurrent: base.vsHandBarrel ? base.vsHandPullBarrel / base.vsHandBarrel : null,
+    hrPullSample: base.hr,
+    barrelPullSample: base.barrel,
+    vsHandHrPullSample: base.vsHandHr,
+    vsHandBarrelPullSample: base.vsHandBarrel,
+  };
+}
+
+function pitchMatchupScore100(value, low, high, fallback = 50) {
+  const n = Number(value);
+  if (!Number.isFinite(n)) return fallback;
+  if (high === low) return fallback;
+  return clamp(Math.round(((n - low) / (high - low)) * 100), 0, 100);
+}
+
+function pitchMatchupLocalHrBlend(row = {}, batterSeason = null, pitcherSeason = null) {
+  const batterLocalPa = Number(row.batter?.pa || 0);
+  const pitcherLocalPa = Number(row.pitcher?.pa || 0);
+  const batterLocal = Number(row.batter?.hrPerPa || 0);
+  const pitcherLocal = Number(row.pitcher?.hrPerPa || 0);
+  const batterSeasonRate = Number(batterSeason?.hrPerPa || 0);
+  const pitcherSeasonRate = Number(pitcherSeason?.hrPerPa || 0);
+  const leagueContext = Number.isFinite(row.leaguePitchContextHrPerPa) ? row.leaguePitchContextHrPerPa : 0.028;
+  let weights;
+  let source;
+  if (batterLocalPa >= 30 && pitcherLocalPa >= 30) {
+    weights = [[batterLocal, 0.35], [pitcherLocal, 0.35], [batterSeasonRate, 0.15], [pitcherSeasonRate, 0.15]];
+    source = 'both_local_strong';
+  } else if (batterLocalPa >= 30 || pitcherLocalPa >= 30) {
+    const strongLocal = batterLocalPa >= pitcherLocalPa ? batterLocal : pitcherLocal;
+    const weakLocal = batterLocalPa >= pitcherLocalPa ? pitcherLocal : batterLocal;
+    weights = [[strongLocal, 0.20], [weakLocal, 0.20], [batterSeasonRate, 0.25], [pitcherSeasonRate, 0.25], [leagueContext, 0.10]];
+    source = 'one_local_weak';
+  } else {
+    weights = [[batterSeasonRate, 0.30], [pitcherSeasonRate, 0.30], [leagueContext, 0.40]];
+    source = 'season_league_fallback';
+  }
+  const rate = weights.reduce((sum, [value, weight]) => sum + ((Number(value) || 0) * weight), 0);
+  const sample = Math.min(batterLocalPa || 0, pitcherLocalPa || 0);
+  const reliability = sample >= 60 ? 'High' : sample >= 30 ? 'Medium' : sample >= 12 ? 'Low' : 'Very low';
+  return {
+    rate,
+    reliability,
+    source,
+    index: leagueContext ? rate / leagueContext : 1,
+  };
+}
+
+function pitchMatchupZoneReliability(batterBucket = null, pitcherBucket = null) {
+  const sample = Math.min(Number(batterBucket?.pa || 0), Number(pitcherBucket?.pa || 0));
+  if (sample >= 45) return { label: 'High', weight: 1.00, sample };
+  if (sample >= 25) return { label: 'Medium', weight: 0.82, sample };
+  if (sample >= 12) return { label: 'Low', weight: 0.62, sample };
+  return { label: 'Very low', weight: 0.38, sample };
+}
+
+function pitchMatchupBayesRate(successes = 0, chances = 0, priorRate = 0, priorStrength = 12) {
+  const s = Math.max(0, Number(successes) || 0);
+  const c = Math.max(0, Number(chances) || 0);
+  const p = Math.max(0, Number(priorRate) || 0);
+  const w = Math.max(0, Number(priorStrength) || 0);
+  return (s + (p * w)) / Math.max(1, c + w);
+}
+
+function pitchMatchupSmoothedZoneStats(bucket = null, options = {}) {
+  const bbe = Number(bucket?.bip || 0);
+  const pa = Number(bucket?.pa || 0);
+  const priorStrength = Number(options.priorStrength) || 14;
+  return {
+    hrPerBbe: pitchMatchupBayesRate(bucket?.hr, bbe, 0.045, priorStrength),
+    hrPerPa: pitchMatchupBayesRate(bucket?.hr, pa, 0.020, Math.max(8, priorStrength)),
+    barrelRate: pitchMatchupBayesRate(bucket?.barrel, bbe, 0.080, priorStrength),
+    hardHitRate: pitchMatchupBayesRate(bucket?.hardHit, bbe, 0.380, priorStrength),
+    xslg: Number.isFinite(Number(bucket?.xslg)) ? ((Number(bucket.xslg) * Math.max(1, bbe)) + (0.420 * priorStrength)) / (Math.max(1, bbe) + priorStrength) : 0.420,
+  };
+}
+
+function pitchMatchupZoneDamageScore(bucket = null, fallback = 45) {
+  const smooth = pitchMatchupSmoothedZoneStats(bucket, { priorStrength: 14 });
+  return Math.round(
+    (pitchMatchupScore100(smooth.xslg, 0.250, 0.850, fallback) * 0.34)
+    + (pitchMatchupScore100(smooth.hrPerPa, 0.000, 0.100, fallback) * 0.22)
+    + (pitchMatchupScore100(smooth.hrPerBbe, 0.000, 0.180, fallback) * 0.18)
+    + (pitchMatchupScore100(smooth.barrelRate, 0.000, 0.220, fallback) * 0.14)
+    + (pitchMatchupScore100(smooth.hardHitRate, 0.180, 0.650, fallback) * 0.12)
+  );
+}
+
+function pitchMatchupZoneVulnerabilityScore(bucket = null, fallback = 45) {
+  const smooth = pitchMatchupSmoothedZoneStats(bucket, { priorStrength: 14 });
+  return Math.round(
+    (pitchMatchupScore100(smooth.xslg, 0.260, 0.780, fallback) * 0.38)
+    + (pitchMatchupScore100(smooth.hrPerPa, 0.000, 0.090, fallback) * 0.24)
+    + (pitchMatchupScore100(smooth.barrelRate, 0.000, 0.200, fallback) * 0.18)
+    + (pitchMatchupScore100(smooth.hardHitRate, 0.180, 0.620, fallback) * 0.14)
+    + (pitchMatchupScore100(bucket?.usage, 0.015, 0.180, fallback) * 0.06)
+  );
+}
+
+function pitchMatchupZonePitchClash(batterSplits = {}, pitcherSplits = {}, options = {}) {
+  const batterZoneMap = batterSplits?.maps?.zonePitch || new Map();
+  const pitcherZoneRows = [...(pitcherSplits?.maps?.zonePitch?.values?.() || [])]
+    .filter((row) => row?.pitchType && row?.velocityBucket && row?.verticalZone && row?.horizontalZone);
+  const rows = [];
+  for (const pitcherBucket of pitcherZoneRows) {
+    const key = [
+      pitcherBucket.pitchType || 'UNK',
+      pitcherBucket.throwsHand || 'U',
+      pitcherBucket.stand || 'U',
+      pitcherBucket.velocityBucket || 'unknown_velo',
+      pitcherBucket.verticalZone || 'unknown_vertical',
+      pitcherBucket.horizontalZone || 'unknown_horizontal',
+    ].join('|');
+    const batterBucket = batterZoneMap.get(key);
+    if (!batterBucket) continue;
+    const reliability = pitchMatchupZoneReliability(batterBucket, pitcherBucket);
+    const batterDamageScore = pitchMatchupZoneDamageScore(batterBucket);
+    const pitcherVulnerabilityScore = pitchMatchupZoneVulnerabilityScore(pitcherBucket);
+    const usage = Math.max(0, Number(pitcherBucket.usage) || 0);
+    const clashRaw = usage * (batterDamageScore / 100) * (pitcherVulnerabilityScore / 100);
+    const clash = clashRaw * reliability.weight;
+    rows.push({
+      key,
+      pitchType: pitcherBucket.pitchType,
+      velocityBucket: pitcherBucket.velocityBucket,
+      verticalZone: pitcherBucket.verticalZone,
+      horizontalZone: pitcherBucket.horizontalZone,
+      attackZone: pitcherBucket.attackZone,
+      pitcherUsagePct: usage,
+      batterBucket,
+      pitcherBucket,
+      batterDamageScore,
+      pitcherVulnerabilityScore,
+      reliability: reliability.label,
+      reliabilitySample: reliability.sample,
+      clashRaw,
+      clash,
+    });
+  }
+  rows.sort((a, b) => b.clash - a.clash);
+  const totalRaw = rows.reduce((sum, row) => sum + row.clashRaw, 0);
+  const total = rows.reduce((sum, row) => sum + row.clash, 0);
+  const scoreRaw = clamp(Math.round(totalRaw * 520), 0, 100);
+  const score = clamp(Math.round(total * 520), 0, 100);
+  const best = rows[0] || null;
+  const weakRows = rows.filter((row) => ['Low', 'Very low'].includes(row.reliability)).length;
+  const caution = !rows.length ? 'no_zone_overlap'
+    : weakRows / rows.length > 0.6 ? 'mostly_low_sample_zone_splits'
+      : best?.reliability === 'Very low' ? 'best_zone_very_low_sample'
+        : 'ok';
+  const asofDate = calendarDateOnly(options.asofDate || batterSplits?.asofDate || pitcherSplits?.asofDate || '');
+  let dataThroughDate = '';
+  if (asofDate) {
+    const through = new Date(`${asofDate}T12:00:00`);
+    through.setDate(through.getDate() - 1);
+    dataThroughDate = formatDate(through);
+  }
+  const targetGamePk = String(options.targetGamePk || '');
+  const targetIncluded = Boolean(targetGamePk && rows.some((row) => [
+    ...(row.batterBucket?.contributingGamePks || []),
+    ...(row.pitcherBucket?.contributingGamePks || []),
+  ].map(String).includes(targetGamePk)));
+  const lastEventDate = rows.map((row) => row.batterBucket?.lastEventDate || row.pitcherBucket?.lastEventDate || '').filter(Boolean).sort().pop() || '';
+  const leakageFlag = Boolean((asofDate && lastEventDate && lastEventDate >= asofDate) || targetIncluded);
+  return {
+    score,
+    scoreRaw,
+    rows,
+    best,
+    reliability: best?.reliability || '',
+    caution,
+    asofDate,
+    dataThroughDate,
+    targetGamePk,
+    targetGameIncluded: targetIncluded,
+    leakageFlag,
+    lastEventDate,
+  };
+}
+
+function pitchMatchupZonePitchClashFields(zoneClash = null) {
+  const best = zoneClash?.best || null;
+  return {
+    zonePitchClashScore: Number.isFinite(Number(zoneClash?.score)) ? Math.round(Number(zoneClash.score)) : '',
+    zonePitchClashScoreRaw: Number.isFinite(Number(zoneClash?.scoreRaw)) ? Math.round(Number(zoneClash.scoreRaw)) : '',
+    zonePitchClashScoreReliabilityAdjusted: Number.isFinite(Number(zoneClash?.score)) ? Math.round(Number(zoneClash.score)) : '',
+    bestZonePitchMatch: best ? `${pitchMatchupPitchLabel({ pitchType: best.pitchType, velocityBucket: best.velocityBucket })} ${best.verticalZone}/${best.horizontalZone}` : '',
+    bestZonePitchType: best?.pitchType || '',
+    bestZoneVelocityBucket: best?.velocityBucket || '',
+    bestVerticalZone: best?.verticalZone || '',
+    bestHorizontalZone: best?.horizontalZone || '',
+    pitcherBestZoneUsagePct: pitchMatchupRateCsv(best?.pitcherUsagePct),
+    batterPitchZoneHrPerPa: pitchMatchupRateCsv(best?.batterBucket?.hrPerPa),
+    batterPitchZoneHrPerBbe: pitchMatchupRateCsv(best?.batterBucket?.hrPerBbe),
+    batterPitchZoneXslg: pitchMatchupNumberCsv(best?.batterBucket?.xslg),
+    batterPitchZoneBarrelPct: pitchMatchupRateCsv(best?.batterBucket?.barrelRate),
+    batterPitchZoneHardHitPct: pitchMatchupRateCsv(best?.batterBucket?.hardHitRate),
+    batterPitchZoneWhiffPct: pitchMatchupRateCsv(best?.batterBucket?.whiffRate),
+    pitcherPitchZoneUsagePct: pitchMatchupRateCsv(best?.pitcherUsagePct),
+    pitcherPitchZoneHrPerPaAllowed: pitchMatchupRateCsv(best?.pitcherBucket?.hrPerPa),
+    pitcherPitchZoneXslgAllowed: pitchMatchupNumberCsv(best?.pitcherBucket?.xslg),
+    pitcherPitchZoneBarrelPctAllowed: pitchMatchupRateCsv(best?.pitcherBucket?.barrelRate),
+    pitcherPitchZoneHardHitPctAllowed: pitchMatchupRateCsv(best?.pitcherBucket?.hardHitRate),
+    batterBestZoneXslg: pitchMatchupNumberCsv(best?.batterBucket?.xslg),
+    pitcherBestZoneXslgAllowed: pitchMatchupNumberCsv(best?.pitcherBucket?.xslg),
+    zonePitchClashReliability: zoneClash?.reliability || '',
+    zonePitchClashCaution: zoneClash?.caution || '',
+    zonePitchClashAsofDate: zoneClash?.asofDate || '',
+    zonePitchClashDataThroughDate: zoneClash?.dataThroughDate || '',
+    zonePitchClashLastEventDate: zoneClash?.lastEventDate || '',
+    zonePitchClashTargetIncluded: zoneClash?.targetGameIncluded ? 1 : 0,
+    zonePitchClashLeakageFlag: zoneClash?.leakageFlag ? 1 : 0,
+  };
+}
+
+function pitchMatchupPcmiScores(parts = {}) {
+  const hrBatterPowerScore = Number(parts.hrBatterPowerScore);
+  const hrPitcherVulnerabilityScore = Number(parts.hrPitcherVulnerabilityScore);
+  const hrLocalizedRateScore = Number(parts.hrLocalizedRateScore);
+  const hrPitchScore = Number(parts.hrPitchScore);
+  const pitcherVsSideHrAllowedPercentile = pitchMatchupScore100(parts.pitcherVsSideHrPerPaAllowed, 0.005, 0.070, 45);
+  const batterVsHandHrPercentile = pitchMatchupScore100(parts.batterVsHandHrPerPa, 0.005, 0.075, 45);
+  const recentHeatScore = Number(parts.recentHeatScore);
+  const localized = Math.sqrt(Math.max(0, hrLocalizedRateScore || 0) * Math.max(0, hrPitchScore || 0));
+  const powerVulnerability = Math.sqrt(Math.max(0, hrBatterPowerScore || 0) * Math.max(0, hrPitcherVulnerabilityScore || 0));
+  const minGate = (0.55 * Math.min(hrBatterPowerScore || 0, hrPitcherVulnerabilityScore || 0))
+    + (0.45 * Math.min(hrLocalizedRateScore || 0, hrPitchScore || 0));
+  const raw = (0.30 * localized)
+    + (0.20 * powerVulnerability)
+    + (0.15 * pitcherVsSideHrAllowedPercentile)
+    + (0.15 * batterVsHandHrPercentile)
+    + (0.10 * (Number.isFinite(recentHeatScore) ? recentHeatScore : 45))
+    + (0.10 * (Number.isFinite(hrPitchScore) ? hrPitchScore : 45));
+  const reliabilityScore = Number(parts.reliabilityScore);
+  const reliabilityWeight = Number.isFinite(reliabilityScore)
+    ? clamp((reliabilityScore - 30) / 62, 0.35, 1)
+    : 0.65;
+  const adjusted = raw * reliabilityWeight + 50 * (1 - reliabilityWeight);
+  return {
+    pcmiRaw: Math.round(clamp(raw, 0, 100)),
+    pcmiReliabilityAdjusted: Math.round(clamp(adjusted, 0, 100)),
+    pcmi: Math.round(clamp(raw, 0, 100)),
+    pitchClashLocalized: Math.round(clamp(localized, 0, 100)),
+    pitchClashPowerVulnerability: Math.round(clamp(powerVulnerability, 0, 100)),
+    pitchClashMinGate: Math.round(clamp(minGate, 0, 100)),
+    pitcherVsSideHrAllowedPercentile,
+    batterVsHandHrPercentile,
+  };
+}
+
+function pitchMatchupHandednessScores(batterHand = null, pitcherHand = null) {
+  const batterDamage = pitchMatchupScore100(batterHand?.xslg, 0.320, 0.650, 45);
+  const pitcherDamage = pitchMatchupScore100(pitcherHand?.xslg, 0.330, 0.620, 45);
+  const batterHr = pitchMatchupScore100(batterHand?.hrPerPa, 0.005, 0.075, 45);
+  const pitcherHr = pitchMatchupScore100(pitcherHand?.hrPerPa, 0.005, 0.070, 45);
+  const matchupScore = Math.round((batterDamage * 0.35) + (pitcherDamage * 0.35) + (batterHr * 0.15) + (pitcherHr * 0.15));
+  const hrAverage = Math.round((batterHr + pitcherHr) / 2);
+  const damageAverage = Math.round((batterDamage + pitcherDamage) / 2);
+  return {
+    handedness_matchup_score: matchupScore,
+    handedness_hr_boost: hrAverage - 50,
+    handedness_damage_boost: damageAverage - 50,
+  };
+}
+
+function pitchMatchupRecentHeat(recent = {}) {
+  const powerScore = (row = null, fallback = 45) => Math.round(
+    (pitchMatchupScore100(row?.hrPerPa, 0.000, 0.090, fallback) * 0.35)
+    + (pitchMatchupScore100(row?.xslg, 0.300, 0.700, fallback) * 0.35)
+    + (pitchMatchupScore100(row?.barrelRate, 0.020, 0.180, fallback) * 0.20)
+    + (pitchMatchupScore100(row?.hardHitRate, 0.250, 0.600, fallback) * 0.10)
+  );
+  const last7Weight = Number(recent.last7?.pa || 0) >= 20 ? 0.25 : 0.12;
+  const last14Weight = 0.35;
+  const last30Weight = 1 - last7Weight - last14Weight;
+  const last7 = powerScore(recent.last7, 45);
+  const last14 = powerScore(recent.last14, 45);
+  const last30 = powerScore(recent.last30, 45);
+  const recent_heat_score = Math.round((last30 * last30Weight) + (last14 * last14Weight) + (last7 * last7Weight));
+  return {
+    recent_heat_score,
+    recent_hr_score: pitchMatchupScore100(recent.last30?.hrPerPa, 0.000, 0.075, 45),
+    recent_power_score: Math.round((last30 * 0.45) + (last14 * 0.35) + (last7 * 0.20)),
+    recent_contact_quality_score: Math.round(
+      (pitchMatchupScore100(recent.last30?.barrelRate, 0.020, 0.180, 45) * 0.55)
+      + (pitchMatchupScore100(recent.last30?.hardHitRate, 0.250, 0.600, 45) * 0.45)
+    ),
+  };
+}
+
+function pitchMatchupRateCsv(value, digits = 4) {
+  return Number.isFinite(Number(value)) ? Number(value).toFixed(digits) : '';
+}
+
+function pitchMatchupNumberCsv(value, digits = 3) {
+  return Number.isFinite(Number(value)) ? Number(value).toFixed(digits) : '';
+}
+
+function pitchMatchupPointInTimeAuditFields(date = '', options = {}) {
+  const targetDate = calendarDateOnly(date || options.date || dateInput.value || formatDate(new Date()));
+  const dataCutoffDate = calendarDateOnly(options.dataCutoffDate || addDaysToDateValue(targetDate, -1));
+  const statWindowStart = calendarDateOnly(options.statWindowStart || `${seasonForDate(targetDate)}-03-01`);
+  const statWindowEnd = calendarDateOnly(options.statWindowEnd || dataCutoffDate);
+  const valid = Boolean(targetDate && dataCutoffDate && dataCutoffDate < targetDate && statWindowEnd <= dataCutoffDate);
+  return {
+    dataCutoffDate,
+    pointInTimeValid: valid ? 1 : 0,
+    statWindowStart,
+    statWindowEnd,
+    leakageCheckFlag: valid ? 'ok_source_dates_before_target' : 'leakage_risk_check_cutoff_dates',
+  };
+}
+
+function pitchMatchupParkDirectionFactors(homeTeam = '') {
+  const team = canonicalTeamAbbrev(homeTeam || '');
+  const presets = {
+    BAL: { lhbPull: 0.88, lhbCenter: 0.96, lhbOppo: 0.98, rhbPull: 1.02, rhbCenter: 0.96, rhbOppo: 0.88 },
+    BOS: { lhbPull: 0.92, lhbCenter: 1.02, lhbOppo: 1.14, rhbPull: 1.16, rhbCenter: 1.02, rhbOppo: 0.92 },
+    CIN: { lhbPull: 1.16, lhbCenter: 1.06, lhbOppo: 1.05, rhbPull: 1.15, rhbCenter: 1.06, rhbOppo: 1.05 },
+    COL: { lhbPull: 1.22, lhbCenter: 1.18, lhbOppo: 1.14, rhbPull: 1.22, rhbCenter: 1.18, rhbOppo: 1.14 },
+    HOU: { lhbPull: 1.02, lhbCenter: 0.98, lhbOppo: 0.96, rhbPull: 1.10, rhbCenter: 0.98, rhbOppo: 0.96 },
+    LAD: { lhbPull: 1.06, lhbCenter: 1.00, lhbOppo: 0.98, rhbPull: 1.06, rhbCenter: 1.00, rhbOppo: 0.98 },
+    NYY: { lhbPull: 1.18, lhbCenter: 0.98, lhbOppo: 0.95, rhbPull: 0.98, rhbCenter: 0.98, rhbOppo: 1.18 },
+    PHI: { lhbPull: 1.12, lhbCenter: 1.03, lhbOppo: 1.02, rhbPull: 1.10, rhbCenter: 1.03, rhbOppo: 1.02 },
+    SD: { lhbPull: 0.96, lhbCenter: 0.94, lhbOppo: 0.98, rhbPull: 0.96, rhbCenter: 0.94, rhbOppo: 0.98 },
+    SEA: { lhbPull: 0.94, lhbCenter: 0.92, lhbOppo: 0.96, rhbPull: 0.94, rhbCenter: 0.92, rhbOppo: 0.96 },
+    SF: { lhbPull: 0.90, lhbCenter: 0.96, lhbOppo: 0.98, rhbPull: 0.98, rhbCenter: 0.96, rhbOppo: 0.90 },
+  };
+  return {
+    team,
+    source: presets[team] ? 'directional_park_factor_estimate' : 'neutral_directional_park_factor_fallback',
+    factors: presets[team] || { lhbPull: 1, lhbCenter: 1, lhbOppo: 1, rhbPull: 1, rhbCenter: 1, rhbOppo: 1 },
+  };
+}
+
+function pitchMatchupParkSwingFitFields(payload = null, options = {}) {
+  const batterHand = handednessCode(options.batterHand || payload?.batterHand?.stand || payload?.stand || '');
+  const park = pitchMatchupParkDirectionFactors(options.homeTeam || payload?.homeTeam || '');
+  const sprayProfile = payload?.batterSprayProfile || predictionFallbackAirSprayProfile();
+  const sprayWeights = predictionAirSprayWeights(sprayProfile);
+  const prefix = batterHand === 'L' ? 'lhb' : 'rhb';
+  const pull = park.factors[`${prefix}Pull`];
+  const center = park.factors[`${prefix}Center`];
+  const oppo = park.factors[`${prefix}Oppo`];
+  const fit = (sprayWeights.pullAirWeight * pull) + (sprayWeights.straightAirWeight * center) + (sprayWeights.oppoAirWeight * oppo);
+  const weather = options.weather ? predictionWeatherEffect(options.weather, { batterHand, sprayProfile }) : null;
+  const weatherAdj = Number.isFinite(Number(weather?.hrWeatherScore)) ? Number(weather.hrWeatherScore) / 100 : 0;
+  const fitWithWeather = clamp(fit + weatherAdj, 0.70, 1.35);
+  const cautions = [];
+  if (!payload?.batterSprayProfile) cautions.push('spray_profile_fallback');
+  if (park.source.includes('fallback')) cautions.push('park_factor_fallback');
+  if (!options.weather) cautions.push('weather_not_applied');
+  return {
+    parkSwingHrFit: pitchMatchupNumberCsv(fitWithWeather, 3),
+    parkFitType: park.source,
+    parkFitCaution: cautions.join('|') || 'ok',
+    batterPullAirPct: pitchMatchupRateCsv(sprayProfile.pullAirPctCurrent),
+    batterCenterAirPct: pitchMatchupRateCsv(sprayProfile.straightAirPctCurrent),
+    batterOppoAirPct: pitchMatchupRateCsv(sprayProfile.oppoAirPctCurrent),
+    batterHrPullPct: pitchMatchupRateCsv(sprayProfile.hrPullPctCurrent ?? sprayProfile.hrPullPct),
+    batterBarrelPullPct: pitchMatchupRateCsv(sprayProfile.barrelPullPctCurrent ?? sprayProfile.barrelPullPct),
+    batterVsHandPullAirPct: pitchMatchupRateCsv(sprayProfile.vsHandPullAirPctCurrent ?? sprayProfile.vsHandPullAirPct ?? sprayProfile.pullAirPctCurrent),
+    batterVsHandHrPullPct: pitchMatchupRateCsv(sprayProfile.vsHandHrPullPctCurrent ?? sprayProfile.vsHandHrPullPct ?? sprayProfile.hrPullPctCurrent ?? sprayProfile.hrPullPct),
+    batterVsHandBarrelPullPct: pitchMatchupRateCsv(sprayProfile.vsHandBarrelPullPctCurrent ?? sprayProfile.vsHandBarrelPullPct ?? sprayProfile.barrelPullPctCurrent ?? sprayProfile.barrelPullPct),
+    parkHrFactorLhbPull: pitchMatchupNumberCsv(park.factors.lhbPull, 3),
+    parkHrFactorLhbCenter: pitchMatchupNumberCsv(park.factors.lhbCenter, 3),
+    parkHrFactorLhbOppo: pitchMatchupNumberCsv(park.factors.lhbOppo, 3),
+    parkHrFactorRhbPull: pitchMatchupNumberCsv(park.factors.rhbPull, 3),
+    parkHrFactorRhbCenter: pitchMatchupNumberCsv(park.factors.rhbCenter, 3),
+    parkHrFactorRhbOppo: pitchMatchupNumberCsv(park.factors.rhbOppo, 3),
+  };
+}
+
+function pitchMatchupExportContextFields(payload = null, options = {}) {
+  const parkFields = pitchMatchupParkSwingFitFields(payload, options);
+  const parkScore = pitchMatchupScore100(parkFields.parkSwingHrFit, 0.90, 1.15, 50);
+  const zoneFields = pitchMatchupZonePitchClashFields(payload?.zonePitchClash);
+  const targetGamePk = String(options.gamePk || '');
+  if (targetGamePk && payload?.zonePitchClash?.rows?.length) {
+    const targetIncluded = payload.zonePitchClash.rows.some((row) => [
+      ...(row.batterBucket?.contributingGamePks || []),
+      ...(row.pitcherBucket?.contributingGamePks || []),
+    ].map(String).includes(targetGamePk));
+    zoneFields.zonePitchClashTargetIncluded = targetIncluded ? 1 : 0;
+    if (targetIncluded) zoneFields.zonePitchClashLeakageFlag = 1;
+  }
+  const pcmi = Number(options.pcmi);
+  const localized = Number(options.pitchClashLocalized);
+  const powerVulnerability = Number(options.pitchClashPowerVulnerability);
+  const minGate = Number(options.pitchClashMinGate);
+  const zoneScore = Number(zoneFields.zonePitchClashScore);
+  const pcmiWithHomeAway = Number.isFinite(pcmi) ? Math.round((pcmi * 0.90) + (parkScore * 0.10)) : '';
+  const hrPickScoreV2 = pcmiWithHomeAway;
+  const hrPickScoreV3 = Number.isFinite(pcmi)
+    ? Math.round((pcmi * 0.80) + (parkScore * 0.10) + ((Number.isFinite(zoneScore) ? zoneScore : 50) * 0.10))
+    : '';
+  const zoneScaled = Number.isFinite(zoneScore) ? zoneScore : 50;
+  const hrPickScoreV4 = Number.isFinite(pcmi)
+    ? Math.round(
+      (pcmi * 0.55)
+      + (zoneScaled * 0.20)
+      + (parkScore * 0.10)
+      + (pcmi * 0.10)
+      + (parkScore * 0.05)
+    )
+    : '';
+  const hrPickScoreV4a = Number.isFinite(pcmi) ? Math.round((pcmi * 0.60) + (zoneScaled * 0.25) + (parkScore * 0.10) + (parkScore * 0.05)) : '';
+  const hrPickScoreV4b = Number.isFinite(pcmi) ? Math.round((pcmi * 0.50) + (zoneScaled * 0.35) + (parkScore * 0.10) + (parkScore * 0.05)) : '';
+  const hrPickScoreV4c = Number.isFinite(pcmi)
+    ? Math.round((pcmi * 0.45) + (zoneScaled * 0.35) + ((Number(options.finalHrDamageScore) || pcmi) * 0.10) + (parkScore * 0.05) + (parkScore * 0.05))
+    : '';
+  return {
+    ...pitchMatchupPointInTimeAuditFields(options.date || payload?.date || ''),
+    ...parkFields,
+    pcmi: Number.isFinite(pcmi) ? Math.round(pcmi) : '',
+    parkSwingHrFitScore: parkScore,
+    parkWeatherHrScore: parkScore,
+    pitchClashLocalized: Number.isFinite(localized) ? Math.round(localized) : '',
+    pitchClashPowerVulnerability: Number.isFinite(powerVulnerability) ? Math.round(powerVulnerability) : '',
+    pitchClashMinGate: Number.isFinite(minGate) ? Math.round(minGate) : '',
+    personalizedHomeAwayScore: parkScore,
+    ...zoneFields,
+    zonePitchClashScoreScaled: zoneScaled,
+    pcmiWithHomeAway,
+    hrPickScoreV2,
+    hrPickScoreV3,
+    hrPickScoreV4,
+    hrPickScoreV4a,
+    hrPickScoreV4b,
+    hrPickScoreV4c,
+  };
+}
+
+function pitchMatchupSprayAngleFromHitData(hitData = {}) {
+  const coords = hitData?.coordinates || {};
+  const hcX = liveLabFinite(coords.coordX ?? coords.hcX ?? hitData.hcX ?? hitData.hc_x);
+  const hcY = liveLabFinite(coords.coordY ?? coords.hcY ?? hitData.hcY ?? hitData.hc_y);
+  if (hcX == null || hcY == null) return { hcX, hcY, sprayAngle: null, pullCenterOppo: '' };
+  const sprayAngle = clamp(Math.atan2(hcX - 125.42, 198.27 - hcY) * (180 / Math.PI), -60, 60);
+  return { hcX, hcY, sprayAngle };
+}
+
+function pitchMatchupPullCenterOppo(sprayAngle = null, batterHand = '') {
+  const angle = Number(sprayAngle);
+  if (!Number.isFinite(angle)) return '';
+  if (Math.abs(angle) < 15) return 'center';
+  const hand = handednessCode(batterHand || '');
+  if (hand === 'L') return angle > 0 ? 'pull' : 'oppo';
+  return angle < 0 ? 'pull' : 'oppo';
+}
+
+function pitchMatchupHrAuditFields(contextRow = null, payload = null, options = {}) {
+  const batterLocal = contextRow?.batter || {};
+  const pitcherLocal = contextRow?.pitcher || {};
+  const batterSeason = payload?.batterSeason || {};
+  const pitcherSeason = payload?.pitcherSeason || {};
+  const batterHand = payload?.batterHand || {};
+  const pitcherHand = payload?.pitcherHand || {};
+  const recent = payload?.batterRecent || {};
+  const handScores = pitchMatchupHandednessScores(batterHand, pitcherHand);
+  const heatScores = pitchMatchupRecentHeat(recent);
+  const combined = contextRow?.combinedLocalHr || pitchMatchupLocalHrBlend(contextRow || {}, batterSeason, pitcherSeason);
+  const arsenalMatchupScore = pitchMatchupScore100(payload?.summary?.overall, -0.120, 0.120, 50);
+  const hrLocalizedRateScore = pitchMatchupScore100(combined.rate, 0.005, 0.075, 45);
+  const hrBatterPowerScore = Math.round(
+    (pitchMatchupScore100(batterSeason.hrPerPa, 0.005, 0.075, 45) * 0.35)
+    + (pitchMatchupScore100(batterSeason.xslg, 0.300, 0.700, 45) * 0.30)
+    + (pitchMatchupScore100(batterSeason.barrelRate, 0.020, 0.180, 45) * 0.20)
+    + (pitchMatchupScore100(batterSeason.hardHitRate, 0.250, 0.600, 45) * 0.15)
+  );
+  const hrPitcherVulnerabilityScore = Math.round(
+    (pitchMatchupScore100(pitcherSeason.hrPerPa, 0.005, 0.070, 45) * 0.35)
+    + (pitchMatchupScore100(pitcherSeason.xslg, 0.330, 0.650, 45) * 0.30)
+    + (pitchMatchupScore100(pitcherSeason.barrelRate, 0.020, 0.180, 45) * 0.20)
+    + (pitchMatchupScore100(pitcherSeason.hardHitRate, 0.250, 0.600, 45) * 0.15)
+  );
+  const reliabilityScore = contextRow?.reliability === 'High' ? 92 : contextRow?.reliability === 'Medium' ? 74 : contextRow?.reliability === 'Low' ? 52 : 32;
+  const hrPitchScore = Math.round(
+    (pitchMatchupScore100(combined.rate, 0.005, 0.075, 45) * 0.35)
+    + (pitchMatchupScore100(batterLocal.xslg, 0.280, 0.720, 45) * 0.20)
+    + (pitchMatchupScore100(pitcherLocal.xslg, 0.300, 0.700, 45) * 0.20)
+    + (pitchMatchupScore100(batterLocal.barrelRate, 0.010, 0.180, 45) * 0.125)
+    + (pitchMatchupScore100(pitcherLocal.barrelRate, 0.010, 0.180, 45) * 0.125)
+  );
+  const finalHrDamageScore = Math.round(
+    (arsenalMatchupScore * 0.25)
+    + (hrLocalizedRateScore * 0.20)
+    + (hrBatterPowerScore * 0.18)
+    + (hrPitcherVulnerabilityScore * 0.17)
+    + (handScores.handedness_matchup_score * 0.10)
+    + (heatScores.recent_heat_score * 0.07)
+    + (reliabilityScore * 0.03)
+  );
+  const pcmiScores = pitchMatchupPcmiScores({
+    hrBatterPowerScore,
+    hrPitcherVulnerabilityScore,
+    hrLocalizedRateScore,
+    hrPitchScore,
+    pitcherVsSideHrPerPaAllowed: pitcherHand.hrPerPa,
+    batterVsHandHrPerPa: batterHand.hrPerPa,
+    recentHeatScore: heatScores.recent_heat_score,
+    reliabilityScore,
+  });
+  const velocityBucket = pitcherLocal.velocityBucket || pitchMatchupVelocityBucket(options.pitchType || pitcherLocal.pitchType || '', Number(options.velocity));
+  return {
+    velocityBucket,
+    ...pitchMatchupExportContextFields(payload, {
+      ...options,
+      pcmi: pcmiScores.pcmi,
+      pitchClashLocalized: pcmiScores.pitchClashLocalized,
+      pitchClashPowerVulnerability: pcmiScores.pitchClashPowerVulnerability,
+      pitchClashMinGate: pcmiScores.pitchClashMinGate,
+      finalHrDamageScore,
+    }),
+    pcmiRaw: pcmiScores.pcmiRaw,
+    pcmiReliabilityAdjusted: pcmiScores.pcmiReliabilityAdjusted,
+    pitcherVsSideHrAllowedPercentile: pcmiScores.pitcherVsSideHrAllowedPercentile,
+    batterVsHandHrPercentile: pcmiScores.batterVsHandHrPercentile,
+    pitcherLocalUsagePct: pitchMatchupRateCsv(pitcherLocal.usage, 4),
+    batterLocalPa: batterLocal.pa || '',
+    batterLocalPitches: batterLocal.pitches || '',
+    batterLocalBbe: batterLocal.bip || '',
+    batterLocalHr: batterLocal.hr || 0,
+    batterLocalHrPerPa: pitchMatchupRateCsv(batterLocal.hrPerPa),
+    batterLocalHrPerPitch: pitchMatchupRateCsv(batterLocal.hrRate),
+    batterLocalHrPerBbe: pitchMatchupRateCsv(batterLocal.hrPerBbe),
+    batterLocalXslg: pitchMatchupNumberCsv(batterLocal.xslg),
+    batterLocalSlg: pitchMatchupNumberCsv(batterLocal.slg),
+    batterLocalIso: pitchMatchupNumberCsv(batterLocal.iso),
+    batterLocalBarrelPct: pitchMatchupRateCsv(batterLocal.barrelRate),
+    batterLocalHardHitPct: pitchMatchupRateCsv(batterLocal.hardHitRate),
+    batterLocalAvgEv: pitchMatchupNumberCsv(batterLocal.avgEv, 1),
+    batterLocalMaxEv: pitchMatchupNumberCsv(batterLocal.maxEv, 1),
+    batterLocalLaunchAngleAvg: pitchMatchupNumberCsv(batterLocal.launchAngleAvg, 1),
+    batterLocalWhiffPct: pitchMatchupRateCsv(batterLocal.whiffRate),
+    pitcherLocalPa: pitcherLocal.pa || '',
+    pitcherLocalPitches: pitcherLocal.pitches || '',
+    pitcherLocalBbe: pitcherLocal.bip || '',
+    pitcherLocalHrAllowed: pitcherLocal.hr || 0,
+    pitcherLocalHrPerPaAllowed: pitchMatchupRateCsv(pitcherLocal.hrPerPa),
+    pitcherLocalHrPerPitchAllowed: pitchMatchupRateCsv(pitcherLocal.hrRate),
+    pitcherLocalHrPerBbeAllowed: pitchMatchupRateCsv(pitcherLocal.hrPerBbe),
+    pitcherLocalXslgAllowed: pitchMatchupNumberCsv(pitcherLocal.xslg),
+    pitcherLocalSlgAllowed: pitchMatchupNumberCsv(pitcherLocal.slg),
+    pitcherLocalIsoAllowed: pitchMatchupNumberCsv(pitcherLocal.iso),
+    pitcherLocalBarrelPctAllowed: pitchMatchupRateCsv(pitcherLocal.barrelRate),
+    pitcherLocalHardHitPctAllowed: pitchMatchupRateCsv(pitcherLocal.hardHitRate),
+    pitcherLocalAvgEvAllowed: pitchMatchupNumberCsv(pitcherLocal.avgEv, 1),
+    pitcherLocalMaxEvAllowed: pitchMatchupNumberCsv(pitcherLocal.maxEv, 1),
+    pitcherLocalLaunchAngleAvgAllowed: pitchMatchupNumberCsv(pitcherLocal.launchAngleAvg, 1),
+    combinedLocalHrRate: pitchMatchupRateCsv(combined.rate),
+    combinedLocalHrRateReliability: combined.reliability,
+    combinedLocalHrRateSource: combined.source,
+    combinedLocalHrIndex: pitchMatchupNumberCsv(combined.index, 2),
+    batterSeasonPa: batterSeason.pa || '',
+    batterSeasonAb: batterSeason.ab || '',
+    batterSeasonHr: batterSeason.hr || 0,
+    batterSeasonHrPerPa: pitchMatchupRateCsv(batterSeason.hrPerPa),
+    batterSeasonHrPerAb: pitchMatchupRateCsv(batterSeason.hrPerAb),
+    batterSeasonHrPerBbe: pitchMatchupRateCsv(batterSeason.hrPerBbe),
+    batterSeasonIso: pitchMatchupNumberCsv(batterSeason.iso),
+    batterSeasonSlg: pitchMatchupNumberCsv(batterSeason.slg),
+    batterSeasonXslg: pitchMatchupNumberCsv(batterSeason.xslg),
+    batterSeasonBarrelPct: pitchMatchupRateCsv(batterSeason.barrelRate),
+    batterSeasonHardHitPct: pitchMatchupRateCsv(batterSeason.hardHitRate),
+    batterSeasonAvgEv: pitchMatchupNumberCsv(batterSeason.avgEv, 1),
+    batterSeasonMaxEv: pitchMatchupNumberCsv(batterSeason.maxEv, 1),
+    batterSeasonFbPct: pitchMatchupRateCsv(batterSeason.fbRate),
+    batterPriorSeasonPa: payload?.batterPriorSeason?.pa || '',
+    batterPriorSeasonHrPerPa: pitchMatchupRateCsv(payload?.batterPriorSeason?.hrPerPa),
+    batterPriorSeasonIso: pitchMatchupNumberCsv(payload?.batterPriorSeason?.iso),
+    batterPriorSeasonXslg: pitchMatchupNumberCsv(payload?.batterPriorSeason?.xslg),
+    batterPriorSeasonBarrelPct: pitchMatchupRateCsv(payload?.batterPriorSeason?.barrelRate),
+    batterPriorSeasonHardHitPct: pitchMatchupRateCsv(payload?.batterPriorSeason?.hardHitRate),
+    batterPriorSeasonAvgEv: pitchMatchupNumberCsv(payload?.batterPriorSeason?.avgEv, 1),
+    batterPriorSeasonFbPct: pitchMatchupRateCsv(payload?.batterPriorSeason?.fbRate),
+    pitcherSeasonPa: pitcherSeason.pa || '',
+    pitcherSeasonHrAllowed: pitcherSeason.hr || 0,
+    pitcherSeasonHrPerPaAllowed: pitchMatchupRateCsv(pitcherSeason.hrPerPa),
+    pitcherSeasonHrPer9: pitchMatchupNumberCsv((Number(pitcherSeason.hrPerPa) || 0) * 38, 2),
+    pitcherSeasonHrPerBbeAllowed: pitchMatchupRateCsv(pitcherSeason.hrPerBbe),
+    pitcherSeasonSlgAllowed: pitchMatchupNumberCsv(pitcherSeason.slg),
+    pitcherSeasonXslgAllowed: pitchMatchupNumberCsv(pitcherSeason.xslg),
+    pitcherSeasonBarrelPctAllowed: pitchMatchupRateCsv(pitcherSeason.barrelRate),
+    pitcherSeasonHardHitPctAllowed: pitchMatchupRateCsv(pitcherSeason.hardHitRate),
+    pitcherSeasonAvgEvAllowed: pitchMatchupNumberCsv(pitcherSeason.avgEv, 1),
+    pitcherSeasonFbPctAllowed: pitchMatchupRateCsv(pitcherSeason.fbRate),
+    pitcherPriorSeasonPa: payload?.pitcherPriorSeason?.pa || '',
+    pitcherPriorSeasonHrPerPaAllowed: pitchMatchupRateCsv(payload?.pitcherPriorSeason?.hrPerPa),
+    pitcherPriorSeasonXslgAllowed: pitchMatchupNumberCsv(payload?.pitcherPriorSeason?.xslg),
+    pitcherPriorSeasonBarrelPctAllowed: pitchMatchupRateCsv(payload?.pitcherPriorSeason?.barrelRate),
+    pitcherPriorSeasonHardHitPctAllowed: pitchMatchupRateCsv(payload?.pitcherPriorSeason?.hardHitRate),
+    pitcherPriorSeasonAvgEvAllowed: pitchMatchupNumberCsv(payload?.pitcherPriorSeason?.avgEv, 1),
+    pitcherPriorSeasonFbPctAllowed: pitchMatchupRateCsv(payload?.pitcherPriorSeason?.fbRate),
+    batterVsHandPa: batterHand.pa || '',
+    batterVsHandHr: batterHand.hr || 0,
+    batterVsHandHrPerPa: pitchMatchupRateCsv(batterHand.hrPerPa),
+    batterVsHandSlg: pitchMatchupNumberCsv(batterHand.slg),
+    batterVsHandIso: pitchMatchupNumberCsv(batterHand.iso),
+    batterVsHandXslg: pitchMatchupNumberCsv(batterHand.xslg),
+    batterVsHandHardHitPct: pitchMatchupRateCsv(batterHand.hardHitRate),
+    batterVsHandBarrelPct: pitchMatchupRateCsv(batterHand.barrelRate),
+    pitcherVsSidePa: pitcherHand.pa || '',
+    pitcherVsSideHrAllowed: pitcherHand.hr || 0,
+    pitcherVsSideHrPerPaAllowed: pitchMatchupRateCsv(pitcherHand.hrPerPa),
+    pitcherVsSideSlgAllowed: pitchMatchupNumberCsv(pitcherHand.slg),
+    pitcherVsSideIsoAllowed: pitchMatchupNumberCsv(pitcherHand.iso),
+    pitcherVsSideXslgAllowed: pitchMatchupNumberCsv(pitcherHand.xslg),
+    pitcherVsSideHardHitPctAllowed: pitchMatchupRateCsv(pitcherHand.hardHitRate),
+    pitcherVsSideBarrelPctAllowed: pitchMatchupRateCsv(pitcherHand.barrelRate),
+    handednessMatchupScore: handScores.handedness_matchup_score,
+    handednessHrBoost: handScores.handedness_hr_boost,
+    handednessDamageBoost: handScores.handedness_damage_boost,
+    batterLast7Pa: recent.last7?.pa || '',
+    batterLast7Hr: recent.last7?.hr || 0,
+    batterLast7Xbh: recent.last7?.xbh || 0,
+    batterLast7HrPerPa: pitchMatchupRateCsv(recent.last7?.hrPerPa),
+    batterLast7Xslg: pitchMatchupNumberCsv(recent.last7?.xslg),
+    batterLast7BarrelPct: pitchMatchupRateCsv(recent.last7?.barrelRate),
+    batterLast14Pa: recent.last14?.pa || '',
+    batterLast14Hr: recent.last14?.hr || 0,
+    batterLast14Xbh: recent.last14?.xbh || 0,
+    batterLast14HrPerPa: pitchMatchupRateCsv(recent.last14?.hrPerPa),
+    batterLast14Xslg: pitchMatchupNumberCsv(recent.last14?.xslg),
+    batterLast14BarrelPct: pitchMatchupRateCsv(recent.last14?.barrelRate),
+    batterLast30Pa: recent.last30?.pa || '',
+    batterLast30Hr: recent.last30?.hr || 0,
+    batterLast30Xbh: recent.last30?.xbh || 0,
+    batterLast30HrPerPa: pitchMatchupRateCsv(recent.last30?.hrPerPa),
+    batterLast30Xslg: pitchMatchupNumberCsv(recent.last30?.xslg),
+    batterLast30BarrelPct: pitchMatchupRateCsv(recent.last30?.barrelRate),
+    recentHeatScore: heatScores.recent_heat_score,
+    recentHrScore: heatScores.recent_hr_score,
+    recentPowerScore: heatScores.recent_power_score,
+    recentContactQualityScore: heatScores.recent_contact_quality_score,
+    arsenalMatchupScore,
+    hrPitchScore,
+    pitchTypeDamageMatchupScoreNoZone: hrPitchScore,
+    hrBatterPowerScore,
+    hrPitcherVulnerabilityScore,
+    hrLocalizedRateScore,
+    hrHandednessScore: handScores.handedness_matchup_score,
+    hrRecentHeatScore: heatScores.recent_heat_score,
+    hrReliabilityScore: reliabilityScore,
+    finalHrDamageScore,
+  };
+}
+
+function pitchMatchupFallbackMatch(row = {}, batterMaps = {}) {
+  const ladder = [
+    ['exact', 'Exact split', 8],
+    ['velocity', 'Velocity split', 12],
+    ['handed', 'Handed pitch split', 18],
+    ['pitchHand', 'Handed pitch split', 25],
+    ['type', 'Pitch type only', 25],
+  ];
+  for (const [level, label, minimum] of ladder) {
+    const key = pitchMatchupSplitKey(row, level);
+    const match = batterMaps?.[level]?.get?.(key);
+    if (match && match.pitches >= minimum) return { split: match, level, label };
+  }
+  return { split: null, level: 'league', label: 'League fallback' };
+}
+
+function pitchMatchupReliability(pitcher = {}, batter = null) {
+  const sample = Math.min(Number(pitcher.pitches || 0), Number(batter?.pitches || 0) || Number(pitcher.pitches || 0));
+  if (sample >= 100) return 'High';
+  if (sample >= 40) return 'Medium';
+  if (sample >= 15) return 'Low';
+  return 'Very low';
+}
+
+function pitchMatchupEdgeLabel(pitcher = {}, batter = null) {
+  if (!batter) return 'Context only';
+  const batterWhiff = Number.isFinite(batter.whiffRate) ? batter.whiffRate : 0.24;
+  const pitcherWhiff = Number.isFinite(pitcher.whiffRate) ? pitcher.whiffRate : 0.24;
+  const batterXslg = Number.isFinite(batter.xslg) ? batter.xslg : 0.380;
+  const pitcherXslg = Number.isFinite(pitcher.xslg) ? pitcher.xslg : 0.380;
+  const score = ((batterXslg - pitcherXslg) * 1.25) + ((pitcherWhiff - batterWhiff) * -0.75);
+  if (score >= 0.09) return 'Batter+';
+  if (score <= -0.09) return 'Pitcher+';
+  return 'Neutral';
+}
+
+function joinPitchMatchupRows(pitcherSplits, batterMaps) {
+  const velocityMap = pitcherSplits?.maps?.velocity;
+  const pitcherRows = [...(velocityMap instanceof Map ? velocityMap.values() : [])]
+    .filter((row) => row.pitches >= 3)
+    .sort((a, b) => b.pitches - a.pitches)
+    .slice(0, 10);
+  return pitcherRows.map((pitcher) => {
+    const representative = {
+      pitch_type: pitcher.pitchType,
+      p_throws: pitcher.throwsHand,
+      stand: pitcher.stand,
+      velocity_bucket: pitcher.velocityBucket,
+      location_bucket: '',
+      movement_bucket: '',
+    };
+    const batterMatch = pitchMatchupFallbackMatch(representative, batterMaps);
+    return {
+      pitcher,
+      batter: batterMatch.split,
+      fallbackLabel: batterMatch.label,
+      edge: pitchMatchupEdgeLabel(pitcher, batterMatch.split),
+      reliability: pitchMatchupReliability(pitcher, batterMatch.split),
+    };
+  });
+}
+
+function pitchMatchupSummary(rows = []) {
+  let totalUsage = 0;
+  let contact = 0;
+  let damage = 0;
+  let hr = 0;
+  let tb = 0;
+  for (const row of rows) {
+    const usage = Number(row.pitcher?.usage || 0);
+    if (!usage) continue;
+    const batter = row.batter;
+    const pitcher = row.pitcher;
+    const batterContact = Number.isFinite(batter?.contactRate) ? batter.contactRate : 0.72;
+    const pitcherContact = Number.isFinite(pitcher?.contactRate) ? pitcher.contactRate : 0.72;
+    const batterXslg = Number.isFinite(batter?.xslg) ? batter.xslg : 0.380;
+    const pitcherXslg = Number.isFinite(pitcher?.xslg) ? pitcher.xslg : 0.380;
+    contact += usage * (batterContact - pitcherContact);
+    damage += usage * (batterXslg - pitcherXslg);
+    hr += usage * ((batter?.hrRate || 0) - (pitcher?.hrRate || 0));
+    tb += usage * ((batter?.tbPerPitch || 0) - (pitcher?.tbPerPitch || 0));
+    totalUsage += usage;
+  }
+  const norm = totalUsage || 1;
+  const damageScore = damage / norm;
+  const contactScore = contact / norm;
+  const hrScore = hr / norm;
+  const tbScore = tb / norm;
+  const overall = (damageScore * 0.55) + (contactScore * 0.25) + (tbScore * 0.15) + (hrScore * 0.05);
+  const label = overall >= 0.08 ? 'Batter edge' : overall <= -0.08 ? 'Pitcher edge' : 'Balanced';
+  return { contactScore, damageScore, hrScore, tbScore, overall, label };
+}
+
+async function getPitchMatchupRawRows(playerId, playerType = 'batter', season = seasonForDate(dateInput.value || formatDate(new Date()))) {
+  const id = Number(playerId);
+  if (!Number.isFinite(id) || id <= 0) return [];
+  const cacheKey = `${playerType === 'pitcher' ? 'pitcher' : 'batter'}_pitch_splits:${season}:${id}`;
+  if (pitchMatchupRawRowsRunCache.has(cacheKey)) return pitchMatchupRawRowsRunCache.get(cacheKey);
+  const promise = (async () => {
+  const cached = readPitchMatchupLocalCache(cacheKey);
+  if (cached?.rows) return cached.rows;
+  const rows = parseCsvRows(await getText(savantPitchMatchupRawUrl(id, playerType, season)));
+  writePitchMatchupLocalCache(cacheKey, { rows });
+  return rows;
+  })().catch(() => {
+    return [];
+  });
+  pitchMatchupRawRowsRunCache.set(cacheKey, promise);
+  return promise;
+}
+
+function pitchMatchupNowMs() {
+  return (typeof performance !== 'undefined' && typeof performance.now === 'function') ? performance.now() : Date.now();
+}
+
+function pitchMatchupElapsedMs(startedAt) {
+  return Math.max(0, Math.round(pitchMatchupNowMs() - Number(startedAt || 0)));
+}
+
+async function pitchMatchupTimed(label, runner) {
+  const startedAt = pitchMatchupNowMs();
+  try {
+    return {
+      label,
+      ok: true,
+      value: await runner(),
+      ms: pitchMatchupElapsedMs(startedAt),
+    };
+  } catch (error) {
+    return {
+      label,
+      ok: false,
+      value: null,
+      error,
+      ms: pitchMatchupElapsedMs(startedAt),
+    };
+  }
+}
+
+function pitchMatchupFormatDuration(ms) {
+  const totalSeconds = Math.max(0, Math.round(Number(ms) / 1000));
+  if (!Number.isFinite(totalSeconds) || totalSeconds <= 0) return '<1s';
+  const minutes = Math.floor(totalSeconds / 60);
+  const seconds = totalSeconds % 60;
+  if (minutes <= 0) return `${seconds}s`;
+  const hours = Math.floor(minutes / 60);
+  const mins = minutes % 60;
+  return hours > 0 ? `${hours}h ${mins}m ${seconds}s` : `${minutes}m ${seconds}s`;
+}
+
+function pitchMatchupTimingMs(value) {
+  const ms = Number(value);
+  return Number.isFinite(ms) ? Math.round(ms) : '';
+}
+
+function directPitchMatchupHistoryRows(batterRows = [], batterId = '', pitcherId = '') {
+  const bId = String(batterId || '');
+  const pId = String(pitcherId || '');
+  return batterRows.filter((row) => String(pitchMatchupValue(row, ['batter']) || '') === bId && String(pitchMatchupValue(row, ['pitcher']) || '') === pId);
+}
+
+async function getPitchMatchupContext(params = {}) {
+  const batterId = Number(params.batterId);
+  const pitcherId = Number(params.pitcherId);
+  const season = Number(params.season) || seasonForDate(dateInput.value || formatDate(new Date()));
+  const date = params.date || dateInput.value || formatDate(new Date());
+  if (!Number.isFinite(batterId) || !Number.isFinite(pitcherId) || batterId <= 0 || pitcherId <= 0) return null;
+  const cacheKey = `pitch_matchup:${season}:${pitcherId}:${batterId}:${date}`;
+  if (pitchMatchupContextRunCache.has(cacheKey)) return pitchMatchupContextRunCache.get(cacheKey);
+  const promise = (async () => {
+  const cached = readPitchMatchupLocalCache(cacheKey);
+  if (cached) {
+    return {
+      ...cached,
+      cacheHit: true,
+      timing: {
+        ...(cached.timing || {}),
+        contextCacheHit: 1,
+        contextTotalMs: 0,
+        batterStatcastCsvMs: 0,
+        pitcherStatcastCsvMs: 0,
+        batterSprayProfileMs: 0,
+        contextJoinMs: 0,
+        preaggregationMs: 0,
+        dictionaryBuildMs: 0,
+        forecastLookupMs: 0,
+      },
+    };
+  }
+  const contextStartedAt = pitchMatchupNowMs();
+  const priorSeason = season > 2025 ? season - 1 : 0;
+  const [batterTimed, pitcherTimed, batterSprayTimed, priorBatterTimed, priorPitcherTimed] = await Promise.all([
+    pitchMatchupTimed('batter_statcast_csv', () => getPitchMatchupRawRows(batterId, 'batter', season)),
+    pitchMatchupTimed('pitcher_statcast_csv', () => getPitchMatchupRawRows(pitcherId, 'pitcher', season)),
+    pitchMatchupTimed('batter_spray_profile', () => getSavantAirSprayProfile(batterId, season)),
+    priorSeason ? pitchMatchupTimed('batter_prior_statcast_csv', () => getPitchMatchupRawRows(batterId, 'batter', priorSeason)) : Promise.resolve({ ok: false, value: [] }),
+    priorSeason ? pitchMatchupTimed('pitcher_prior_statcast_csv', () => getPitchMatchupRawRows(pitcherId, 'pitcher', priorSeason)) : Promise.resolve({ ok: false, value: [] }),
+  ]);
+  const batterRows = batterTimed.ok ? batterTimed.value : [];
+  const pitcherRows = pitcherTimed.ok ? pitcherTimed.value : [];
+  const priorBatterRows = priorBatterTimed.ok ? priorBatterTimed.value : [];
+  const priorPitcherRows = priorPitcherTimed.ok ? priorPitcherTimed.value : [];
+  const rawBatterSprayProfile = batterSprayTimed.ok ? batterSprayTimed.value : null;
+  const batterSplitResult = getPitchMatchupSplitMapsCached(batterId, 'batter', season, batterRows, { asofDate: date });
+  const pitcherSplitResult = getPitchMatchupSplitMapsCached(pitcherId, 'pitcher', season, pitcherRows, { asofDate: date });
+  const batterPriorSplitResult = priorSeason && priorBatterRows.length ? getPitchMatchupSplitMapsCached(batterId, 'batter', priorSeason, priorBatterRows, { asofDate: '' }) : null;
+  const pitcherPriorSplitResult = priorSeason && priorPitcherRows.length ? getPitchMatchupSplitMapsCached(pitcherId, 'pitcher', priorSeason, priorPitcherRows, { asofDate: '' }) : null;
+  const batterSplits = batterSplitResult.splits;
+  const pitcherSplits = pitcherSplitResult.splits;
+  const preaggregationMs = (Number(batterSplitResult.ms) || 0) + (Number(pitcherSplitResult.ms) || 0)
+    + (Number(batterPriorSplitResult?.ms) || 0)
+    + (Number(pitcherPriorSplitResult?.ms) || 0);
+  const dictionaryStartedAt = pitchMatchupNowMs();
+  const batterSeason = pitchMatchupSeasonSplit(batterSplits);
+  const pitcherSeason = pitchMatchupSeasonSplit(pitcherSplits);
+  const batterPriorSeason = batterPriorSplitResult ? pitchMatchupSeasonSplit(batterPriorSplitResult.splits) : null;
+  const pitcherPriorSeason = pitcherPriorSplitResult ? pitchMatchupSeasonSplit(pitcherPriorSplitResult.splits) : null;
+  const matchupThrows = pitcherSplits.derived?.[0]?.p_throws || batterSplits.derived?.[0]?.p_throws || '';
+  const matchupStand = batterSplits.derived?.[0]?.stand || pitcherSplits.derived?.[0]?.stand || '';
+  const batterHand = pitchMatchupHandSplit(batterSplits, matchupThrows, matchupStand);
+  const pitcherHand = pitchMatchupHandSplit(pitcherSplits, matchupThrows, matchupStand);
+  const batterRecent = {
+    last7: pitchMatchupRecentSplit(batterSplits.derived, date, 7),
+    last14: pitchMatchupRecentSplit(batterSplits.derived, date, 14),
+    last30: pitchMatchupRecentSplit(batterSplits.derived, date, 30),
+  };
+  const batterSprayProfile = {
+    ...(rawBatterSprayProfile || {}),
+    ...pitchMatchupSprayPowerProfile(batterSplits.derived, matchupThrows),
+  };
+  const dictionaryBuildMs = pitchMatchupElapsedMs(dictionaryStartedAt);
+  const lookupStartedAt = pitchMatchupNowMs();
+  const rows = joinPitchMatchupRows(pitcherSplits, batterSplits.maps).map((row) => ({
+    ...row,
+    combinedLocalHr: pitchMatchupLocalHrBlend(row, batterSeason, pitcherSeason),
+  }));
+  const forecastLookupMs = pitchMatchupElapsedMs(lookupStartedAt);
+  const zonePitchClash = pitchMatchupZonePitchClash(batterSplits, pitcherSplits, { asofDate: date, targetGamePk: '' });
+  const directRows = directPitchMatchupHistoryRows(batterRows, batterId, pitcherId);
+  const contextJoinMs = preaggregationMs + dictionaryBuildMs + forecastLookupMs;
+  const payload = {
+    batterId,
+    pitcherId,
+    season,
+    date,
+    rows,
+    summary: pitchMatchupSummary(rows),
+    batterSeason,
+    pitcherSeason,
+    batterPriorSeason,
+    pitcherPriorSeason,
+    batterHand,
+    pitcherHand,
+    batterRecent,
+    batterSprayProfile,
+    zonePitchClash,
+    direct: {
+      pitches: directRows.length,
+      plateAppearances: new Set(directRows.map((row) => `${pitchMatchupValue(row, ['game_pk'])}:${pitchMatchupValue(row, ['at_bat_number'])}`)).size || 0,
+    },
+    source: 'Baseball Savant Statcast Search CSV',
+    timing: {
+      contextCacheHit: 0,
+      contextTotalMs: pitchMatchupElapsedMs(contextStartedAt),
+      batterStatcastCsvMs: batterTimed.ms,
+      pitcherStatcastCsvMs: pitcherTimed.ms,
+      batterSprayProfileMs: batterSprayTimed.ms,
+      contextJoinMs,
+      preaggregationMs,
+      dictionaryBuildMs,
+      forecastLookupMs,
+      splitCacheHit: batterSplitResult.cacheHit && pitcherSplitResult.cacheHit ? 1 : 0,
+      batterStatcastOk: batterTimed.ok ? 1 : 0,
+      pitcherStatcastOk: pitcherTimed.ok ? 1 : 0,
+    },
+    generatedAt: new Date().toISOString(),
+  };
+  return writePitchMatchupLocalCache(cacheKey, payload);
+  })().catch(() => null);
+  pitchMatchupContextRunCache.set(cacheKey, promise);
+  return promise;
+}
+
+function pitchMatchupRate(value, digits = 0) {
+  return Number.isFinite(value) ? `${(value * 100).toFixed(digits)}%` : '--';
+}
+
+function pitchMatchupDecimal(value, digits = 3) {
+  return Number.isFinite(value) ? value.toFixed(digits).replace(/^0\./, '.') : '--';
+}
+
+function pitchMatchupPitchLabel(row = {}) {
+  const pitch = playerStatHeatMapPitchLabel(row.pitchType || row.pitch_name || row.pitch_type || '');
+  const velo = row.velocityBucket ? row.velocityBucket.replace(/_/g, ' ') : '';
+  return `${pitch}${velo ? ` ${velo}` : ''}`;
+}
+
+function pitchMatchupScoreText(value) {
+  if (!Number.isFinite(value)) return '--';
+  const sign = value > 0 ? '+' : '';
+  return `${sign}${value.toFixed(3).replace(/^(-?)0\./, '$1.')}`;
+}
+
+function renderPitchMatchupZoneClashGrid(zoneClash = null, batterHand = '') {
+  const rows = listify(zoneClash?.rows);
+  const bestByZone = new Map();
+  for (const row of rows) {
+    const key = `${row.verticalZone}:${row.horizontalZone}`;
+    const existing = bestByZone.get(key);
+    if (!existing || Number(row.batterDamageScore || 0) > Number(existing.batterDamageScore || 0)) bestByZone.set(key, row);
+  }
+  const verticals = ['high', 'middle', 'low'];
+  const horizontals = ['inside', 'middle', 'outside'];
+  const cells = verticals.flatMap((vertical) => horizontals.map((horizontal) => {
+    const row = bestByZone.get(`${vertical}:${horizontal}`);
+    const score = Number(row?.batterDamageScore);
+    const level = Number.isFinite(score) ? clamp(Math.round(score), 0, 100) : 0;
+    const coldLevel = Math.max(0, 50 - level) * 2;
+    const hotLevel = Math.max(0, level - 50) * 2;
+    const label = row ? `${playerStatHeatMapPitchLabel(row.pitchType)} ${String(row.velocityBucket || '').replace(/_/g, ' ')}` : '--';
+    return `<div class="pitch-matchup-zone-cell" style="--zone-score:${level};--zone-cold:${coldLevel}%;--zone-hot:${hotLevel}%" title="${escapeHtml(`${vertical}/${horizontal} | ${label} | Batter damage ${Number.isFinite(score) ? score : '--'} | ${row?.reliability || 'no sample'}`)}">
+      <span>${escapeHtml(vertical[0].toUpperCase())}/${escapeHtml(horizontal[0].toUpperCase())}</span>
+      <b>${escapeHtml(Number.isFinite(score) ? score : '--')}</b>
+      <small>${escapeHtml(label)}</small>
+    </div>`;
+  })).join('');
+  const mirrored = handednessCode(batterHand) === 'L' ? ' is-lefty' : '';
+  return `<section class="pitch-matchup-zone-panel${mirrored}">
+    <div class="pitch-matchup-zone-stage">
+      <img class="pitch-matchup-batter-img" src="batter.png" alt="" />
+      <div class="pitch-matchup-zone-card">
+        <div class="pitch-matchup-zone-grid">${cells}</div>
+      </div>
+    </div>
+    <div class="pitch-matchup-zone-head"><b>Batter Zone Damage</b><span>mirrored for ${escapeHtml(handednessCode(batterHand) === 'L' ? 'LHH' : 'RHH')}</span></div>
+  </section>`;
+}
+
+function pitchMatchupStrengthColor(score = 50) {
+  const n = clamp(Number(score) || 50, 0, 100);
+  const mix = (a, b, t) => Math.round(a + ((b - a) * t));
+  const low = [91, 141, 239];
+  const mid = [244, 248, 255];
+  const high = [244, 72, 72];
+  const t = n <= 50 ? n / 50 : (n - 50) / 50;
+  const from = n <= 50 ? low : mid;
+  const to = n <= 50 ? mid : high;
+  const [r, g, b] = [mix(from[0], to[0], t), mix(from[1], to[1], t), mix(from[2], to[2], t)];
+  return `rgb(${r}, ${g}, ${b})`;
+}
+
+function pitchMatchupHrV7Bucket(score) {
+  const n = Number(score);
+  if (!Number.isFinite(n)) return { label: 'Unavailable', hrPerGame: '--' };
+  if (n < 60) return { label: 'No throw', hrPerGame: 'Under 60' };
+  if (n < 65) return { label: '60-65', hrPerGame: '3.37%' };
+  if (n < 70) return { label: '65-70', hrPerGame: '4.44%' };
+  if (n < 75) return { label: '70-75', hrPerGame: '6.06%' };
+  if (n < 80) return { label: '75-80', hrPerGame: '8.99%' };
+  if (n < 85) return { label: '80-85', hrPerGame: '11.17%' };
+  if (n < 90) return { label: '85-90', hrPerGame: '12.70%' };
+  if (n < 95) return { label: '90-95', hrPerGame: '18.92%' };
+  return { label: '95+', hrPerGame: '27.43%' };
+}
+
+function pitchMatchupBucketBreakdownHtml(score) {
+  const bucket = pitchMatchupHrV7Bucket(score);
+  return `<table class="pitch-matchup-bucket-table">
+    <tbody>
+      <tr><th>Bucket</th><td>${escapeHtml(bucket.label)}</td></tr>
+      <tr><th>HR/G</th><td>${escapeHtml(bucket.hrPerGame)}</td></tr>
+    </tbody>
+  </table>`;
+}
+
+function pitchMatchupSideProfileHtml({ id = '', name = '', label = '', side = 'batter' } = {}) {
+  const playerId = Number(id);
+  return `<div class="pitch-matchup-side-profile is-${escapeHtml(side)}">
+    ${Number.isFinite(playerId) && playerId > 0 ? `<img src="${playerHeadshotUrl(playerId)}" alt="${escapeHtml(name || label)}" onerror="this.onerror=null;this.src='placeholder.png';" />` : ''}
+    <div>
+      <span>${escapeHtml(label)}</span>
+      <b>${escapeHtml(name || '--')}</b>
+    </div>
+  </div>`;
+}
+
+function pitchMatchupPitcherHandednessHtml(payload = null, uiSummary = null) {
+  const hand = payload?.pitcherHand || {};
+  const rows = [
+    ['Pitcher hand', payload?.pitcherHand?.throws || payload?.rows?.[0]?.pitcher?.throws || uiSummary?.throwsHand || '--'],
+    ['Vs side HR/PA', uiSummary?.pitcherVsSideHrPerPaAllowed || pitchMatchupRateCsv(hand.hrPerPa)],
+    ['Vs side xSLG', pitchMatchupNumberCsv(hand.xslg)],
+    ['Vs side Barrel', pitchMatchupRateCsv(hand.barrelRate)],
+    ['Vs side Hard Hit', pitchMatchupRateCsv(hand.hardHitRate)],
+  ];
+  return `<section class="pitch-matchup-handedness-panel">
+    <h3>Pitcher Handedness</h3>
+    <div class="player-heatmap-metric-table">
+      ${rows.map(([label, value]) => `<div class="player-heatmap-metric-row"><span>${escapeHtml(label)}</span><b>${escapeHtml(value || '--')}</b></div>`).join('')}
+    </div>
+  </section>`;
+}
+
+function pitchMatchupImportantNumbersHtml(uiSummary = null) {
+  const rows = [
+    ['HR eruption', uiSummary?.hrEruptionScore || '--'],
+    ['Recent heat', uiSummary?.recentHeatScore || '--'],
+    ['HR v10', uiSummary?.hrScoreV10NoZone || uiSummary?.hrScoreV9NoZone || '--'],
+    ['Power base', uiSummary?.hitterPowerBaseline || '--'],
+    ['Old zone score', uiSummary?.oldHrScoreWithZone || uiSummary?.hrScoreV820 || '--'],
+    ['PCMI', uiSummary?.pcmi || '--'],
+    ['Old HR', uiSummary?.finalHrDamageScore || '--'],
+  ];
+  return `<table class="pitch-matchup-number-table">
+    <tbody>${rows.map(([label, value]) => `<tr><th>${escapeHtml(label)}</th><td>${escapeHtml(value)}</td></tr>`).join('')}</tbody>
+  </table>`;
+}
+
+function pitchMatchupFlagsHtml(uiSummary = null) {
+  const flags = [
+    ['Zone confirmed', pitchMatchupTruth(uiSummary?.zoneConfirmedFlag), uiSummary?.zoneConfirmedReason],
+    ['Hot playable', pitchMatchupTruth(uiSummary?.hotPlayableFlag), uiSummary?.hotPlayableReason],
+    ['Split power', pitchMatchupTruth(uiSummary?.splitPowerNonZoneCandidate), 'Split-power non-zone candidate.'],
+    ['HR eruption', pitchMatchupTruth(uiSummary?.activeHrEruptionFlag), uiSummary?.hrEruptionReason],
+    ['Extreme eruption', pitchMatchupTruth(uiSummary?.extremeHrEruptionFlag), uiSummary?.hrEruptionReason],
+    ['Fallback trap', pitchMatchupTruth(uiSummary?.fallbackTrapFlag), uiSummary?.fallbackTrapReason],
+  ];
+  return `<section class="pitch-matchup-flags-panel">
+    <h3>Flags</h3>
+    <div>${flags.map(([label, active, reason]) => `<span class="${active ? 'is-on' : ''}" title="${escapeHtml(reason || '')}">${escapeHtml(label)}</span>`).join('')}</div>
+  </section>`;
+}
+
+function pitchMatchupHrV7Label(score, candidateLabel = '') {
+  const n = Number(score);
+  if (!Number.isFinite(n)) return 'Loading';
+  if (/elite/i.test(candidateLabel)) return 'Elite';
+  if (/strong|zone-confirmed/i.test(candidateLabel)) return 'Throw';
+  if (n < 60) return 'No throw';
+  if (n >= 90) return 'Elite';
+  if (n >= 75) return 'Throw';
+  return 'Playable';
+}
+
+function renderPitchMatchupContextHtml(payload = null, uiSummary = null, options = {}) {
+  const payloadRows = listify(payload?.rows);
+  const renderableRows = payloadRows.length ? payloadRows : [{
+    batter: { pitchType: '', velocityBucket: '', pitches: 0, pa: 0, bip: 0 },
+    pitcher: { pitchType: 'ARS', velocityBucket: '', usage: 1, pitches: 0, pa: 0, bip: 0 },
+    edge: '',
+    reliability: 'Very low',
+    fallbackLabel: 'daily_profile_fallback',
+    combinedLocalHr: pitchMatchupLocalHrBlend({}, payload?.batterSeason || {}, payload?.pitcherSeason || {}),
+  }];
+  if (!payload && !uiSummary) {
+    return `<div class="pitch-matchup-empty">Pitch Matchup Context is not available for this batter-pitcher pair yet.</div>`;
+  }
+  const summary = payload?.summary || pitchMatchupSummary(renderableRows);
+  const batterHand = payload?.batterHand?.stand || payload?.batterHand?.standHand || renderableRows?.[0]?.batter?.stand || '';
+  const auditedRows = renderableRows.map((row) => ({
+    row,
+    audit: pitchMatchupHrAuditFields(row, payload, {
+      date: payload?.date,
+      pitchType: row?.pitcher?.pitchType,
+      velocity: row?.pitcher?.velo,
+      batterHand: row?.batter?.stand || row?.stand,
+      pcmi: null,
+    }),
+  })).sort((a, b) => (Number(b.row?.pitcher?.usage) || 0) - (Number(a.row?.pitcher?.usage) || 0));
+  const topPcmi = auditedRows
+    .slice()
+    .sort((a, b) => (Number(b.audit.finalHrDamageScore) || 0) - (Number(a.audit.finalHrDamageScore) || 0))[0]?.audit || {};
+  const zoneFields = pitchMatchupZonePitchClashFields(payload?.zonePitchClash);
+  const primaryHrScore = pitchMatchupCsvNumberValue(uiSummary?.hrScoreV10NoZone || uiSummary?.hrScoreV9NoZone || uiSummary?.hrScoreV820 || uiSummary?.hrScoreV7);
+  const primaryHrScoreText = Number.isFinite(primaryHrScore) ? pitchMatchupNumberCsv(primaryHrScore, 1) : '--';
+  const candidateLabel = uiSummary?.candidateLabel || '';
+  const hrThrowLabel = pitchMatchupHrV7Label(primaryHrScore, candidateLabel);
+  const hrBucket = pitchMatchupHrV7Bucket(primaryHrScore);
+  const hrTitle = [
+    `HR v10 no-zone: ${primaryHrScoreText}`,
+    candidateLabel ? `Label: ${candidateLabel}` : `Label: ${hrThrowLabel}`,
+    `Bucket ${hrBucket.label}: ${hrBucket.hrPerGame} HR/G`,
+    uiSummary?.hrScoreV9NoZoneCautionReason || uiSummary?.hrScoreV820CautionReason || uiSummary?.v7CautionReason ? `Caution: ${uiSummary.hrScoreV9NoZoneCautionReason || uiSummary.hrScoreV820CautionReason || uiSummary.v7CautionReason}` : '',
+  ].filter(Boolean).join('\n');
+  const rows = auditedRows.map(({ row }) => {
+    const batterStrength = Math.round(
+      (pitchMatchupScore100(row?.batter?.xslg, 0.260, 0.760, 45) * 0.50)
+      + (pitchMatchupScore100(row?.batter?.hardHitRate, 0.180, 0.650, 45) * 0.25)
+      + (pitchMatchupScore100(row?.batter?.barrelRate, 0.000, 0.220, 45) * 0.25)
+    );
+    const better = row.edge === 'Batter+' ? 'Batter'
+      : row.edge === 'Pitcher+' ? 'Pitcher'
+        : batterStrength >= 58 ? 'Batter'
+          : batterStrength <= 42 ? 'Pitcher'
+            : 'Even';
+    return `<div class="player-heatmap-metric-row pitch-matchup-row ${better === 'Batter' ? 'is-batter' : better === 'Pitcher' ? 'is-pitcher' : 'is-even'}" style="--matchup-color:${pitchMatchupStrengthColor(batterStrength)}" title="${escapeHtml(`${pitchMatchupPitchLabel(row.pitcher)} | usage ${pitchMatchupRate(row.pitcher?.usage, 1)} | favors ${better}`)}">
+    <span>${escapeHtml(pitchMatchupPitchLabel(row.pitcher))}</span>
+    <strong>${escapeHtml(better)}</strong>
+  </div>`;
+  }).join('');
+  return `<div class="pitch-matchup-compact-card">
+    <section class="pitch-matchup-left-panel">
+      ${pitchMatchupSideProfileHtml({ id: options.batterId, name: options.batterName, label: 'Batter', side: 'batter' })}
+      <button type="button" class="pitch-matchup-hr-v7 ${Number.isFinite(primaryHrScore) && primaryHrScore >= 85 ? 'is-elite' : Number.isFinite(primaryHrScore) && primaryHrScore >= 75 ? 'is-throw' : Number.isFinite(primaryHrScore) && primaryHrScore < 60 ? 'is-no-throw' : ''}" title="${escapeHtml(hrTitle)}" aria-label="HR v10 no-zone score ${escapeHtml(primaryHrScoreText)}">
+        <span>HR v10</span>
+        <b>${escapeHtml(primaryHrScoreText)}</b>
+        <small>${escapeHtml(hrThrowLabel)}</small>
+      </button>
+      ${pitchMatchupBucketBreakdownHtml(primaryHrScore)}
+      ${pitchMatchupImportantNumbersHtml(uiSummary)}
+      ${pitchMatchupFlagsHtml(uiSummary)}
+    </section>
+    <section class="pitch-matchup-center-panel">
+      ${renderPitchMatchupZoneClashGrid(payload?.zonePitchClash, batterHand)}
+      <div class="pitch-matchup-note">Experimental zone context, not included in HR score.</div>
+      <div class="player-heatmap-metric-table pitch-matchup-table" aria-label="Pitch matchup edges by usage">
+        <div class="player-heatmap-metric-row pitch-matchup-row header">
+          <span>Pitch</span><strong>Favors</strong>
+        </div>
+        ${rows}
+      </div>
+    </section>
+    <aside class="pitch-matchup-pitcher-panel">
+      ${pitchMatchupSideProfileHtml({ id: options.pitcherId, name: options.pitcherName, label: 'Pitcher', side: 'pitcher' })}
+      ${pitchMatchupPitcherHandednessHtml(payload, uiSummary)}
+      ${options.pitcherInfoHtml || '<div class="pitch-matchup-pitcher-empty">Pitcher start info unavailable.</div>'}
+    </aside>
+  </div>`;
+}
+
+function ensurePitchMatchupStyles() {
+  if (document.getElementById('testingZonePitchMatchupStyles')) return;
+  const style = document.createElement('style');
+  style.id = 'testingZonePitchMatchupStyles';
+  style.textContent = `
+    .pitch-matchup-context { position: relative; overflow: hidden; border-color: rgba(93, 215, 255, 0.45); background: radial-gradient(circle at 50% 0%, rgba(123, 208, 255, 0.16), transparent 36%), linear-gradient(135deg, rgba(6, 20, 32, 0.96), rgba(20, 30, 44, 0.92)); }
+    .pitch-matchup-context::before { content: ""; position: absolute; inset: 0; pointer-events: none; background: linear-gradient(90deg, transparent 0 12%, rgba(255,255,255,0.05) 50%, transparent 88%); opacity: 0.5; }
+    .player-stat-pitch-matchup-panel { display: grid; gap: 5px; padding: 6px; }
+    .pitch-matchup-head { position: relative; z-index: 1; display: flex; align-items: baseline; justify-content: space-between; gap: 10px; }
+    .pitch-matchup-head h3 { color: #f4fbff; text-shadow: 0 0 14px rgba(123, 208, 255, 0.22); }
+    .pitch-matchup-head small { color: rgba(226, 242, 255, 0.72); font-weight: 800; text-transform: uppercase; letter-spacing: 0; }
+    .pitch-matchup-body { position: relative; z-index: 1; display: grid; gap: 5px; min-width: 0; }
+    .pitch-matchup-compact-card { display: grid; grid-template-columns: minmax(210px, 0.86fr) minmax(260px, 1fr) minmax(210px, 0.86fr); align-items: stretch; gap: 8px; min-width: 0; }
+    .pitch-matchup-left-panel, .pitch-matchup-center-panel, .pitch-matchup-pitcher-panel { display: grid; align-content: start; gap: 6px; min-width: 0; min-height: 100%; padding: 8px; border: 1px solid rgba(148, 197, 255, 0.14); border-radius: 5px; background: rgba(3, 12, 20, 0.34); }
+    .pitch-matchup-center-panel { padding: 0; border: 0; background: transparent; }
+    .pitch-matchup-pitcher-panel { border-color: rgba(255, 209, 102, 0.22); background: radial-gradient(circle at 50% 0%, rgba(255, 209, 102, 0.10), transparent 44%), rgba(16, 13, 6, 0.26); }
+    .pitch-matchup-pitcher-panel .player-heatmap-table-panel { padding: 0; border: 0; background: transparent; box-shadow: none; }
+    .pitch-matchup-pitcher-panel h3 { color: #fff2be; font-size: 12px; margin: 0 0 5px; }
+    .pitch-matchup-pitcher-panel .player-heatmap-metric-row { grid-template-columns: minmax(90px, 1fr) minmax(64px, auto); padding: 4px 5px; }
+    .pitch-matchup-pitcher-panel .player-heatmap-metric-row span, .pitch-matchup-pitcher-panel .player-heatmap-metric-row b { min-width: 0; overflow: visible; text-overflow: clip; white-space: nowrap; }
+    .pitch-matchup-pitcher-panel .pitcher-heatmap-starts-table .player-heatmap-metric-row { grid-template-columns: minmax(82px, 1.2fr) minmax(30px, .55fr) minmax(30px, .55fr) minmax(30px, .55fr) minmax(30px, .55fr) minmax(30px, .55fr) minmax(92px, 1.15fr); }
+    .pitch-matchup-pitcher-panel .pitcher-heatmap-starts-table .player-heatmap-metric-row b { text-align: right; }
+    .pitch-matchup-pitcher-panel .pitcher-heatmap-starts-table .pitcher-hr-batters { white-space: normal; text-align: left; justify-self: stretch; line-height: 1.15; }
+    .pitch-matchup-pitcher-panel table { width: 100%; table-layout: fixed; border-collapse: collapse; font-size: 10px; }
+    .pitch-matchup-pitcher-panel th, .pitch-matchup-pitcher-panel td { padding: 6px 5px; white-space: nowrap; overflow: hidden; text-overflow: clip; text-align: right; }
+    .pitch-matchup-pitcher-panel th:first-child, .pitch-matchup-pitcher-panel td:first-child { width: 40%; text-align: left; }
+    .pitch-matchup-handedness-panel { display: grid; gap: 4px; }
+    .pitch-matchup-handedness-panel h3 { margin: 0; }
+    .pitch-matchup-handedness-panel .player-heatmap-metric-row { grid-template-columns: minmax(92px, 1fr) minmax(44px, auto); }
+    .pitch-matchup-pitcher-empty { color: rgba(255, 242, 190, 0.68); font-size: 11px; font-weight: 850; }
+    .pitch-matchup-side-profile { display: grid; grid-template-columns: 48px minmax(0, 1fr); align-items: center; gap: 8px; padding: 5px; border: 1px solid rgba(255,255,255,0.10); border-radius: 5px; background: rgba(0,0,0,0.20); }
+    .pitch-matchup-side-profile img { width: 48px; height: 48px; border-radius: 4px; object-fit: cover; background: rgba(255,255,255,0.05); filter: drop-shadow(0 0 8px rgba(123,208,255,0.16)); }
+    .pitch-matchup-side-profile span { display: block; color: rgba(226,242,255,0.62); font: 950 9px var(--font-ui); text-transform: uppercase; }
+    .pitch-matchup-side-profile b { display: block; color: #fff; font: 950 12px var(--font-ui); line-height: 1.1; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+    .pitch-matchup-side-profile.is-pitcher span { color: rgba(255, 226, 147, 0.70); }
+    .pitch-matchup-summary, .pitch-matchup-pcmi-strip { display: grid; grid-template-columns: repeat(5, minmax(0, 1fr)); gap: 4px; }
+    .pitch-matchup-summary span, .pitch-matchup-pcmi-strip span { border: 1px solid rgba(148, 197, 255, 0.18); border-radius: 4px; padding: 4px 6px; background: rgba(2, 8, 14, 0.36); color: #eaf7ff; font-weight: 900; min-width: 0; line-height: 1.1; }
+    .pitch-matchup-summary b, .pitch-matchup-pcmi-strip b { display: block; color: rgba(180, 223, 255, 0.70); font-size: 9px; text-transform: uppercase; }
+    .pitch-matchup-pcmi-strip span { border-color: rgba(126, 231, 166, 0.22); background: rgba(3, 19, 14, 0.38); color: #f3fff8; }
+    .pitch-matchup-pcmi-strip b { color: rgba(184, 245, 207, 0.72); }
+    .pitch-matchup-zone-panel { display: grid; justify-items: center; align-content: center; gap: 3px; padding: 4px; border: 1px solid rgba(148, 197, 255, 0.18); border-radius: 5px; background: radial-gradient(circle at 47% 34%, rgba(255, 209, 102, 0.10), transparent 30%), rgba(4, 12, 19, 0.22); width: 100%; min-height: 315px; box-shadow: inset 0 0 18px rgba(123, 208, 255, 0.08), 0 10px 22px rgba(0,0,0,0.22); }
+    .pitch-matchup-zone-stage { position: relative; width: min(100%, 330px); aspect-ratio: 1.05 / 1; margin: 0 auto; overflow: hidden; }
+    .pitch-matchup-batter-img { position: absolute; inset: 0 0 0 auto; height: 100%; width: auto; object-fit: contain; opacity: 0.86; filter: drop-shadow(0 0 10px rgba(120, 210, 255, 0.20)); }
+    .pitch-matchup-zone-panel.is-lefty .pitch-matchup-batter-img { transform: scaleX(-1); right: auto; left: 0; }
+    .pitch-matchup-zone-card { position: absolute; left: 7%; top: 24%; width: 31%; height: 42%; display: grid; padding: 2px; border: 1px solid rgba(255,255,255,0.38); background: rgba(2, 7, 12, 0.44); box-shadow: 0 0 0 1px rgba(0,0,0,0.45), 0 0 22px rgba(255,209,102,0.16), 0 10px 25px rgba(0,0,0,0.22); }
+    .pitch-matchup-zone-panel.is-lefty .pitch-matchup-zone-card { left: auto; right: 7%; }
+    .pitch-matchup-zone-head { display: none; }
+    .pitch-matchup-zone-grid { display: grid; grid-template-columns: repeat(3, minmax(0, 1fr)); gap: 2px; }
+    .pitch-matchup-zone-cell { min-height: 38px; display: grid; align-content: center; gap: 0; border: 1px solid rgba(255, 255, 255, 0.12); border-radius: 3px; padding: 2px; background: color-mix(in srgb, #ef4b4b var(--zone-hot, 0%), color-mix(in srgb, #5b8def var(--zone-cold, 0%), rgba(244,248,255,0.70))); box-shadow: inset 0 0 9px rgba(255,255,255,0.05); }
+    .pitch-matchup-zone-cell span, .pitch-matchup-zone-cell small { display: none; }
+    .pitch-matchup-zone-cell b { color: #fff; font-size: 11px; line-height: 1; }
+    .pitch-matchup-hr-v7 { display: grid; grid-template-columns: auto auto auto; align-items: baseline; justify-content: center; gap: 8px; width: 100%; min-height: 48px; border: 1px solid rgba(255, 209, 102, 0.38); border-radius: 5px; background: linear-gradient(180deg, rgba(255,255,255,0.12), transparent 64%), rgba(36, 24, 5, 0.52); color: #fff8df; cursor: help; box-shadow: 0 0 20px rgba(255, 209, 102, 0.12); }
+    .pitch-matchup-hr-v7.is-elite { border-color: rgba(255, 95, 95, 0.78); background: linear-gradient(180deg, rgba(255,255,255,0.14), transparent 64%), linear-gradient(90deg, rgba(117, 13, 13, 0.72), rgba(70, 20, 6, 0.72)); box-shadow: 0 0 22px rgba(255, 79, 79, 0.28); }
+    .pitch-matchup-hr-v7.is-throw { border-color: rgba(255, 209, 102, 0.72); box-shadow: 0 0 22px rgba(255, 209, 102, 0.22); }
+    .pitch-matchup-hr-v7.is-no-throw { border-color: rgba(112, 153, 205, 0.42); background: linear-gradient(180deg, rgba(255,255,255,0.09), transparent 64%), rgba(8, 20, 37, 0.62); color: #dceaff; box-shadow: none; }
+    .pitch-matchup-hr-v7 span { color: rgba(255, 224, 138, 0.82); font: 950 10px var(--font-ui); text-transform: uppercase; }
+    .pitch-matchup-hr-v7 b { color: #fff; font: 950 25px var(--font-ui); line-height: 1; }
+    .pitch-matchup-hr-v7 small { color: rgba(255, 248, 223, 0.76); font: 900 10px var(--font-ui); text-transform: uppercase; }
+    .pitch-matchup-bucket-table, .pitch-matchup-number-table { width: 100%; border-collapse: collapse; overflow: hidden; border: 1px solid rgba(255, 209, 102, 0.18); border-radius: 4px; background: rgba(0,0,0,0.22); color: rgba(255, 248, 223, 0.82); font-size: 10px; line-height: 1.25; }
+    .pitch-matchup-bucket-table th, .pitch-matchup-number-table th { width: 78px; padding: 5px 6px; color: rgba(255, 224, 138, 0.78); text-align: left; text-transform: uppercase; font-size: 9px; border-bottom: 1px solid rgba(255,255,255,0.06); }
+    .pitch-matchup-bucket-table td, .pitch-matchup-number-table td { padding: 5px 6px; color: #fff; font-weight: 950; text-align: right; border-bottom: 1px solid rgba(255,255,255,0.06); }
+    .pitch-matchup-bucket-table td { text-align: left; font-weight: 850; }
+    .pitch-matchup-flags-panel { display: grid; gap: 5px; padding: 6px; border: 1px solid rgba(148,197,255,0.14); border-radius: 4px; background: rgba(0,0,0,0.18); }
+    .pitch-matchup-flags-panel h3 { margin: 0; color: rgba(226,242,255,0.70); font-size: 10px; text-transform: uppercase; }
+    .pitch-matchup-flags-panel div { display: flex; flex-wrap: wrap; gap: 4px; }
+    .pitch-matchup-flags-panel span { padding: 3px 6px; border: 1px solid rgba(148,197,255,0.12); border-radius: 999px; color: rgba(226,242,255,0.45); background: rgba(255,255,255,0.035); font: 900 9px var(--font-ui); text-transform: uppercase; }
+    .pitch-matchup-flags-panel span.is-on { border-color: rgba(255,209,102,0.54); color: #fff1ba; background: rgba(255,209,102,0.12); box-shadow: 0 0 12px rgba(255,209,102,0.14); }
+    .pitch-matchup-table { display: grid; gap: 1px; width: 100%; max-height: 122px; overflow: auto; padding-bottom: 1px; border: 1px solid rgba(148, 197, 255, 0.16); border-radius: 4px; }
+    .pitch-matchup-row { display: grid; grid-template-columns: minmax(96px, 1fr) 68px; gap: 6px; align-items: center; min-width: 0; padding: 4px 6px; border-bottom: 1px solid rgba(148, 197, 255, 0.10); background: color-mix(in srgb, var(--matchup-color, #f4f8ff) 28%, rgba(4, 12, 19, 0.64)); }
+    .pitch-matchup-row.header { position: sticky; top: 0; color: rgba(226, 242, 255, 0.74); text-transform: uppercase; font-size: 9px; background: rgba(21, 50, 73, 0.92); z-index: 1; }
+    .pitch-matchup-row span { color: #f6fbff; font-weight: 900; }
+    .pitch-matchup-row b, .pitch-matchup-row small, .pitch-matchup-row strong { text-align: right; color: rgba(242, 248, 255, 0.90); font-size: 10px; white-space: nowrap; }
+    .pitch-matchup-row strong { justify-self: end; min-width: 52px; padding: 2px 6px; border-radius: 999px; background: rgba(0,0,0,0.32); }
+    .pitch-matchup-row.is-batter strong { color: #ffdada; box-shadow: inset 0 0 0 1px rgba(255, 118, 118, 0.28); }
+    .pitch-matchup-row.is-pitcher strong { color: #d8e7ff; box-shadow: inset 0 0 0 1px rgba(112, 165, 255, 0.30); }
+    .pitch-matchup-row.is-even strong { color: #f8f8f8; }
+    .pitch-matchup-row small { color: rgba(226, 242, 255, 0.62); }
+    .pitch-matchup-row .batter-edge { color: #6be58d; }
+    .pitch-matchup-row .pitcher-edge { color: #ffcf5e; }
+    .pitch-matchup-note, .pitch-matchup-empty { color: rgba(226, 242, 255, 0.68); font-size: 10px; line-height: 1.25; }
+    @media (max-width: 900px) { .pitch-matchup-compact-card { grid-template-columns: 1fr; } .pitch-matchup-zone-panel { min-height: 260px; } .pitch-matchup-summary, .pitch-matchup-pcmi-strip { grid-template-columns: repeat(2, minmax(0, 1fr)); } }
+  `;
+  document.head.appendChild(style);
+}
+
+function pitchMatchupShell(params = {}) {
+  const batterId = Number(params.batterId || params.batter_id);
+  const pitcherId = Number(params.pitcherId || params.pitcher_id);
+  if (!Number.isFinite(batterId) || !Number.isFinite(pitcherId) || batterId <= 0 || pitcherId <= 0) return '';
+  ensurePitchMatchupStyles();
+  const season = Number(params.season) || seasonForDate(params.date || dateInput.value || formatDate(new Date()));
+  const date = params.date || dateInput.value || formatDate(new Date());
+  const batterName = params.batterName || 'Batter';
+  const pitcherName = params.pitcherName || 'Pitcher';
+  return `<section class="player-heatmap-table-panel pitch-matchup-context" data-pitch-matchup="1" data-batter-id="${escapeHtml(batterId)}" data-pitcher-id="${escapeHtml(pitcherId)}" data-batter-name="${escapeHtml(batterName)}" data-pitcher-name="${escapeHtml(pitcherName)}" data-season="${escapeHtml(season)}" data-date="${escapeHtml(date)}" data-hr-v7="${escapeHtml(params.hrScoreV7 || '')}" data-hr-v8-20="${escapeHtml(params.hrScoreV820 || '')}" data-hr-v9-no-zone="${escapeHtml(params.hrScoreV9NoZone || '')}" data-old-hr-score-with-zone="${escapeHtml(params.oldHrScoreWithZone || '')}" data-hr-v9-caution="${escapeHtml(params.hrScoreV9NoZoneCautionReason || '')}" data-hr-eruption-score="${escapeHtml(params.hrEruptionScore || '')}" data-recent-heat-score="${escapeHtml(params.recentHeatScore || '')}" data-pcmi="${escapeHtml(params.pcmi || '')}" data-final-hr-damage-score="${escapeHtml(params.finalHrDamageScore || '')}" data-candidate-label="${escapeHtml(params.candidateLabel || '')}" data-v7-caution="${escapeHtml(params.v7CautionReason || '')}" data-v8-caution="${escapeHtml(params.hrScoreV820CautionReason || '')}" data-zone-confirmed-flag="${escapeHtml(params.zoneConfirmedFlag || '')}" data-zone-confirmed-reason="${escapeHtml(params.zoneConfirmedReason || '')}" data-hot-playable-flag="${escapeHtml(params.hotPlayableFlag || '')}" data-hot-playable-reason="${escapeHtml(params.hotPlayableReason || '')}" data-split-power-non-zone-candidate="${escapeHtml(params.splitPowerNonZoneCandidate || '')}" data-active-eruption-flag="${escapeHtml(params.activeHrEruptionFlag || '')}" data-extreme-eruption-flag="${escapeHtml(params.extremeHrEruptionFlag || '')}" data-hr-eruption-reason="${escapeHtml(params.hrEruptionReason || '')}" data-fallback-trap-flag="${escapeHtml(params.fallbackTrapFlag || '')}" data-fallback-trap-reason="${escapeHtml(params.fallbackTrapReason || '')}">
+    <div class="pitch-matchup-head">
+      <h3>Pitch Matchup vs Actual Arsenal</h3>
+      <small>${escapeHtml(batterName)} vs ${escapeHtml(pitcherName)}</small>
+    </div>
+    <div class="pitch-matchup-body">Loading pitch-level Statcast matchup...</div>
+    <template data-pitcher-info>${params.pitcherInfoHtml || ''}</template>
+  </section>`;
+}
+
+async function pitchMatchupUiSlateSummaryRows(game, date, options = {}) {
+  const key = `slate:${date || ''}`;
+  if (pitchMatchupUiSlateRunCache.has(key)) {
+    const progress = pitchMatchupUiSlateProgressByDate.get(date || '');
+    if (progress) options.onProgress?.(progress);
+    return pitchMatchupUiSlateRunCache.get(key);
+  }
+  const cached = readPitchMatchupUiSlateSummary(date);
+  if (cached) return cached;
+  const reportProgress = (progress = {}) => {
+    const next = { ...progress, date };
+    pitchMatchupUiSlateProgressByDate.set(date || '', next);
+    options.onProgress?.(next);
+  };
+  const promise = fetchGamesAndHomeRuns(date)
+    .then((forecastPayload) => {
+      const cards = listify(forecastPayload?.cards);
+      let done = 0;
+      reportProgress({ done, total: cards.length, rows: 0, label: 'Loading games' });
+      return mapWithConcurrency(cards, 2, async (card) => {
+        const meta = await pitchMatchupForecastRowsForGame(date, card).catch(() => null);
+        done += 1;
+        reportProgress({
+          done,
+          total: cards.length,
+          rows: listify(meta?.rows).length,
+          game: `${displayTeamAbbrev(card?.away || '')} @ ${displayTeamAbbrev(card?.home || '')}`,
+          label: `Built ${done}/${cards.length} games`,
+        });
+        return meta;
+      });
+    })
+    .then((metas) => {
+      const rows = metas.flatMap((meta) => listify(meta?.rows));
+      const summaryRows = writePitchMatchupUiSlateSummary(date, pitchMatchupApplyV7SummaryScores(pitchMatchupBatterSummaryRows(rows)));
+      reportProgress({ done: listify(metas).length, total: listify(metas).length, rows: summaryRows.length, label: 'Complete' });
+      return summaryRows;
+    })
+    .catch(() => {
+      pitchMatchupUiSlateRunCache.delete(key);
+      return [];
+    });
+  pitchMatchupUiSlateRunCache.set(key, promise);
+  return promise;
+}
+
+function pitchMatchupUiSlateCacheKey(date = '') {
+  return pitchMatchupStorageKey(`ui_slate_summary:${date || ''}:v7`);
+}
+
+function readPitchMatchupUiSlateSummary(date = '') {
+  try {
+    const parsed = JSON.parse(localStorage.getItem(pitchMatchupUiSlateCacheKey(date)) || 'null');
+    if (!parsed || parsed.version !== PITCH_MATCHUP_CACHE_VERSION || !Array.isArray(parsed.rows)) return null;
+    return parsed.rows;
+  } catch {
+    return null;
+  }
+}
+
+function writePitchMatchupUiSlateSummary(date = '', rows = []) {
+  try {
+    localStorage.setItem(pitchMatchupUiSlateCacheKey(date), JSON.stringify({
+      version: PITCH_MATCHUP_CACHE_VERSION,
+      savedAt: Date.now(),
+      rows,
+    }));
+  } catch {}
+  return rows;
+}
+
+function prewarmPitchMatchupUiSlateForDate(date = dateInput.value || formatDate(new Date()), options = {}) {
+  const key = `slate:${date || ''}`;
+  if (options.force) {
+    pitchMatchupUiSlateRunCache.delete(key);
+    try { localStorage.removeItem(pitchMatchupUiSlateCacheKey(date)); } catch {}
+  }
+  if (!options.force && readPitchMatchupUiSlateSummary(date)) return;
+  if (pitchMatchupUiSlateRunCache.has(key)) return;
+  pitchMatchupUiSlateSummaryRows(null, date).catch(() => []);
+}
+
+function pitchMatchupOfficialLineupSignature(game = null) {
+  const date = officialDateForGame(game) || dateInput.value || '';
+  const away = listify(game?.lineup?.away).slice(0, 9).map((entry) => entry?.id || entry?.fullName || '').join(',');
+  const home = listify(game?.lineup?.home).slice(0, 9).map((entry) => entry?.id || entry?.fullName || '').join(',');
+  const awayPitcher = game?.probablePitchers?.away?.id || game?.awayPitcherId || game?.awayPitcher || '';
+  const homePitcher = game?.probablePitchers?.home?.id || game?.homePitcherId || game?.homePitcher || '';
+  return [date, game?.gamePk || '', away, home, awayPitcher, homePitcher].join('|');
+}
+
+function pitchMatchupUiSummaryForPair(summaryRows = [], batterId = '', pitcherId = '') {
+  const b = String(batterId || '');
+  const p = String(pitcherId || '');
+  return summaryRows.find((row) => String(row.batterId || '') === b && String(row.pitcherId || '') === p) || null;
+}
+
+async function hydratePitchMatchupShells(root = playerStatPitchMatchupEl || playerStatHeatmapEl) {
+  const shells = [...(root?.querySelectorAll?.('[data-pitch-matchup]') || [])];
+  if (!shells.length) return;
+  ensurePitchMatchupStyles();
+  await Promise.all(shells.map(async (shell) => {
+    const body = shell.querySelector('.pitch-matchup-body') || shell;
+    const uiSummary = {
+      hrScoreV7: shell.dataset.hrV7 || '',
+      hrScoreV820: shell.dataset.hrV820 || '',
+      hrScoreV9NoZone: shell.dataset.hrV9NoZone || '',
+      oldHrScoreWithZone: shell.dataset.oldHrScoreWithZone || '',
+      hrScoreV9NoZoneCautionReason: shell.dataset.hrV9Caution || '',
+      hrEruptionScore: shell.dataset.hrEruptionScore || '',
+      recentHeatScore: shell.dataset.recentHeatScore || '',
+      pcmi: shell.dataset.pcmi || '',
+      finalHrDamageScore: shell.dataset.finalHrDamageScore || '',
+      candidateLabel: shell.dataset.candidateLabel || '',
+      v7CautionReason: shell.dataset.v7Caution || '',
+      hrScoreV820CautionReason: shell.dataset.v8Caution || '',
+      zoneConfirmedFlag: shell.dataset.zoneConfirmedFlag || '',
+      zoneConfirmedReason: shell.dataset.zoneConfirmedReason || '',
+      hotPlayableFlag: shell.dataset.hotPlayableFlag || '',
+      hotPlayableReason: shell.dataset.hotPlayableReason || '',
+      splitPowerNonZoneCandidate: shell.dataset.splitPowerNonZoneCandidate || '',
+      activeHrEruptionFlag: shell.dataset.activeEruptionFlag || '',
+      extremeHrEruptionFlag: shell.dataset.extremeEruptionFlag || '',
+      hrEruptionReason: shell.dataset.hrEruptionReason || '',
+      fallbackTrapFlag: shell.dataset.fallbackTrapFlag || '',
+      fallbackTrapReason: shell.dataset.fallbackTrapReason || '',
+    };
+    const renderOptions = {
+      batterId: shell.dataset.batterId,
+      pitcherId: shell.dataset.pitcherId,
+      batterName: shell.dataset.batterName || '',
+      pitcherName: shell.dataset.pitcherName || '',
+      pitcherInfoHtml: shell.querySelector('template[data-pitcher-info]')?.innerHTML || '',
+    };
+    try {
+      const payload = await getPitchMatchupContext({
+        batterId: shell.dataset.batterId,
+        pitcherId: shell.dataset.pitcherId,
+        season: shell.dataset.season,
+        date: shell.dataset.date,
+      });
+      body.innerHTML = renderPitchMatchupContextHtml(payload, uiSummary, renderOptions);
+    } catch (error) {
+      body.innerHTML = renderPitchMatchupContextHtml(null, uiSummary, renderOptions);
+    }
+  }));
+}
+
+function pitchMatchupContextRowForPitch(payload = null, pitchType = '', velocity = NaN) {
+  const type = String(pitchType || '').toUpperCase();
+  const bucket = pitchMatchupVelocityBucket(type, Number(velocity));
+  const rows = Array.isArray(payload?.rows) ? payload.rows : [];
+  return rows.find((row) => String(row.pitcher?.pitchType || '').toUpperCase() === type && row.pitcher?.velocityBucket === bucket)
+    || rows.find((row) => String(row.pitcher?.pitchType || '').toUpperCase() === type)
+    || null;
+}
+
+function pitchMatchupExportColumns() {
+  return [
+    ['date', 'Date'],
+    ['dataCutoffDate', 'data_cutoff_date'],
+    ['pointInTimeValid', 'point_in_time_valid'],
+    ['statWindowStart', 'stat_window_start'],
+    ['statWindowEnd', 'stat_window_end'],
+    ['leakageCheckFlag', 'leakage_check_flag'],
+    ['gamePk', 'Game PK'],
+    ['game', 'Game'],
+    ['inning', 'Inning'],
+    ['half', 'Half'],
+    ['atBatIndex', 'AB Index'],
+    ['pitchNumber', 'Pitch #'],
+    ['batterId', 'Batter ID'],
+    ['batterName', 'Batter'],
+    ['pitcherId', 'Pitcher ID'],
+    ['pitcherName', 'Pitcher'],
+    ['stand', 'Stand'],
+    ['throwsHand', 'Throws'],
+    ['count', 'Count After'],
+    ['outs', 'Outs'],
+    ['pitchType', 'Actual Pitch Type'],
+    ['pitchName', 'Actual Pitch'],
+    ['velocity', 'Actual Velo'],
+    ['zone', 'Zone'],
+    ['plateX', 'Plate X'],
+    ['plateZ', 'Plate Z'],
+    ['verticalZone', 'vertical_zone'],
+    ['horizontalZone', 'horizontal_zone'],
+    ['attackZone', 'attack_zone'],
+    ['hcX', 'hc_x'],
+    ['hcY', 'hc_y'],
+    ['sprayAngle', 'spray_angle'],
+    ['pullCenterOppo', 'pull_center_oppo'],
+    ['launchSpeed', 'launch_speed'],
+    ['launchAngle', 'launch_angle'],
+    ['bbType', 'bb_type'],
+    ['hitDistanceSc', 'hit_distance_sc'],
+    ['description', 'Pitch Result'],
+    ['code', 'Pitch Code'],
+    ['atBatResult', 'AB Result'],
+    ['atBatDescription', 'AB Description'],
+    ['actualHit', 'Actual Hit'],
+    ['actualXbh', 'Actual XBH'],
+    ['actualHr', 'Actual HR'],
+    ['actualTotalBases', 'Actual TB'],
+    ['isInPlay', 'In Play'],
+    ['isBall', 'Ball'],
+    ['isStrike', 'Strike'],
+    ['contextPitch', 'Context Pitch'],
+    ['contextUsage', 'Pitcher Usage'],
+    ['contextPitcherWhiff', 'Pitcher Whiff%'],
+    ['contextPitcherXslg', 'Pitcher xSLGA'],
+    ['contextBatterWhiff', 'Batter Whiff%'],
+    ['contextBatterHardHit', 'Batter HH%'],
+    ['contextBatterXslg', 'Batter xSLG'],
+    ['contextSample', 'Context Sample'],
+    ['contextEdge', 'Edge'],
+    ['contextReliability', 'Reliability'],
+    ['contextFallback', 'Fallback'],
+    ['velocityBucket', 'Velocity Bucket'],
+    ['parkSwingHrFit', 'park_swing_hr_fit'],
+    ['parkFitType', 'park_fit_type'],
+    ['parkFitCaution', 'park_fit_caution'],
+    ['batterPullAirPct', 'batter_pull_air_pct'],
+    ['batterCenterAirPct', 'batter_center_air_pct'],
+    ['batterOppoAirPct', 'batter_oppo_air_pct'],
+    ['batterHrPullPct', 'batter_hr_pull_pct'],
+    ['batterBarrelPullPct', 'batter_barrel_pull_pct'],
+    ['batterVsHandPullAirPct', 'batter_vs_hand_pull_air_pct'],
+    ['batterVsHandHrPullPct', 'batter_vs_hand_hr_pull_pct'],
+    ['batterVsHandBarrelPullPct', 'batter_vs_hand_barrel_pull_pct'],
+    ['parkHrFactorLhbPull', 'park_hr_factor_lhb_pull'],
+    ['parkHrFactorLhbCenter', 'park_hr_factor_lhb_center'],
+    ['parkHrFactorLhbOppo', 'park_hr_factor_lhb_oppo'],
+    ['parkHrFactorRhbPull', 'park_hr_factor_rhb_pull'],
+    ['parkHrFactorRhbCenter', 'park_hr_factor_rhb_center'],
+    ['parkHrFactorRhbOppo', 'park_hr_factor_rhb_oppo'],
+    ['pcmi', 'pcmi'],
+    ['pcmiRaw', 'pcmi_raw'],
+    ['pcmiReliabilityAdjusted', 'pcmi_reliability_adjusted'],
+    ['parkSwingHrFitScore', 'park_swing_hr_fit_score'],
+    ['pitchClashLocalized', 'pitch_clash_localized'],
+    ['pitchClashPowerVulnerability', 'pitch_clash_power_vulnerability'],
+    ['pitchClashMinGate', 'pitch_clash_min_gate'],
+    ['pitcherVsSideHrAllowedPercentile', 'pitcher_vs_side_hr_allowed_percentile'],
+    ['batterVsHandHrPercentile', 'batter_vs_hand_hr_percentile'],
+    ['pcmiWithHomeAway', 'pcmi_with_home_away'],
+    ['personalizedHomeAwayScore', 'personalized_home_away_score'],
+    ['zonePitchClashScore', 'zone_pitch_clash_score'],
+    ['zonePitchClashScoreRaw', 'zone_pitch_clash_score_raw'],
+    ['zonePitchClashScoreReliabilityAdjusted', 'zone_pitch_clash_score_reliability_adjusted'],
+    ['zonePitchClashScoreScaled', 'zone_pitch_clash_score_scaled'],
+    ['bestZonePitchMatch', 'best_zone_pitch_match'],
+    ['bestZonePitchType', 'best_zone_pitch_type'],
+    ['bestZoneVelocityBucket', 'best_zone_velocity_bucket'],
+    ['bestVerticalZone', 'best_vertical_zone'],
+    ['bestHorizontalZone', 'best_horizontal_zone'],
+    ['pitcherBestZoneUsagePct', 'pitcher_best_zone_usage_pct'],
+    ['batterPitchZoneHrPerPa', 'batter_pitch_zone_hr_per_pa'],
+    ['batterPitchZoneHrPerBbe', 'batter_pitch_zone_hr_per_bbe'],
+    ['batterPitchZoneXslg', 'batter_pitch_zone_xslg'],
+    ['batterPitchZoneBarrelPct', 'batter_pitch_zone_barrel_pct'],
+    ['batterPitchZoneHardHitPct', 'batter_pitch_zone_hard_hit_pct'],
+    ['batterPitchZoneWhiffPct', 'batter_pitch_zone_whiff_pct'],
+    ['pitcherPitchZoneUsagePct', 'pitcher_pitch_zone_usage_pct'],
+    ['pitcherPitchZoneHrPerPaAllowed', 'pitcher_pitch_zone_hr_per_pa_allowed'],
+    ['pitcherPitchZoneXslgAllowed', 'pitcher_pitch_zone_xslg_allowed'],
+    ['pitcherPitchZoneBarrelPctAllowed', 'pitcher_pitch_zone_barrel_pct_allowed'],
+    ['pitcherPitchZoneHardHitPctAllowed', 'pitcher_pitch_zone_hard_hit_pct_allowed'],
+    ['batterBestZoneXslg', 'batter_best_zone_xslg'],
+    ['pitcherBestZoneXslgAllowed', 'pitcher_best_zone_xslg_allowed'],
+    ['zonePitchClashReliability', 'zone_pitch_clash_reliability'],
+    ['zonePitchClashCaution', 'zone_pitch_clash_caution'],
+    ['zonePitchClashAsofDate', 'zone_pitch_clash_asof_date'],
+    ['zonePitchClashDataThroughDate', 'zone_pitch_clash_data_through_date'],
+    ['zonePitchClashLastEventDate', 'zone_pitch_clash_last_event_date'],
+    ['zonePitchClashTargetIncluded', 'zone_pitch_clash_target_included'],
+    ['zonePitchClashLeakageFlag', 'zone_pitch_clash_leakage_flag'],
+    ['hrPickScoreV2', 'hr_pick_score_v2'],
+    ['hrPickScoreV3', 'hr_pick_score_v3'],
+    ['hrPickScoreV4', 'hr_pick_score_v4'],
+    ['hrPickScoreV4a', 'hr_pick_score_v4a'],
+    ['hrPickScoreV4b', 'hr_pick_score_v4b'],
+    ['hrPickScoreV4c', 'hr_pick_score_v4c'],
+    ['oldHrScoreWithZone', 'old_hr_score_with_zone'],
+    ['hrScoreV10NoZone', 'hr_score_v10_no_zone'],
+    ['hrScoreV10NoZoneRank', 'hr_score_v10_no_zone_rank'],
+    ['hitterPowerBaseline', 'hitter_power_baseline'],
+    ['hitterRecentPower', 'hitter_recent_power'],
+    ['pitchTypeDamageMatchup', 'pitch_type_damage_matchup'],
+    ['pitcherHrVulnerability', 'pitcher_hr_vulnerability'],
+    ['pitcherArsenalExposure', 'pitcher_arsenal_exposure'],
+    ['parkWeatherHrContext', 'park_weather_hr_context'],
+    ['handednessHomeAwayContext', 'handedness_home_away_context'],
+    ['candidateLabelV10', 'candidate_label_v10'],
+    ['trapFlagsV10', 'trap_flags_v10'],
+    ['hrScoreV9NoZone', 'hr_score_v9_no_zone'],
+    ['hrScoreV9NoZoneRank', 'hr_score_v9_no_zone_rank'],
+    ['hrScoreV9NoZonePercentile', 'hr_score_v9_no_zone_percentile'],
+    ['zoneScoreRemovedAmount', 'zone_score_removed_amount'],
+    ['zoneRemovedFromScore', 'zone_removed_from_score'],
+    ['zoneFieldsPresent', 'zone_fields_present'],
+    ['zoneFieldsUsedInScore', 'zone_fields_used_in_score'],
+    ['noZoneScoreInputNames', 'no_zone_score_input_names'],
+    ['pitchTypeDamageMatchupScoreNoZone', 'pitch_type_damage_matchup_score_no_zone'],
+    ['parkWeatherHrScore', 'park_weather_hr_score'],
+    ['pitcherLocalUsagePct', 'pitcher_local_usage_pct'],
+    ['batterLocalPa', 'batter_local_pa'],
+    ['batterLocalPitches', 'batter_local_pitches'],
+    ['batterLocalBbe', 'batter_local_bbe'],
+    ['batterLocalHr', 'batter_local_hr'],
+    ['batterLocalHrPerPa', 'batter_local_hr_per_pa'],
+    ['batterLocalHrPerPitch', 'batter_local_hr_per_pitch'],
+    ['batterLocalHrPerBbe', 'batter_local_hr_per_bbe'],
+    ['batterLocalXslg', 'batter_local_xslg'],
+    ['batterLocalSlg', 'batter_local_slg'],
+    ['batterLocalIso', 'batter_local_iso'],
+    ['batterLocalBarrelPct', 'batter_local_barrel_pct'],
+    ['batterLocalHardHitPct', 'batter_local_hard_hit_pct'],
+    ['batterLocalAvgEv', 'batter_local_avg_ev'],
+    ['batterLocalMaxEv', 'batter_local_max_ev'],
+    ['batterLocalLaunchAngleAvg', 'batter_local_launch_angle_avg'],
+    ['batterLocalWhiffPct', 'batter_local_whiff_pct'],
+    ['pitcherLocalPa', 'pitcher_local_pa'],
+    ['pitcherLocalPitches', 'pitcher_local_pitches'],
+    ['pitcherLocalBbe', 'pitcher_local_bbe'],
+    ['pitcherLocalHrAllowed', 'pitcher_local_hr_allowed'],
+    ['pitcherLocalHrPerPaAllowed', 'pitcher_local_hr_per_pa_allowed'],
+    ['pitcherLocalHrPerPitchAllowed', 'pitcher_local_hr_per_pitch_allowed'],
+    ['pitcherLocalHrPerBbeAllowed', 'pitcher_local_hr_per_bbe_allowed'],
+    ['pitcherLocalXslgAllowed', 'pitcher_local_xslg_allowed'],
+    ['pitcherLocalSlgAllowed', 'pitcher_local_slg_allowed'],
+    ['pitcherLocalIsoAllowed', 'pitcher_local_iso_allowed'],
+    ['pitcherLocalBarrelPctAllowed', 'pitcher_local_barrel_pct_allowed'],
+    ['pitcherLocalHardHitPctAllowed', 'pitcher_local_hard_hit_pct_allowed'],
+    ['pitcherLocalAvgEvAllowed', 'pitcher_local_avg_ev_allowed'],
+    ['pitcherLocalMaxEvAllowed', 'pitcher_local_max_ev_allowed'],
+    ['pitcherLocalLaunchAngleAvgAllowed', 'pitcher_local_launch_angle_avg_allowed'],
+    ['combinedLocalHrRate', 'combined_local_hr_rate'],
+    ['combinedLocalHrRateReliability', 'combined_local_hr_rate_reliability'],
+    ['combinedLocalHrRateSource', 'combined_local_hr_rate_source'],
+    ['combinedLocalHrIndex', 'combined_local_hr_index'],
+    ['batterSeasonPa', 'batter_season_pa'],
+    ['batterSeasonAb', 'batter_season_ab'],
+    ['batterSeasonHr', 'batter_season_hr'],
+    ['batterSeasonHrPerPa', 'batter_season_hr_per_pa'],
+    ['batterSeasonHrPerAb', 'batter_season_hr_per_ab'],
+    ['batterSeasonHrPerBbe', 'batter_season_hr_per_bbe'],
+    ['batterSeasonIso', 'batter_season_iso'],
+    ['batterSeasonSlg', 'batter_season_slg'],
+    ['batterSeasonXslg', 'batter_season_xslg'],
+    ['batterSeasonBarrelPct', 'batter_season_barrel_pct'],
+    ['batterSeasonHardHitPct', 'batter_season_hard_hit_pct'],
+    ['batterSeasonAvgEv', 'batter_season_avg_ev'],
+    ['batterSeasonMaxEv', 'batter_season_max_ev'],
+    ['batterSeasonFbPct', 'batter_season_fb_pct'],
+    ['batterPriorSeasonPa', 'batter_prior_season_pa'],
+    ['batterPriorSeasonHrPerPa', 'batter_prior_season_hr_per_pa'],
+    ['batterPriorSeasonIso', 'batter_prior_season_iso'],
+    ['batterPriorSeasonXslg', 'batter_prior_season_xslg'],
+    ['batterPriorSeasonBarrelPct', 'batter_prior_season_barrel_pct'],
+    ['batterPriorSeasonHardHitPct', 'batter_prior_season_hard_hit_pct'],
+    ['batterPriorSeasonAvgEv', 'batter_prior_season_avg_ev'],
+    ['batterPriorSeasonFbPct', 'batter_prior_season_fb_pct'],
+    ['pitcherSeasonPa', 'pitcher_season_pa'],
+    ['pitcherSeasonHrAllowed', 'pitcher_season_hr_allowed'],
+    ['pitcherSeasonHrPerPaAllowed', 'pitcher_season_hr_per_pa_allowed'],
+    ['pitcherSeasonHrPer9', 'pitcher_season_hr_per_9'],
+    ['pitcherSeasonHrPerBbeAllowed', 'pitcher_season_hr_per_bbe_allowed'],
+    ['pitcherSeasonSlgAllowed', 'pitcher_season_slg_allowed'],
+    ['pitcherSeasonXslgAllowed', 'pitcher_season_xslg_allowed'],
+    ['pitcherSeasonBarrelPctAllowed', 'pitcher_season_barrel_pct_allowed'],
+    ['pitcherSeasonHardHitPctAllowed', 'pitcher_season_hard_hit_pct_allowed'],
+    ['pitcherSeasonAvgEvAllowed', 'pitcher_season_avg_ev_allowed'],
+    ['pitcherSeasonFbPctAllowed', 'pitcher_season_fb_pct_allowed'],
+    ['pitcherPriorSeasonPa', 'pitcher_prior_season_pa'],
+    ['pitcherPriorSeasonHrPerPaAllowed', 'pitcher_prior_season_hr_per_pa_allowed'],
+    ['pitcherPriorSeasonXslgAllowed', 'pitcher_prior_season_xslg_allowed'],
+    ['pitcherPriorSeasonBarrelPctAllowed', 'pitcher_prior_season_barrel_pct_allowed'],
+    ['pitcherPriorSeasonHardHitPctAllowed', 'pitcher_prior_season_hard_hit_pct_allowed'],
+    ['pitcherPriorSeasonAvgEvAllowed', 'pitcher_prior_season_avg_ev_allowed'],
+    ['pitcherPriorSeasonFbPctAllowed', 'pitcher_prior_season_fb_pct_allowed'],
+    ['batterVsHandPa', 'batter_vs_hand_pa'],
+    ['batterVsHandHr', 'batter_vs_hand_hr'],
+    ['batterVsHandHrPerPa', 'batter_vs_hand_hr_per_pa'],
+    ['batterVsHandSlg', 'batter_vs_hand_slg'],
+    ['batterVsHandIso', 'batter_vs_hand_iso'],
+    ['batterVsHandXslg', 'batter_vs_hand_xslg'],
+    ['batterVsHandHardHitPct', 'batter_vs_hand_hard_hit_pct'],
+    ['batterVsHandBarrelPct', 'batter_vs_hand_barrel_pct'],
+    ['pitcherVsSidePa', 'pitcher_vs_side_pa'],
+    ['pitcherVsSideHrAllowed', 'pitcher_vs_side_hr_allowed'],
+    ['pitcherVsSideHrPerPaAllowed', 'pitcher_vs_side_hr_per_pa_allowed'],
+    ['pitcherVsSideSlgAllowed', 'pitcher_vs_side_slg_allowed'],
+    ['pitcherVsSideIsoAllowed', 'pitcher_vs_side_iso_allowed'],
+    ['pitcherVsSideXslgAllowed', 'pitcher_vs_side_xslg_allowed'],
+    ['pitcherVsSideHardHitPctAllowed', 'pitcher_vs_side_hard_hit_pct_allowed'],
+    ['pitcherVsSideBarrelPctAllowed', 'pitcher_vs_side_barrel_pct_allowed'],
+    ['handednessMatchupScore', 'handedness_matchup_score'],
+    ['handednessHrBoost', 'handedness_hr_boost'],
+    ['handednessDamageBoost', 'handedness_damage_boost'],
+    ['batterLast7Pa', 'batter_last_7_pa'],
+    ['batterLast7Hr', 'batter_last_7_hr'],
+    ['batterLast7Xbh', 'batter_last_7_xbh'],
+    ['batterLast7HrPerPa', 'batter_last_7_hr_per_pa'],
+    ['batterLast7Xslg', 'batter_last_7_xslg'],
+    ['batterLast7BarrelPct', 'batter_last_7_barrel_pct'],
+    ['batterLast14Pa', 'batter_last_14_pa'],
+    ['batterLast14Hr', 'batter_last_14_hr'],
+    ['batterLast14Xbh', 'batter_last_14_xbh'],
+    ['batterLast14HrPerPa', 'batter_last_14_hr_per_pa'],
+    ['batterLast14Xslg', 'batter_last_14_xslg'],
+    ['batterLast14BarrelPct', 'batter_last_14_barrel_pct'],
+    ['batterLast30Pa', 'batter_last_30_pa'],
+    ['batterLast30Hr', 'batter_last_30_hr'],
+    ['batterLast30Xbh', 'batter_last_30_xbh'],
+    ['batterLast30HrPerPa', 'batter_last_30_hr_per_pa'],
+    ['batterLast30Xslg', 'batter_last_30_xslg'],
+    ['batterLast30BarrelPct', 'batter_last_30_barrel_pct'],
+    ['recentHeatScore', 'recent_heat_score'],
+    ['recentHrScore', 'recent_hr_score'],
+    ['recentPowerScore', 'recent_power_score'],
+    ['recentContactQualityScore', 'recent_contact_quality_score'],
+    ['arsenalMatchupScore', 'arsenal_matchup_score'],
+    ['hrPitchScore', 'hr_pitch_score'],
+    ['pitchTypeDamageMatchupScoreNoZone', 'pitch_type_damage_matchup_score_no_zone'],
+    ['hrBatterPowerScore', 'hr_batter_power_score'],
+    ['hrPitcherVulnerabilityScore', 'hr_pitcher_vulnerability_score'],
+    ['hrLocalizedRateScore', 'hr_localized_rate_score'],
+    ['hrHandednessScore', 'hr_handedness_score'],
+    ['hrRecentHeatScore', 'hr_recent_heat_score'],
+    ['hrReliabilityScore', 'hr_reliability_score'],
+    ['finalHrDamageScore', 'final_hr_damage_score'],
+    ['overallEdge', 'Overall Edge'],
+    ['source', 'Context Source'],
+  ].map(([key, header]) => ({ key, header }));
+}
+
+function pitchMatchupGameTimingColumns() {
+  return [
+    ['date', 'Date'],
+    ['gamePk', 'Game PK'],
+    ['game', 'Game'],
+    ['awayTeam', 'Away'],
+    ['homeTeam', 'Home'],
+    ['pitchRows', 'Pitch Rows'],
+    ['atBats', 'ABs'],
+    ['uniqueContexts', 'Unique Contexts'],
+    ['validForBacktest', 'valid_for_backtest'],
+    ['invalidReason', 'invalid_reason'],
+    ['liveFeedFetchMs', 'MLB Live Feed ms'],
+    ['gameParseMs', 'Game Parse ms'],
+    ['contextMs', 'Context ms'],
+    ['writeJoinMs', 'Write/Join ms'],
+    ['totalGameMs', 'Total Game ms'],
+  ].map(([key, header]) => ({ key, header }));
+}
+
+function pitchMatchupContextTimingColumns() {
+  return [
+    ['date', 'Date'],
+    ['gamePk', 'Game PK'],
+    ['game', 'Game'],
+    ['batterId', 'Batter ID'],
+    ['batterName', 'Batter'],
+    ['pitcherId', 'Pitcher ID'],
+    ['pitcherName', 'Pitcher'],
+    ['pitchType', 'Pitch Types Covered'],
+    ['contextKey', 'Context Key'],
+    ['batterLookupMs', 'batter_statcast_lookup_ms'],
+    ['pitcherLookupMs', 'pitcher_statcast_lookup_ms'],
+    ['batterSprayProfileMs', 'batter_spray_profile_ms'],
+    ['preaggregationMs', 'preaggregation_ms'],
+    ['dictionaryBuildMs', 'dictionary_build_ms'],
+    ['forecastLookupMs', 'forecast_lookup_ms'],
+    ['contextTotalMs', 'context_total_ms'],
+    ['contextJoinMs', 'context_join_ms'],
+    ['cacheHit', 'context_cache_hit'],
+    ['splitCacheHit', 'split_cache_hit'],
+    ['source', 'Source'],
+  ].map(([key, header]) => ({ key, header }));
+}
+
+function pitchMatchupDailySummaryColumns() {
+  return [
+    ['date', 'Date'],
+    ['totalGames', 'Total Games'],
+    ['totalPitchRows', 'Total Pitch Rows'],
+    ['totalAbs', 'Total ABs'],
+    ['totalUniqueContexts', 'Total Unique Contexts'],
+    ['totalRuntimeMs', 'Total Runtime ms'],
+    ['scheduleFetchMs', 'Schedule Fetch ms'],
+    ['statcastLoadMs', 'sum_statcast_lookup_ms'],
+    ['statcastPrefetchMs', 'statcast_prefetch_ms'],
+    ['preaggregationMs', 'preaggregation_ms'],
+    ['dictionaryBuildMs', 'dictionary_build_ms'],
+    ['forecastLookupMs', 'forecast_lookup_ms'],
+    ['forecastWriteMs', 'forecast_write_ms'],
+    ['contextTotalMs', 'sum_context_total_ms'],
+    ['writeCsvMs', 'Write CSV ms'],
+    ['contextCacheHits', 'context_cache_hits'],
+    ['contextCacheMisses', 'context_cache_misses'],
+    ['contextCacheHitRate', 'context_cache_hit_rate'],
+    ['splitCacheHits', 'split_cache_hits'],
+    ['splitCacheMisses', 'split_cache_misses'],
+    ['splitCacheHitRate', 'split_cache_hit_rate'],
+  ].map(([key, header]) => ({ key, header }));
+}
+
+function pitchMatchupBatterSummaryColumns() {
+  return [
+    ['date', 'date'],
+    ['dataCutoffDate', 'data_cutoff_date'],
+    ['pointInTimeValid', 'point_in_time_valid'],
+    ['statWindowStart', 'stat_window_start'],
+    ['statWindowEnd', 'stat_window_end'],
+    ['leakageCheckFlag', 'leakage_check_flag'],
+    ['gamePk', 'game_pk'],
+    ['game', 'game'],
+    ['battingSide', 'batting_side'],
+    ['team', 'team'],
+    ['opponent', 'opponent'],
+    ['batterId', 'batter_id'],
+    ['batterName', 'batter_name'],
+    ['pitcherId', 'pitcher_id'],
+    ['pitcherName', 'pitcher_name'],
+    ['stand', 'stand'],
+    ['throwsHand', 'throws'],
+    ['lineupStatus', 'lineup_status'],
+    ['confirmedStarter', 'confirmed_starter'],
+    ['projectedStarter', 'projected_starter'],
+    ['starterConfidence', 'starter_confidence'],
+    ['battingOrder', 'batting_order'],
+    ['lineupSource', 'lineup_source'],
+    ['lineupLocked', 'lineup_locked'],
+    ['eligibleForPregameCard', 'eligible_for_pregame_card'],
+    ['nonstarterExclusionReason', 'nonstarter_exclusion_reason'],
+    ['pitchContextCount', 'pitch_context_count'],
+    ['topMatchingPitches', 'top_matching_pitches'],
+    ['topPitchTypes', 'top_pitch_types'],
+    ['finalHrDamageScore', 'final_hr_damage_score'],
+    ['pcmi', 'pcmi'],
+    ['pcmiRaw', 'pcmi_raw'],
+    ['pcmiReliabilityAdjusted', 'pcmi_reliability_adjusted'],
+    ['parkSwingHrFitScore', 'park_swing_hr_fit_score'],
+    ['pitchClashLocalized', 'pitch_clash_localized'],
+    ['pitchClashPowerVulnerability', 'pitch_clash_power_vulnerability'],
+    ['pitchClashMinGate', 'pitch_clash_min_gate'],
+    ['pitcherVsSideHrAllowedPercentile', 'pitcher_vs_side_hr_allowed_percentile'],
+    ['batterVsHandHrPercentile', 'batter_vs_hand_hr_percentile'],
+    ['pcmiWithHomeAway', 'pcmi_with_home_away'],
+    ['hrPickScoreV2', 'hr_pick_score_v2'],
+    ['hrPickScoreV3', 'hr_pick_score_v3'],
+    ['hrPickScoreV4', 'hr_pick_score_v4'],
+    ['hrPickScoreV4a', 'hr_pick_score_v4a'],
+    ['hrPickScoreV4b', 'hr_pick_score_v4b'],
+    ['hrPickScoreV4c', 'hr_pick_score_v4c'],
+    ['hrScoreV7', 'hr_score_v7'],
+    ['hrScoreV7Rank', 'hr_score_v7_rank'],
+    ['hrScoreV7Percentile', 'hr_score_v7_percentile'],
+    ['hrEruptionScore', 'hr_eruption_score'],
+    ['hrEruptionScorePercentile', 'hr_eruption_score_percentile'],
+    ['activeHrEruptionFlag', 'active_hr_eruption_flag'],
+    ['extremeHrEruptionFlag', 'extreme_hr_eruption_flag'],
+    ['hrEruptionReason', 'hr_eruption_reason'],
+    ['hrScoreV820', 'hr_score_v8_20'],
+    ['hrScoreV820Rank', 'hr_score_v8_20_rank'],
+    ['hrScoreV820Percentile', 'hr_score_v8_20_percentile'],
+    ['hrScoreV820PrimaryReason', 'hr_score_v8_20_primary_reason'],
+    ['hrScoreV820CautionReason', 'hr_score_v8_20_caution_reason'],
+    ['hrScoreV10NoZone', 'hr_score_v10_no_zone'],
+    ['hrScoreV10NoZoneRank', 'hr_score_v10_no_zone_rank'],
+    ['hitterPowerBaseline', 'hitter_power_baseline'],
+    ['hitterRecentPower', 'hitter_recent_power'],
+    ['pitchTypeDamageMatchup', 'pitch_type_damage_matchup'],
+    ['pitcherHrVulnerability', 'pitcher_hr_vulnerability'],
+    ['pitcherArsenalExposure', 'pitcher_arsenal_exposure'],
+    ['parkWeatherHrContext', 'park_weather_hr_context'],
+    ['handednessHomeAwayContext', 'handedness_home_away_context'],
+    ['candidateLabelV10', 'candidate_label_v10'],
+    ['trapFlagsV10', 'trap_flags_v10'],
+    ['oldHrScoreWithZone', 'old_hr_score_with_zone'],
+    ['hrScoreV9NoZone', 'hr_score_v9_no_zone'],
+    ['hrScoreV9NoZoneRank', 'hr_score_v9_no_zone_rank'],
+    ['hrScoreV9NoZonePercentile', 'hr_score_v9_no_zone_percentile'],
+    ['hrScoreV9NoZonePrimaryReason', 'hr_score_v9_no_zone_primary_reason'],
+    ['hrScoreV9NoZoneCautionReason', 'hr_score_v9_no_zone_caution_reason'],
+    ['zoneScoreRemovedAmount', 'zone_score_removed_amount'],
+    ['zoneRemovedFromScore', 'zone_removed_from_score'],
+    ['zoneFieldsPresent', 'zone_fields_present'],
+    ['zoneFieldsUsedInScore', 'zone_fields_used_in_score'],
+    ['noZoneScoreInputNames', 'no_zone_score_input_names'],
+    ['pitchTypeDamageMatchupScoreNoZone', 'pitch_type_damage_matchup_score_no_zone'],
+    ['parkWeatherHrScore', 'park_weather_hr_score'],
+    ['weakPitcherCombo', 'weak_pitcher_combo'],
+    ['weakPitcherComboPercentile', 'weak_pitcher_combo_percentile'],
+    ['v7PrimaryReason', 'v7_primary_reason'],
+    ['v7CautionReason', 'v7_caution_reason'],
+    ['zoneConfirmedFlag', 'zone_confirmed_flag'],
+    ['zoneConfirmedReason', 'zone_confirmed_reason'],
+    ['hotPlayableFlag', 'hot_playable_flag'],
+    ['hotPlayableReason', 'hot_playable_reason'],
+    ['hotPlayableNonZoneCandidate', 'hot_playable_non_zone_candidate'],
+    ['splitPowerNonZoneCandidate', 'split_power_non_zone_candidate'],
+    ['hrProfileOverrideCandidate', 'hr_profile_override_candidate'],
+    ['fallbackTrapFlag', 'fallback_trap_flag'],
+    ['fallbackTrapReason', 'fallback_trap_reason'],
+    ['candidateLabel', 'candidate_label'],
+    ['candidatePriorityTier', 'candidate_priority_tier'],
+    ['parkSwingHrFit', 'park_swing_hr_fit'],
+    ['parkFitType', 'park_fit_type'],
+    ['parkFitCaution', 'park_fit_caution'],
+    ['personalizedHomeAwayScore', 'personalized_home_away_score'],
+    ['zonePitchClashScore', 'zone_pitch_clash_score'],
+    ['zonePitchClashScoreRaw', 'zone_pitch_clash_score_raw'],
+    ['zonePitchClashScoreReliabilityAdjusted', 'zone_pitch_clash_score_reliability_adjusted'],
+    ['zonePitchClashScoreScaled', 'zone_pitch_clash_score_scaled'],
+    ['bestZonePitchMatch', 'best_zone_pitch_match'],
+    ['bestZonePitchType', 'best_zone_pitch_type'],
+    ['bestZoneVelocityBucket', 'best_zone_velocity_bucket'],
+    ['bestVerticalZone', 'best_vertical_zone'],
+    ['bestHorizontalZone', 'best_horizontal_zone'],
+    ['pitcherBestZoneUsagePct', 'pitcher_best_zone_usage_pct'],
+    ['batterPitchZoneHrPerPa', 'batter_pitch_zone_hr_per_pa'],
+    ['batterPitchZoneHrPerBbe', 'batter_pitch_zone_hr_per_bbe'],
+    ['batterPitchZoneXslg', 'batter_pitch_zone_xslg'],
+    ['batterPitchZoneBarrelPct', 'batter_pitch_zone_barrel_pct'],
+    ['batterPitchZoneHardHitPct', 'batter_pitch_zone_hard_hit_pct'],
+    ['batterPitchZoneWhiffPct', 'batter_pitch_zone_whiff_pct'],
+    ['pitcherPitchZoneUsagePct', 'pitcher_pitch_zone_usage_pct'],
+    ['pitcherPitchZoneHrPerPaAllowed', 'pitcher_pitch_zone_hr_per_pa_allowed'],
+    ['pitcherPitchZoneXslgAllowed', 'pitcher_pitch_zone_xslg_allowed'],
+    ['pitcherPitchZoneBarrelPctAllowed', 'pitcher_pitch_zone_barrel_pct_allowed'],
+    ['pitcherPitchZoneHardHitPctAllowed', 'pitcher_pitch_zone_hard_hit_pct_allowed'],
+    ['batterBestZoneXslg', 'batter_best_zone_xslg'],
+    ['pitcherBestZoneXslgAllowed', 'pitcher_best_zone_xslg_allowed'],
+    ['zonePitchClashReliability', 'zone_pitch_clash_reliability'],
+    ['zonePitchClashCaution', 'zone_pitch_clash_caution'],
+    ['zonePitchClashAsofDate', 'zone_pitch_clash_asof_date'],
+    ['zonePitchClashDataThroughDate', 'zone_pitch_clash_data_through_date'],
+    ['zonePitchClashLastEventDate', 'zone_pitch_clash_last_event_date'],
+    ['zonePitchClashTargetIncluded', 'zone_pitch_clash_target_included'],
+    ['zonePitchClashLeakageFlag', 'zone_pitch_clash_leakage_flag'],
+    ['batterPullAirPct', 'batter_pull_air_pct'],
+    ['batterCenterAirPct', 'batter_center_air_pct'],
+    ['batterOppoAirPct', 'batter_oppo_air_pct'],
+    ['batterHrPullPct', 'batter_hr_pull_pct'],
+    ['batterBarrelPullPct', 'batter_barrel_pull_pct'],
+    ['batterVsHandPullAirPct', 'batter_vs_hand_pull_air_pct'],
+    ['batterVsHandHrPullPct', 'batter_vs_hand_hr_pull_pct'],
+    ['batterVsHandBarrelPullPct', 'batter_vs_hand_barrel_pull_pct'],
+    ['combinedLocalHrRate', 'combined_local_hr_rate'],
+    ['combinedLocalHrRateReliability', 'combined_local_hr_rate_reliability'],
+    ['combinedLocalHrRateSource', 'combined_local_hr_rate_source'],
+    ['hrLocalizedRateScore', 'hr_localized_rate_score'],
+    ['hrPitchScore', 'hr_pitch_score'],
+    ['hrBatterPowerScore', 'hr_batter_power_score'],
+    ['hrPitcherVulnerabilityScore', 'hr_pitcher_vulnerability_score'],
+    ['handednessMatchupScore', 'handedness_matchup_score'],
+    ['recentHeatScore', 'recent_heat_score'],
+    ['recentHrScore', 'recent_hr_score'],
+    ['batterLast7Pa', 'batter_last_7_pa'],
+    ['batterLast7Hr', 'batter_last_7_hr'],
+    ['batterLast7Xbh', 'batter_last_7_xbh'],
+    ['batterLast7HrPerPa', 'batter_last_7_hr_per_pa'],
+    ['batterLast7Xslg', 'batter_last_7_xslg'],
+    ['batterLast7BarrelPct', 'batter_last_7_barrel_pct'],
+    ['batterLast14Pa', 'batter_last_14_pa'],
+    ['batterLast14Hr', 'batter_last_14_hr'],
+    ['batterLast14Xbh', 'batter_last_14_xbh'],
+    ['batterLast14HrPerPa', 'batter_last_14_hr_per_pa'],
+    ['batterLast14Xslg', 'batter_last_14_xslg'],
+    ['batterLast14BarrelPct', 'batter_last_14_barrel_pct'],
+    ['batterSeasonHrPerPa', 'batter_season_hr_per_pa'],
+    ['batterSeasonHr', 'batter_season_hr'],
+    ['batterSeasonIso', 'batter_season_iso'],
+    ['batterSeasonXslg', 'batter_season_xslg'],
+    ['batterSeasonBarrelPct', 'batter_season_barrel_pct'],
+    ['batterSeasonHardHitPct', 'batter_season_hard_hit_pct'],
+    ['batterSeasonAvgEv', 'batter_season_avg_ev'],
+    ['batterSeasonFbPct', 'batter_season_fb_pct'],
+    ['batterPriorSeasonPa', 'batter_prior_season_pa'],
+    ['batterPriorSeasonHrPerPa', 'batter_prior_season_hr_per_pa'],
+    ['batterPriorSeasonIso', 'batter_prior_season_iso'],
+    ['batterPriorSeasonXslg', 'batter_prior_season_xslg'],
+    ['batterPriorSeasonBarrelPct', 'batter_prior_season_barrel_pct'],
+    ['batterPriorSeasonHardHitPct', 'batter_prior_season_hard_hit_pct'],
+    ['pitcherSeasonHrPerPaAllowed', 'pitcher_season_hr_per_pa_allowed'],
+    ['pitcherSeasonHrAllowed', 'pitcher_season_hr_allowed'],
+    ['pitcherSeasonXslgAllowed', 'pitcher_season_xslg_allowed'],
+    ['pitcherSeasonBarrelPctAllowed', 'pitcher_season_barrel_pct_allowed'],
+    ['pitcherSeasonHardHitPctAllowed', 'pitcher_season_hard_hit_pct_allowed'],
+    ['pitcherSeasonAvgEvAllowed', 'pitcher_season_avg_ev_allowed'],
+    ['pitcherSeasonFbPctAllowed', 'pitcher_season_fb_pct_allowed'],
+    ['pitcherPriorSeasonPa', 'pitcher_prior_season_pa'],
+    ['pitcherPriorSeasonHrPerPaAllowed', 'pitcher_prior_season_hr_per_pa_allowed'],
+    ['pitcherPriorSeasonXslgAllowed', 'pitcher_prior_season_xslg_allowed'],
+    ['pitcherPriorSeasonBarrelPctAllowed', 'pitcher_prior_season_barrel_pct_allowed'],
+    ['pitcherPriorSeasonHardHitPctAllowed', 'pitcher_prior_season_hard_hit_pct_allowed'],
+    ['batterVsHandHrPerPa', 'batter_vs_hand_hr_per_pa'],
+    ['pitcherVsSideHrPerPaAllowed', 'pitcher_vs_side_hr_per_pa_allowed'],
+    ['reliability', 'reliability'],
+    ['reliabilityLabel', 'reliability_label'],
+    ['fallbackUsed', 'fallback_used'],
+    ['fallbackLevel', 'fallback_level'],
+  ].map(([key, header]) => ({ key, header }));
+}
+
+function pitchMatchupCsvNumberValue(value) {
+  const n = Number(value);
+  return Number.isFinite(n) ? n : NaN;
+}
+
+function pitchMatchupWeightedAverage(rows = [], key = '') {
+  let totalWeight = 0;
+  let total = 0;
+  for (const row of rows) {
+    const value = pitchMatchupCsvNumberValue(row[key]);
+    if (!Number.isFinite(value)) continue;
+    const weight = Math.max(0.01, pitchMatchupCsvNumberValue(row.pitcherLocalUsagePct) || 0.01);
+    total += value * weight;
+    totalWeight += weight;
+  }
+  return totalWeight ? total / totalWeight : NaN;
+}
+
+function pitchMatchupReliabilityRank(value = '') {
+  const text = String(value || '').toLowerCase();
+  if (text === 'high') return 4;
+  if (text === 'medium') return 3;
+  if (text === 'low') return 2;
+  if (text === 'very low') return 1;
+  return 0;
+}
+
+function pitchMatchupSummaryReliability(rows = []) {
+  const ranks = rows.map((row) => pitchMatchupReliabilityRank(row.combinedLocalHrRateReliability || row.contextReliability)).filter(Boolean);
+  if (!ranks.length) return '';
+  const min = Math.min(...ranks);
+  return min >= 4 ? 'High' : min >= 3 ? 'Medium' : min >= 2 ? 'Low' : 'Very low';
+}
+
+function pitchMatchupBatterSummaryRows(rows = []) {
+  const groups = new Map();
+  for (const row of rows) {
+    if (!row?.batterId || !row?.pitcherId) continue;
+    const groupKey = [row.date, row.gamePk, row.batterId, row.pitcherId].join('|');
+    if (!groups.has(groupKey)) groups.set(groupKey, []);
+    groups.get(groupKey).push(row);
+  }
+  return [...groups.values()].map((groupRows) => {
+    const first = groupRows[0] || {};
+    const contexts = new Map();
+    for (const row of groupRows) {
+      const contextKey = [row.pitchType, row.velocityBucket, row.contextPitch].join('|');
+      const existing = contexts.get(contextKey);
+      if (!existing || (pitchMatchupCsvNumberValue(row.finalHrDamageScore) || 0) > (pitchMatchupCsvNumberValue(existing.finalHrDamageScore) || 0)) {
+        contexts.set(contextKey, row);
+      }
+    }
+    const contextRows = [...contexts.values()];
+    const topRows = contextRows
+      .slice()
+      .sort((a, b) => (pitchMatchupCsvNumberValue(b.finalHrDamageScore) || 0) - (pitchMatchupCsvNumberValue(a.finalHrDamageScore) || 0))
+      .slice(0, 5);
+    const avg = (key, digits = 1) => pitchMatchupNumberCsv(pitchMatchupWeightedAverage(contextRows, key), digits);
+    return {
+      date: first.date,
+      dataCutoffDate: first.dataCutoffDate,
+      pointInTimeValid: first.pointInTimeValid,
+      statWindowStart: first.statWindowStart,
+      statWindowEnd: first.statWindowEnd,
+      leakageCheckFlag: [...new Set(contextRows.map((row) => row.leakageCheckFlag).filter(Boolean))].join('|'),
+      gamePk: first.gamePk,
+      game: first.game,
+      venue: first.venue || '',
+      battingSide: first.battingSide,
+      team: first.team,
+      opponent: first.opponent,
+      batterId: first.batterId,
+      batterName: first.batterName,
+      pitcherId: first.pitcherId,
+      pitcherName: first.pitcherName,
+      stand: first.stand,
+      throwsHand: first.throwsHand,
+      lineupStatus: first.lineupStatus || '',
+      confirmedStarter: first.confirmedStarter || '',
+      projectedStarter: first.projectedStarter || '',
+      starterConfidence: first.starterConfidence || '',
+      battingOrder: first.battingOrder || '',
+      lineupSource: first.lineupSource || '',
+      lineupLocked: first.lineupLocked || '',
+      eligibleForPregameCard: first.eligibleForPregameCard || '',
+      nonstarterExclusionReason: first.nonstarterExclusionReason || '',
+      pitchContextCount: contextRows.length,
+      topMatchingPitches: topRows.map((row) => `${row.contextPitch || row.pitchName || row.pitchType}: score ${row.finalHrDamageScore || ''}, HRr ${row.combinedLocalHrRate || ''}, rel ${row.combinedLocalHrRateReliability || row.contextReliability || ''}`).join('; '),
+      topPitchTypes: topRows.map((row) => row.contextPitch || row.pitchName || row.pitchType).join('|'),
+      finalHrDamageScore: avg('finalHrDamageScore', 1),
+      pcmi: avg('pcmi', 1),
+      pcmiRaw: avg('pcmiRaw', 1),
+      pcmiReliabilityAdjusted: avg('pcmiReliabilityAdjusted', 1),
+      parkSwingHrFitScore: avg('parkSwingHrFitScore', 1),
+      pitchClashLocalized: avg('pitchClashLocalized', 1),
+      pitchClashPowerVulnerability: avg('pitchClashPowerVulnerability', 1),
+      pitchClashMinGate: avg('pitchClashMinGate', 1),
+      pitcherVsSideHrAllowedPercentile: avg('pitcherVsSideHrAllowedPercentile', 1),
+      batterVsHandHrPercentile: avg('batterVsHandHrPercentile', 1),
+      pcmiWithHomeAway: avg('pcmiWithHomeAway', 1),
+      hrPickScoreV2: avg('hrPickScoreV2', 1),
+      hrPickScoreV3: avg('hrPickScoreV3', 1),
+      hrPickScoreV4: avg('hrPickScoreV4', 1),
+      hrPickScoreV4a: avg('hrPickScoreV4a', 1),
+      hrPickScoreV4b: avg('hrPickScoreV4b', 1),
+      hrPickScoreV4c: avg('hrPickScoreV4c', 1),
+      oldHrScoreWithZone: avg('hrPickScoreV4c', 1),
+      hrScoreV10NoZone: '',
+      hitterPowerBaseline: '',
+      hitterRecentPower: '',
+      pitchTypeDamageMatchup: '',
+      pitcherHrVulnerability: '',
+      pitcherArsenalExposure: '',
+      parkWeatherHrContext: '',
+      handednessHomeAwayContext: '',
+      candidateLabelV10: '',
+      trapFlagsV10: '',
+      hrScoreV9NoZone: '',
+      hrScoreV9NoZoneRank: '',
+      hrScoreV9NoZonePercentile: '',
+      zoneScoreRemovedAmount: '',
+      zoneRemovedFromScore: true,
+      zoneFieldsPresent: pitchMatchupZoneFieldsPresent(first),
+      zoneFieldsUsedInScore: false,
+      noZoneScoreInputNames: PITCH_MATCHUP_NO_ZONE_SCORE_INPUTS.join('|'),
+      pitchTypeDamageMatchupScoreNoZone: avg('pitchTypeDamageMatchupScoreNoZone', 1) || avg('hrPitchScore', 1),
+      parkWeatherHrScore: avg('parkWeatherHrScore', 1) || avg('parkSwingHrFitScore', 1),
+      parkSwingHrFit: avg('parkSwingHrFit', 3),
+      parkFitType: first.parkFitType,
+      parkFitCaution: [...new Set(contextRows.map((row) => row.parkFitCaution).filter(Boolean))].join('|'),
+      personalizedHomeAwayScore: avg('personalizedHomeAwayScore', 1),
+      zonePitchClashScore: avg('zonePitchClashScore', 1),
+      zonePitchClashScoreRaw: avg('zonePitchClashScoreRaw', 1),
+      zonePitchClashScoreReliabilityAdjusted: avg('zonePitchClashScoreReliabilityAdjusted', 1),
+      zonePitchClashScoreScaled: avg('zonePitchClashScoreScaled', 1),
+      bestZonePitchMatch: first.bestZonePitchMatch,
+      bestZonePitchType: first.bestZonePitchType,
+      bestZoneVelocityBucket: first.bestZoneVelocityBucket,
+      bestVerticalZone: first.bestVerticalZone,
+      bestHorizontalZone: first.bestHorizontalZone,
+      pitcherBestZoneUsagePct: first.pitcherBestZoneUsagePct,
+      batterPitchZoneHrPerPa: first.batterPitchZoneHrPerPa,
+      batterPitchZoneHrPerBbe: first.batterPitchZoneHrPerBbe,
+      batterPitchZoneXslg: first.batterPitchZoneXslg,
+      batterPitchZoneBarrelPct: first.batterPitchZoneBarrelPct,
+      batterPitchZoneHardHitPct: first.batterPitchZoneHardHitPct,
+      batterPitchZoneWhiffPct: first.batterPitchZoneWhiffPct,
+      pitcherPitchZoneUsagePct: first.pitcherPitchZoneUsagePct,
+      pitcherPitchZoneHrPerPaAllowed: first.pitcherPitchZoneHrPerPaAllowed,
+      pitcherPitchZoneXslgAllowed: first.pitcherPitchZoneXslgAllowed,
+      pitcherPitchZoneBarrelPctAllowed: first.pitcherPitchZoneBarrelPctAllowed,
+      pitcherPitchZoneHardHitPctAllowed: first.pitcherPitchZoneHardHitPctAllowed,
+      batterBestZoneXslg: first.batterBestZoneXslg,
+      pitcherBestZoneXslgAllowed: first.pitcherBestZoneXslgAllowed,
+      zonePitchClashReliability: first.zonePitchClashReliability,
+      zonePitchClashCaution: [...new Set(contextRows.map((row) => row.zonePitchClashCaution).filter(Boolean))].join('|'),
+      zonePitchClashAsofDate: first.zonePitchClashAsofDate,
+      zonePitchClashDataThroughDate: first.zonePitchClashDataThroughDate,
+      zonePitchClashLastEventDate: first.zonePitchClashLastEventDate,
+      zonePitchClashTargetIncluded: contextRows.some((row) => pitchMatchupTruth(row.zonePitchClashTargetIncluded)) ? 1 : 0,
+      zonePitchClashLeakageFlag: contextRows.some((row) => pitchMatchupTruth(row.zonePitchClashLeakageFlag)) ? 1 : 0,
+      batterPullAirPct: first.batterPullAirPct,
+      batterCenterAirPct: first.batterCenterAirPct,
+      batterOppoAirPct: first.batterOppoAirPct,
+      batterHrPullPct: first.batterHrPullPct,
+      batterBarrelPullPct: first.batterBarrelPullPct,
+      batterVsHandPullAirPct: first.batterVsHandPullAirPct,
+      batterVsHandHrPullPct: first.batterVsHandHrPullPct,
+      batterVsHandBarrelPullPct: first.batterVsHandBarrelPullPct,
+      combinedLocalHrRate: pitchMatchupRateCsv(pitchMatchupWeightedAverage(contextRows, 'combinedLocalHrRate'), 4),
+      combinedLocalHrRateReliability: pitchMatchupSummaryReliability(contextRows),
+      combinedLocalHrRateSource: [...new Set(contextRows.map((row) => row.combinedLocalHrRateSource).filter(Boolean))].join('|'),
+      hrLocalizedRateScore: avg('hrLocalizedRateScore', 1),
+      hrPitchScore: avg('hrPitchScore', 1),
+      hrBatterPowerScore: avg('hrBatterPowerScore', 1),
+      hrPitcherVulnerabilityScore: avg('hrPitcherVulnerabilityScore', 1),
+      handednessMatchupScore: avg('handednessMatchupScore', 1),
+      recentHeatScore: avg('recentHeatScore', 1),
+      recentHrScore: avg('recentHrScore', 1),
+      batterLast7Pa: first.batterLast7Pa,
+      batterLast7Hr: first.batterLast7Hr,
+      batterLast7Xbh: first.batterLast7Xbh,
+      batterLast7HrPerPa: first.batterLast7HrPerPa,
+      batterLast7Xslg: first.batterLast7Xslg,
+      batterLast7BarrelPct: first.batterLast7BarrelPct,
+      batterLast14Pa: first.batterLast14Pa,
+      batterLast14Hr: first.batterLast14Hr,
+      batterLast14Xbh: first.batterLast14Xbh,
+      batterLast14HrPerPa: first.batterLast14HrPerPa,
+      batterLast14Xslg: first.batterLast14Xslg,
+      batterLast14BarrelPct: first.batterLast14BarrelPct,
+      batterSeasonHrPerPa: first.batterSeasonHrPerPa,
+      batterSeasonIso: first.batterSeasonIso,
+      batterSeasonXslg: first.batterSeasonXslg,
+      batterSeasonBarrelPct: first.batterSeasonBarrelPct,
+      batterSeasonHardHitPct: first.batterSeasonHardHitPct,
+      batterSeasonAvgEv: first.batterSeasonAvgEv,
+      batterSeasonFbPct: first.batterSeasonFbPct,
+      batterSeasonHr: first.batterSeasonHr,
+      batterPriorSeasonPa: first.batterPriorSeasonPa,
+      batterPriorSeasonHrPerPa: first.batterPriorSeasonHrPerPa,
+      batterPriorSeasonIso: first.batterPriorSeasonIso,
+      batterPriorSeasonXslg: first.batterPriorSeasonXslg,
+      batterPriorSeasonBarrelPct: first.batterPriorSeasonBarrelPct,
+      batterPriorSeasonHardHitPct: first.batterPriorSeasonHardHitPct,
+      pitcherSeasonHrPerPaAllowed: first.pitcherSeasonHrPerPaAllowed,
+      pitcherSeasonHrAllowed: first.pitcherSeasonHrAllowed,
+      pitcherSeasonXslgAllowed: first.pitcherSeasonXslgAllowed,
+      pitcherSeasonBarrelPctAllowed: first.pitcherSeasonBarrelPctAllowed,
+      pitcherSeasonHardHitPctAllowed: first.pitcherSeasonHardHitPctAllowed,
+      pitcherSeasonAvgEvAllowed: first.pitcherSeasonAvgEvAllowed,
+      pitcherSeasonFbPctAllowed: first.pitcherSeasonFbPctAllowed,
+      pitcherPriorSeasonPa: first.pitcherPriorSeasonPa,
+      pitcherPriorSeasonHrPerPaAllowed: first.pitcherPriorSeasonHrPerPaAllowed,
+      pitcherPriorSeasonXslgAllowed: first.pitcherPriorSeasonXslgAllowed,
+      pitcherPriorSeasonBarrelPctAllowed: first.pitcherPriorSeasonBarrelPctAllowed,
+      pitcherPriorSeasonHardHitPctAllowed: first.pitcherPriorSeasonHardHitPctAllowed,
+      batterVsHandHrPerPa: first.batterVsHandHrPerPa,
+      batterVsHandXslg: first.batterVsHandXslg,
+      batterVsHandBarrelPct: first.batterVsHandBarrelPct,
+      pitcherVsSideHrPerPaAllowed: first.pitcherVsSideHrPerPaAllowed,
+      pitcherVsSideXslgAllowed: first.pitcherVsSideXslgAllowed,
+      pitcherVsSideBarrelPctAllowed: first.pitcherVsSideBarrelPctAllowed,
+      reliability: pitchMatchupSummaryReliability(contextRows),
+      reliabilityLabel: pitchMatchupSummaryReliability(contextRows),
+      fallbackUsed: [...new Set(contextRows.map((row) => row.contextFallback).filter(Boolean))].join('|'),
+      fallbackLevel: [...new Set(contextRows.map((row) => row.contextFallback).filter(Boolean))].join('|'),
+    };
+  }).sort((a, b) => (Number(b.finalHrDamageScore) || 0) - (Number(a.finalHrDamageScore) || 0));
+}
+
+function pitchMatchupPercentileMap(rows = [], key = '') {
+  const values = rows
+    .map((row) => ({ row, value: pitchMatchupCsvNumberValue(row[key]) }))
+    .filter((entry) => Number.isFinite(entry.value))
+    .sort((a, b) => a.value - b.value);
+  const map = new Map();
+  const denom = Math.max(1, values.length - 1);
+  values.forEach((entry, index) => {
+    map.set(entry.row, values.length === 1 ? 100 : (index / denom) * 100);
+  });
+  return map;
+}
+
+function pitchMatchupTruth(value) {
+  return value === true || value === 1 || value === '1' || String(value).toLowerCase() === 'true';
+}
+
+const PITCH_MATCHUP_NO_ZONE_FORBIDDEN_INPUT_RE = /(zone|heatmap|hot_zone|cold_zone|plate_x|plate_z|location_bucket|attack_zone|cell)/i;
+const PITCH_MATCHUP_NO_ZONE_SCORE_INPUTS = [
+  'hitterPowerBaseline',
+  'hitterRecentPower',
+  'pitchTypeDamageMatchup',
+  'pitcherHrVulnerability',
+  'pitcherArsenalExposure',
+  'parkWeatherHrContext',
+  'handednessHomeAwayContext',
+  'batterSeasonHrPerPa',
+  'batterSeasonIso',
+  'batterSeasonBarrelPct',
+  'batterSeasonXslg',
+  'batterSeasonHardHitPct',
+  'batterSeasonAvgEv',
+  'batterPullAirPct',
+  'batterHrPullPct',
+  'batterLast14HrPerPa',
+  'batterLast14BarrelPct',
+  'batterLast14Xslg',
+  'pitcherSeasonHrPerPaAllowed',
+  'pitcherSeasonXslgAllowed',
+  'pitcherSeasonBarrelPctAllowed',
+  'pitcherSeasonHardHitPctAllowed',
+  'pitcherSeasonAvgEvAllowed',
+  'pitcherSeasonFbPctAllowed',
+  'pitcherLocalUsagePct',
+  'pitcherVsSideHrPerPaAllowed',
+];
+
+function pitchMatchupValidateNoZoneScoreInputs(inputNames = PITCH_MATCHUP_NO_ZONE_SCORE_INPUTS) {
+  const blocked = listify(inputNames).filter((name) => PITCH_MATCHUP_NO_ZONE_FORBIDDEN_INPUT_RE.test(String(name || '')));
+  if (blocked.length) throw new Error(`Blocked HR v9 no-zone score inputs: ${blocked.join(', ')}`);
+  return true;
+}
+
+function pitchMatchupNoZoneComponentScore(value, low, high, fallback = 45) {
+  const numeric = pitchMatchupCsvNumberValue(value);
+  return pitchMatchupScore100(Number.isFinite(numeric) ? numeric : NaN, low, high, fallback);
+}
+
+function pitchMatchupAverageNumbers(values = []) {
+  const nums = values.map((value) => pitchMatchupCsvNumberValue(value)).filter((value) => Number.isFinite(value));
+  return nums.length ? nums.reduce((sum, value) => sum + value, 0) / nums.length : NaN;
+}
+
+function pitchMatchupNoZoneReliabilityWeights(currentSample = 0, priorSample = 0, currentFull = 250, priorFull = 350) {
+  const current = Math.max(0, Number(currentSample) || 0);
+  const prior = Math.max(0, Number(priorSample) || 0);
+  const hasPrior = prior > 0;
+  if (!hasPrior) {
+    const currentWeight = Math.min(0.80, Math.max(0.20, current / Math.max(1, currentFull)));
+    return { current: currentWeight, prior: 0, league: 1 - currentWeight };
+  }
+  if (current >= currentFull) return { current: 0.70, prior: 0.25, league: 0.05 };
+  if (current >= 100) return { current: 0.55, prior: 0.35, league: 0.10 };
+  if (current >= 40) return { current: 0.35, prior: 0.45, league: 0.20 };
+  return { current: 0.20, prior: 0.50, league: 0.30 };
+}
+
+function pitchMatchupNoZoneBlend(currentValue, priorValue, leagueValue, weights) {
+  const current = pitchMatchupCsvNumberValue(currentValue);
+  const prior = pitchMatchupCsvNumberValue(priorValue);
+  const league = Number(leagueValue);
+  let total = 0;
+  let value = 0;
+  const add = (input, weight) => {
+    if (!Number.isFinite(input) || weight <= 0) return;
+    value += input * weight;
+    total += weight;
+  };
+  add(current, weights.current);
+  add(prior, weights.prior);
+  add(league, weights.league);
+  return total ? value / total : league;
+}
+
+function pitchMatchupNoZoneTrapFlags(row = {}, components = {}, score = 0) {
+  const flags = [];
+  const hitterPower = Number(components.hitterPowerBaseline) || 0;
+  const pitchType = Number(components.pitchTypeDamageMatchup) || 0;
+  const currentPa = pitchMatchupCsvNumberValue(row.batterSeasonPa);
+  const priorPa = pitchMatchupCsvNumberValue(row.batterPriorSeasonPa ?? row.batter2025Pa);
+  const barrel = Number(components.batterSeasonBarrelPctScore) || 0;
+  const hardHit = Number(components.batterSeasonHardHitPctScore) || 0;
+  const airPull = pitchMatchupCsvNumberValue(row.batterPullAirPct);
+  const fbRate = pitchMatchupCsvNumberValue(row.batterSeasonFbPct);
+  if (hitterPower < 45 && pitchType >= 70) flags.push('TRAP_PITCH_ONLY');
+  if ((Number.isFinite(currentPa) ? currentPa : 0) < 40 && (Number.isFinite(priorPa) ? priorPa : 0) < 100) flags.push('TRAP_LOW_SAMPLE');
+  if (barrel < 35 && hardHit < 35) flags.push('BAD_CONTACT_PENALTY');
+  if (Number.isFinite(fbRate) && Number.isFinite(airPull) && fbRate < 0.28 && airPull < 0.22) flags.push('TRAP_GROUND_BALL');
+  if (!pitchMatchupTruth(row.confirmedStarter)) flags.push('NONSTARTER_EXCLUDED');
+  if (hitterPower < 35 && score > 48) flags.push('LOW_POWER_CAP');
+  return flags;
+}
+
+function pitchMatchupV10CandidateLabel(row = {}, components = {}, score = 0, trapFlags = []) {
+  const hitterPower = Number(components.hitterPowerBaseline) || 0;
+  const recentPower = Number(components.hitterRecentPower) || 0;
+  const pitchType = Number(components.pitchTypeDamageMatchup) || 0;
+  const pitcherVuln = Number(components.pitcherHrVulnerability) || 0;
+  if (trapFlags.includes('TRAP_PITCH_ONLY')) return 'TRAP_PITCH_ONLY';
+  if (trapFlags.includes('TRAP_LOW_SAMPLE')) return 'TRAP_LOW_SAMPLE';
+  if (trapFlags.includes('TRAP_GROUND_BALL')) return 'TRAP_GROUND_BALL';
+  if (hitterPower >= 75 && score >= 70) return 'A_CORE_POWER';
+  if (hitterPower >= 60 && pitchType >= 60 && score >= 68) return 'B_POWER_PLUS_MATCHUP';
+  if (hitterPower >= 55 && recentPower >= 70 && score >= 65) return 'C_HEAT_PLUS_POWER';
+  if (hitterPower >= 50 && pitcherVuln >= 75 && score >= 62) return 'D_PITCHER_TARGET';
+  return score >= 60 ? 'VIABLE_ALTERNATE' : 'NOT_CARD_CANDIDATE';
+}
+
+function pitchMatchupNoZoneScoreForRow(row = {}) {
+  pitchMatchupValidateNoZoneScoreInputs();
+  const pitchTypeDamage = pitchMatchupCsvNumberValue(row.pitchTypeDamageMatchupScoreNoZone);
+  const recentPower = pitchMatchupCsvNumberValue(row.recentPowerScore);
+  const parkWeather = pitchMatchupCsvNumberValue(row.parkWeatherHrScore ?? row.parkSwingHrFitScore);
+  const currentPa = pitchMatchupCsvNumberValue(row.batterSeasonPa);
+  const priorPa = pitchMatchupCsvNumberValue(row.batterPriorSeasonPa ?? row.batter2025Pa);
+  const currentBf = pitchMatchupCsvNumberValue(row.pitcherSeasonPa ?? row.pitcherSeasonBattersFaced);
+  const priorBf = pitchMatchupCsvNumberValue(row.pitcherPriorSeasonPa ?? row.pitcher2025BattersFaced);
+  const hitterWeights = pitchMatchupNoZoneReliabilityWeights(currentPa, priorPa, 250, 350);
+  const pitcherWeights = pitchMatchupNoZoneReliabilityWeights(currentBf, priorBf, 300, 450);
+  const hitterMetric = (currentKey, priorKey, league, low, high, fallback = 45) => pitchMatchupNoZoneComponentScore(
+    pitchMatchupNoZoneBlend(row[currentKey], row[priorKey], league, hitterWeights),
+    low,
+    high,
+    fallback,
+  );
+  const pitcherMetric = (currentKey, priorKey, league, low, high, fallback = 45) => pitchMatchupNoZoneComponentScore(
+    pitchMatchupNoZoneBlend(row[currentKey], row[priorKey], league, pitcherWeights),
+    low,
+    high,
+    fallback,
+  );
+  const components = {
+    normalizedHrPerPa: hitterMetric('batterSeasonHrPerPa', 'batterPriorSeasonHrPerPa', 0.030, 0.005, 0.075),
+    normalizedIso: hitterMetric('batterSeasonIso', 'batterPriorSeasonIso', 0.160, 0.070, 0.320),
+    normalizedBarrelPct: hitterMetric('batterSeasonBarrelPct', 'batterPriorSeasonBarrelPct', 0.080, 0.020, 0.180),
+    normalizedXslg: hitterMetric('batterSeasonXslg', 'batterPriorSeasonXslg', 0.400, 0.300, 0.700),
+    normalizedHardHitPct: hitterMetric('batterSeasonHardHitPct', 'batterPriorSeasonHardHitPct', 0.390, 0.250, 0.600),
+    normalizedAvgEv: hitterMetric('batterSeasonAvgEv', 'batterPriorSeasonAvgEv', 88.5, 84, 94),
+    normalizedAirPullPower: pitchMatchupAverageNumbers([
+      pitchMatchupNoZoneComponentScore(row.batterPullAirPct, 0.180, 0.420, 45),
+      pitchMatchupNoZoneComponentScore(row.batterHrPullPct, 0.250, 0.650, 45),
+    ]),
+    batterSeasonBarrelPctScore: pitchMatchupNoZoneComponentScore(row.batterSeasonBarrelPct, 0.020, 0.180),
+    batterSeasonHardHitPctScore: pitchMatchupNoZoneComponentScore(row.batterSeasonHardHitPct, 0.250, 0.600),
+    pitcherHrPerPaAllowedScore: pitcherMetric('pitcherSeasonHrPerPaAllowed', 'pitcherPriorSeasonHrPerPaAllowed', 0.030, 0.005, 0.070),
+    pitcherBarrelAllowedScore: pitcherMetric('pitcherSeasonBarrelPctAllowed', 'pitcherPriorSeasonBarrelPctAllowed', 0.080, 0.020, 0.180),
+    pitcherXslgAllowedScore: pitcherMetric('pitcherSeasonXslgAllowed', 'pitcherPriorSeasonXslgAllowed', 0.410, 0.330, 0.650),
+    pitcherHardHitAllowedScore: pitcherMetric('pitcherSeasonHardHitPctAllowed', 'pitcherPriorSeasonHardHitPctAllowed', 0.390, 0.250, 0.600),
+    pitcherAirDamageAllowedScore: pitcherMetric('pitcherSeasonFbPctAllowed', 'pitcherPriorSeasonFbPctAllowed', 0.360, 0.240, 0.520),
+    pitcherRecentHrAllowedScore: pitchMatchupNoZoneComponentScore(row.pitcherRecentHrPerPaAllowed, 0.005, 0.070, 45),
+    pitchTypeDamageMatchup: Number.isFinite(pitchTypeDamage) ? pitchTypeDamage : pitchMatchupNoZoneComponentScore(row.hrPitchScore, 0, 100, 45),
+    pitcherArsenalExposure: pitchMatchupNoZoneComponentScore(row.pitcherLocalUsagePct, 0.050, 0.350, 45),
+    parkWeatherHrContext: Number.isFinite(parkWeather) ? parkWeather : 50,
+    handednessHomeAwayContext: pitchMatchupNoZoneComponentScore(row.handednessMatchupScore ?? row.hrHandednessScore, 0, 100, 50),
+  };
+  components.hitterPowerBaseline = (
+    (components.normalizedHrPerPa * 0.24)
+    + (components.normalizedIso * 0.20)
+    + (components.normalizedBarrelPct * 0.18)
+    + (components.normalizedXslg * 0.14)
+    + (components.normalizedHardHitPct * 0.10)
+    + (components.normalizedAvgEv * 0.08)
+    + (components.normalizedAirPullPower * 0.06)
+  );
+  const rawRecentPower = Number.isFinite(recentPower)
+    ? recentPower
+    : (
+      (pitchMatchupNoZoneComponentScore(row.batterLast14HrPerPa, 0.000, 0.100, 45) * 0.35)
+      + (pitchMatchupNoZoneComponentScore(row.batterLast14BarrelPct, 0.000, 0.220, 45) * 0.25)
+      + (pitchMatchupNoZoneComponentScore(row.batterSeasonHardHitPct, 0.250, 0.600, 45) * 0.15)
+      + (pitchMatchupNoZoneComponentScore(row.batterLast14Xslg, 0.250, 0.850, 45) * 0.15)
+      + (components.normalizedAirPullPower * 0.10)
+    );
+  components.hitterRecentPower = Math.min(rawRecentPower, components.hitterPowerBaseline + 18);
+  components.pitcherHrVulnerability = (
+    (components.pitcherHrPerPaAllowedScore * 0.30)
+    + (components.pitcherBarrelAllowedScore * 0.22)
+    + (components.pitcherXslgAllowedScore * 0.18)
+    + (components.pitcherHardHitAllowedScore * 0.12)
+    + (components.pitcherAirDamageAllowedScore * 0.10)
+    + (components.pitcherRecentHrAllowedScore * 0.08)
+  );
+  let score = (
+    (components.hitterPowerBaseline * 0.42)
+    + (components.hitterRecentPower * 0.18)
+    + (components.pitchTypeDamageMatchup * 0.16)
+    + (components.pitcherHrVulnerability * 0.10)
+    + (components.pitcherArsenalExposure * 0.06)
+    + (components.parkWeatherHrContext * 0.05)
+    + (components.handednessHomeAwayContext * 0.03)
+  );
+  if (components.hitterPowerBaseline < 35) score = Math.min(score, 48);
+  if ((Number.isFinite(currentPa) ? currentPa : 0) < 40 && (Number.isFinite(priorPa) ? priorPa : 0) < 100) score = Math.min(score, 55);
+  if (components.hitterPowerBaseline < 45 && components.pitchTypeDamageMatchup > 75) score = Math.min(score, 58);
+  if (components.batterSeasonBarrelPctScore < 35 && components.batterSeasonHardHitPctScore < 35) score -= 8;
+  const fbRate = pitchMatchupCsvNumberValue(row.batterSeasonFbPct);
+  const airPull = pitchMatchupCsvNumberValue(row.batterPullAirPct);
+  if (Number.isFinite(fbRate) && Number.isFinite(airPull) && fbRate < 0.28 && airPull < 0.22) score -= 7;
+  score = clamp(score, 0, 100);
+  if (score >= 85 && components.hitterPowerBaseline < 70) score = 84;
+  if (score >= 75 && components.hitterPowerBaseline < 60) score = 74;
+  if (score >= 68 && components.hitterPowerBaseline < 50 && !(components.hitterRecentPower >= 85 && components.hitterPowerBaseline >= 60)) score = 67;
+  const trapFlags = pitchMatchupNoZoneTrapFlags(row, components, score);
+  return {
+    score,
+    components,
+    trapFlags,
+    candidateLabel: pitchMatchupV10CandidateLabel(row, components, score, trapFlags),
+    inputNames: PITCH_MATCHUP_NO_ZONE_SCORE_INPUTS.join('|'),
+  };
+}
+
+function pitchMatchupZoneFieldsPresent(row = {}) {
+  return [
+    'zonePitchClashScore',
+    'zonePitchClashScoreRaw',
+    'zonePitchClashScoreReliabilityAdjusted',
+    'bestZonePitchMatch',
+    'batterPitchZoneHrPerBbe',
+    'pitcherPitchZoneXslgAllowed',
+  ].some((key) => {
+    const value = row?.[key];
+    return value !== undefined && value !== null && value !== '';
+  }) ? 1 : 0;
+}
+
+function pitchMatchupApplyNoZoneAuditFields(rows = []) {
+  pitchMatchupValidateNoZoneScoreInputs();
+  for (const row of listify(rows)) {
+    row.zoneRemovedFromScore = true;
+    row.zoneFieldsPresent = pitchMatchupZoneFieldsPresent(row);
+    row.zoneFieldsUsedInScore = false;
+    row.noZoneScoreInputNames = PITCH_MATCHUP_NO_ZONE_SCORE_INPUTS.join('|');
+    if (!row.pitchTypeDamageMatchupScoreNoZone) row.pitchTypeDamageMatchupScoreNoZone = row.hrPitchScore || '';
+    if (!row.parkWeatherHrScore) row.parkWeatherHrScore = row.parkSwingHrFitScore || row.personalizedHomeAwayScore || '';
+    const noZone = pitchMatchupNoZoneScoreForRow(row);
+    const oldScore = pitchMatchupCsvNumberValue(row.oldHrScoreWithZone)
+      || pitchMatchupCsvNumberValue(row.hrScoreV820)
+      || pitchMatchupCsvNumberValue(row.hrPickScoreV4c)
+      || pitchMatchupCsvNumberValue(row.hrPickScoreV4)
+      || pitchMatchupCsvNumberValue(row.finalHrDamageScore);
+    row.oldHrScoreWithZone = Number.isFinite(oldScore) ? pitchMatchupNumberCsv(oldScore, 1) : '';
+    row.hrScoreV9NoZone = pitchMatchupNumberCsv(noZone.score, 1);
+    row.hrScoreV9NoZonePercentile = pitchMatchupNumberCsv(noZone.score, 1);
+    row.hrScoreV10NoZone = pitchMatchupNumberCsv(noZone.score, 1);
+    row.hitterPowerBaseline = pitchMatchupNumberCsv(noZone.components.hitterPowerBaseline, 1);
+    row.hitterRecentPower = pitchMatchupNumberCsv(noZone.components.hitterRecentPower, 1);
+    row.pitchTypeDamageMatchup = pitchMatchupNumberCsv(noZone.components.pitchTypeDamageMatchup, 1);
+    row.pitcherHrVulnerability = pitchMatchupNumberCsv(noZone.components.pitcherHrVulnerability, 1);
+    row.pitcherArsenalExposure = pitchMatchupNumberCsv(noZone.components.pitcherArsenalExposure, 1);
+    row.parkWeatherHrContext = pitchMatchupNumberCsv(noZone.components.parkWeatherHrContext, 1);
+    row.handednessHomeAwayContext = pitchMatchupNumberCsv(noZone.components.handednessHomeAwayContext, 1);
+    row.candidateLabelV10 = noZone.candidateLabel;
+    row.trapFlagsV10 = noZone.trapFlags.join('|');
+    row.zoneScoreRemovedAmount = Number.isFinite(oldScore) ? pitchMatchupNumberCsv(oldScore - noZone.score, 1) : '';
+  }
+  return rows;
+}
+
+function pitchMatchupApplyV7SummaryScores(rows = []) {
+  const byDate = new Map();
+  for (const row of rows) {
+    const date = row.date || '';
+    if (!byDate.has(date)) byDate.set(date, []);
+    byDate.get(date).push(row);
+  }
+  for (const slateRows of byDate.values()) {
+    const eligibleRows = slateRows.filter((row) => pitchMatchupTruth(row.eligibleForPregameCard));
+    const heatPct = pitchMatchupPercentileMap(eligibleRows, 'recentHeatScore');
+    const zonePct = pitchMatchupPercentileMap(eligibleRows, 'zonePitchClashScore');
+    const zoneHrPct = pitchMatchupPercentileMap(eligibleRows, 'batterPitchZoneHrPerBbe');
+    const pitcherVulnPct = pitchMatchupPercentileMap(eligibleRows, 'hrPitcherVulnerabilityScore');
+    const sideAllowedPct = pitchMatchupPercentileMap(eligibleRows, 'pitcherVsSideHrPerPaAllowed');
+    const pitchScorePct = pitchMatchupPercentileMap(eligibleRows, 'hrPitchScore');
+    const last7HrPct = pitchMatchupPercentileMap(eligibleRows, 'batterLast7Hr');
+    const last14HrPct = pitchMatchupPercentileMap(eligibleRows, 'batterLast14Hr');
+    const last7HrPerPaPct = pitchMatchupPercentileMap(eligibleRows, 'batterLast7HrPerPa');
+    const last14HrPerPaPct = pitchMatchupPercentileMap(eligibleRows, 'batterLast14HrPerPa');
+    const last7XbhPct = pitchMatchupPercentileMap(eligibleRows, 'batterLast7Xbh');
+    for (const row of slateRows) {
+      const eligible = pitchMatchupTruth(row.eligibleForPregameCard);
+      if (!eligible) {
+        row.hrScoreV7 = '';
+        row.hrScoreV7Percentile = '';
+        row.hrEruptionScore = '';
+        row.hrEruptionScorePercentile = '';
+        row.hrScoreV820 = '';
+        row.hrScoreV820Percentile = '';
+        row.oldHrScoreWithZone = '';
+        row.hrScoreV10NoZone = '';
+        row.hitterPowerBaseline = '';
+        row.hitterRecentPower = '';
+        row.pitchTypeDamageMatchup = '';
+        row.pitcherHrVulnerability = '';
+        row.pitcherArsenalExposure = '';
+        row.parkWeatherHrContext = '';
+        row.handednessHomeAwayContext = '';
+        row.candidateLabelV10 = 'NONSTARTER_EXCLUDED';
+        row.trapFlagsV10 = 'NONSTARTER_EXCLUDED';
+        row.hrScoreV9NoZone = '';
+        row.hrScoreV9NoZonePercentile = '';
+        row.zoneScoreRemovedAmount = '';
+        row.zoneRemovedFromScore = true;
+        row.zoneFieldsPresent = pitchMatchupZoneFieldsPresent(row);
+        row.zoneFieldsUsedInScore = false;
+        row.noZoneScoreInputNames = PITCH_MATCHUP_NO_ZONE_SCORE_INPUTS.join('|');
+        row.weakPitcherCombo = '';
+        row.weakPitcherComboPercentile = '';
+        row.nonstarterExclusionReason = row.nonstarterExclusionReason || 'actual_context_or_nonstarter';
+        row.candidateLabel = 'Ineligible for pregame card';
+        row.candidatePriorityTier = '';
+        continue;
+      }
+      const weakPitcherCombo = (
+        ((pitcherVulnPct.get(row) ?? 0) * 0.50)
+        + ((sideAllowedPct.get(row) ?? 0) * 0.30)
+        + ((pitchScorePct.get(row) ?? 0) * 0.20)
+      );
+      row.weakPitcherCombo = pitchMatchupNumberCsv(weakPitcherCombo, 1);
+      const hrEruptionScore = (
+        ((last7HrPct.get(row) ?? 0) * 0.40)
+        + ((last14HrPct.get(row) ?? 0) * 0.25)
+        + ((last7HrPerPaPct.get(row) ?? 0) * 0.15)
+        + ((last14HrPerPaPct.get(row) ?? 0) * 0.10)
+        + ((last7XbhPct.get(row) ?? 0) * 0.10)
+      );
+      row.hrEruptionScore = pitchMatchupNumberCsv(hrEruptionScore, 1);
+    }
+    const weakPct = pitchMatchupPercentileMap(eligibleRows, 'weakPitcherCombo');
+    const eruptionPct = pitchMatchupPercentileMap(eligibleRows, 'hrEruptionScore');
+    for (const row of eligibleRows) {
+      const oldZoneScoreV820 = (
+        ((heatPct.get(row) ?? 0) * 0.25)
+        + ((zonePct.get(row) ?? 0) * 0.30)
+        + ((zoneHrPct.get(row) ?? 0) * 0.20)
+        + ((eruptionPct.get(row) ?? 0) * 0.20)
+        + ((weakPct.get(row) ?? 0) * 0.05)
+      );
+      row.hrEruptionScorePercentile = pitchMatchupNumberCsv(eruptionPct.get(row) ?? 0, 1);
+      const noZone = pitchMatchupNoZoneScoreForRow(row);
+      row.hrScoreV7 = pitchMatchupNumberCsv(noZone.score, 1);
+      row.hrScoreV7Percentile = pitchMatchupNumberCsv(noZone.score, 1);
+      row.hrScoreV820 = pitchMatchupNumberCsv(noZone.score, 1);
+      row.hrScoreV820Percentile = pitchMatchupNumberCsv(noZone.score, 1);
+      row.oldHrScoreWithZone = pitchMatchupNumberCsv(oldZoneScoreV820, 1);
+      row.hrScoreV9NoZone = pitchMatchupNumberCsv(noZone.score, 1);
+      row.hrScoreV9NoZonePercentile = pitchMatchupNumberCsv(noZone.score, 1);
+      row.hrScoreV10NoZone = pitchMatchupNumberCsv(noZone.score, 1);
+      row.hitterPowerBaseline = pitchMatchupNumberCsv(noZone.components.hitterPowerBaseline, 1);
+      row.hitterRecentPower = pitchMatchupNumberCsv(noZone.components.hitterRecentPower, 1);
+      row.pitchTypeDamageMatchup = pitchMatchupNumberCsv(noZone.components.pitchTypeDamageMatchup, 1);
+      row.pitcherHrVulnerability = pitchMatchupNumberCsv(noZone.components.pitcherHrVulnerability, 1);
+      row.pitcherArsenalExposure = pitchMatchupNumberCsv(noZone.components.pitcherArsenalExposure, 1);
+      row.parkWeatherHrContext = pitchMatchupNumberCsv(noZone.components.parkWeatherHrContext, 1);
+      row.handednessHomeAwayContext = pitchMatchupNumberCsv(noZone.components.handednessHomeAwayContext, 1);
+      row.candidateLabelV10 = noZone.candidateLabel;
+      row.trapFlagsV10 = noZone.trapFlags.join('|');
+      row.zoneScoreRemovedAmount = pitchMatchupNumberCsv(oldZoneScoreV820 - noZone.score, 1);
+      row.zoneRemovedFromScore = true;
+      row.zoneFieldsPresent = pitchMatchupZoneFieldsPresent(row);
+      row.zoneFieldsUsedInScore = false;
+      row.noZoneScoreInputNames = noZone.inputNames;
+      row.weakPitcherComboPercentile = pitchMatchupNumberCsv(weakPct.get(row) ?? 0, 1);
+      const zone = pitchMatchupCsvNumberValue(row.zonePitchClashScore) || 0;
+      const heat = pitchMatchupCsvNumberValue(row.recentHeatScore) || 0;
+      const pcmi = pitchMatchupCsvNumberValue(row.pcmi) || 0;
+      const finalDamage = pitchMatchupCsvNumberValue(row.finalHrDamageScore) || 0;
+      const zoneHr = pitchMatchupCsvNumberValue(row.batterPitchZoneHrPerBbe) || 0;
+      const seasonHr = pitchMatchupCsvNumberValue(row.batterSeasonHrPerPa) || 0;
+      const weak = pitchMatchupCsvNumberValue(row.weakPitcherCombo) || 0;
+      const last7Hr = pitchMatchupCsvNumberValue(row.batterLast7Hr) || 0;
+      const last14Hr = pitchMatchupCsvNumberValue(row.batterLast14Hr) || 0;
+      const last7Pa = pitchMatchupCsvNumberValue(row.batterLast7Pa) || 0;
+      const last14Pa = pitchMatchupCsvNumberValue(row.batterLast14Pa) || 0;
+      const eruption = pitchMatchupCsvNumberValue(row.hrEruptionScore) || 0;
+      const reliability = String(row.reliability || '').toLowerCase();
+      const fallback = String(row.fallbackUsed || '');
+      const zoneConfirmed = zone >= 1 && heat >= 20 && (pcmi >= 30 || finalDamage >= 35);
+      const hotPlayable = zone === 0 && heat >= 23 && weak >= 65 && pcmi >= 30 && finalDamage >= 33;
+      const strongHotPlayable = zone === 0 && heat >= 25 && weak >= 65 && pcmi >= 32 && finalDamage >= 35;
+      const splitPowerNonZone = zone === 0 && seasonHr >= 0.040 && (pcmi >= 32 || finalDamage >= 35);
+      const activeEruption = last7Hr >= 3 || last14Hr >= 5;
+      const extremeEruption = last7Hr >= 5 || last14Hr >= 8;
+      const lowRecentPa = (last7Pa > 0 && last7Pa < 12) || (last14Pa > 0 && last14Pa < 22);
+      const hrProfileOverride = (seasonHr >= 0.045 || pitchMatchupCsvNumberValue(row.batterSeasonHr) >= 8)
+        && pcmi >= 32 && finalDamage >= 35 && heat >= 18 && (zone === 0 || zoneHr <= 0);
+      const fallbackTrap = reliability === 'very low'
+        && /league/i.test(fallback)
+        && (seasonHr < 0.030)
+        && (zone === 0 || zoneHr <= 0);
+      const noZoneScore = pitchMatchupCsvNumberValue(row.hrScoreV9NoZone) || 0;
+      row.zoneConfirmedFlag = zoneConfirmed ? 1 : 0;
+      row.zoneConfirmedReason = zoneConfirmed ? 'Confirmed pitch/location damage lane with recent heat and matchup support.' : '';
+      row.hotPlayableFlag = hotPlayable ? 1 : 0;
+      row.hotPlayableNonZoneCandidate = hotPlayable ? 1 : 0;
+      row.hotPlayableReason = hotPlayable ? 'Hot playable non-zone candidate: heat and weak-pitcher support, but no confirmed zone HR lane.' : '';
+      row.splitPowerNonZoneCandidate = splitPowerNonZone ? 1 : 0;
+      row.activeHrEruptionFlag = activeEruption ? 1 : 0;
+      row.extremeHrEruptionFlag = extremeEruption ? 1 : 0;
+      row.hrEruptionReason = extremeEruption
+        ? `Extreme HR eruption: ${last7Hr} HR in last 7-game window and ${last14Hr} HR in last 14-game window.`
+        : activeEruption
+          ? `Active HR eruption: ${last7Hr} HR in last 7-game window and ${last14Hr} HR in last 14-game window.`
+          : lowRecentPa
+            ? 'Recent HR activity present, but low PA sample.'
+            : '';
+      row.hrProfileOverrideCandidate = hrProfileOverride ? 1 : 0;
+      row.fallbackTrapFlag = fallbackTrap ? 1 : 0;
+      row.fallbackTrapReason = fallbackTrap ? 'Fallback-driven very low reliability with no confirmed zone lane. Downgrade for betting-card use.' : '';
+      row.v7PrimaryReason = zoneConfirmed
+        ? 'Strong v7 profile: active recent heat plus a confirmed pitch/location damage lane.'
+        : hotPlayable
+          ? 'Hot playable support without a confirmed zone lane.'
+          : 'Slate-relative v7 blend of heat, zone clash, zone HR conversion, and pitcher weakness.';
+      row.v7CautionReason = fallbackTrap
+        ? row.fallbackTrapReason
+        : zone === 0
+          ? 'No confirmed zone clash; treat as secondary unless HR profile overrides.'
+          : String(row.zonePitchClashCaution || '');
+      const v820SupportCount = [
+        zone >= 1,
+        activeEruption,
+        eruption >= 85,
+        pcmi >= 35,
+        finalDamage >= 40,
+      ].filter(Boolean).length;
+      const eliteV820 = noZoneScore >= 85 && v820SupportCount >= 2;
+      const strongV820 = noZoneScore >= 75 && (activeEruption || pcmi >= 35 || finalDamage >= 38);
+      row.hrScoreV820PrimaryReason = eliteV820
+        ? 'Elite no-zone profile: stable power plus multiple eruption/matchup supports.'
+        : strongV820
+          ? 'Strong no-zone profile: primary score supported by eruption, PCMI, or old HR damage.'
+          : activeEruption
+            ? 'HR eruption support present; inspect pitcher context before promoting.'
+            : 'No-zone blend of stable power, recent power, pitch type, pitcher vulnerability, environment, and handedness.';
+      row.hrScoreV820CautionReason = fallbackTrap
+        ? row.fallbackTrapReason
+        : lowRecentPa
+          ? 'Low recent PA sample for eruption score.'
+          : extremeEruption && zone === 0 && pcmi < 35
+            ? 'Extreme eruption but no confirmed zone lane and limited PCMI support; secondary candidate.'
+            : String(row.zonePitchClashCaution || '');
+      row.hrScoreV9NoZonePrimaryReason = noZoneScore >= 85
+        ? 'Elite v10 no-zone profile: stable power baseline with recent power, pitch-type damage, pitcher vulnerability, arsenal exposure, environment, and handedness support.'
+        : noZoneScore >= 75
+          ? 'Strong v10 no-zone profile with power-first support.'
+          : noZoneScore >= 68
+            ? 'Playable v10 no-zone profile; confirm price and lineup context.'
+            : noZoneScore >= 60
+              ? 'Viable alternate on v10 no-zone inputs.'
+              : 'Below v10 HR-card range.';
+      row.hrScoreV9NoZoneCautionReason = fallbackTrap
+        ? row.fallbackTrapReason
+        : 'Zone-location fields are exported only as audit/debug context and are not included in HR v10.';
+      row.candidateLabel = row.candidateLabelV10;
+      row.candidatePriorityTier = ['A_CORE_POWER', 'B_POWER_PLUS_MATCHUP', 'C_HEAT_PLUS_POWER', 'D_PITCHER_TARGET'].includes(row.candidateLabelV10)
+        ? noZoneScore >= 85 ? 1 : noZoneScore >= 75 ? 2 : noZoneScore >= 68 ? 3 : 4
+        : 6;
+    }
+    eligibleRows
+      .slice()
+      .sort((a, b) => (pitchMatchupCsvNumberValue(b.hrScoreV7) || 0) - (pitchMatchupCsvNumberValue(a.hrScoreV7) || 0))
+      .forEach((row, index) => {
+        row.hrScoreV7Rank = index + 1;
+      });
+    eligibleRows
+      .slice()
+      .sort((a, b) => (pitchMatchupCsvNumberValue(b.hrScoreV820) || 0) - (pitchMatchupCsvNumberValue(a.hrScoreV820) || 0))
+      .forEach((row, index) => {
+        row.hrScoreV820Rank = index + 1;
+      });
+    eligibleRows
+      .slice()
+      .sort((a, b) => (pitchMatchupCsvNumberValue(b.hrScoreV10NoZone) || 0) - (pitchMatchupCsvNumberValue(a.hrScoreV10NoZone) || 0))
+      .forEach((row, index) => {
+        row.hrScoreV9NoZoneRank = index + 1;
+        row.hrScoreV10NoZoneRank = index + 1;
+      });
+  }
+  return rows.sort((a, b) => (pitchMatchupCsvNumberValue(b.hrScoreV10NoZone) || 0) - (pitchMatchupCsvNumberValue(a.hrScoreV10NoZone) || 0));
+}
+
+function pitchMatchupAverageTop(values = [], count = 3) {
+  const sorted = values.filter((value) => Number.isFinite(value)).sort((a, b) => b - a).slice(0, count);
+  return sorted.length ? sorted.reduce((sum, value) => sum + value, 0) / sorted.length : NaN;
+}
+
+function pitchMatchupMedian(values = []) {
+  const sorted = values.filter((value) => Number.isFinite(value)).sort((a, b) => a - b);
+  if (!sorted.length) return NaN;
+  const mid = Math.floor(sorted.length / 2);
+  return sorted.length % 2 ? sorted[mid] : (sorted[mid - 1] + sorted[mid]) / 2;
+}
+
+function pitchMatchupTeamPressureRows(summaryRows = []) {
+  const groups = new Map();
+  for (const row of summaryRows) {
+    const key = [row.date, row.gamePk, row.battingSide || row.team].join('|');
+    if (!groups.has(key)) groups.set(key, []);
+    groups.get(key).push(row);
+  }
+  return [...groups.values()].map((rows) => {
+    const first = rows[0] || {};
+    const eligibleRows = rows.filter((row) => pitchMatchupTruth(row.eligibleForPregameCard));
+    const scoringRows = eligibleRows.length ? eligibleRows : rows;
+    const nums = (key) => scoringRows.map((row) => pitchMatchupCsvNumberValue(row[key])).filter((value) => Number.isFinite(value));
+    const avg = (values = []) => values.length ? values.reduce((sum, value) => sum + value, 0) / values.length : NaN;
+    const v10 = nums('hrScoreV10NoZone').length ? nums('hrScoreV10NoZone') : nums('hrScoreV9NoZone');
+    const power = nums('hitterPowerBaseline');
+    const pitchType = nums('pitchTypeDamageMatchup');
+    const pitcherVuln = nums('pitcherHrVulnerability');
+    const parkWeather = nums('parkWeatherHrContext');
+    const teamHrPressure = (
+      (pitchMatchupAverageTop(v10, 3) * 0.35)
+      + (pitchMatchupAverageTop(v10, 5) * 0.20)
+      + (v10.filter((v) => v >= 70).length * 5 * 0.15)
+      + (v10.filter((v) => v >= 60).length * 5 * 0.10)
+      + (avg(power) * 0.10)
+      + (pitchMatchupAverageTop(pitcherVuln, 3) * 0.05)
+      + (avg(parkWeather) * 0.05)
+    );
+    return {
+      date: first.date,
+      gamePk: first.gamePk,
+      game: first.game,
+      battingSide: first.battingSide,
+      team: first.team,
+      opponent: first.opponent,
+      venue: first.venue || '',
+      lineupLocked: first.lineupLocked,
+      opposingProbablePitcher: first.pitcherName || '',
+      opposingProbablePitcherId: first.pitcherId || '',
+      starterCount: eligibleRows.length,
+      top1V10NoZone: pitchMatchupNumberCsv(pitchMatchupAverageTop(v10, 1), 1),
+      top3V10NoZoneAvg: pitchMatchupNumberCsv(pitchMatchupAverageTop(v10, 3), 1),
+      top5V10NoZoneAvg: pitchMatchupNumberCsv(pitchMatchupAverageTop(v10, 5), 1),
+      top9V10NoZoneAvg: pitchMatchupNumberCsv(pitchMatchupAverageTop(v10, 9), 1),
+      count80PlusV10: v10.filter((v) => v >= 80).length,
+      count70PlusV10: v10.filter((v) => v >= 70).length,
+      count60PlusV10: v10.filter((v) => v >= 60).length,
+      avgHitterPowerBaseline: pitchMatchupNumberCsv(avg(power), 1),
+      avgPitchTypeDamageMatchup: pitchMatchupNumberCsv(avg(pitchType), 1),
+      avgPitcherHrVulnerability: pitchMatchupNumberCsv(avg(pitcherVuln), 1),
+      teamHrPressureV10: pitchMatchupNumberCsv(teamHrPressure, 1),
+      countTrapPitchOnly: rows.filter((row) => String(row.trapFlagsV10 || '').includes('TRAP_PITCH_ONLY')).length,
+      countTrapLowSample: rows.filter((row) => String(row.trapFlagsV10 || '').includes('TRAP_LOW_SAMPLE')).length,
+      countTrapGroundBall: rows.filter((row) => String(row.trapFlagsV10 || '').includes('TRAP_GROUND_BALL')).length,
+      walkPressure: '',
+      kAvoidanceScore: '',
+      contactQualityScore: '',
+      starterWeaknessFaced: pitchMatchupNumberCsv(pitchMatchupAverageTop(pitcherVuln, 5), 1),
+      bullpenWeaknessFaced: '',
+      parkRunFactor: '',
+      parkHrFactor: '',
+      weatherRunFactor: '',
+      windRunFactor: '',
+      homeAwayTeamPressure: pitchMatchupNumberCsv(teamHrPressure, 1),
+      teamOffensivePressure: pitchMatchupNumberCsv(teamHrPressure, 1),
+    };
+  });
+}
+
+function pitchMatchupTeamPressureColumns() {
+  return [
+    ['date', 'date'], ['gamePk', 'game_pk'], ['game', 'game'], ['venue', 'venue'], ['battingSide', 'batting_side'], ['team', 'team'], ['opponent', 'opponent'], ['lineupLocked', 'lineup_locked'], ['opposingProbablePitcher', 'opposing_probable_pitcher'], ['opposingProbablePitcherId', 'opposing_probable_pitcher_id'], ['starterCount', 'starter_count'],
+    ['top1V10NoZone', 'top1_v10_no_zone'], ['top3V10NoZoneAvg', 'top3_v10_no_zone_avg'], ['top5V10NoZoneAvg', 'top5_v10_no_zone_avg'], ['top9V10NoZoneAvg', 'top9_v10_no_zone_avg'],
+    ['count80PlusV10', 'count_80plus_v10'], ['count70PlusV10', 'count_70plus_v10'], ['count60PlusV10', 'count_60plus_v10'],
+    ['avgHitterPowerBaseline', 'avg_hitter_power_baseline'], ['avgPitchTypeDamageMatchup', 'avg_pitch_type_damage_matchup'], ['avgPitcherHrVulnerability', 'avg_pitcher_hr_vulnerability'], ['teamHrPressureV10', 'team_hr_pressure_v10'],
+    ['countTrapPitchOnly', 'count_trap_pitch_only'], ['countTrapLowSample', 'count_trap_low_sample'], ['countTrapGroundBall', 'count_trap_ground_ball'],
+    ['walkPressure', 'walk_pressure'], ['kAvoidanceScore', 'k_avoidance_score'], ['contactQualityScore', 'contact_quality_score'],
+    ['starterWeaknessFaced', 'starter_weakness_faced'], ['bullpenWeaknessFaced', 'bullpen_weakness_faced'], ['parkRunFactor', 'park_run_factor'], ['parkHrFactor', 'park_hr_factor'], ['weatherRunFactor', 'weather_run_factor'], ['windRunFactor', 'wind_run_factor'],
+    ['homeAwayTeamPressure', 'home_away_team_pressure'], ['teamOffensivePressure', 'team_offensive_pressure'],
+  ].map(([key, header]) => ({ key, header }));
+}
+
+function pitchMatchupGamePredictionRows(teamRows = []) {
+  const groups = new Map();
+  for (const row of teamRows) {
+    const key = [row.date, row.gamePk].join('|');
+    if (!groups.has(key)) groups.set(key, []);
+    groups.get(key).push(row);
+  }
+  return [...groups.values()].map((rows) => {
+    const first = rows[0] || {};
+    const away = rows.find((row) => row.battingSide === 'away') || rows[0] || {};
+    const home = rows.find((row) => row.battingSide === 'home') || rows[1] || {};
+    const diff = (key) => pitchMatchupNumberCsv((pitchMatchupCsvNumberValue(home[key]) || 0) - (pitchMatchupCsvNumberValue(away[key]) || 0), 1);
+    const homePressure = pitchMatchupCsvNumberValue(home.teamOffensivePressure) || 0;
+    const awayPressure = pitchMatchupCsvNumberValue(away.teamOffensivePressure) || 0;
+    const homeWinScore = homePressure - awayPressure;
+    const totalRunsScore = Math.max(0, homePressure + awayPressure);
+    return {
+      date: first.date,
+      gamePk: first.gamePk,
+      awayTeam: away.team || '',
+      homeTeam: home.team || '',
+      venue: first.venue || away.venue || home.venue || '',
+      awayProbablePitcher: home.opposingProbablePitcher || '',
+      homeProbablePitcher: away.opposingProbablePitcher || '',
+      awayProbablePitcherId: home.opposingProbablePitcherId || '',
+      homeProbablePitcherId: away.opposingProbablePitcherId || '',
+      lineupLocked: pitchMatchupTruth(away.lineupLocked) && pitchMatchupTruth(home.lineupLocked) ? 1 : 0,
+      weatherAvailable: 0,
+      parkFactorAvailable: 0,
+      awayTeamOffensivePressure: away.teamOffensivePressure || '',
+      homeTeamOffensivePressure: home.teamOffensivePressure || '',
+      top1V10NoZoneDiff: diff('top1V10NoZone'),
+      top3V10NoZoneDiff: diff('top3V10NoZoneAvg'),
+      top5V10NoZoneDiff: diff('top5V10NoZoneAvg'),
+      top9V10NoZoneDiff: diff('top9V10NoZoneAvg'),
+      count80PlusV10Diff: diff('count80PlusV10'),
+      count70PlusV10Diff: diff('count70PlusV10'),
+      count60PlusV10Diff: diff('count60PlusV10'),
+      avgHitterPowerBaselineDiff: diff('avgHitterPowerBaseline'),
+      avgPitchTypeDamageMatchupDiff: diff('avgPitchTypeDamageMatchup'),
+      avgPitcherHrVulnerabilityDiff: diff('avgPitcherHrVulnerability'),
+      teamHrPressureV10Diff: diff('teamHrPressureV10'),
+      trapPitchOnlyDiff: diff('countTrapPitchOnly'),
+      trapLowSampleDiff: diff('countTrapLowSample'),
+      trapGroundBallDiff: diff('countTrapGroundBall'),
+      walkPressureDiff: '',
+      kAvoidanceDiff: '',
+      contactQualityDiff: '',
+      starterAdvantageDiff: diff('starterWeaknessFaced'),
+      bullpenAdvantageDiff: '',
+      parkAdjustedPressureDiff: '',
+      weatherAdjustedPressureDiff: '',
+      homeWinScore: pitchMatchupNumberCsv(homeWinScore, 1),
+      projectedWinner: homeWinScore >= 0 ? home.team || '' : away.team || '',
+      projectedRunMarginScore: pitchMatchupNumberCsv(homeWinScore, 1),
+      projectedTotalRunsScore: pitchMatchupNumberCsv(totalRunsScore, 1),
+      homeActualRuns: '',
+      awayActualRuns: '',
+      homeWinFlag: '',
+      awayWinFlag: '',
+      runMargin: '',
+      totalRuns: '',
+    };
+  });
+}
+
+function pitchMatchupGamePredictionColumns() {
+  return [
+    ['date', 'date'], ['gamePk', 'game_pk'], ['awayTeam', 'away_team'], ['homeTeam', 'home_team'], ['venue', 'venue'],
+    ['awayProbablePitcher', 'away_probable_pitcher'], ['homeProbablePitcher', 'home_probable_pitcher'], ['awayProbablePitcherId', 'away_probable_pitcher_id'], ['homeProbablePitcherId', 'home_probable_pitcher_id'],
+    ['lineupLocked', 'lineup_locked'], ['weatherAvailable', 'weather_available'], ['parkFactorAvailable', 'park_factor_available'],
+    ['awayTeamOffensivePressure', 'away_team_offensive_pressure'], ['homeTeamOffensivePressure', 'home_team_offensive_pressure'],
+    ['top1V10NoZoneDiff', 'top1_v10_no_zone_diff'], ['top3V10NoZoneDiff', 'top3_v10_no_zone_diff'], ['top5V10NoZoneDiff', 'top5_v10_no_zone_diff'], ['top9V10NoZoneDiff', 'top9_v10_no_zone_diff'],
+    ['count80PlusV10Diff', 'count_80plus_v10_diff'], ['count70PlusV10Diff', 'count_70plus_v10_diff'], ['count60PlusV10Diff', 'count_60plus_v10_diff'],
+    ['avgHitterPowerBaselineDiff', 'avg_hitter_power_baseline_diff'], ['avgPitchTypeDamageMatchupDiff', 'avg_pitch_type_damage_matchup_diff'], ['avgPitcherHrVulnerabilityDiff', 'avg_pitcher_hr_vulnerability_diff'], ['teamHrPressureV10Diff', 'team_hr_pressure_v10_diff'],
+    ['trapPitchOnlyDiff', 'trap_pitch_only_diff'], ['trapLowSampleDiff', 'trap_low_sample_diff'], ['trapGroundBallDiff', 'trap_ground_ball_diff'],
+    ['walkPressureDiff', 'walk_pressure_diff'], ['kAvoidanceDiff', 'k_avoidance_diff'], ['contactQualityDiff', 'contact_quality_diff'], ['starterAdvantageDiff', 'starter_advantage_diff'], ['bullpenAdvantageDiff', 'bullpen_advantage_diff'],
+    ['parkAdjustedPressureDiff', 'park_adjusted_pressure_diff'], ['weatherAdjustedPressureDiff', 'weather_adjusted_pressure_diff'],
+    ['homeWinScore', 'home_win_score'], ['projectedWinner', 'projected_winner'], ['projectedRunMarginScore', 'projected_run_margin_score'], ['projectedTotalRunsScore', 'projected_total_runs_score'],
+    ['homeActualRuns', 'home_actual_runs'], ['awayActualRuns', 'away_actual_runs'], ['homeWinFlag', 'home_win_flag'], ['awayWinFlag', 'away_win_flag'], ['runMargin', 'run_margin'], ['totalRuns', 'total_runs'],
+  ].map(([key, header]) => ({ key, header }));
+}
+
+function pitchMatchupPaActualRows(rows = []) {
+  const byPa = new Map();
+  for (const row of listify(rows)) {
+    if (String(row?.code || '').toUpperCase() === 'FORECAST') continue;
+    const gamePk = row?.gamePk || '';
+    const atBatIndex = row?.atBatIndex;
+    if (!gamePk || atBatIndex === '' || atBatIndex == null) continue;
+    const key = `${gamePk}:${atBatIndex}`;
+    const existing = byPa.get(key);
+    const pitchNumber = Number(row?.pitchNumber);
+    const existingPitchNumber = Number(existing?.pitchNumber);
+    if (!existing || (Number.isFinite(pitchNumber) && (!Number.isFinite(existingPitchNumber) || pitchNumber >= existingPitchNumber))) {
+      byPa.set(key, row);
+    }
+  }
+  return [...byPa.values()]
+    .sort((a, b) => String(a.date || '').localeCompare(String(b.date || ''))
+      || String(a.gamePk || '').localeCompare(String(b.gamePk || ''))
+      || (Number(a.atBatIndex) || 0) - (Number(b.atBatIndex) || 0))
+    .map((row) => ({
+      date: row.date || '',
+      gamePk: row.gamePk || '',
+      atBatIndex: row.atBatIndex ?? '',
+      inning: row.inning || '',
+      half: row.half || '',
+      battingTeam: row.half === 'bottom' ? String(row.game || '').split(' @ ')[1] || '' : String(row.game || '').split(' @ ')[0] || '',
+      pitchingTeam: row.half === 'bottom' ? String(row.game || '').split(' @ ')[0] || '' : String(row.game || '').split(' @ ')[1] || '',
+      batterId: row.batterId || '',
+      batterName: row.batterName || '',
+      pitcherId: row.pitcherId || '',
+      pitcherName: row.pitcherName || '',
+      finalPitchType: row.pitchType || '',
+      finalPitchVelocity: row.velocity || '',
+      actualHit: row.actualHit || 0,
+      actualXbh: row.actualXbh || 0,
+      actualHr: row.actualHr || 0,
+      actualTotalBases: row.actualTotalBases || 0,
+      event: row.atBatResult || row.description || '',
+    }));
+}
+
+function pitchMatchupPaActualColumns() {
+  return [
+    ['date', 'date'], ['gamePk', 'game_pk'], ['atBatIndex', 'ab_index'], ['inning', 'inning'], ['half', 'inning_half'],
+    ['battingTeam', 'batting_team'], ['pitchingTeam', 'pitching_team'],
+    ['batterId', 'batter_id'], ['batterName', 'batter_name'], ['pitcherId', 'pitcher_id'], ['pitcherName', 'pitcher_name'],
+    ['finalPitchType', 'final_pitch_type'], ['finalPitchVelocity', 'final_pitch_velocity'],
+    ['actualHit', 'actual_hit'], ['actualXbh', 'actual_xbh'], ['actualHr', 'actual_hr'], ['actualTotalBases', 'actual_tb'], ['event', 'event'],
+  ].map(([key, header]) => ({ key, header }));
+}
+
+function pitchMatchupBatterGameActualRows(paRows = []) {
+  const groups = new Map();
+  for (const row of listify(paRows)) {
+    if (!row?.gamePk || !row?.batterId) continue;
+    const key = `${row.gamePk}:${row.batterId}`;
+    const existing = groups.get(key) || {
+      date: row.date || '',
+      gamePk: row.gamePk || '',
+      batterId: row.batterId || '',
+      batterName: row.batterName || '',
+      plateAppearances: 0,
+      actualHr: 0,
+      actualHit: 0,
+      actualXbh: 0,
+      actualTotalBases: 0,
+    };
+    existing.plateAppearances += 1;
+    existing.actualHr += Number(row.actualHr) || 0;
+    existing.actualHit += Number(row.actualHit) || 0;
+    existing.actualXbh += Number(row.actualXbh) || 0;
+    existing.actualTotalBases += Number(row.actualTotalBases) || 0;
+    groups.set(key, existing);
+  }
+  return [...groups.values()];
+}
+
+function pitchMatchupVerificationColumns() {
+  return [
+    ['fileName', 'file_name'],
+    ['checkName', 'check_name'],
+    ['status', 'status'],
+    ['rowsChecked', 'rows_checked'],
+    ['failCount', 'fail_count'],
+    ['failRate', 'fail_rate'],
+    ['notes', 'notes'],
+  ].map(([key, header]) => ({ key, header }));
+}
+
+function pitchMatchupVerificationReport({ forecastRows = [], teamRows = [], gameRows = [], paRows = [], gameTimingRows = [], summaryRows = [] } = {}) {
+  const checks = [];
+  const addCheck = (fileName, checkName, condition, rowsChecked = '', failCount = 0, notes = '') => {
+    const checked = Number(rowsChecked);
+    checks.push({
+      fileName,
+      checkName,
+      status: condition ? 'PASS' : 'FAIL',
+      rowsChecked,
+      failCount,
+      failRate: Number.isFinite(checked) && checked > 0 ? (Number(failCount) / checked).toFixed(3) : '',
+      notes,
+    });
+  };
+  const requiredScoreCols = ['hrScoreV10NoZone', 'hitterPowerBaseline', 'pitchTypeDamageMatchup', 'pitcherHrVulnerability'];
+  for (const key of requiredScoreCols) {
+    const failCount = forecastRows.filter((row) => !Number.isFinite(Number(row?.[key]))).length;
+    addCheck('pitch_matchup_forecast_batter_summary', `${key} populated`, forecastRows.length > 0 && failCount / Math.max(1, forecastRows.length) <= 0.05, forecastRows.length, failCount);
+  }
+  const uniqueForecast = new Set(forecastRows.map((row) => `${row.gamePk}:${row.batterId}`));
+  addCheck('pitch_matchup_forecast_batter_summary', 'one row per batter-game', uniqueForecast.size === forecastRows.length, forecastRows.length, forecastRows.length - uniqueForecast.size);
+  const actualLeakCount = forecastRows.filter((row) => Number(row.actualHr) || Number(row.actualHit) || Number(row.actualXbh) || Number(row.actualTotalBases)).length;
+  addCheck('pitch_matchup_forecast_batter_summary', 'no actual outcome columns populated before postgame join', actualLeakCount === 0, forecastRows.length, actualLeakCount);
+  const teamFail = teamRows.filter((row) => !row.team || !row.opponent || !Number.isFinite(Number(row.teamOffensivePressure))).length;
+  addCheck('team_offensive_pressure', 'valid team/opponent pressure rows', teamRows.length > 0 && teamFail === 0, teamRows.length, teamFail);
+  const gameFail = gameRows.filter((row) => !row.gamePk || !row.awayTeam || !row.homeTeam || !row.venue || !row.awayProbablePitcher || !row.homeProbablePitcher || !row.projectedWinner || !Number.isFinite(Number(row.awayTeamOffensivePressure)) || !Number.isFinite(Number(row.homeTeamOffensivePressure))).length;
+  addCheck('game_prediction_features', 'valid teams venue pitchers and projected winner', gameRows.length > 0 && gameFail === 0, gameRows.length, gameFail);
+  const paKeySet = new Set(paRows.map((row) => `${row.gamePk}:${row.atBatIndex}`));
+  addCheck('pitch_matchup_pa_actuals', 'actuals collapsed to one row per plate appearance', paKeySet.size === paRows.length, paRows.length, paRows.length - paKeySet.size);
+  const invalidGames = gameTimingRows.filter((row) => !(Number(row.pitchRows) > 0 && Number(row.atBats) > 0 && Number(row.uniqueContexts) > 0)).length;
+  addCheck('pitch_matchup_game_timing', 'empty games excluded from backtest denominator', invalidGames === 0, gameTimingRows.length, invalidGames, invalidGames ? 'Rows marked invalid_for_backtest in timing output.' : '');
+  const summary = summaryRows[0] || {};
+  const cacheRate = Number(summary.contextCacheHitRate);
+  addCheck('timing_summary', 'context cache hit rate recorded', summaryRows.length > 0 && (Number.isFinite(cacheRate) || summary.contextCacheHitRate === ''), summaryRows.length, 0, `context_cache_hit_rate=${summary.contextCacheHitRate || 'n/a'}`);
+  return checks;
+}
+
+function pitchMatchupPitchEventRowsForPlay({ date, gameLabel, gamePk, play, payload, timings = {}, homeTeam = '', weather = null }) {
+  const matchup = play?.matchup || {};
+  const batterId = Number(matchup?.batter?.id) || '';
+  const pitcherId = Number(matchup?.pitcher?.id) || '';
+  const batterName = matchup?.batter?.fullName || matchup?.batter?.name || '';
+  const pitcherName = matchup?.pitcher?.fullName || matchup?.pitcher?.name || '';
+  const stand = handednessCode(matchup?.batSide?.code || matchup?.batSide?.description || '');
+  const throwsHand = handednessCode(matchup?.pitchHand?.code || matchup?.pitchHand?.description || '');
+  const inning = play?.about?.inning || '';
+  const half = normalizeHalfInning(play?.about?.halfInning) || play?.about?.halfInning || '';
+  const atBatIndex = play?.about?.atBatIndex ?? '';
+  const atBatResult = play?.result?.event || '';
+  const eventType = String(play?.result?.eventType || '').toLowerCase();
+  const actualTotalBases = eventType === 'home_run' ? 4 : eventType === 'triple' ? 3 : eventType === 'double' ? 2 : eventType === 'single' ? 1 : 0;
+  const atBatDescription = cleanSummary(play?.result?.description || '');
+  return listify(play?.playEvents)
+    .filter((event) => event?.isPitch || event?.pitchData)
+    .map((event, index) => {
+      const pitchType = String(event?.details?.type?.code || event?.pitchData?.type?.code || '').toUpperCase();
+      const pitchName = event?.details?.type?.description || event?.pitchData?.type?.description || pitchType;
+      const velocity = liveLabFinite(event?.pitchData?.startSpeed);
+      const contextRow = pitchMatchupContextRowForPitch(payload, pitchType, velocity);
+      const count = event?.count || {};
+      const plateX = liveLabFinite(event?.pitchData?.coordinates?.pX);
+      const plateZ = liveLabFinite(event?.pitchData?.coordinates?.pZ);
+      const zoneBuckets = pitchMatchupZoneBucketsFromValues(
+        plateX,
+        plateZ,
+        liveLabFinite(event?.pitchData?.strikeZoneTop),
+        liveLabFinite(event?.pitchData?.strikeZoneBottom),
+        event?.pitchData?.zone,
+        stand,
+      );
+      const hitData = event?.hitData || {};
+      const hitGeometry = pitchMatchupSprayAngleFromHitData(hitData);
+      const launchSpeed = liveLabFinite(hitData?.launchSpeed);
+      const launchAngle = liveLabFinite(hitData?.launchAngle);
+      const hitDistanceSc = liveLabFinite(hitData?.totalDistance);
+      const isBattedBall = Boolean(event?.details?.isInPlay) || Number.isFinite(launchSpeed) || Number.isFinite(launchAngle);
+      return {
+        date,
+        gamePk,
+        game: gameLabel,
+        inning,
+        half,
+        atBatIndex,
+        pitchNumber: event?.pitchNumber || index + 1,
+        batterId,
+        batterName,
+        pitcherId,
+        pitcherName,
+        stand,
+        throwsHand,
+        count: `${count.balls ?? ''}-${count.strikes ?? ''}`,
+        outs: count.outs ?? '',
+        pitchType,
+        pitchName,
+        velocity: Number.isFinite(velocity) ? velocity.toFixed(1) : '',
+        zone: event?.pitchData?.zone || '',
+        plateX: Number.isFinite(plateX) ? plateX.toFixed(3) : '',
+        plateZ: Number.isFinite(plateZ) ? plateZ.toFixed(3) : '',
+        verticalZone: zoneBuckets.verticalZone,
+        horizontalZone: zoneBuckets.horizontalZone,
+        attackZone: zoneBuckets.attackZone,
+        hcX: Number.isFinite(hitGeometry.hcX) ? hitGeometry.hcX.toFixed(2) : '',
+        hcY: Number.isFinite(hitGeometry.hcY) ? hitGeometry.hcY.toFixed(2) : '',
+        sprayAngle: Number.isFinite(hitGeometry.sprayAngle) ? hitGeometry.sprayAngle.toFixed(1) : '',
+        pullCenterOppo: isBattedBall ? pitchMatchupPullCenterOppo(hitGeometry.sprayAngle, stand) : '',
+        launchSpeed: Number.isFinite(launchSpeed) ? launchSpeed.toFixed(1) : '',
+        launchAngle: Number.isFinite(launchAngle) ? launchAngle.toFixed(1) : '',
+        bbType: hitData?.trajectory || '',
+        hitDistanceSc: Number.isFinite(hitDistanceSc) ? hitDistanceSc.toFixed(0) : '',
+        description: event?.details?.description || '',
+        code: event?.details?.code || '',
+        atBatResult,
+        atBatDescription,
+        actualHit: ['single', 'double', 'triple', 'home_run'].includes(eventType) ? 1 : 0,
+        actualXbh: ['double', 'triple', 'home_run'].includes(eventType) ? 1 : 0,
+        actualHr: eventType === 'home_run' ? 1 : 0,
+        actualTotalBases,
+        isInPlay: event?.details?.isInPlay ? 1 : 0,
+        isBall: event?.details?.isBall ? 1 : 0,
+        isStrike: event?.details?.isStrike ? 1 : 0,
+        contextPitch: contextRow ? pitchMatchupPitchLabel(contextRow.pitcher) : '',
+        contextUsage: contextRow ? pitchMatchupRate(contextRow.pitcher?.usage, 1) : '',
+        contextPitcherWhiff: contextRow ? pitchMatchupRate(contextRow.pitcher?.whiffRate, 1) : '',
+        contextPitcherXslg: contextRow ? pitchMatchupDecimal(contextRow.pitcher?.xslg) : '',
+        contextBatterWhiff: contextRow ? pitchMatchupRate(contextRow.batter?.whiffRate, 1) : '',
+        contextBatterHardHit: contextRow ? pitchMatchupRate(contextRow.batter?.hardHitRate, 1) : '',
+        contextBatterXslg: contextRow ? pitchMatchupDecimal(contextRow.batter?.xslg) : '',
+        contextSample: contextRow ? `${contextRow.pitcher?.pitches || 0}/${contextRow.batter?.pitches || 0}` : '',
+        contextEdge: contextRow?.edge || '',
+        contextReliability: contextRow?.reliability || '',
+        contextFallback: contextRow?.fallbackLabel || '',
+        ...pitchMatchupHrAuditFields(contextRow, payload, { date, gamePk, pitchType, velocity, homeTeam, batterHand: stand, weather }),
+        overallEdge: payload?.summary?.label || '',
+        source: payload?.source || '',
+      };
+    });
+}
+
+function pitchMatchupForecastRowsForBatter({ date, gameLabel, gamePk, batter, pitcher, payload, battingSide = '', pitchingSide = '', homeTeam = '', awayTeam = '', battingOrder = '', lineupLocked = false, weather = null }) {
+  const batterId = Number(batter?.id) || '';
+  const pitcherId = Number(pitcher?.id) || '';
+  if (!batterId || !pitcherId) return [];
+  const batterName = batter?.fullName || batter?.name || '';
+  const pitcherName = pitcher?.fullName || pitcher?.name || '';
+  const stand = handednessCode(batter?.bats || batter?.batSide?.code || batter?.batSide?.description || '');
+  const throwsHand = handednessCode(pitcher?.throws || pitcher?.pitchHand?.code || pitcher?.pitchHand?.description || '');
+  const sourceRows = listify(payload?.rows);
+  const forecastRows = sourceRows.length ? sourceRows : [{
+    batter: { pitchType: '', velocityBucket: '', pitches: 0, pa: 0, bip: 0 },
+    pitcher: { pitchType: 'ARS', velocityBucket: '', usage: 1, pitches: 0, pa: 0, bip: 0 },
+    edge: '',
+    reliability: 'Very low',
+    fallbackLabel: 'daily_profile_fallback',
+    combinedLocalHr: pitchMatchupLocalHrBlend({}, payload?.batterSeason || {}, payload?.pitcherSeason || {}),
+  }];
+  return forecastRows
+    .slice()
+    .sort((a, b) => (Number(b?.pitcher?.usage) || 0) - (Number(a?.pitcher?.usage) || 0))
+    .map((contextRow, index) => {
+      const batterLocal = contextRow?.batter || {};
+      const pitcherLocal = contextRow?.pitcher || {};
+      const batterSeason = payload?.batterSeason || {};
+      const pitcherSeason = payload?.pitcherSeason || {};
+      const batterHand = payload?.batterHand || {};
+      const pitcherHand = payload?.pitcherHand || {};
+      const recent = payload?.batterRecent || {};
+      const handScores = pitchMatchupHandednessScores(batterHand, pitcherHand);
+      const heatScores = pitchMatchupRecentHeat(recent);
+      const combined = contextRow?.combinedLocalHr || pitchMatchupLocalHrBlend(contextRow, batterSeason, pitcherSeason);
+      const arsenalMatchupScore = pitchMatchupScore100(payload?.summary?.overall, -0.120, 0.120, 50);
+      const hrLocalizedRateScore = pitchMatchupScore100(combined.rate, 0.005, 0.075, 45);
+      const hrBatterPowerScore = Math.round(
+        (pitchMatchupScore100(batterSeason.hrPerPa, 0.005, 0.075, 45) * 0.35)
+        + (pitchMatchupScore100(batterSeason.xslg, 0.300, 0.700, 45) * 0.30)
+        + (pitchMatchupScore100(batterSeason.barrelRate, 0.020, 0.180, 45) * 0.20)
+        + (pitchMatchupScore100(batterSeason.hardHitRate, 0.250, 0.600, 45) * 0.15)
+      );
+      const hrPitcherVulnerabilityScore = Math.round(
+        (pitchMatchupScore100(pitcherSeason.hrPerPa, 0.005, 0.070, 45) * 0.35)
+        + (pitchMatchupScore100(pitcherSeason.xslg, 0.330, 0.650, 45) * 0.30)
+        + (pitchMatchupScore100(pitcherSeason.barrelRate, 0.020, 0.180, 45) * 0.20)
+        + (pitchMatchupScore100(pitcherSeason.hardHitRate, 0.250, 0.600, 45) * 0.15)
+      );
+      const reliabilityScore = contextRow.reliability === 'High' ? 92 : contextRow.reliability === 'Medium' ? 74 : contextRow.reliability === 'Low' ? 52 : 32;
+      const hrPitchScore = Math.round(
+        (pitchMatchupScore100(combined.rate, 0.005, 0.075, 45) * 0.35)
+        + (pitchMatchupScore100(batterLocal.xslg, 0.280, 0.720, 45) * 0.20)
+        + (pitchMatchupScore100(pitcherLocal.xslg, 0.300, 0.700, 45) * 0.20)
+        + (pitchMatchupScore100(batterLocal.barrelRate, 0.010, 0.180, 45) * 0.125)
+        + (pitchMatchupScore100(pitcherLocal.barrelRate, 0.010, 0.180, 45) * 0.125)
+      );
+      const finalHrDamageScore = Math.round(
+        (arsenalMatchupScore * 0.25)
+        + (hrLocalizedRateScore * 0.20)
+        + (hrBatterPowerScore * 0.18)
+        + (hrPitcherVulnerabilityScore * 0.17)
+        + (handScores.handedness_matchup_score * 0.10)
+        + (heatScores.recent_heat_score * 0.07)
+        + (reliabilityScore * 0.03)
+      );
+      const pcmiScores = pitchMatchupPcmiScores({
+        hrBatterPowerScore,
+        hrPitcherVulnerabilityScore,
+        hrLocalizedRateScore,
+        hrPitchScore,
+        pitcherVsSideHrPerPaAllowed: pitcherHand.hrPerPa,
+        batterVsHandHrPerPa: batterHand.hrPerPa,
+        recentHeatScore: heatScores.recent_heat_score,
+        reliabilityScore,
+      });
+      return {
+        date,
+        gamePk,
+        game: gameLabel,
+        battingSide,
+        team: battingSide === 'home' ? homeTeam : awayTeam,
+        opponent: battingSide === 'home' ? awayTeam : homeTeam,
+        inning: '',
+        half: '',
+        atBatIndex: '',
+        pitchNumber: index + 1,
+        batterId,
+        batterName,
+        pitcherId,
+        pitcherName,
+        stand,
+        throwsHand,
+        lineupStatus: Number(battingOrder) >= 1 && Number(battingOrder) <= 9 ? 'starter' : 'active_roster_candidate',
+        confirmedStarter: lineupLocked && Number(battingOrder) >= 1 && Number(battingOrder) <= 9 ? 1 : 0,
+        projectedStarter: !lineupLocked && Number(battingOrder) >= 1 && Number(battingOrder) <= 9 ? 1 : 0,
+        starterConfidence: Number(battingOrder) >= 1 && Number(battingOrder) <= 9 ? (lineupLocked ? 'confirmed' : 'projected') : 'healthy_active_roster',
+        battingOrder,
+        lineupSource: batter?.source || (lineupLocked ? 'confirmed_lineup' : 'projected_lineup'),
+        lineupLocked: lineupLocked ? 1 : 0,
+        eligibleForPregameCard: 1,
+        nonstarterExclusionReason: '',
+        count: '',
+        outs: '',
+        pitchType: String(pitcherLocal.pitchType || '').toUpperCase(),
+        pitchName: pitchMatchupPitchLabel(pitcherLocal || {}),
+        velocity: Number.isFinite(Number(pitcherLocal.velo)) ? Number(pitcherLocal.velo).toFixed(1) : '',
+        zone: '',
+        plateX: '',
+        plateZ: '',
+        verticalZone: '',
+        horizontalZone: '',
+        attackZone: '',
+        hcX: '',
+        hcY: '',
+        sprayAngle: '',
+        pullCenterOppo: '',
+        launchSpeed: '',
+        launchAngle: '',
+        bbType: '',
+        hitDistanceSc: '',
+        description: 'Forecast',
+        code: 'FORECAST',
+        atBatResult: '',
+        atBatDescription: '',
+        actualHit: '',
+        actualXbh: '',
+        actualHr: '',
+        actualTotalBases: '',
+        isInPlay: '',
+        isBall: '',
+        isStrike: '',
+        contextPitch: pitchMatchupPitchLabel(pitcherLocal),
+        contextUsage: pitchMatchupRate(pitcherLocal.usage, 1),
+        contextPitcherWhiff: pitchMatchupRate(pitcherLocal.whiffRate, 1),
+        contextPitcherXslg: pitchMatchupDecimal(pitcherLocal.xslg),
+        contextBatterWhiff: pitchMatchupRate(batterLocal.whiffRate, 1),
+        contextBatterHardHit: pitchMatchupRate(batterLocal.hardHitRate, 1),
+        contextBatterXslg: pitchMatchupDecimal(batterLocal.xslg),
+        contextSample: `${pitcherLocal.pitches || 0}/${batterLocal.pitches || 0}`,
+        contextEdge: contextRow?.edge || '',
+        contextReliability: contextRow?.reliability || '',
+        contextFallback: contextRow?.fallbackLabel || '',
+        velocityBucket: pitcherLocal.velocityBucket || '',
+        ...pitchMatchupExportContextFields(payload, {
+          date,
+          gamePk,
+          homeTeam,
+          batterHand: stand,
+          pitchType: pitcherLocal.pitchType,
+          velocity: pitcherLocal.velo,
+          weather,
+          pcmi: pcmiScores.pcmi,
+          pitchClashLocalized: pcmiScores.pitchClashLocalized,
+          pitchClashPowerVulnerability: pcmiScores.pitchClashPowerVulnerability,
+          pitchClashMinGate: pcmiScores.pitchClashMinGate,
+          finalHrDamageScore,
+        }),
+        pcmiRaw: pcmiScores.pcmiRaw,
+        pcmiReliabilityAdjusted: pcmiScores.pcmiReliabilityAdjusted,
+        pitcherVsSideHrAllowedPercentile: pcmiScores.pitcherVsSideHrAllowedPercentile,
+        batterVsHandHrPercentile: pcmiScores.batterVsHandHrPercentile,
+        pitcherLocalUsagePct: pitchMatchupRateCsv(pitcherLocal.usage, 4),
+        batterLocalPa: batterLocal.pa || '',
+        batterLocalPitches: batterLocal.pitches || '',
+        batterLocalBbe: batterLocal.bip || '',
+        batterLocalHr: batterLocal.hr || 0,
+        batterLocalHrPerPa: pitchMatchupRateCsv(batterLocal.hrPerPa),
+        batterLocalHrPerPitch: pitchMatchupRateCsv(batterLocal.hrRate),
+        batterLocalHrPerBbe: pitchMatchupRateCsv(batterLocal.hrPerBbe),
+        batterLocalXslg: pitchMatchupNumberCsv(batterLocal.xslg),
+        batterLocalSlg: pitchMatchupNumberCsv(batterLocal.slg),
+        batterLocalIso: pitchMatchupNumberCsv(batterLocal.iso),
+        batterLocalBarrelPct: pitchMatchupRateCsv(batterLocal.barrelRate),
+        batterLocalHardHitPct: pitchMatchupRateCsv(batterLocal.hardHitRate),
+        batterLocalAvgEv: pitchMatchupNumberCsv(batterLocal.avgEv, 1),
+        batterLocalMaxEv: pitchMatchupNumberCsv(batterLocal.maxEv, 1),
+        batterLocalLaunchAngleAvg: pitchMatchupNumberCsv(batterLocal.launchAngleAvg, 1),
+        batterLocalWhiffPct: pitchMatchupRateCsv(batterLocal.whiffRate),
+        pitcherLocalPa: pitcherLocal.pa || '',
+        pitcherLocalPitches: pitcherLocal.pitches || '',
+        pitcherLocalBbe: pitcherLocal.bip || '',
+        pitcherLocalHrAllowed: pitcherLocal.hr || 0,
+        pitcherLocalHrPerPaAllowed: pitchMatchupRateCsv(pitcherLocal.hrPerPa),
+        pitcherLocalHrPerPitchAllowed: pitchMatchupRateCsv(pitcherLocal.hrRate),
+        pitcherLocalHrPerBbeAllowed: pitchMatchupRateCsv(pitcherLocal.hrPerBbe),
+        pitcherLocalXslgAllowed: pitchMatchupNumberCsv(pitcherLocal.xslg),
+        pitcherLocalSlgAllowed: pitchMatchupNumberCsv(pitcherLocal.slg),
+        pitcherLocalIsoAllowed: pitchMatchupNumberCsv(pitcherLocal.iso),
+        pitcherLocalBarrelPctAllowed: pitchMatchupRateCsv(pitcherLocal.barrelRate),
+        pitcherLocalHardHitPctAllowed: pitchMatchupRateCsv(pitcherLocal.hardHitRate),
+        pitcherLocalAvgEvAllowed: pitchMatchupNumberCsv(pitcherLocal.avgEv, 1),
+        pitcherLocalMaxEvAllowed: pitchMatchupNumberCsv(pitcherLocal.maxEv, 1),
+        pitcherLocalLaunchAngleAvgAllowed: pitchMatchupNumberCsv(pitcherLocal.launchAngleAvg, 1),
+        combinedLocalHrRate: pitchMatchupRateCsv(combined.rate),
+        combinedLocalHrRateReliability: combined.reliability,
+        combinedLocalHrRateSource: combined.source,
+        combinedLocalHrIndex: pitchMatchupNumberCsv(combined.index, 2),
+        batterSeasonPa: batterSeason.pa || '',
+        batterSeasonAb: batterSeason.ab || '',
+        batterSeasonHr: batterSeason.hr || 0,
+        batterSeasonHrPerPa: pitchMatchupRateCsv(batterSeason.hrPerPa),
+        batterSeasonHrPerAb: pitchMatchupRateCsv(batterSeason.hrPerAb),
+        batterSeasonHrPerBbe: pitchMatchupRateCsv(batterSeason.hrPerBbe),
+        batterSeasonIso: pitchMatchupNumberCsv(batterSeason.iso),
+        batterSeasonSlg: pitchMatchupNumberCsv(batterSeason.slg),
+        batterSeasonXslg: pitchMatchupNumberCsv(batterSeason.xslg),
+        batterSeasonBarrelPct: pitchMatchupRateCsv(batterSeason.barrelRate),
+        batterSeasonHardHitPct: pitchMatchupRateCsv(batterSeason.hardHitRate),
+        batterSeasonAvgEv: pitchMatchupNumberCsv(batterSeason.avgEv, 1),
+        batterSeasonMaxEv: pitchMatchupNumberCsv(batterSeason.maxEv, 1),
+        batterSeasonFbPct: pitchMatchupRateCsv(batterSeason.fbRate),
+        batterPriorSeasonPa: payload?.batterPriorSeason?.pa || '',
+        batterPriorSeasonHrPerPa: pitchMatchupRateCsv(payload?.batterPriorSeason?.hrPerPa),
+        batterPriorSeasonIso: pitchMatchupNumberCsv(payload?.batterPriorSeason?.iso),
+        batterPriorSeasonXslg: pitchMatchupNumberCsv(payload?.batterPriorSeason?.xslg),
+        batterPriorSeasonBarrelPct: pitchMatchupRateCsv(payload?.batterPriorSeason?.barrelRate),
+        batterPriorSeasonHardHitPct: pitchMatchupRateCsv(payload?.batterPriorSeason?.hardHitRate),
+        batterPriorSeasonAvgEv: pitchMatchupNumberCsv(payload?.batterPriorSeason?.avgEv, 1),
+        batterPriorSeasonFbPct: pitchMatchupRateCsv(payload?.batterPriorSeason?.fbRate),
+        pitcherSeasonPa: pitcherSeason.pa || '',
+        pitcherSeasonHrAllowed: pitcherSeason.hr || 0,
+        pitcherSeasonHrPerPaAllowed: pitchMatchupRateCsv(pitcherSeason.hrPerPa),
+        pitcherSeasonHrPer9: pitchMatchupNumberCsv((Number(pitcherSeason.hrPerPa) || 0) * 38, 2),
+        pitcherSeasonHrPerBbeAllowed: pitchMatchupRateCsv(pitcherSeason.hrPerBbe),
+        pitcherSeasonSlgAllowed: pitchMatchupNumberCsv(pitcherSeason.slg),
+        pitcherSeasonXslgAllowed: pitchMatchupNumberCsv(pitcherSeason.xslg),
+        pitcherSeasonBarrelPctAllowed: pitchMatchupRateCsv(pitcherSeason.barrelRate),
+        pitcherSeasonHardHitPctAllowed: pitchMatchupRateCsv(pitcherSeason.hardHitRate),
+        pitcherSeasonAvgEvAllowed: pitchMatchupNumberCsv(pitcherSeason.avgEv, 1),
+        pitcherSeasonFbPctAllowed: pitchMatchupRateCsv(pitcherSeason.fbRate),
+        pitcherPriorSeasonPa: payload?.pitcherPriorSeason?.pa || '',
+        pitcherPriorSeasonHrPerPaAllowed: pitchMatchupRateCsv(payload?.pitcherPriorSeason?.hrPerPa),
+        pitcherPriorSeasonXslgAllowed: pitchMatchupNumberCsv(payload?.pitcherPriorSeason?.xslg),
+        pitcherPriorSeasonBarrelPctAllowed: pitchMatchupRateCsv(payload?.pitcherPriorSeason?.barrelRate),
+        pitcherPriorSeasonHardHitPctAllowed: pitchMatchupRateCsv(payload?.pitcherPriorSeason?.hardHitRate),
+        pitcherPriorSeasonAvgEvAllowed: pitchMatchupNumberCsv(payload?.pitcherPriorSeason?.avgEv, 1),
+        pitcherPriorSeasonFbPctAllowed: pitchMatchupRateCsv(payload?.pitcherPriorSeason?.fbRate),
+        batterVsHandPa: batterHand.pa || '',
+        batterVsHandHr: batterHand.hr || 0,
+        batterVsHandHrPerPa: pitchMatchupRateCsv(batterHand.hrPerPa),
+        batterVsHandSlg: pitchMatchupNumberCsv(batterHand.slg),
+        batterVsHandIso: pitchMatchupNumberCsv(batterHand.iso),
+        batterVsHandXslg: pitchMatchupNumberCsv(batterHand.xslg),
+        batterVsHandHardHitPct: pitchMatchupRateCsv(batterHand.hardHitRate),
+        batterVsHandBarrelPct: pitchMatchupRateCsv(batterHand.barrelRate),
+        pitcherVsSidePa: pitcherHand.pa || '',
+        pitcherVsSideHrAllowed: pitcherHand.hr || 0,
+        pitcherVsSideHrPerPaAllowed: pitchMatchupRateCsv(pitcherHand.hrPerPa),
+        pitcherVsSideSlgAllowed: pitchMatchupNumberCsv(pitcherHand.slg),
+        pitcherVsSideIsoAllowed: pitchMatchupNumberCsv(pitcherHand.iso),
+        pitcherVsSideXslgAllowed: pitchMatchupNumberCsv(pitcherHand.xslg),
+        pitcherVsSideHardHitPctAllowed: pitchMatchupRateCsv(pitcherHand.hardHitRate),
+        pitcherVsSideBarrelPctAllowed: pitchMatchupRateCsv(pitcherHand.barrelRate),
+        handednessMatchupScore: handScores.handedness_matchup_score,
+        handednessHrBoost: handScores.handedness_hr_boost,
+        handednessDamageBoost: handScores.handedness_damage_boost,
+        batterLast7Pa: recent.last7?.pa || '',
+        batterLast7Hr: recent.last7?.hr || 0,
+        batterLast7Xbh: recent.last7?.xbh || 0,
+        batterLast7HrPerPa: pitchMatchupRateCsv(recent.last7?.hrPerPa),
+        batterLast7Xslg: pitchMatchupNumberCsv(recent.last7?.xslg),
+        batterLast7BarrelPct: pitchMatchupRateCsv(recent.last7?.barrelRate),
+        batterLast14Pa: recent.last14?.pa || '',
+        batterLast14Hr: recent.last14?.hr || 0,
+        batterLast14Xbh: recent.last14?.xbh || 0,
+        batterLast14HrPerPa: pitchMatchupRateCsv(recent.last14?.hrPerPa),
+        batterLast14Xslg: pitchMatchupNumberCsv(recent.last14?.xslg),
+        batterLast14BarrelPct: pitchMatchupRateCsv(recent.last14?.barrelRate),
+        batterLast30Pa: recent.last30?.pa || '',
+        batterLast30Hr: recent.last30?.hr || 0,
+        batterLast30Xbh: recent.last30?.xbh || 0,
+        batterLast30HrPerPa: pitchMatchupRateCsv(recent.last30?.hrPerPa),
+        batterLast30Xslg: pitchMatchupNumberCsv(recent.last30?.xslg),
+        batterLast30BarrelPct: pitchMatchupRateCsv(recent.last30?.barrelRate),
+        recentHeatScore: heatScores.recent_heat_score,
+        recentHrScore: heatScores.recent_hr_score,
+        recentPowerScore: heatScores.recent_power_score,
+        recentContactQualityScore: heatScores.recent_contact_quality_score,
+        arsenalMatchupScore,
+        hrPitchScore,
+        pitchTypeDamageMatchupScoreNoZone: hrPitchScore,
+        hrBatterPowerScore,
+        hrPitcherVulnerabilityScore,
+        hrLocalizedRateScore,
+        hrHandednessScore: handScores.handedness_matchup_score,
+        hrRecentHeatScore: heatScores.recent_heat_score,
+        hrReliabilityScore: reliabilityScore,
+        finalHrDamageScore,
+        overallEdge: payload?.summary?.label || '',
+        source: `${payload?.source || 'Baseball Savant Statcast Search CSV'} | Pregame forecast ${battingSide || ''} vs ${pitchingSide || ''}`.trim(),
+      };
+    });
+}
+
+async function pitchMatchupHealthyTeamBattersForGame(game, side) {
+  const team = side === 'away' ? game?.away : game?.home;
+  const seen = new Set();
+  const batters = [];
+  const addEntry = (entry, fallbackSlot = '') => {
+    const normalized = normalizeLineupEntryForSide(game, side, {
+      ...entry,
+      slot: entry?.slot || fallbackSlot || '',
+    }, Number(entry?.slot || fallbackSlot) || batters.length + 1);
+    const id = Number(normalized?.id);
+    if (!Number.isFinite(id) || id <= 0 || seen.has(id)) return;
+    if (lineupEntryIsPitcherOnly(normalized)) return;
+    if (!isHealthyPitcherCandidate(normalized)) return;
+    seen.add(id);
+    batters.push(normalized);
+  };
+
+  activeLineupForRecognition(game, side).forEach((entry, index) => addEntry(entry, index + 1));
+
+  const bench = side === 'away' ? game?.lineup?.awayBench : game?.lineup?.homeBench;
+  normalizeLineupCollectionForSide(game, side, Array.isArray(bench) ? bench : []).forEach((entry) => addEntry(entry));
+
+  Object.values(game?.playerLookup || {})
+    .filter((profile) => sameTeamAbbrev(profile?.teamAbbrev, team))
+    .filter((profile) => !lineupEntryIsPitcherOnly(profile))
+    .filter((profile) => isHealthyPitcherCandidate(profile))
+    .sort((a, b) => fallbackLineupCandidateScore(b) - fallbackLineupCandidateScore(a)
+      || String(a?.fullName || '').localeCompare(String(b?.fullName || '')))
+    .forEach((profile) => addEntry(fallbackLineupEntryFromProfile(profile, '')));
+
+  const roster = await fetchTeamActiveRoster(team, game).catch(() => []);
+  roster
+    .filter((player) => !lineupEntryIsPitcherOnly(player))
+    .filter((player) => isHealthyPitcherCandidate(player))
+    .sort((a, b) => {
+      const aProfile = game?.playerLookup?.[String(a?.id)] || null;
+      const bProfile = game?.playerLookup?.[String(b?.id)] || null;
+      return fallbackLineupCandidateScore(b, bProfile) - fallbackLineupCandidateScore(a, aProfile)
+        || String(a?.fullName || '').localeCompare(String(b?.fullName || ''));
+    })
+    .forEach((player) => addEntry({
+      id: player.id,
+      fullName: player.fullName,
+      name: lastName(player.fullName),
+      position: player.position,
+      status: player.status,
+      rosterStatus: player.rosterStatus,
+      today: '0-0',
+      source: 'active-roster-hr-candidate',
+    }));
+
+  return batters;
+}
+
+async function pitchMatchupStarterForSide(card, side) {
+  const probable = card?.probablePitchers?.[side] || card?.teams?.[side]?.probablePitcher || null;
+  if (Number.isFinite(Number(probable?.id)) && Number(probable.id) > 0) return probable;
+  const lineupPitcher = resolveLineupPitcherForDisplay(card, side)?.starter || resolveLineupPitcherForDisplay(card, side)?.current || null;
+  if (Number.isFinite(Number(lineupPitcher?.id)) && Number(lineupPitcher.id) > 0) return lineupPitcher;
+  const displayPitcher = side === 'away' ? card?.awayPitcher : card?.homePitcher;
+  const displayId = Number(side === 'away' ? card?.awayPitcherId : card?.homePitcherId);
+  if (Number.isFinite(displayId) && displayId > 0) {
+    return { id: displayId, fullName: displayPitcher || 'Pitcher', name: displayPitcher || 'Pitcher' };
+  }
+  const team = side === 'away' ? card?.away : card?.home;
+  const namedPitcher = cleanSummary(probable?.fullName || probable?.name || lineupPitcher?.fullName || lineupPitcher?.name || displayPitcher || '');
+  if (namedPitcher) {
+    const resolved = await searchMlbPlayerByName(namedPitcher, team).catch(() => null);
+    if (Number.isFinite(Number(resolved?.id)) && Number(resolved.id) > 0) return resolved;
+  }
+  return probable || lineupPitcher || null;
+}
+
+async function pitchMatchupForecastRowsForGame(date, card) {
+  const gameStartedAt = pitchMatchupNowMs();
+  const gamePk = card?.gamePk || '';
+  const away = displayTeamAbbrev(card?.away || '');
+  const home = displayTeamAbbrev(card?.home || '');
+  const gameLabel = `${away} @ ${home}`;
+  const [awayCandidateBatters, homeCandidateBatters] = await Promise.all([
+    pitchMatchupHealthyTeamBattersForGame(card, 'away'),
+    pitchMatchupHealthyTeamBattersForGame(card, 'home'),
+  ]);
+  const [awayStarter, homeStarter] = await Promise.all([
+    pitchMatchupStarterForSide(card, 'away'),
+    pitchMatchupStarterForSide(card, 'home'),
+  ]);
+  const pairs = [
+    { battingSide: 'away', pitchingSide: 'home', lineup: awayCandidateBatters, pitcher: homeStarter },
+    { battingSide: 'home', pitchingSide: 'away', lineup: homeCandidateBatters, pitcher: awayStarter },
+  ];
+  const rows = [];
+  const contextTimingRows = [];
+  for (const pair of pairs) {
+    const pitcherId = Number(pair.pitcher?.id);
+    if (!Number.isFinite(pitcherId) || pitcherId <= 0) continue;
+    const lineupLocked = hasTrustedLineupOrder(card, pair.battingSide);
+    for (const [lineupIndex, batter] of listify(pair.lineup).entries()) {
+      const batterId = Number(batter?.id);
+      if (!Number.isFinite(batterId) || batterId <= 0) continue;
+      const payload = await getPitchMatchupContext({ batterId, pitcherId, date }).catch(() => null);
+      const forecastRows = pitchMatchupForecastRowsForBatter({
+        date,
+        gameLabel,
+        gamePk,
+        batter,
+        pitcher: pair.pitcher,
+        payload,
+        battingSide: pair.battingSide,
+        pitchingSide: pair.pitchingSide,
+        homeTeam: home,
+        awayTeam: away,
+        battingOrder: Number(batter?.slot) || (lineupIndex < 9 ? lineupIndex + 1 : ''),
+        lineupLocked,
+      });
+      forecastRows.forEach((row) => {
+        row.venue = card?.venue || card?.venueName || card?.venueNameShort || '';
+      });
+      rows.push(...forecastRows);
+      const pitchTypes = [...new Set(listify(payload?.rows).map((row) => row?.pitcher?.pitchType).filter(Boolean))].join('|');
+      contextTimingRows.push({
+        date,
+        gamePk,
+        game: gameLabel,
+        batterId,
+        batterName: batter?.fullName || batter?.name || '',
+        pitcherId,
+        pitcherName: pair.pitcher?.fullName || pair.pitcher?.name || '',
+        pitchType: pitchTypes,
+        contextKey: `${gamePk}:${batterId}:${pitcherId}:forecast`,
+        batterLookupMs: pitchMatchupTimingMs(payload?.timing?.batterStatcastCsvMs),
+        pitcherLookupMs: pitchMatchupTimingMs(payload?.timing?.pitcherStatcastCsvMs),
+        batterSprayProfileMs: pitchMatchupTimingMs(payload?.timing?.batterSprayProfileMs),
+        preaggregationMs: pitchMatchupTimingMs(payload?.timing?.preaggregationMs),
+        dictionaryBuildMs: pitchMatchupTimingMs(payload?.timing?.dictionaryBuildMs),
+        forecastLookupMs: pitchMatchupTimingMs(payload?.timing?.forecastLookupMs),
+        contextTotalMs: pitchMatchupTimingMs(payload?.timing?.contextTotalMs),
+        contextJoinMs: pitchMatchupTimingMs(payload?.timing?.contextJoinMs),
+        cacheHit: pitchMatchupTimingMs(payload?.timing?.contextCacheHit),
+        splitCacheHit: pitchMatchupTimingMs(payload?.timing?.splitCacheHit),
+        source: payload?.source || '',
+      });
+    }
+  }
+  const gameParseMs = pitchMatchupElapsedMs(gameStartedAt);
+  const contextMs = contextTimingRows.reduce((sum, row) => sum + (Number(row.contextTotalMs) || 0), 0);
+  return {
+    rows,
+    gameTimingRows: [{
+      date,
+      gamePk,
+      game: gameLabel,
+      awayTeam: away,
+      homeTeam: home,
+      pitchRows: rows.length,
+      atBats: rows.length ? new Set(rows.map((row) => `${row.batterId}:${row.pitcherId}`)).size : 0,
+      uniqueContexts: contextTimingRows.length,
+      validForBacktest: 0,
+      invalidReason: 'pregame_forecast_only',
+      liveFeedFetchMs: 0,
+      gameParseMs: pitchMatchupTimingMs(gameParseMs),
+      contextMs: pitchMatchupTimingMs(contextMs),
+      writeJoinMs: 0,
+      totalGameMs: pitchMatchupTimingMs(gameParseMs + contextMs),
+    }],
+    contextTimingRows,
+  };
+}
+
+async function pitchMatchupRowsForDate(date = dateInput.value || formatDate(new Date()), options = {}) {
+  const dayStartedAt = pitchMatchupNowMs();
+  const scheduleTimed = await pitchMatchupTimed('mlb_schedule', () => getSchedule(date));
+  const schedule = scheduleTimed.ok ? scheduleTimed.value : null;
+  const games = listify(schedule?.dates?.[0]?.games).filter((game) => game?.gamePk);
+  let gamesParsed = 0;
+  let contextPairsParsed = 0;
+  let pitchRowsParsed = 0;
+  const forecastCardsByPk = new Map();
+  let forecastCardsPromise = null;
+  const getForecastCardForGame = async (gamePk) => {
+    const key = String(gamePk || '');
+    if (forecastCardsByPk.has(key)) return forecastCardsByPk.get(key);
+    if (!forecastCardsPromise) {
+      forecastCardsPromise = fetchGamesAndHomeRuns(date).then((forecastPayload) => {
+        for (const card of listify(forecastPayload?.cards)) {
+          if (card?.gamePk) forecastCardsByPk.set(String(card.gamePk), card);
+        }
+        return forecastCardsByPk;
+      }).catch(() => forecastCardsByPk);
+    }
+    await forecastCardsPromise;
+    return forecastCardsByPk.get(key) || null;
+  };
+  const rowsByGame = await mapWithConcurrency(games, 2, async (scheduleGame) => {
+    const gameStartedAt = pitchMatchupNowMs();
+    const liveTimed = await pitchMatchupTimed('mlb_live_feed', () => getLiveGameFeed(scheduleGame.gamePk));
+    const live = liveTimed.ok ? liveTimed.value : null;
+    const plays = listify(live?.liveData?.plays?.allPlays);
+    const away = displayTeamAbbrev(live?.gameData?.teams?.away?.abbreviation || scheduleGame?.teams?.away?.team?.abbreviation || '');
+    const home = displayTeamAbbrev(live?.gameData?.teams?.home?.abbreviation || scheduleGame?.teams?.home?.team?.abbreviation || '');
+    const gameLabel = `${away} @ ${home}`;
+    const pairPayloads = new Map();
+    const rows = [];
+    const contextTimingRows = [];
+    const pitchPlays = plays.filter((play) => {
+      const batterId = Number(play?.matchup?.batter?.id);
+      const pitcherId = Number(play?.matchup?.pitcher?.id);
+      return Number.isFinite(batterId)
+        && Number.isFinite(pitcherId)
+        && listify(play?.playEvents).some((event) => event?.isPitch || event?.pitchData);
+    });
+    const uniquePairs = [];
+    const uniquePairKeys = new Set();
+    for (const play of pitchPlays) {
+      const batterId = Number(play?.matchup?.batter?.id);
+      const pitcherId = Number(play?.matchup?.pitcher?.id);
+      const pairKey = `${batterId}:${pitcherId}`;
+      if (uniquePairKeys.has(pairKey)) continue;
+      uniquePairKeys.add(pairKey);
+      uniquePairs.push({ play, batterId, pitcherId, pairKey });
+    }
+    await mapWithConcurrency(uniquePairs, 4, async ({ play, batterId, pitcherId, pairKey }) => {
+      const payload = await getPitchMatchupContext({ batterId, pitcherId, date }).catch(() => null);
+      pairPayloads.set(pairKey, payload);
+      contextPairsParsed += 1;
+      const pitchTypes = [...new Set(listify(payload?.rows).map((row) => row?.pitcher?.pitchType).filter(Boolean))].join('|');
+      contextTimingRows.push({
+        date,
+        gamePk: scheduleGame.gamePk,
+        game: gameLabel,
+        batterId,
+        batterName: play?.matchup?.batter?.fullName || play?.matchup?.batter?.name || '',
+        pitcherId,
+        pitcherName: play?.matchup?.pitcher?.fullName || play?.matchup?.pitcher?.name || '',
+        pitchType: pitchTypes,
+        contextKey: `${scheduleGame.gamePk}:${pairKey}`,
+        batterLookupMs: pitchMatchupTimingMs(payload?.timing?.batterStatcastCsvMs),
+        pitcherLookupMs: pitchMatchupTimingMs(payload?.timing?.pitcherStatcastCsvMs),
+        batterSprayProfileMs: pitchMatchupTimingMs(payload?.timing?.batterSprayProfileMs),
+        preaggregationMs: pitchMatchupTimingMs(payload?.timing?.preaggregationMs),
+        dictionaryBuildMs: pitchMatchupTimingMs(payload?.timing?.dictionaryBuildMs),
+        forecastLookupMs: pitchMatchupTimingMs(payload?.timing?.forecastLookupMs),
+        contextTotalMs: pitchMatchupTimingMs(payload?.timing?.contextTotalMs),
+        contextJoinMs: pitchMatchupTimingMs(payload?.timing?.contextJoinMs),
+        cacheHit: pitchMatchupTimingMs(payload?.timing?.contextCacheHit),
+        splitCacheHit: pitchMatchupTimingMs(payload?.timing?.splitCacheHit),
+        source: payload?.source || '',
+      });
+    });
+    for (const play of pitchPlays) {
+      const batterId = Number(play?.matchup?.batter?.id);
+      const pitcherId = Number(play?.matchup?.pitcher?.id);
+      if (!Number.isFinite(batterId) || !Number.isFinite(pitcherId) || !listify(play?.playEvents).some((event) => event?.isPitch || event?.pitchData)) continue;
+      const pairKey = `${batterId}:${pitcherId}`;
+      if (!pairPayloads.has(pairKey)) {
+        const payload = await getPitchMatchupContext({ batterId, pitcherId, date }).catch(() => null);
+        pairPayloads.set(pairKey, payload);
+        contextPairsParsed += 1;
+        const pitchTypes = [...new Set(listify(payload?.rows).map((row) => row?.pitcher?.pitchType).filter(Boolean))].join('|');
+        contextTimingRows.push({
+          date,
+          gamePk: scheduleGame.gamePk,
+          game: gameLabel,
+          batterId,
+          batterName: play?.matchup?.batter?.fullName || play?.matchup?.batter?.name || '',
+          pitcherId,
+          pitcherName: play?.matchup?.pitcher?.fullName || play?.matchup?.pitcher?.name || '',
+          pitchType: pitchTypes,
+          contextKey: `${scheduleGame.gamePk}:${pairKey}`,
+          batterLookupMs: pitchMatchupTimingMs(payload?.timing?.batterStatcastCsvMs),
+          pitcherLookupMs: pitchMatchupTimingMs(payload?.timing?.pitcherStatcastCsvMs),
+          batterSprayProfileMs: pitchMatchupTimingMs(payload?.timing?.batterSprayProfileMs),
+          preaggregationMs: pitchMatchupTimingMs(payload?.timing?.preaggregationMs),
+          dictionaryBuildMs: pitchMatchupTimingMs(payload?.timing?.dictionaryBuildMs),
+          forecastLookupMs: pitchMatchupTimingMs(payload?.timing?.forecastLookupMs),
+          contextTotalMs: pitchMatchupTimingMs(payload?.timing?.contextTotalMs),
+          contextJoinMs: pitchMatchupTimingMs(payload?.timing?.contextJoinMs),
+          cacheHit: pitchMatchupTimingMs(payload?.timing?.contextCacheHit),
+          splitCacheHit: pitchMatchupTimingMs(payload?.timing?.splitCacheHit),
+          source: payload?.source || '',
+        });
+      }
+      rows.push(...pitchMatchupPitchEventRowsForPlay({
+        date,
+        gameLabel,
+        gamePk: scheduleGame.gamePk,
+        play,
+        payload: pairPayloads.get(pairKey),
+        homeTeam: home,
+        timings: {
+          scheduleFetchMs: scheduleTimed.ms,
+          liveFeedFetchMs: liveTimed.ms,
+        },
+      }));
+    }
+    if (!rows.length && options.includeForecast === true) {
+      const forecastCard = await getForecastCardForGame(scheduleGame.gamePk);
+      if (forecastCard) {
+        const forecast = await pitchMatchupForecastRowsForGame(date, forecastCard).catch(() => null);
+        if (forecast?.rows?.length) {
+          gamesParsed += 1;
+          pitchRowsParsed += forecast.rows.length;
+          contextPairsParsed += listify(forecast.contextTimingRows).length;
+          options.onGame?.({
+            date,
+            gamePk: scheduleGame.gamePk,
+            gameLabel,
+            gamesParsed,
+            gamesTotal: games.length,
+            contextPairsParsed,
+            pitchRowsParsed,
+            elapsedMs: pitchMatchupElapsedMs(dayStartedAt),
+          });
+          return forecast;
+        }
+      }
+    }
+    const gameParseMs = pitchMatchupElapsedMs(gameStartedAt);
+    const contextMs = contextTimingRows.reduce((sum, row) => sum + (Number(row.contextTotalMs) || 0), 0);
+    const atBats = new Set(rows.map((row) => `${row.gamePk}:${row.atBatIndex}`).filter(Boolean)).size;
+    const gameTimingRow = {
+      date,
+      gamePk: scheduleGame.gamePk,
+      game: gameLabel,
+      awayTeam: away,
+      homeTeam: home,
+      pitchRows: rows.length,
+      atBats,
+      uniqueContexts: pairPayloads.size,
+      validForBacktest: rows.length > 0 && atBats > 0 && pairPayloads.size > 0 ? 1 : 0,
+      invalidReason: rows.length > 0 && atBats > 0 && pairPayloads.size > 0 ? '' : (rows.length ? 'context_missing' : 'feed_empty'),
+      liveFeedFetchMs: pitchMatchupTimingMs(liveTimed.ms),
+      gameParseMs: pitchMatchupTimingMs(gameParseMs),
+      contextMs: pitchMatchupTimingMs(contextMs),
+      writeJoinMs: 0,
+      totalGameMs: pitchMatchupTimingMs((Number(liveTimed.ms) || 0) + gameParseMs + contextMs),
+    };
+    gamesParsed += 1;
+    pitchRowsParsed += rows.length;
+    options.onGame?.({
+      date,
+      gamePk: scheduleGame.gamePk,
+      gameLabel,
+      gamesParsed,
+      gamesTotal: games.length,
+      contextPairsParsed,
+      pitchRowsParsed,
+      elapsedMs: pitchMatchupElapsedMs(dayStartedAt),
+    });
+    return { rows, gameTimingRows: [gameTimingRow], contextTimingRows };
+  });
+  const rows = rowsByGame.flatMap((entry) => listify(entry?.rows));
+  const gameTimingRows = rowsByGame.flatMap((entry) => listify(entry?.gameTimingRows));
+  const contextTimingRows = rowsByGame.flatMap((entry) => listify(entry?.contextTimingRows));
+  const contextTotalMs = contextTimingRows.reduce((sum, row) => sum + (Number(row.contextTotalMs) || 0), 0);
+  const statcastLoadMs = contextTimingRows.reduce((sum, row) => sum + (Number(row.batterLookupMs) || 0) + (Number(row.pitcherLookupMs) || 0), 0);
+  const preaggregationMs = contextTimingRows.reduce((sum, row) => sum + (Number(row.preaggregationMs) || 0), 0);
+  const dictionaryBuildMs = contextTimingRows.reduce((sum, row) => sum + (Number(row.dictionaryBuildMs) || 0), 0);
+  const forecastLookupMs = contextTimingRows.reduce((sum, row) => sum + (Number(row.forecastLookupMs) || 0), 0);
+  const contextCacheHits = contextTimingRows.filter((row) => Number(row.cacheHit) > 0).length;
+  const contextCacheMisses = Math.max(0, contextTimingRows.length - contextCacheHits);
+  const splitCacheHits = contextTimingRows.filter((row) => Number(row.splitCacheHit) > 0).length;
+  const splitCacheMisses = Math.max(0, contextTimingRows.length - splitCacheHits);
+  const totalAbs = new Set(rows.map((row) => `${row.gamePk}:${row.atBatIndex}`).filter(Boolean)).size;
+  const summaryRow = {
+    date,
+    totalGames: games.length,
+    totalPitchRows: rows.length,
+    totalAbs,
+    totalUniqueContexts: contextTimingRows.length,
+    totalRuntimeMs: pitchMatchupTimingMs(pitchMatchupElapsedMs(dayStartedAt)),
+    scheduleFetchMs: pitchMatchupTimingMs(scheduleTimed.ms),
+    statcastLoadMs: pitchMatchupTimingMs(statcastLoadMs),
+    statcastPrefetchMs: pitchMatchupTimingMs(statcastLoadMs),
+    preaggregationMs: pitchMatchupTimingMs(preaggregationMs),
+    dictionaryBuildMs: pitchMatchupTimingMs(dictionaryBuildMs),
+    forecastLookupMs: pitchMatchupTimingMs(forecastLookupMs),
+    forecastWriteMs: '',
+    contextTotalMs: pitchMatchupTimingMs(contextTotalMs),
+    writeCsvMs: '',
+    contextCacheHits,
+    contextCacheMisses,
+    contextCacheHitRate: contextTimingRows.length ? (contextCacheHits / contextTimingRows.length).toFixed(3) : '',
+    splitCacheHits,
+    splitCacheMisses,
+    splitCacheHitRate: contextTimingRows.length ? (splitCacheHits / contextTimingRows.length).toFixed(3) : '',
+  };
+  const meta = {
+    date,
+    rows,
+    gameTimingRows,
+    contextTimingRows,
+    summaryRows: [summaryRow],
+    gamesParsed,
+    gamesTotal: games.length,
+    contextPairsParsed,
+    scheduleFetchMs: scheduleTimed.ms,
+    dayParseMs: pitchMatchupElapsedMs(dayStartedAt),
+    scheduleOk: scheduleTimed.ok ? 1 : 0,
+  };
+  return options.withMeta ? meta : rows;
+}
+
+function setPitchMatchupExportWorking(isWorking = false) {
+  pitchMatchupExportInFlight = Boolean(isWorking);
+  if (pitchMatchupExportBtnEl) pitchMatchupExportBtnEl.disabled = isWorking;
+  if (pitchMatchupExportStartInputEl) pitchMatchupExportStartInputEl.disabled = isWorking;
+  if (pitchMatchupExportEndInputEl) pitchMatchupExportEndInputEl.disabled = isWorking;
+  if (pitchMatchupExportRunBtnEl) pitchMatchupExportRunBtnEl.disabled = isWorking;
+  if (pitchMatchupExportCancelBtnEl) pitchMatchupExportCancelBtnEl.disabled = isWorking;
+  if (pitchMatchupExportCloseBtnEl) pitchMatchupExportCloseBtnEl.disabled = isWorking;
+}
+
+function setPitchMatchupExportProgress(done = 0, total = 1, text = '') {
+  const safeTotal = Math.max(1, Number(total) || 1);
+  const safeDone = clamp(Number(done) || 0, 0, safeTotal);
+  if (pitchMatchupExportProgressEl) {
+    pitchMatchupExportProgressEl.max = safeTotal;
+    pitchMatchupExportProgressEl.value = safeDone;
+  }
+  if (pitchMatchupExportStatusEl && text) pitchMatchupExportStatusEl.textContent = text;
+}
+
+function pitchMatchupExportStatusText(state = {}) {
+  const totalDays = Math.max(1, Number(state.totalDays) || 1);
+  const completedDays = clamp(Number(state.completedDays) || 0, 0, totalDays);
+  const activeGamesDone = Math.max(0, Number(state.activeGamesDone) || 0);
+  const activeGamesTotal = Math.max(0, Number(state.activeGamesTotal) || 0);
+  const activeDayFraction = activeGamesTotal > 0 ? activeGamesDone / activeGamesTotal : 0;
+  const progressUnits = Math.min(totalDays, completedDays + activeDayFraction);
+  const elapsedMs = Math.max(0, Number(state.elapsedMs) || 0);
+  const ratePerDay = progressUnits > 0 && elapsedMs > 0 ? progressUnits / (elapsedMs / 1000) : 0;
+  const etaMs = ratePerDay > 0 ? ((totalDays - progressUnits) / ratePerDay) * 1000 : 0;
+  const gamesParsed = Math.max(0, Number(state.gamesParsed) || 0);
+  const gamesKnown = Math.max(gamesParsed, Number(state.gamesKnown) || 0);
+  const rows = Math.max(0, Number(state.rows) || 0);
+  const pairs = Math.max(0, Number(state.contextPairs) || 0);
+  const activeDate = state.activeDate ? ` | ${state.activeDate}` : '';
+  const gameText = gamesKnown > 0 ? `${gamesParsed}/${gamesKnown} games` : `${gamesParsed} games`;
+  const etaText = progressUnits > 0 && progressUnits < totalDays ? ` | ETA ${pitchMatchupFormatDuration(etaMs)}` : '';
+  return `${Math.round((progressUnits / totalDays) * 100)}%${activeDate} | Days ${completedDays}/${totalDays} | ${gameText} parsed | ${rows} pitch rows | ${pairs} contexts | Elapsed ${pitchMatchupFormatDuration(elapsedMs)}${etaText}`;
+}
+
+function openPitchMatchupExportDialog() {
+  const selected = parseFlexibleDateInput(dateInput.value) || formatDate(new Date());
+  if (pitchMatchupExportStartInputEl) pitchMatchupExportStartInputEl.value = selected;
+  if (pitchMatchupExportEndInputEl) pitchMatchupExportEndInputEl.value = selected;
+  setPitchMatchupExportProgress(0, 1, 'Choose a date range to export pitch-by-pitch matchup context and actual results.');
+  setPitchMatchupExportWorking(false);
+  if (pitchMatchupExportDialogEl?.showModal) pitchMatchupExportDialogEl.showModal();
+  else if (pitchMatchupExportDialogEl) pitchMatchupExportDialogEl.hidden = false;
+}
+
+function closePitchMatchupExportDialog() {
+  if (pitchMatchupExportInFlight) return;
+  if (pitchMatchupExportDialogEl?.open) pitchMatchupExportDialogEl.close();
+  else if (pitchMatchupExportDialogEl) pitchMatchupExportDialogEl.hidden = true;
+}
+
+async function exportPitchMatchupsForRange(startDate, endDate = startDate) {
+  const range = dateRangeInclusive(startDate, endDate);
+  const total = range.dates.length;
+  const allRows = [];
+  const allForecastSummaryRows = [];
+  const allGameTimingRows = [];
+  const allContextTimingRows = [];
+  const allSummaryRows = [];
+  const exportStartedAt = pitchMatchupNowMs();
+  let gamesParsedTotal = 0;
+  let gamesKnownTotal = 0;
+  let contextPairsTotal = 0;
+  setPitchMatchupExportWorking(true);
+  setPitchMatchupExportProgress(0, total, `Preparing ${total} day${total === 1 ? '' : 's'}...`);
+  try {
+    for (let index = 0; index < range.dates.length; index += 1) {
+      const day = range.dates[index];
+      const priorGamesParsed = gamesParsedTotal;
+      const priorGamesKnown = gamesKnownTotal;
+      const priorContextPairs = contextPairsTotal;
+      setPitchMatchupExportProgress(index, total, pitchMatchupExportStatusText({
+        totalDays: total,
+        completedDays: index,
+        activeDate: day,
+        gamesParsed: gamesParsedTotal,
+        gamesKnown: gamesKnownTotal,
+        rows: allRows.length,
+        contextPairs: contextPairsTotal,
+        elapsedMs: pitchMatchupElapsedMs(exportStartedAt),
+      }));
+      const meta = await pitchMatchupRowsForDate(day, {
+        withMeta: true,
+        includeForecast: true,
+        onGame: (progress) => {
+          setPitchMatchupExportProgress(index + ((Number(progress.gamesParsed) || 0) / Math.max(1, Number(progress.gamesTotal) || 1)), total, pitchMatchupExportStatusText({
+            totalDays: total,
+            completedDays: index,
+            activeDate: day,
+            activeGamesDone: progress.gamesParsed,
+            activeGamesTotal: progress.gamesTotal,
+            gamesParsed: priorGamesParsed + (Number(progress.gamesParsed) || 0),
+            gamesKnown: priorGamesKnown + (Number(progress.gamesTotal) || 0),
+            rows: allRows.length + (Number(progress.pitchRowsParsed) || 0),
+            contextPairs: priorContextPairs + (Number(progress.contextPairsParsed) || 0),
+            elapsedMs: pitchMatchupElapsedMs(exportStartedAt),
+          }));
+        },
+      }).catch(() => ({ rows: [], gamesParsed: 0, gamesTotal: 0, contextPairsParsed: 0 }));
+      const rows = listify(meta.rows);
+      allRows.push(...rows);
+      const forecastSummaryRows = await pitchMatchupUiSlateSummaryRows(null, day).catch(() => []);
+      allForecastSummaryRows.push(...listify(forecastSummaryRows));
+      allGameTimingRows.push(...listify(meta.gameTimingRows));
+      allContextTimingRows.push(...listify(meta.contextTimingRows));
+      allSummaryRows.push(...listify(meta.summaryRows));
+      gamesParsedTotal += Number(meta.gamesParsed) || 0;
+      gamesKnownTotal += Number(meta.gamesTotal) || 0;
+      contextPairsTotal += Number(meta.contextPairsParsed) || 0;
+      setPitchMatchupExportProgress(index + 1, total, pitchMatchupExportStatusText({
+        totalDays: total,
+        completedDays: index + 1,
+        activeDate: day,
+        gamesParsed: gamesParsedTotal,
+        gamesKnown: gamesKnownTotal,
+        rows: allRows.length,
+        contextPairs: contextPairsTotal,
+        elapsedMs: pitchMatchupElapsedMs(exportStartedAt),
+      }));
+      await new Promise((resolve) => setTimeout(resolve, 25));
+    }
+    const writeStartedAt = pitchMatchupNowMs();
+    pitchMatchupApplyNoZoneAuditFields(allRows);
+    const batterSummaryRows = allForecastSummaryRows.length
+      ? pitchMatchupApplyV7SummaryScores(allForecastSummaryRows)
+      : pitchMatchupApplyV7SummaryScores(pitchMatchupBatterSummaryRows(allRows));
+    const forecastBatterRows = batterSummaryRows.filter((row) => pitchMatchupTruth(row.eligibleForPregameCard));
+    const teamPressureRows = pitchMatchupTeamPressureRows(forecastBatterRows);
+    const gamePredictionRows = pitchMatchupGamePredictionRows(teamPressureRows);
+    const paActualRows = pitchMatchupPaActualRows(allRows);
+    const batterGameActualRows = pitchMatchupBatterGameActualRows(paActualRows);
+    const verificationRows = pitchMatchupVerificationReport({
+      forecastRows: forecastBatterRows,
+      teamRows: teamPressureRows,
+      gameRows: gamePredictionRows,
+      paRows: paActualRows,
+      gameTimingRows: allGameTimingRows.filter((row) => Number(row.validForBacktest) > 0),
+      summaryRows: allSummaryRows,
+    });
+    const verificationFailed = verificationRows.some((row) => row.status === 'FAIL');
+    const forecastScoreValidationFailed = verificationRows.some((row) => row.fileName === 'pitch_matchup_forecast_batter_summary' && row.status === 'FAIL');
+    const gamePredictionBacktestRows = [{
+      export_range_start: range.startDate,
+      export_range_end: range.endDate,
+      score_version: 'hr_score_v9_no_zone',
+      forecast_batters: forecastBatterRows.length,
+      plate_appearances: paActualRows.length,
+      batter_actual_rows: batterGameActualRows.length,
+      accuracy: verificationFailed ? 'blocked_by_validation_failure' : '',
+      run_margin_correlation: '',
+      total_runs_correlation: '',
+      feature_importance: 'pending_historical_backtest',
+      optimized_weights: 'not_optimized_current_export_uses_initial_weights',
+      baseline_comparison: 'pending',
+    }];
+    const backtestColumns = [
+      { key: 'export_range_start', header: 'export_range_start' },
+      { key: 'export_range_end', header: 'export_range_end' },
+      { key: 'score_version', header: 'score_version' },
+      { key: 'forecast_batters', header: 'forecast_batters' },
+      { key: 'plate_appearances', header: 'plate_appearances' },
+      { key: 'batter_actual_rows', header: 'batter_actual_rows' },
+      { key: 'accuracy', header: 'accuracy' },
+      { key: 'run_margin_correlation', header: 'run_margin_correlation' },
+      { key: 'total_runs_correlation', header: 'total_runs_correlation' },
+      { key: 'feature_importance', header: 'feature_importance' },
+      { key: 'optimized_weights', header: 'optimized_weights' },
+      { key: 'baseline_comparison', header: 'baseline_comparison' },
+    ];
+    const writeCsvMs = pitchMatchupElapsedMs(writeStartedAt);
+    for (const row of allSummaryRows) {
+      row.writeCsvMs = pitchMatchupTimingMs(writeCsvMs);
+      row.forecastWriteMs = pitchMatchupTimingMs(writeCsvMs);
+    }
+    const perGameWriteMs = allGameTimingRows.length ? writeCsvMs / allGameTimingRows.length : 0;
+    for (const row of allGameTimingRows) {
+      row.writeJoinMs = pitchMatchupTimingMs(perGameWriteMs);
+      row.totalGameMs = pitchMatchupTimingMs(
+        (Number(row.liveFeedFetchMs) || 0)
+        + (Number(row.gameParseMs) || 0)
+        + (Number(row.contextMs) || 0)
+        + perGameWriteMs,
+      );
+    }
+    const suffix = range.startDate === range.endDate ? range.startDate : `${range.startDate}_to_${range.endDate}`;
+    const forecastFilename = forecastScoreValidationFailed
+      ? `pitch_matchup_forecast_FAILED_VALIDATION_${suffix}.csv`
+      : `pitch_matchup_forecast_batter_summary_${suffix}.csv`;
+    const downloadJobs = [
+      [forecastFilename, forecastBatterRows, pitchMatchupBatterSummaryColumns()],
+      [`team_offensive_pressure_${suffix}.csv`, teamPressureRows, pitchMatchupTeamPressureColumns()],
+      [`game_prediction_features_${suffix}.csv`, gamePredictionRows, pitchMatchupGamePredictionColumns()],
+      [`pitch_matchup_pa_actuals_${suffix}.csv`, paActualRows, pitchMatchupPaActualColumns()],
+      [`data_verification_report_${suffix}.csv`, verificationRows, pitchMatchupVerificationColumns()],
+      [`game_prediction_backtest_summary_${suffix}.csv`, gamePredictionBacktestRows, backtestColumns],
+      [`pitch_matchup_game_timing_${suffix}.csv`, allGameTimingRows, pitchMatchupGameTimingColumns()],
+      [`pitch_matchup_context_timing_${suffix}.csv`, allContextTimingRows, pitchMatchupContextTimingColumns()],
+      [`pitch_matchup_daily_summary_${suffix}.csv`, allSummaryRows, pitchMatchupDailySummaryColumns()],
+    ];
+    if (allRows.length > 0 && allRows.length <= 12000) {
+      downloadJobs.splice(5, 0, [`pitch_matchup_actuals_debug_${suffix}.csv`, allRows, pitchMatchupExportColumns()]);
+    }
+    for (const [jobName, jobRows, jobColumns] of downloadJobs) {
+      downloadCsvRowsFile(jobName, jobRows, jobColumns);
+      await new Promise((resolve) => setTimeout(resolve, 75));
+    }
+    setPitchMatchupExportProgress(total, total, `Export complete: ${forecastBatterRows.length} forecast batters | ${paActualRows.length} PA actuals | ${gamesParsedTotal}/${gamesKnownTotal || gamesParsedTotal} games | ${contextPairsTotal} contexts | ${pitchMatchupFormatDuration(pitchMatchupElapsedMs(exportStartedAt))}${verificationFailed ? ' | validation warnings in report' : ''}.`);
+  } catch (error) {
+    console.error('Pitch matchup export failed', error);
+    const message = error?.message ? ` ${error.message}` : '';
+    setPitchMatchupExportProgress(Math.min(total, allRows.length ? pitchMatchupExportProgressEl?.value || 0 : 0), total, `Export failed.${message}`);
+  } finally {
+    setPitchMatchupExportWorking(false);
+  }
+}
+
+function initPitchMatchupExportControl() {
+  pitchMatchupExportBtnEl?.addEventListener('click', openPitchMatchupExportDialog);
+  pitchMatchupExportCloseBtnEl?.addEventListener('click', closePitchMatchupExportDialog);
+  pitchMatchupExportCancelBtnEl?.addEventListener('click', closePitchMatchupExportDialog);
+  pitchMatchupExportDialogEl?.addEventListener('cancel', (event) => {
+    if (pitchMatchupExportInFlight) event.preventDefault();
+  });
+  pitchMatchupExportFormEl?.addEventListener('submit', (event) => {
+    event.preventDefault();
+    if (pitchMatchupExportInFlight) return;
+    const fallback = parseFlexibleDateInput(dateInput.value) || formatDate(new Date());
+    const startDate = parseFlexibleDateInput(pitchMatchupExportStartInputEl?.value || '') || fallback;
+    const endDate = parseFlexibleDateInput(pitchMatchupExportEndInputEl?.value || '') || startDate;
+    exportPitchMatchupsForRange(startDate, endDate);
+  });
+}
+
 function playerStatHeatMapSplitRows(row = {}, fallback = null) {
   const valueFor = (prefix, key, alt = null) => {
     const direct = cleanSummary(row[`batter_vs_${prefix}_${key}`]);
@@ -29404,7 +34168,7 @@ function pitcherHeatMapLineupHtml(lineup = [], signalMaps = {}) {
 
 async function getPitcherHeatMapRecentStatsMap(game, lineup = []) {
   const ids = [...new Set(lineup.map((entry) => Number(entry?.id)).filter((id) => Number.isFinite(id) && id > 0))];
-  const pairs = await mapWithConcurrency(ids, 6, async (id) => {
+  const pairs = await mapWithConcurrency(ids, 10, async (id) => {
     const stats = await getLineupRecentBattingStats(id, game, 7).catch(() => null);
     return stats ? [String(id), stats] : null;
   });
@@ -29564,7 +34328,7 @@ function pitcherHeatMapLineupForContext() {
 }
 
 function navigatePitcherHeatMapLineup(step = 1) {
-  if (!playerStatOverlayEl || playerStatOverlayEl.hidden || currentPlayerStatTab !== 'heatmap') return false;
+  if (!playerStatOverlayEl || playerStatOverlayEl.hidden || !['heatmap', 'pitchmatchup'].includes(currentPlayerStatTab)) return false;
   const profile = activePlayerStatContext?.profile || null;
   const game = activePlayerStatContext?.game || null;
   if (!profile || !game || !isPitcherProfile(profile)) return false;
@@ -29573,15 +34337,92 @@ function navigatePitcherHeatMapLineup(step = 1) {
   const currentIndex = Math.max(0, lineup.findIndex((entry) => String(entry?.id || '') === String(pitcherHeatMapSelectedBatterId || '')));
   const nextIndex = (currentIndex + Number(step || 1) + lineup.length) % lineup.length;
   pitcherHeatMapSelectedBatterId = String(lineup[nextIndex]?.id || '');
-  renderPlayerStatHeatMap(profile, game);
+  if (currentPlayerStatTab === 'pitchmatchup') renderPlayerStatPitchMatchup(profile, game);
+  else renderPlayerStatHeatMap(profile, game);
   return true;
 }
 
+async function renderPlayerStatPitchMatchup(profile, game) {
+  if (!playerStatPitchMatchupEl) return;
+  playerStatPitchMatchupEl.innerHTML = '<div class="player-stat-loading">Loading pitch matchup...</div>';
+  if (!profile || !game) {
+    playerStatPitchMatchupEl.innerHTML = '<div class="player-stat-loading">Pitch Matchup needs a game context.</div>';
+    return;
+  }
+  let batterProfile = profile;
+  let pitcherProfile = null;
+  if (isPitcherProfile(profile)) {
+    const side = playerStatPitcherSideForProfile(profile, game);
+    const opponentSide = side === 'away' ? 'home' : side === 'home' ? 'away' : '';
+    const lineup = opponentSide ? activeLineupForRecognition(game, opponentSide) : [];
+    if (!pitcherHeatMapSelectedBatterId || !lineup.some((entry) => String(entry?.id || '') === String(pitcherHeatMapSelectedBatterId))) {
+      pitcherHeatMapSelectedBatterId = String(lineup[0]?.id || '');
+    }
+    batterProfile = await resolvePitcherHeatMapBatterProfile(game, lineup, pitcherHeatMapSelectedBatterId).catch(() => null);
+    pitcherProfile = profile;
+  } else {
+    pitcherProfile = currentMatchupPitcher(profile, game);
+  }
+  if (!batterProfile?.id || !pitcherProfile?.id) {
+    playerStatPitchMatchupEl.innerHTML = '<div class="player-stat-loading">No batter-pitcher matchup is available yet.</div>';
+    return;
+  }
+  const batterName = batterProfile.fullName || batterProfile.name || 'Batter';
+  const pitcherName = pitcherProfile.fullName || pitcherProfile.name || 'Pitcher';
+  const matchupDate = dateInput.value || formatDate(new Date());
+  const [slateSummaryRows, pitcherStarts] = await Promise.all([
+    pitchMatchupUiSlateSummaryRows(game, matchupDate),
+    getPitcherLastThreeStarts(pitcherProfile.id, game, pitcherProfile).catch(() => []),
+  ]);
+  const uiSummary = pitchMatchupUiSummaryForPair(slateSummaryRows, batterProfile.id, pitcherProfile.id);
+  const pitcherInfoHtml = pitcherLastThreeStartsHtml(pitcherStarts, pitcherShouldUseStartHistory(pitcherProfile) ? 'Last 3 Starts' : 'Last 3 Apps');
+  const selectedLineup = isPitcherProfile(profile)
+    ? `<section class="player-heatmap-table-panel"><h3>Selected Batter</h3><div class="player-heatmap-metric-table"><div class="player-heatmap-metric-row"><span>${escapeHtml(batterName)}</span><b>${escapeHtml(batterProfile.position || '')}</b><b>${escapeHtml(batterProfile.bats || '')}</b></div></div></section>`
+    : '';
+  playerStatPitchMatchupEl.innerHTML = `<div class="player-stat-pitch-matchup-panel">
+    ${selectedLineup}
+    ${pitchMatchupShell({
+      batterId: batterProfile.id,
+      pitcherId: pitcherProfile.id,
+      date: matchupDate,
+      batterName,
+      pitcherName,
+      hrScoreV7: uiSummary?.hrScoreV7 || '',
+      hrScoreV820: uiSummary?.hrScoreV820 || '',
+      hrScoreV10NoZone: uiSummary?.hrScoreV10NoZone || '',
+      hitterPowerBaseline: uiSummary?.hitterPowerBaseline || '',
+      hrScoreV9NoZone: uiSummary?.hrScoreV9NoZone || '',
+      oldHrScoreWithZone: uiSummary?.oldHrScoreWithZone || '',
+      hrScoreV9NoZoneCautionReason: uiSummary?.hrScoreV9NoZoneCautionReason || '',
+      hrEruptionScore: uiSummary?.hrEruptionScore || '',
+      recentHeatScore: uiSummary?.recentHeatScore || '',
+      pcmi: uiSummary?.pcmi || '',
+      finalHrDamageScore: uiSummary?.finalHrDamageScore || '',
+      candidateLabel: uiSummary?.candidateLabel || '',
+      v7CautionReason: uiSummary?.v7CautionReason || '',
+      hrScoreV820CautionReason: uiSummary?.hrScoreV820CautionReason || '',
+      zoneConfirmedFlag: uiSummary?.zoneConfirmedFlag || '',
+      zoneConfirmedReason: uiSummary?.zoneConfirmedReason || '',
+      hotPlayableFlag: uiSummary?.hotPlayableFlag || '',
+      hotPlayableReason: uiSummary?.hotPlayableReason || '',
+      splitPowerNonZoneCandidate: uiSummary?.splitPowerNonZoneCandidate || '',
+      activeHrEruptionFlag: uiSummary?.activeHrEruptionFlag || '',
+      extremeHrEruptionFlag: uiSummary?.extremeHrEruptionFlag || '',
+      hrEruptionReason: uiSummary?.hrEruptionReason || '',
+      fallbackTrapFlag: uiSummary?.fallbackTrapFlag || '',
+      fallbackTrapReason: uiSummary?.fallbackTrapReason || '',
+      pitcherInfoHtml,
+    })}
+  </div>`;
+  hydratePitchMatchupShells(playerStatPitchMatchupEl);
+}
+
 function setPlayerStatTab(tab = 'stats') {
-  currentPlayerStatTab = tab === 'heatmap' ? 'heatmap' : 'stats';
+  currentPlayerStatTab = ['heatmap', 'pitchmatchup'].includes(tab) ? tab : 'stats';
   const bodyEl = playerStatOverlayEl?.querySelector?.('.player-stat-body');
   if (bodyEl) bodyEl.hidden = currentPlayerStatTab !== 'stats';
   if (playerStatHeatmapEl) playerStatHeatmapEl.hidden = currentPlayerStatTab !== 'heatmap';
+  if (playerStatPitchMatchupEl) playerStatPitchMatchupEl.hidden = currentPlayerStatTab !== 'pitchmatchup';
   for (const button of playerStatTabBtns) {
     const active = button.dataset.playerStatTab === currentPlayerStatTab;
     button.classList.toggle('active', active);
@@ -29589,6 +34430,8 @@ function setPlayerStatTab(tab = 'stats') {
   }
   if (currentPlayerStatTab === 'heatmap') {
     renderPlayerStatHeatMap(activePlayerStatContext?.profile, activePlayerStatContext?.game);
+  } else if (currentPlayerStatTab === 'pitchmatchup') {
+    renderPlayerStatPitchMatchup(activePlayerStatContext?.profile, activePlayerStatContext?.game);
   }
 }
 
@@ -30432,6 +35275,14 @@ async function syncLineupOverlay(game, options = {}) {
   const homeLineupListEl = lineupOverlayEl.querySelector('.home-lineup-list');
   const awayHasConfirmedLineup = hasTrustedLineupOrder(game, 'away');
   const homeHasConfirmedLineup = hasTrustedLineupOrder(game, 'home');
+  if (awayHasConfirmedLineup || homeHasConfirmedLineup) {
+    const prewarmDate = officialDateForGame(game);
+    const prewarmSignature = pitchMatchupOfficialLineupSignature(game);
+    if (pitchMatchupUiSlatePrewarmSignatures.get(prewarmDate) !== prewarmSignature) {
+      pitchMatchupUiSlatePrewarmSignatures.set(prewarmDate, prewarmSignature);
+      setTimeout(() => prewarmPitchMatchupUiSlateForDate(prewarmDate), 250);
+    }
+  }
   let awayDisplayLineup = fallbackTeamLineupFromLookup(game, 'away');
   let homeDisplayLineup = fallbackTeamLineupFromLookup(game, 'home');
   const awayInitialComplete = !lineupNeedsCompletion(awayDisplayLineup);
@@ -30752,6 +35603,23 @@ function initLineupOverlay() {
       toggleLiveLabReplayPause();
       return;
     }
+    const liveBtn = e.target.closest('#liveLabLiveBtn');
+    if (liveBtn) {
+      e.preventDefault();
+      e.stopPropagation();
+      stopLiveLabReplay();
+      liveLabManualPlayerSelection = false;
+      liveLabSelectedPlayerId = '';
+      liveLabSelectedOutcomeKey = '';
+      liveLabSelectedPitchKey = '';
+      liveLabPitchFingerprint = '';
+      liveLabOutcomeFingerprint = '';
+      liveLabFollowPlayKey = '';
+      liveLabLiveOverlayKey = '';
+      liveLabLiveInPlayTraceKey = '';
+      if (activeLineupGame) renderLineupLiveLab(activeLineupGame);
+      return;
+    }
     const replayBtn = e.target.closest('#liveLabReplayBtn');
     if (replayBtn) {
       e.preventDefault();
@@ -30788,6 +35656,7 @@ function initLineupOverlay() {
     if (liveOutcome) {
       e.preventDefault();
       e.stopPropagation();
+      liveLabManualPlayerSelection = true;
       liveLabSelectedOutcomeKey = liveOutcome.dataset.liveOutcomeKey || '';
       liveLabSelectedPitchKey = '';
       liveLabPitchFingerprint = '';
@@ -30799,6 +35668,7 @@ function initLineupOverlay() {
     if (livePitchMarker) {
       e.preventDefault();
       e.stopPropagation();
+      liveLabManualPlayerSelection = true;
       liveLabSelectedPitchKey = livePitchMarker.dataset.livePitchKey || livePitchMarker.dataset.livePitchNumber || '';
       if (activeLineupGame) renderLineupLiveLab(activeLineupGame);
       return;
@@ -30807,6 +35677,7 @@ function initLineupOverlay() {
     if (liveZone) {
       e.preventDefault();
       e.stopPropagation();
+      liveLabManualPlayerSelection = true;
       liveLabSelectedPitchKey = '';
       if (activeLineupGame) renderLineupLiveLab(activeLineupGame);
       return;
@@ -31801,6 +36672,7 @@ window.addEventListener('beforeunload', () => persistManualStateSnapshot());
 
 compactExistingStorage();
 initThemePicker();
+initPitchMatchupExportControl();
 initOverlayPageControl();
 initOverlayKeyboardShortcuts();
 initDateKeyboardShortcuts();

@@ -390,6 +390,19 @@ body.dashboard-page .pitcher-opponent-history-col span {
   font: 900 0.52rem/1 var(--font-ui);
 }
 
+body.dashboard-page .pitcher-opponent-history-col .batter-series-starter.is-hr-game {
+  color: inherit;
+  font-style: italic;
+}
+
+body.dashboard-page .pitcher-opponent-history-col .batter-series-starter.is-hr-off-starter {
+  color: inherit;
+  font-weight: 1000;
+  text-decoration: underline;
+  text-decoration-thickness: 1px;
+  text-underline-offset: 2px;
+}
+
 body.dashboard-page .pitcher-opponent-strength {
   width: 100%;
   display: grid;
@@ -451,6 +464,189 @@ body.dashboard-page .live-lab-mobile-matchups,
 body.dashboard-page .live-lab-mobile-field-chip,
 body.dashboard-page .live-lab-mobile-counts {
   display: none;
+}
+
+@media (min-width: 721px) {
+  body.dashboard-page.lineup-split-view .lineup-overlay.is-live-view .lineup-modal-body,
+  body.dashboard-page.lineup-embed-page .lineup-overlay.is-live-view .lineup-modal-body {
+    overflow-y: auto;
+    overflow-x: hidden;
+    -webkit-overflow-scrolling: touch;
+  }
+
+  body.dashboard-page.lineup-split-view .lineup-overlay.is-live-view .lineup-live-lab-grid,
+  body.dashboard-page.lineup-embed-page .lineup-overlay.is-live-view .lineup-live-lab-grid {
+    height: auto;
+    min-height: 100%;
+    max-height: none;
+    grid-template-columns: minmax(0, 1fr);
+    grid-template-areas: "center";
+    gap: 5px;
+    padding: 5px;
+    overflow: visible;
+    background:
+      radial-gradient(circle at 8% 6%, rgba(var(--live-away-rgb, 102, 217, 255), 0.12), transparent 26%),
+      radial-gradient(circle at 92% 6%, rgba(var(--live-home-rgb, 255, 209, 102), 0.11), transparent 26%),
+      linear-gradient(180deg, rgba(4, 10, 18, 0.96), rgba(4, 11, 19, 0.92));
+  }
+
+  body.dashboard-page.lineup-split-view .lineup-overlay.is-live-view .live-lab-away-side,
+  body.dashboard-page.lineup-split-view .lineup-overlay.is-live-view .live-lab-home-side,
+  body.dashboard-page.lineup-embed-page .lineup-overlay.is-live-view .live-lab-away-side,
+  body.dashboard-page.lineup-embed-page .lineup-overlay.is-live-view .live-lab-home-side {
+    display: none;
+  }
+
+  body.dashboard-page.lineup-split-view .lineup-overlay.is-live-view .live-lab-center,
+  body.dashboard-page.lineup-embed-page .lineup-overlay.is-live-view .live-lab-center {
+    min-height: 0;
+    grid-template-rows: auto auto minmax(220px, 38vh) auto auto;
+    gap: 5px;
+  }
+
+  body.dashboard-page.lineup-split-view .lineup-overlay.is-live-view .live-lab-mobile-matchups,
+  body.dashboard-page.lineup-embed-page .lineup-overlay.is-live-view .live-lab-mobile-matchups {
+    display: grid;
+    gap: 5px;
+    padding: 5px;
+    border: 1px solid color-mix(in srgb, var(--line) 76%, transparent);
+    border-radius: 8px;
+    background:
+      linear-gradient(90deg, color-mix(in srgb, var(--mobile-pitching-color, #ffd166) 16%, transparent), transparent 40%, color-mix(in srgb, var(--mobile-batting-color, #7bd0ff) 14%, transparent)),
+      rgba(3, 9, 16, 0.86);
+  }
+
+  body.dashboard-page.lineup-split-view .lineup-overlay.is-live-view .live-lab-field-shell,
+  body.dashboard-page.lineup-embed-page .lineup-overlay.is-live-view .live-lab-field-shell {
+    min-height: 220px;
+    aspect-ratio: 16 / 9;
+  }
+
+  body.dashboard-page.lineup-split-view .lineup-overlay.is-live-view .live-lab-field,
+  body.dashboard-page.lineup-embed-page .lineup-overlay.is-live-view .live-lab-field {
+    min-height: 220px;
+  }
+
+  body.dashboard-page.lineup-split-view .lineup-overlay.is-live-view .live-lab-mobile-field-chip,
+  body.dashboard-page.lineup-embed-page .lineup-overlay.is-live-view .live-lab-mobile-field-chip {
+    display: block;
+  }
+
+  body.dashboard-page.lineup-split-view .lineup-overlay.is-live-view .live-lab-mobile-statcast,
+  body.dashboard-page.lineup-split-view .lineup-overlay.is-live-view .live-lab-mobile-pitch-info,
+  body.dashboard-page.lineup-embed-page .lineup-overlay.is-live-view .live-lab-mobile-statcast,
+  body.dashboard-page.lineup-embed-page .lineup-overlay.is-live-view .live-lab-mobile-pitch-info {
+    display: block;
+    font-size: 0.58rem;
+  }
+
+  body.dashboard-page.lineup-split-view .lineup-overlay.is-live-view .live-lab-mobile-counts,
+  body.dashboard-page.lineup-embed-page .lineup-overlay.is-live-view .live-lab-mobile-counts {
+    display: grid;
+    gap: 3px;
+  }
+
+  body.dashboard-page.lineup-split-view .lineup-overlay.is-live-view .live-lab-play,
+  body.dashboard-page.lineup-embed-page .lineup-overlay.is-live-view .live-lab-play {
+    grid-template-columns: minmax(0, 1fr);
+    padding: 8px 9px;
+    min-height: 0;
+  }
+
+  body.dashboard-page.lineup-split-view .lineup-overlay.is-live-view .live-lab-play h3,
+  body.dashboard-page.lineup-embed-page .lineup-overlay.is-live-view .live-lab-play h3 {
+    white-space: normal;
+    font-size: 0.9rem;
+  }
+
+  body.dashboard-page.lineup-split-view .lineup-overlay.is-live-view .live-lab-play p,
+  body.dashboard-page.lineup-embed-page .lineup-overlay.is-live-view .live-lab-play p {
+    color: var(--text);
+    font-size: 0.76rem;
+  }
+
+  body.dashboard-page.lineup-split-view .lineup-overlay.is-live-view .live-lab-pitch-row,
+  body.dashboard-page.lineup-embed-page .lineup-overlay.is-live-view .live-lab-pitch-row {
+    grid-template-columns: minmax(160px, 0.82fr) minmax(0, 1.18fr);
+  }
+
+  body.dashboard-page.lineup-split-view .lineup-overlay.is-live-view .live-lab-metrics,
+  body.dashboard-page.lineup-embed-page .lineup-overlay.is-live-view .live-lab-metrics {
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+  }
+}
+
+@media (min-width: 721px) {
+  body.dashboard-page.lineup-split-view .lineup-overlay.is-live-view .lineup-modal {
+    border-radius: 8px;
+  }
+
+  body.dashboard-page.lineup-split-view .lineup-overlay.is-live-view .lineup-modal-body {
+    overflow: hidden !important;
+  }
+
+  body.dashboard-page.lineup-split-view .lineup-overlay.is-live-view .lineup-live-lab-grid {
+    width: 100% !important;
+    height: 100% !important;
+    min-height: 0 !important;
+    max-height: 100% !important;
+    display: grid !important;
+    grid-template-columns: minmax(0, 1fr) !important;
+    grid-template-areas: "center" !important;
+    gap: 5px !important;
+    padding: 5px !important;
+    overflow: hidden !important;
+  }
+
+  body.dashboard-page.lineup-split-view .lineup-overlay.is-live-view .live-lab-away-side,
+  body.dashboard-page.lineup-split-view .lineup-overlay.is-live-view .live-lab-home-side {
+    display: none !important;
+  }
+
+  body.dashboard-page.lineup-split-view .lineup-overlay.is-live-view .live-lab-center {
+    grid-area: center !important;
+    width: 100% !important;
+    height: 100% !important;
+    min-width: 0 !important;
+    min-height: 0 !important;
+    overflow-y: auto !important;
+    overflow-x: hidden !important;
+    grid-template-rows: auto auto minmax(190px, clamp(220px, 32vh, 320px)) auto minmax(118px, auto) !important;
+    gap: 5px !important;
+    scrollbar-width: thin;
+  }
+
+  body.dashboard-page.lineup-split-view .lineup-overlay.is-live-view .live-lab-field-shell,
+  body.dashboard-page.lineup-split-view .lineup-overlay.is-live-view .live-lab-play,
+  body.dashboard-page.lineup-split-view .lineup-overlay.is-live-view .live-lab-pitch-row {
+    width: 100% !important;
+    min-width: 0 !important;
+    justify-self: stretch !important;
+  }
+
+  body.dashboard-page.lineup-split-view .lineup-overlay.is-live-view .live-lab-field-shell {
+    min-height: 190px !important;
+    max-height: clamp(220px, 32vh, 320px) !important;
+    aspect-ratio: 16 / 9 !important;
+  }
+
+  body.dashboard-page.lineup-split-view .lineup-overlay.is-live-view .live-lab-field {
+    width: 100% !important;
+    min-height: 190px !important;
+  }
+
+  body.dashboard-page.lineup-split-view .lineup-overlay.is-live-view .live-lab-play {
+    grid-template-columns: minmax(0, 1fr) !important;
+    padding: 8px 9px !important;
+  }
+
+  body.dashboard-page.lineup-split-view .lineup-overlay.is-live-view .live-lab-pitch-row {
+    grid-template-columns: minmax(160px, 0.82fr) minmax(0, 1.18fr) !important;
+  }
+
+  body.dashboard-page.lineup-split-view .lineup-overlay.is-live-view .live-lab-metrics {
+    grid-template-columns: repeat(2, minmax(0, 1fr)) !important;
+  }
 }
 
 body.dashboard-page .live-lab-lineup,
@@ -744,10 +940,31 @@ body.dashboard-page .live-lab-replay-btn {
   cursor: pointer;
 }
 
-body.dashboard-page .live-lab-replay-pause-btn {
+body.dashboard-page .live-lab-live-btn {
   position: absolute;
   right: 10px;
   bottom: 46px;
+  z-index: 7;
+  min-height: 28px;
+  min-width: 58px;
+  padding: 0 11px;
+  border: 1px solid color-mix(in srgb, #7bd0ff 76%, var(--line) 24%);
+  border-radius: 7px;
+  background:
+    linear-gradient(180deg, rgba(255,255,255,0.13), transparent 60%),
+    color-mix(in srgb, #0d4258 54%, var(--panel-head) 46%);
+  color: var(--text);
+  font: 950 0.63rem var(--font-ui);
+  letter-spacing: 0.05em;
+  text-transform: uppercase;
+  box-shadow: 0 8px 20px rgba(0,0,0,0.34), 0 0 18px rgba(123,208,255,0.2);
+  cursor: pointer;
+}
+
+body.dashboard-page .live-lab-replay-pause-btn {
+  position: absolute;
+  right: 10px;
+  bottom: 82px;
   z-index: 7;
   min-height: 27px;
   min-width: 72px;
@@ -768,7 +985,7 @@ body.dashboard-page .live-lab-replay-pause-btn {
 body.dashboard-page .live-lab-replay-speed-controls {
   position: absolute;
   right: 10px;
-  bottom: 82px;
+  bottom: 118px;
   z-index: 7;
   display: grid;
   grid-template-columns: repeat(4, 34px);
@@ -815,7 +1032,9 @@ body.dashboard-page .live-lab-replay-pause-btn[hidden] {
 
 body.dashboard-page .live-lab-replay-pause-btn:hover,
 body.dashboard-page .live-lab-replay-pause-btn:focus-visible,
-body.dashboard-page .live-lab-replay-pause-btn[aria-pressed='true'] {
+body.dashboard-page .live-lab-replay-pause-btn[aria-pressed='true'],
+body.dashboard-page .live-lab-live-btn:hover,
+body.dashboard-page .live-lab-live-btn:focus-visible {
   border-color: #7bd0ff;
   background:
     linear-gradient(180deg, rgba(255,255,255,0.17), transparent 60%),
@@ -1142,6 +1361,17 @@ body.dashboard-page .live-lab-svg-contact .live-lab-svg-distance-label {
   letter-spacing: 0.04em;
 }
 
+body.dashboard-page .live-lab-svg-contact .live-lab-svg-angle-label,
+body.dashboard-page .live-lab-replay-contact .live-lab-replay-angle-label {
+  fill: #d9f3ff;
+  stroke: rgba(0,0,0,0.58);
+  stroke-width: 3.2;
+  paint-order: stroke;
+  font: 950 12px var(--font-ui);
+  letter-spacing: 0.03em;
+  text-transform: uppercase;
+}
+
 body.dashboard-page .live-lab-svg-contact,
 body.dashboard-page .live-lab-svg-plate-result {
   cursor: pointer;
@@ -1175,6 +1405,21 @@ body.dashboard-page .live-lab-replay-contact path {
   stroke-dasharray: 100;
   stroke-dashoffset: 100;
   filter: drop-shadow(0 0 8px rgba(255,230,143,0.9));
+  animation: liveLabReplayTraceDraw var(--replay-trace-duration, 1.5s) linear both;
+}
+
+body.dashboard-page .live-lab-svg-contact .live-lab-svg-ground-streak,
+body.dashboard-page .live-lab-replay-contact .live-lab-replay-ground-streak {
+  stroke: rgba(172, 236, 154, 0.66);
+  stroke-width: 7;
+  stroke-linecap: round;
+  stroke-dasharray: 2 10;
+  filter: drop-shadow(0 0 5px rgba(70, 180, 92, 0.42));
+}
+
+body.dashboard-page .live-lab-replay-contact .live-lab-replay-ground-streak {
+  stroke-dasharray: 100;
+  stroke-dashoffset: 100;
   animation: liveLabReplayTraceDraw var(--replay-trace-duration, 1.5s) linear both;
 }
 
@@ -2438,5 +2683,137 @@ body.dashboard-page .live-lab-metric strong {
   body.dashboard-page .live-lab-metric {
     min-height: 42px;
     padding: 5px 6px;
+  }
+}
+
+@media (min-width: 721px) {
+  body.dashboard-page.lineup-split-view .lineup-overlay.is-live-view .lineup-modal-body,
+  body.dashboard-page.lineup-embed-page .lineup-overlay.is-live-view .lineup-modal-body {
+    overflow-y: auto !important;
+    overflow-x: hidden !important;
+    -webkit-overflow-scrolling: touch;
+  }
+
+  body.dashboard-page.lineup-split-view .lineup-overlay.is-live-view .lineup-live-lab-grid,
+  body.dashboard-page.lineup-embed-page .lineup-overlay.is-live-view .lineup-live-lab-grid {
+    height: auto !important;
+    min-height: 100% !important;
+    max-height: none !important;
+    display: grid !important;
+    grid-template-columns: minmax(0, 1fr) !important;
+    grid-template-areas: "center" !important;
+    gap: 5px !important;
+    padding: 5px !important;
+    overflow: visible !important;
+  }
+
+  body.dashboard-page.lineup-split-view .lineup-overlay.is-live-view .live-lab-away-side,
+  body.dashboard-page.lineup-split-view .lineup-overlay.is-live-view .live-lab-home-side,
+  body.dashboard-page.lineup-embed-page .lineup-overlay.is-live-view .live-lab-away-side,
+  body.dashboard-page.lineup-embed-page .lineup-overlay.is-live-view .live-lab-home-side {
+    display: none !important;
+  }
+
+  body.dashboard-page.lineup-split-view .lineup-overlay.is-live-view .live-lab-center,
+  body.dashboard-page.lineup-embed-page .lineup-overlay.is-live-view .live-lab-center {
+    min-height: 0 !important;
+    grid-template-rows: auto auto minmax(220px, 38vh) auto auto !important;
+    gap: 5px !important;
+  }
+
+  body.dashboard-page.lineup-split-view .lineup-overlay.is-live-view .live-lab-mobile-matchups,
+  body.dashboard-page.lineup-embed-page .lineup-overlay.is-live-view .live-lab-mobile-matchups {
+    display: grid !important;
+  }
+
+  body.dashboard-page.lineup-split-view .lineup-overlay.is-live-view .live-lab-mobile-field-chip,
+  body.dashboard-page.lineup-embed-page .lineup-overlay.is-live-view .live-lab-mobile-field-chip {
+    display: block !important;
+  }
+
+  body.dashboard-page.lineup-split-view .lineup-overlay.is-live-view .live-lab-mobile-counts,
+  body.dashboard-page.lineup-embed-page .lineup-overlay.is-live-view .live-lab-mobile-counts {
+    display: grid !important;
+  }
+
+  body.dashboard-page.lineup-split-view .lineup-overlay.is-live-view .live-lab-mobile-field-chip[hidden],
+  body.dashboard-page.lineup-split-view .lineup-overlay.is-live-view .live-lab-mobile-counts[hidden],
+  body.dashboard-page.lineup-embed-page .lineup-overlay.is-live-view .live-lab-mobile-field-chip[hidden],
+  body.dashboard-page.lineup-embed-page .lineup-overlay.is-live-view .live-lab-mobile-counts[hidden] {
+    display: none !important;
+  }
+
+  body.dashboard-page.lineup-split-view .lineup-overlay.is-live-view .live-lab-field-shell,
+  body.dashboard-page.lineup-embed-page .lineup-overlay.is-live-view .live-lab-field-shell {
+    min-height: 220px !important;
+    aspect-ratio: 16 / 9 !important;
+  }
+
+  body.dashboard-page.lineup-split-view .lineup-overlay.is-live-view .live-lab-field,
+  body.dashboard-page.lineup-embed-page .lineup-overlay.is-live-view .live-lab-field {
+    min-height: 220px !important;
+  }
+
+  body.dashboard-page.lineup-split-view .lineup-overlay.is-live-view .live-lab-play,
+  body.dashboard-page.lineup-embed-page .lineup-overlay.is-live-view .live-lab-play {
+    grid-template-columns: minmax(0, 1fr) !important;
+    padding: 8px 9px !important;
+    min-height: 0 !important;
+  }
+
+  body.dashboard-page.lineup-split-view .lineup-overlay.is-live-view .live-lab-pitch-row,
+  body.dashboard-page.lineup-embed-page .lineup-overlay.is-live-view .live-lab-pitch-row {
+    grid-template-columns: minmax(160px, 0.82fr) minmax(0, 1.18fr) !important;
+  }
+
+  body.dashboard-page.lineup-split-view .lineup-overlay.is-live-view .live-lab-metrics,
+  body.dashboard-page.lineup-embed-page .lineup-overlay.is-live-view .live-lab-metrics {
+    grid-template-columns: repeat(2, minmax(0, 1fr)) !important;
+  }
+}
+
+@media (min-width: 721px) {
+  body.dashboard-page.lineup-split-view .lineup-overlay.is-live-view .lineup-modal-body,
+  body.dashboard-page.lineup-embed-page .lineup-overlay.is-live-view .lineup-modal-body {
+    overflow: hidden !important;
+  }
+
+  body.dashboard-page.lineup-split-view .lineup-overlay.is-live-view .lineup-live-lab-grid,
+  body.dashboard-page.lineup-embed-page .lineup-overlay.is-live-view .lineup-live-lab-grid {
+    height: 100% !important;
+    min-height: 0 !important;
+    max-height: 100% !important;
+    overflow: hidden !important;
+  }
+
+  body.dashboard-page.lineup-split-view .lineup-overlay.is-live-view .live-lab-center,
+  body.dashboard-page.lineup-embed-page .lineup-overlay.is-live-view .live-lab-center {
+    height: 100% !important;
+    min-height: 0 !important;
+    overflow-y: auto !important;
+    overflow-x: hidden !important;
+    grid-template-rows: auto auto minmax(190px, clamp(220px, 32vh, 320px)) auto minmax(118px, auto) !important;
+    scrollbar-width: thin;
+  }
+
+  body.dashboard-page.lineup-split-view .lineup-overlay.is-live-view .live-lab-field-shell,
+  body.dashboard-page.lineup-embed-page .lineup-overlay.is-live-view .live-lab-field-shell {
+    min-height: 190px !important;
+    max-height: clamp(220px, 32vh, 320px) !important;
+    aspect-ratio: 16 / 9 !important;
+    z-index: 1;
+  }
+
+  body.dashboard-page.lineup-split-view .lineup-overlay.is-live-view .live-lab-field,
+  body.dashboard-page.lineup-embed-page .lineup-overlay.is-live-view .live-lab-field {
+    min-height: 190px !important;
+  }
+
+  body.dashboard-page.lineup-split-view .lineup-overlay.is-live-view .live-lab-play,
+  body.dashboard-page.lineup-split-view .lineup-overlay.is-live-view .live-lab-pitch-row,
+  body.dashboard-page.lineup-embed-page .lineup-overlay.is-live-view .live-lab-play,
+  body.dashboard-page.lineup-embed-page .lineup-overlay.is-live-view .live-lab-pitch-row {
+    position: relative;
+    z-index: 2;
   }
 }

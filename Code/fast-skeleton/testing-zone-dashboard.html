@@ -4,7 +4,7 @@
     <meta charset="utf-8" />
     <meta name="viewport" content="width=device-width, initial-scale=1" />
     <meta name="color-scheme" content="dark" />
-    <title>MLB Game Center</title>
+    <title>MLB Game Center Testing Zone</title>
     <meta name="description" content="Live MLB scoreboard, lineup cards, hot player tracking, team form, pitcher trends, home run feed, and baseball betting stat tools for every MLB team." />
     <meta name="keywords" content="MLB, baseball, MLB betting, baseball betting, betting stats, live MLB scoreboard, MLB lineups, MLB lineup cards, MLB probable pitchers, MLB hot players, player props, team betting, team baseball betting, hits, batting average, home runs, RBI, OPS, stolen bases, strikeouts, ERA, WHIP, wins, saves, innings pitched, doubles, triples, runs, total bases, extra base hits, walks, BB, runs for, runs against, last seven games, Arizona Diamondbacks, Atlanta Braves, Baltimore Orioles, Boston Red Sox, Chicago Cubs, Chicago White Sox, Cincinnati Reds, Cleveland Guardians, Colorado Rockies, Detroit Tigers, Houston Astros, Kansas City Royals, Los Angeles Angels, Los Angeles Dodgers, Miami Marlins, Milwaukee Brewers, Minnesota Twins, New York Mets, New York Yankees, Athletics, Philadelphia Phillies, Pittsburgh Pirates, San Diego Padres, Seattle Mariners, San Francisco Giants, St Louis Cardinals, Tampa Bay Rays, Texas Rangers, Toronto Blue Jays, Washington Nationals, Arizona Diamondbacks betting, Atlanta Braves betting, Baltimore Orioles betting, Boston Red Sox betting, Chicago Cubs betting, Chicago White Sox betting, Cincinnati Reds betting, Cleveland Guardians betting, Colorado Rockies betting, Detroit Tigers betting, Houston Astros betting, Kansas City Royals betting, Los Angeles Angels betting, Los Angeles Dodgers betting, Miami Marlins betting, Milwaukee Brewers betting, Minnesota Twins betting, New York Mets betting, New York Yankees betting, Athletics betting, Philadelphia Phillies betting, Pittsburgh Pirates betting, San Diego Padres betting, Seattle Mariners betting, San Francisco Giants betting, St Louis Cardinals betting, Tampa Bay Rays betting, Texas Rangers betting, Toronto Blue Jays betting, Washington Nationals betting, Arizona Diamondbacks baseball betting, Atlanta Braves baseball betting, Baltimore Orioles baseball betting, Boston Red Sox baseball betting, Chicago Cubs baseball betting, Chicago White Sox baseball betting, Cincinnati Reds baseball betting, Cleveland Guardians baseball betting, Colorado Rockies baseball betting, Detroit Tigers baseball betting, Houston Astros baseball betting, Kansas City Royals baseball betting, Los Angeles Angels baseball betting, Los Angeles Dodgers baseball betting, Miami Marlins baseball betting, Milwaukee Brewers baseball betting, Minnesota Twins baseball betting, New York Mets baseball betting, New York Yankees baseball betting, Athletics baseball betting, Philadelphia Phillies baseball betting, Pittsburgh Pirates baseball betting, San Diego Padres baseball betting, Seattle Mariners baseball betting, San Francisco Giants baseball betting, St Louis Cardinals baseball betting, Tampa Bay Rays baseball betting, Texas Rangers baseball betting, Toronto Blue Jays baseball betting, Washington Nationals baseball betting" />
     <meta name="news_keywords" content="Arizona-Diamondbacks-baseball-betting, Atlanta-Braves-baseball-betting, Baltimore-Orioles-baseball-betting, Boston-Red-Sox-baseball-betting, Chicago-Cubs-baseball-betting, Chicago-White-Sox-baseball-betting, Cincinnati-Reds-baseball-betting, Cleveland-Guardians-baseball-betting, Colorado-Rockies-baseball-betting, Detroit-Tigers-baseball-betting, Houston-Astros-baseball-betting, Kansas-City-Royals-baseball-betting, Los-Angeles-Angels-baseball-betting, Los-Angeles-Dodgers-baseball-betting, Miami-Marlins-baseball-betting, Milwaukee-Brewers-baseball-betting, Minnesota-Twins-baseball-betting, New-York-Mets-baseball-betting, New-York-Yankees-baseball-betting, Athletics-baseball-betting, Philadelphia-Phillies-baseball-betting, Pittsburgh-Pirates-baseball-betting, San-Diego-Padres-baseball-betting, Seattle-Mariners-baseball-betting, San-Francisco-Giants-baseball-betting, St-Louis-Cardinals-baseball-betting, Tampa-Bay-Rays-baseball-betting, Texas-Rangers-baseball-betting, Toronto-Blue-Jays-baseball-betting, Washington-Nationals-baseball-betting" />
@@ -19,6 +19,7 @@
     <link rel="apple-touch-icon" href="baseball.png" />
     <link rel="stylesheet" href="styles.css?v=20260612perf8" />
     <link rel="stylesheet" href="dashboard.css?v=20260612perf6" />
+    <link rel="stylesheet" href="live-prototype.css?v=20260612perf6" />
   </head>
   <body class="dashboard-page">
     <a class="owentools-home-link" href="../index.html" aria-label="Back to owentools" title="Back to owentools">ot</a>
@@ -76,6 +77,29 @@
       </form>
     </dialog>
 
+    <dialog id="pitchMatchupExportDialog" class="bet-dialog">
+      <form id="pitchMatchupExportForm" class="bet-dialog-form" method="dialog">
+        <header class="bet-dialog-header">
+          <strong>Pitch Matchup Export</strong>
+          <button id="pitchMatchupExportCloseBtn" class="bet-dialog-close" type="button" aria-label="Close pitch matchup export">x</button>
+        </header>
+        <label>
+          <span>Start Date</span>
+          <input id="pitchMatchupExportStartInput" type="date" />
+        </label>
+        <label>
+          <span>End Date</span>
+          <input id="pitchMatchupExportEndInput" type="date" />
+        </label>
+        <div id="pitchMatchupExportStatus" class="bet-dialog-note">Choose a date range to export pitch-by-pitch matchup context and actual results.</div>
+        <progress id="pitchMatchupExportProgress" value="0" max="1" style="width:100%;height:14px;"></progress>
+        <div class="bet-dialog-actions">
+          <button id="pitchMatchupExportCancelBtn" type="button">Cancel</button>
+          <button id="pitchMatchupExportRunBtn" type="submit">Export Range</button>
+        </div>
+      </form>
+    </dialog>
+
     <div class="dashboard-shell">
       <main class="dashboard-main">
         <section class="overlay dashboard-scoreboard" id="overlay">
@@ -96,6 +120,7 @@
               <span id="dashboardSummary" class="dashboard-summary">Loading games</span>
               <button id="overlayDockToggleBtn" class="toolbar-btn dashboard-hidden" type="button">Scoreboard: Right</button>
               <button id="scoreboardColumnsBtn" class="toolbar-btn help-btn" type="button" aria-label="Open site controls help" title="Controls and site capabilities">?</button>
+              <button id="globalPlayerSearchBtn" class="toolbar-btn player-search-btn" type="button" aria-label="Search players" title="Search players">&#128269;</button>
               <button id="clearPendingPicksBtn" class="toolbar-btn clear-picks-btn" type="button" aria-label="Clear selected bet teams" title="Clear selected bet teams">Clear Picks</button>
               <div class="dashboard-page-tabs" role="tablist" aria-label="Dashboard pages">
                 <button type="button" data-page-nav="scoreboard" aria-selected="true">Scoreboard</button>
@@ -108,6 +133,7 @@
                 <span>Style</span>
                 <select id="themeSelect"></select>
               </label>
+              <button id="pitchMatchupExportBtn" class="toolbar-btn" type="button" title="Export pitch-by-pitch matchup context and actual results">Export Pitch Matchups</button>
             </div>
             <nav class="dashboard-page-tabs mobile-page-tabs" role="tablist" aria-label="Mobile pages">
               <button type="button" data-page-nav="scoreboard" aria-selected="true">Scoreboard</button>
@@ -179,7 +205,9 @@
                   <button type="button" class="lineup-view-btn active" data-lineup-view="lineups" aria-selected="true">Lineups</button>
                   <button type="button" class="lineup-view-btn" data-lineup-view="pitching" aria-selected="false">Pitching</button>
                   <button type="button" class="lineup-view-btn" data-lineup-view="roster" aria-selected="false">Roster</button>
+                  <button type="button" class="lineup-view-btn" data-lineup-view="live" aria-selected="false">Live</button>
                 </div>
+                <button id="lineupSplitBtn" class="lineup-split-btn" type="button" aria-pressed="false" data-split-mode="none" title="Dock lineup beside scoreboard">Split View</button>
                 <button id="lineupCloseBtn" class="lineup-close-btn" type="button" aria-label="Close lineup card">x</button>
               </header>
               <div class="lineup-modal-body">
@@ -187,9 +215,15 @@
                   <div class="lineup-matchup-strip">
                     <div class="lineup-team-header">
                       <img class="lineup-logo away-lineup-logo lineup-logo-pick-trigger" data-lineup-pick-side="away" role="button" tabindex="0" src="placeholder.png" alt="Away logo" title="Pick away team to win" />
-                      <span class="away-lineup-team"></span>
-                      <span class="team-streak lineup-team-streak away-lineup-streak"></span>
-                      <button type="button" class="lineup-prediction-chip away-lineup-prediction" data-lineup-prediction-side="away" hidden>--</button>
+                      <div class="lineup-team-lines">
+                        <div class="lineup-team-info-line">
+                          <span class="team-streak lineup-team-streak away-lineup-streak"></span>
+                        </div>
+                        <div class="lineup-team-score-line">
+                          <span class="away-lineup-team"></span>
+                          <button type="button" class="lineup-prediction-chip away-lineup-prediction" data-lineup-prediction-side="away" hidden>--</button>
+                        </div>
+                      </div>
                     </div>
                     <div class="lineup-state-scoreboard">
                       <span id="lineupStateAwayCode" class="lineup-state-away-code"></span>
@@ -199,9 +233,15 @@
                       <span id="lineupStateHomeCode" class="lineup-state-home-code"></span>
                     </div>
                     <div class="lineup-team-header lineup-team-header-home">
-                      <span class="home-lineup-team"></span>
-                      <span class="team-streak lineup-team-streak home-lineup-streak"></span>
-                      <button type="button" class="lineup-prediction-chip home-lineup-prediction" data-lineup-prediction-side="home" hidden>--</button>
+                      <div class="lineup-team-lines lineup-team-lines-home">
+                        <div class="lineup-team-info-line">
+                          <span class="team-streak lineup-team-streak home-lineup-streak"></span>
+                        </div>
+                        <div class="lineup-team-score-line">
+                          <span class="home-lineup-team"></span>
+                          <button type="button" class="lineup-prediction-chip home-lineup-prediction" data-lineup-prediction-side="home" hidden>--</button>
+                        </div>
+                      </div>
                       <img class="lineup-logo home-lineup-logo lineup-logo-pick-trigger" data-lineup-pick-side="home" role="button" tabindex="0" src="placeholder.png" alt="Home logo" title="Pick home team to win" />
                     </div>
                   </div>
@@ -252,6 +292,82 @@
                     <ul class="prospect-list roster-status-list"></ul>
                   </section>
                 </div>
+                <div class="lineup-live-lab-grid" data-lineup-panel="live" hidden>
+                  <aside class="live-lab-lineup live-lab-away-side">
+                    <header>
+                      <strong class="away-lineup-team"></strong>
+                      <span>Order</span>
+                    </header>
+                    <ol id="liveLabAwayLineup" class="live-lab-lineup-list"></ol>
+                  </aside>
+
+                  <section class="live-lab-center">
+                    <div class="live-lab-score-strip">
+                      <span id="liveLabAwayScore" class="live-lab-score"></span>
+                      <strong id="liveLabInning"></strong>
+                      <span id="liveLabHomeScore" class="live-lab-score"></span>
+                    </div>
+                    <section id="liveLabMobileMatchups" class="live-lab-mobile-matchups" aria-label="Current live matchup queue"></section>
+                    <section class="live-lab-field-shell" aria-label="Live field view">
+                      <div id="liveLabField" class="live-lab-field">
+                        <svg id="liveLabFieldSvg" class="live-lab-field-svg" viewBox="-50 95 1100 595" role="img" aria-label="Scaled ballpark geometry">
+                          <g id="liveLabFieldGeometry"></g>
+                          <g id="liveLabTraceLayer"></g>
+                          <g id="liveLabBaseLayer"></g>
+                          <g id="liveLabReplayTraceLayer"></g>
+                          <g id="liveLabReplayRunnerLayer"></g>
+                        </svg>
+                      </div>
+                      <div id="liveLabMobileStatcast" class="live-lab-mobile-field-chip live-lab-mobile-statcast" hidden></div>
+                      <div id="liveLabMobilePitchInfo" class="live-lab-mobile-field-chip live-lab-mobile-pitch-info" hidden></div>
+                      <div id="liveLabMobileCounts" class="live-lab-mobile-counts" hidden></div>
+                      <div id="liveLabReplayOverlay" class="live-lab-replay-overlay" hidden>
+                        <strong id="liveLabReplayTitle"></strong>
+                        <span id="liveLabReplayPlayer"></span>
+                        <em id="liveLabReplayMeta"></em>
+                        <small id="liveLabReplayScore"></small>
+                      </div>
+                      <div id="liveLabReplaySpeedControls" class="live-lab-replay-speed-controls" hidden aria-label="Replay speed">
+                        <button type="button" data-live-replay-speed="0.5">0.5x</button>
+                        <button type="button" data-live-replay-speed="1" aria-pressed="true">1x</button>
+                        <button type="button" data-live-replay-speed="3">3x</button>
+                        <button type="button" data-live-replay-speed="5">5x</button>
+                      </div>
+                      <button id="liveLabReplayPauseBtn" class="live-lab-replay-pause-btn" type="button" hidden>Pause</button>
+                      <button id="liveLabReplayBtn" class="live-lab-replay-btn" type="button">Game Replay</button>
+                    </section>
+                    <section class="live-lab-play">
+                      <div>
+                        <span class="eyebrow">Current Matchup</span>
+                        <h3 id="liveLabMatchup"></h3>
+                      </div>
+                      <p id="liveLabPlayText"></p>
+                      <div id="liveLabPitchTimeline" class="live-lab-pitch-timeline"></div>
+                      <div id="liveLabOutcomeList" class="live-lab-outcomes"></div>
+                    </section>
+                    <section class="live-lab-pitch-row">
+                      <div class="live-lab-zone-card">
+                        <div class="live-lab-counts">
+                          <span>B</span><div id="liveLabBalls" class="live-lab-dots"></div>
+                          <span>S</span><div id="liveLabStrikes" class="live-lab-dots"></div>
+                          <span>O</span><div id="liveLabOuts" class="live-lab-dots"></div>
+                        </div>
+                        <div id="liveLabZone" class="live-lab-zone">
+                          <span id="liveLabPitchDot" class="live-lab-pitch-dot"></span>
+                        </div>
+                      </div>
+                      <div id="liveLabMetrics" class="live-lab-metrics"></div>
+                    </section>
+                  </section>
+
+                  <aside class="live-lab-lineup live-lab-home-side">
+                    <header>
+                      <strong class="home-lineup-team"></strong>
+                      <span>Order</span>
+                    </header>
+                    <ol id="liveLabHomeLineup" class="live-lab-lineup-list"></ol>
+                  </aside>
+                </div>
               </div>
               <section class="lineup-live-details">
                 <section class="detail-col play-col">
@@ -280,6 +396,21 @@
             </article>
           </section>
 
+          <section id="lineupSplitPeer" class="lineup-split-peer" hidden aria-label="Secondary lineup card">
+            <button id="lineupSplitPeerCloseBtn" class="lineup-split-peer-close" type="button" aria-label="Close secondary lineup">x</button>
+            <iframe id="lineupSplitPeerFrame" class="lineup-split-peer-frame" title="Secondary lineup card"></iframe>
+          </section>
+
+          <section id="globalPlayerSearchOverlay" class="global-player-search-overlay" hidden>
+            <div id="globalPlayerSearchBackdrop" class="global-player-search-backdrop"></div>
+            <form id="globalPlayerSearchForm" class="global-player-search-panel" role="search">
+              <label for="globalPlayerSearchInput">Player Search</label>
+              <input id="globalPlayerSearchInput" type="search" autocomplete="off" spellcheck="false" placeholder="Type a name or initials" />
+              <div id="globalPlayerSearchResults" class="global-player-search-results" role="listbox" aria-label="Player results"></div>
+              <button id="globalPlayerSearchCloseBtn" class="global-player-search-close" type="button" aria-label="Close player search">x</button>
+            </form>
+          </section>
+
           <section id="playerStatOverlay" class="player-stat-overlay" hidden>
             <div id="playerStatBackdrop" class="player-stat-backdrop"></div>
             <article class="player-stat-modal" role="dialog" aria-modal="true" aria-label="Player stat card">
@@ -292,6 +423,7 @@
                 <div class="player-stat-tabs" role="tablist" aria-label="Player card views">
                 <button type="button" class="player-stat-tab active" data-player-stat-tab="stats" aria-selected="true">Stats</button>
                 <button type="button" class="player-stat-tab" data-player-stat-tab="heatmap" aria-selected="false">Heat Map</button>
+                <button type="button" class="player-stat-tab" data-player-stat-tab="pitchmatchup" aria-selected="false">Pitch Matchup</button>
                 </div>
                 <button id="playerStatCloseBtn" class="player-stat-close" type="button" aria-label="Close player card">x</button>
               </header>
@@ -308,6 +440,7 @@
                 </section>
               </div>
               <div id="playerStatHeatmap" class="player-stat-heatmap" hidden></div>
+              <div id="playerStatPitchMatchup" class="player-stat-heatmap" hidden></div>
               <footer class="player-stat-footer">Click player rows for stats</footer>
             </article>
           </section>
@@ -319,11 +452,13 @@
           <header class="panel-header">
             <div class="panel-tabs">
               <button id="playerTrackerTabBtn" class="panel-tab-btn is-active" type="button">PLAYER TRACKER</button>
-              <button id="betInputTabBtn" class="panel-tab-btn" type="button">BET INPUT</button>
-              <button id="betLogTabBtn" class="panel-tab-btn" type="button">BET LOG</button>
+              <button id="betInputTabBtn" class="panel-tab-btn" type="button" hidden>BET INPUT</button>
+              <button id="betLogTabBtn" class="panel-tab-btn" type="button" hidden>BET LOG</button>
             </div>
             <div class="panel-header-actions">
               <span class="hint">DAY: <span id="betDayLabel"></span></span>
+              <button id="playerTrackerSortBtn" class="hint panel-sort-toggle" type="button">time added</button>
+              <div id="playerTrackerCounts" class="player-tracker-summary player-tracker-summary-header" aria-label="Player tracker counts" hidden></div>
               <button id="clearBetsBtn" class="panel-action-btn" type="button">CLEAR</button>
             </div>
           </header>
@@ -447,8 +582,8 @@
     <script src="../shared/supabase-config.js?v=20260521heatmap"></script>
     <script>
       window.OWENTOOLS_SYNC = {
-        toolId: "baseball-dashboard",
-        label: "Baseball dashboard",
+        toolId: "baseball-live-prototype",
+        label: "Baseball live prototype",
         include: [
           "__baseball-manual-state-is-local-only__"
         ],
@@ -461,6 +596,6 @@
     </script>
     <script src="../shared/owentools-sync.js?v=20260610manual2"></script>
     <script src="rotowire-default-lineups.js?v=20260610manual1"></script>
-    <script src="app.js?v=20260612manual38"></script>
+    <script src="testing-zone-live-dashboard.js?v=20260612testing-zone68"></script>
   </body>
 </html>

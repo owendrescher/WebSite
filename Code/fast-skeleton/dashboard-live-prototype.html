@@ -17,9 +17,9 @@
     <meta name="twitter:description" content="Live MLB scoreboard, lineups, pitcher trends, hot players, and betting stat tools." />
     <link rel="icon" type="image/png" href="baseball.png" />
     <link rel="apple-touch-icon" href="baseball.png" />
-    <link rel="stylesheet" href="styles.css?v=20260602live16" />
-    <link rel="stylesheet" href="dashboard.css?v=20260525moneyline2" />
-    <link rel="stylesheet" href="live-prototype.css?v=20260602live16" />
+    <link rel="stylesheet" href="styles.css?v=20260612perf8" />
+    <link rel="stylesheet" href="dashboard.css?v=20260612perf6" />
+    <link rel="stylesheet" href="live-prototype.css?v=20260612perf6" />
   </head>
   <body class="dashboard-page">
     <a class="owentools-home-link" href="../index.html" aria-label="Back to owentools" title="Back to owentools">ot</a>
@@ -104,7 +104,7 @@
                 <button type="button" data-page-nav="leaders" aria-selected="false">Leaders</button>
                 <button type="button" data-page-nav="hot" aria-selected="false">Hot Players</button>
                 <button type="button" data-page-nav="teamStats" aria-selected="false">Team Stats</button>
-                <button type="button" data-page-nav="hrLeaderboard" aria-selected="false">HR Leaderboard</button>
+                <button type="button" data-page-nav="hrLeaderboard" aria-selected="false">HR Candidates</button>
               </div>
               <label class="theme-label">
                 <span>Style</span>
@@ -116,7 +116,7 @@
               <button type="button" data-page-nav="leaders" aria-selected="false">League Leaders</button>
               <button type="button" data-page-nav="hot" aria-selected="false">Hot Players</button>
               <button type="button" data-page-nav="teamStats" aria-selected="false">Team Stats</button>
-              <button type="button" data-page-nav="hrLeaderboard" aria-selected="false">HR Leaderboard</button>
+              <button type="button" data-page-nav="hrLeaderboard" aria-selected="false">HR Candidates</button>
             </nav>
             <div id="leadersToolbar" class="leaders-toolbar" hidden>
               <label class="leaders-filter">
@@ -183,6 +183,7 @@
                   <button type="button" class="lineup-view-btn" data-lineup-view="roster" aria-selected="false">Roster</button>
                   <button type="button" class="lineup-view-btn" data-lineup-view="live" aria-selected="false">Live</button>
                 </div>
+                <button id="lineupSplitBtn" class="lineup-split-btn" type="button" aria-pressed="false" data-split-mode="none" title="Dock lineup beside scoreboard">Split View</button>
                 <button id="lineupCloseBtn" class="lineup-close-btn" type="button" aria-label="Close lineup card">x</button>
               </header>
               <div class="lineup-modal-body">
@@ -309,6 +310,7 @@
                         <button type="button" data-live-replay-speed="5">5x</button>
                       </div>
                       <button id="liveLabReplayPauseBtn" class="live-lab-replay-pause-btn" type="button" hidden>Pause</button>
+                      <button id="liveLabLiveBtn" class="live-lab-live-btn" type="button">Live</button>
                       <button id="liveLabReplayBtn" class="live-lab-replay-btn" type="button">Game Replay</button>
                     </section>
                     <section class="live-lab-play">
@@ -369,6 +371,11 @@
                 </section>
               </section>
             </article>
+          </section>
+
+          <section id="lineupSplitPeer" class="lineup-split-peer" hidden aria-label="Secondary lineup card">
+            <button id="lineupSplitPeerCloseBtn" class="lineup-split-peer-close" type="button" aria-label="Close secondary lineup">x</button>
+            <iframe id="lineupSplitPeerFrame" class="lineup-split-peer-frame" title="Secondary lineup card"></iframe>
           </section>
 
           <section id="globalPlayerSearchOverlay" class="global-player-search-overlay" hidden>
@@ -553,13 +560,17 @@
         toolId: "baseball-live-prototype",
         label: "Baseball live prototype",
         include: [
+          "__baseball-manual-state-is-local-only__"
+        ],
+        exclude: [
           "player-tracker",
           "pending-game-picks",
           "tossup-scoreboards"
         ]
       };
     </script>
-    <script src="../shared/owentools-sync.js?v=20260511a"></script>
-    <script src="live-dashboard-prototype.js?v=20260602live16"></script>
+    <script src="../shared/owentools-sync.js?v=20260610manual2"></script>
+    <script src="rotowire-default-lineups.js?v=20260610manual1"></script>
+    <script src="live-dashboard-prototype.js?v=20260612live68"></script>
   </body>
 </html>

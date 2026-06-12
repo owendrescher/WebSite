@@ -3794,6 +3794,16 @@ body[data-overlay-dock='bottom'] .player-stat-overlay {
   background: color-mix(in srgb, var(--panel-item) 70%, transparent);
 }
 
+.player-heatmap-zone-note {
+  padding: 6px 8px;
+  border: 1px solid rgba(148, 197, 255, 0.16);
+  border-radius: 5px;
+  background: rgba(3, 12, 20, 0.32);
+  color: rgba(226, 242, 255, 0.70);
+  font: 850 10px var(--font-ui);
+  text-transform: uppercase;
+}
+
 .player-stat-heatmap-main header {
   display: grid;
   gap: 2px;
@@ -4128,6 +4138,170 @@ body[data-overlay-dock='bottom'] .player-stat-overlay {
   font-size: 0.48rem;
 }
 
+.player-heatmap-pitch-table.compact-pitch-table {
+  gap: 2px;
+  border: 0;
+}
+
+.player-heatmap-pitch-table .compact-pitch-row {
+  grid-template-columns: minmax(36px, 0.9fr) repeat(4, minmax(34px, 1fr));
+  min-height: 22px;
+  border: 1px solid color-mix(in srgb, var(--line) 44%, transparent);
+  border-radius: 6px;
+  background: rgba(255,255,255,0.035);
+}
+
+.player-heatmap-pitch-table .compact-pitch-row.hitter-pitch-row {
+  grid-template-columns: minmax(34px, 0.8fr) repeat(6, minmax(30px, 1fr));
+  background:
+    linear-gradient(90deg,
+      rgba(76, 159, 255, calc((1 - var(--pitch-heat, 0.5)) * 0.30)),
+      rgba(255, 74, 74, calc(var(--pitch-heat, 0.5) * 0.32))),
+    rgba(255,255,255,0.035);
+}
+
+.player-heatmap-pitch-table .compact-pitch-row.pitcher-pitch-row {
+  background:
+    linear-gradient(90deg,
+      rgba(255, 74, 74, calc((1 - var(--pitch-heat, 0.5)) * 0.30)),
+      rgba(76, 159, 255, calc(var(--pitch-heat, 0.5) * 0.32))),
+    rgba(255,255,255,0.035);
+}
+
+.player-heatmap-metric-row.pitcher-slg-row {
+  background:
+    linear-gradient(90deg,
+      rgba(255, 74, 74, calc((1 - var(--pitch-heat, 0.5)) * 0.24)),
+      rgba(76, 159, 255, calc(var(--pitch-heat, 0.5) * 0.26))),
+    transparent;
+}
+
+.player-heatmap-pitch-table .compact-pitch-row.header {
+  background: color-mix(in srgb, var(--accent) 12%, var(--panel-bg) 86%);
+}
+
+.player-heatmap-pitch-table .compact-pitch-row span,
+.player-heatmap-pitch-table .compact-pitch-row b {
+  padding: 3px 4px;
+  font-size: 0.62rem;
+  border-right-color: color-mix(in srgb, var(--line) 30%, transparent);
+}
+
+.visible-player-card-pitch-shell {
+  min-width: 0;
+}
+
+.visible-pitch-strip {
+  display: grid;
+  grid-template-columns: repeat(var(--pitch-count, 7), minmax(0, 1fr));
+  gap: 3px;
+  min-height: 78px;
+  align-items: stretch;
+}
+
+.visible-pitch-strip.pitcher {
+  min-height: 58px;
+}
+
+.visible-pitch-strip[data-pitch-count="7"] {
+  gap: 1px;
+  min-height: 70px;
+}
+
+.visible-pitch-strip[data-pitch-count="6"] {
+  gap: 2px;
+  min-height: 74px;
+}
+
+.visible-pitch-strip.pitcher[data-pitch-count="7"] {
+  min-height: 54px;
+}
+
+.visible-pitch-strip.is-loading {
+  min-height: 34px;
+  place-items: center;
+  color: rgba(234, 244, 255, .72);
+  font-size: .62rem;
+  font-weight: 800;
+  letter-spacing: 0;
+  text-transform: uppercase;
+}
+
+.visible-pitch-card {
+  display: grid;
+  grid-auto-rows: minmax(10px, auto);
+  align-content: stretch;
+  min-width: 0;
+  gap: 1px;
+  padding: 3px 2px;
+  border: 1px solid rgba(142, 192, 225, .42);
+  border-radius: 5px;
+  background: var(--pitch-bg, rgba(10, 27, 42, .74));
+  box-shadow: inset 0 1px 0 rgba(255, 255, 255, .05);
+  text-align: center;
+}
+
+.visible-pitch-card.batter {
+  border-color: rgba(149, 202, 238, .48);
+  background: var(--pitch-bg, linear-gradient(180deg, rgba(118, 164, 190, .32), rgba(10, 27, 42, .78)));
+}
+
+.visible-pitch-card span {
+  min-width: 0;
+  overflow: hidden;
+  color: rgba(236, 246, 255, .92);
+  font-size: .54rem;
+  font-weight: 900;
+  line-height: 1.05;
+  text-overflow: ellipsis;
+  text-transform: uppercase;
+  white-space: nowrap;
+}
+
+.current-pitch-count {
+  display: inline-grid;
+  place-items: center;
+  min-width: 30px;
+  margin-left: 6px;
+  padding: 1px 5px;
+  border: 1px solid rgba(142, 192, 225, .58);
+  border-radius: 999px;
+  color: #ffffff;
+  background: rgba(102, 217, 255, .16);
+  font-size: .66rem;
+  font-weight: 900;
+  line-height: 1.15;
+}
+
+.visible-pitch-card .pitch {
+  color: #ffffff;
+  font-size: .58rem;
+}
+
+.visible-pitch-strip[data-pitch-count="7"] .visible-pitch-card {
+  padding: 1px;
+}
+
+.visible-pitch-strip[data-pitch-count="7"] .visible-pitch-card span {
+  font-size: .46rem;
+}
+
+.visible-pitch-strip[data-pitch-count="7"] .visible-pitch-card .pitch {
+  font-size: .5rem;
+}
+
+.visible-pitch-strip[data-pitch-count="6"] .visible-pitch-card {
+  padding: 2px 1px;
+}
+
+.visible-pitch-strip[data-pitch-count="6"] .visible-pitch-card span {
+  font-size: .49rem;
+}
+
+.visible-pitch-strip[data-pitch-count="6"] .visible-pitch-card .pitch {
+  font-size: .53rem;
+}
+
 .pitcher-stat-heatmap-grid .player-stat-heatmap-main {
   align-content: start;
 }
@@ -4256,7 +4430,107 @@ body[data-overlay-dock='bottom'] .player-stat-overlay {
 }
 
 .pitcher-heatmap-starts-table .player-heatmap-metric-row {
-  grid-template-columns: minmax(86px, 1.3fr) repeat(4, minmax(36px, 0.7fr));
+  grid-template-columns: minmax(82px, 1.2fr) repeat(5, minmax(34px, 0.55fr)) minmax(100px, 1.35fr);
+}
+
+.pitcher-heatmap-starts-table .player-heatmap-metric-row b {
+  text-align: right;
+}
+
+.pitcher-heatmap-starts-table .pitcher-hr-batters {
+  justify-self: stretch;
+  text-align: left;
+  white-space: normal;
+  line-height: 1.15;
+  overflow: visible;
+  text-overflow: clip;
+}
+
+.player-stat-comparison-table td:last-child {
+  white-space: normal;
+  min-width: 112px;
+}
+
+.pitcher-opponent-hr-batters {
+  display: grid;
+  gap: 1px;
+  color: inherit;
+  font-size: 0.48rem;
+  font-weight: 900;
+  line-height: 1.15;
+  white-space: normal;
+}
+
+.pitcher-opponent-hr-batters i {
+  display: block;
+  font-style: normal;
+}
+
+.batter-series-starters {
+  display: grid;
+  gap: 1px;
+  margin-top: 2px;
+  color: color-mix(in srgb, var(--text) 88%, var(--muted));
+  font-size: 0.47rem;
+  font-weight: 850;
+  line-height: 1.15;
+}
+
+.batter-series-starter {
+  display: block;
+}
+
+.batter-series-starter.is-hr-game,
+.batter-series-starter.is-hr-off-starter {
+  color: inherit;
+}
+
+.batter-series-starter.is-hr-game {
+  font-style: italic;
+}
+
+.batter-series-starter.is-hr-off-starter {
+  font-weight: 1000;
+  text-decoration: underline;
+  text-decoration-thickness: 1px;
+  text-underline-offset: 2px;
+}
+
+.pitcher-l3-leader {
+  font-weight: 1000;
+  text-decoration: underline;
+  text-decoration-thickness: 1px;
+  text-underline-offset: 2px;
+}
+
+.player-card-link {
+  appearance: none;
+  border: 0;
+  background: transparent;
+  color: inherit;
+  padding: 0;
+  font: inherit;
+  cursor: pointer;
+}
+
+.player-card-link:hover,
+.player-card-link:focus-visible {
+  text-decoration: underline;
+  text-underline-offset: 2px;
+  outline: none;
+}
+
+.player-stat-close.is-back {
+  width: auto;
+  min-width: 54px;
+  padding: 0 10px;
+  font-size: 0.68rem;
+}
+
+.has-split-tooltip {
+  cursor: help;
+  text-decoration: underline dotted color-mix(in srgb, var(--accent) 48%, transparent);
+  text-underline-offset: 2px;
 }
 
 .player-heatmap-metric-row span {
@@ -5487,6 +5761,32 @@ body[data-overlay-dock='bottom'] .team-left {
     0 0 0 3px rgba(0, 0, 0, 0.96),
     0 10px 18px rgba(0, 0, 0, 0.28),
     inset 0 1px 0 rgba(255, 255, 255, 0.08);
+}
+
+.lineup-logo.away-lineup-logo.is-pick-selected {
+  border-color: color-mix(in srgb, var(--away-color, #66d9ff) 82%, white 10%);
+  background:
+    radial-gradient(circle at 50% 42%, rgba(var(--away-rgb, 102, 217, 255), 0.28), transparent 68%),
+    linear-gradient(180deg, rgba(255,255,255,0.12), rgba(var(--away-rgb, 102, 217, 255), 0.10));
+  box-shadow:
+    0 0 0 2px color-mix(in srgb, var(--away-color, #66d9ff) 78%, black 18%),
+    0 0 18px rgba(var(--away-rgb, 102, 217, 255), 0.42),
+    0 0 32px rgba(var(--away-rgb, 102, 217, 255), 0.20),
+    0 10px 18px rgba(0, 0, 0, 0.28),
+    inset 0 1px 0 rgba(255, 255, 255, 0.12);
+}
+
+.lineup-logo.home-lineup-logo.is-pick-selected {
+  border-color: color-mix(in srgb, var(--home-color, #f0da99) 82%, white 10%);
+  background:
+    radial-gradient(circle at 50% 42%, rgba(var(--home-rgb, 240, 218, 153), 0.28), transparent 68%),
+    linear-gradient(180deg, rgba(255,255,255,0.12), rgba(var(--home-rgb, 240, 218, 153), 0.10));
+  box-shadow:
+    0 0 0 2px color-mix(in srgb, var(--home-color, #f0da99) 78%, black 18%),
+    0 0 18px rgba(var(--home-rgb, 240, 218, 153), 0.42),
+    0 0 32px rgba(var(--home-rgb, 240, 218, 153), 0.20),
+    0 10px 18px rgba(0, 0, 0, 0.28),
+    inset 0 1px 0 rgba(255, 255, 255, 0.12);
 }
 
 .team-logo.away-logo.is-game-pick-leading,
@@ -7849,6 +8149,9 @@ body[data-overlay-dock='bottom'] .score-state-strip,
 .player-track-item {
   position: relative;
   isolation: isolate;
+  contain: layout paint style;
+  content-visibility: auto;
+  contain-intrinsic-size: 66px;
   display: grid;
   grid-template-columns: 22px 46px minmax(0, 1fr) 24px;
   gap: 9px;
@@ -8341,6 +8644,9 @@ body[data-overlay-dock='bottom'] .score-state-strip,
   position: relative;
   z-index: 1;
   scrollbar-width: thin;
+  overscroll-behavior: contain;
+  -webkit-overflow-scrolling: touch;
+  scrollbar-gutter: stable;
 }
 .panel-item {
   border: 1px solid color-mix(in srgb, var(--line) 46%, transparent);
@@ -8609,12 +8915,15 @@ body[data-overlay-dock='bottom'] .score-state-strip,
 }
 .hr-item {
   position: relative;
+  contain: layout paint style;
+  content-visibility: auto;
+  contain-intrinsic-size: 78px;
   display: grid;
   grid-template-columns: 40px minmax(0, 1fr) 64px;
   gap: 8px;
   align-items: start;
   overflow-x: clip;
-  overflow-y: visible;
+  overflow-y: hidden;
   border-color: color-mix(in srgb, var(--hr-team-color, var(--accent)) 46%, var(--line));
   background:
     linear-gradient(90deg, rgba(var(--hr-team-rgb, 102, 217, 255), 0.24), transparent 52%),
@@ -8660,6 +8969,28 @@ body[data-overlay-dock='bottom'] .score-state-strip,
   z-index: 1;
 }
 .hr-item[data-player-id] { cursor: pointer; }
+.panel-list.is-scrolling .player-track-item,
+.panel-list.is-scrolling .hr-item {
+  animation: none !important;
+}
+.panel-list.is-scrolling .player-track-item.is-tracker-up-inning,
+.panel-list.is-scrolling .player-track-item.is-tracker-live,
+.panel-list.is-scrolling .player-track-item.is-expectation-hit,
+.panel-list.is-scrolling .hr-item.hr-item-walkoff,
+.panel-list.is-scrolling .hr-rating,
+.panel-list.is-scrolling .hr-logo {
+  box-shadow: inset 0 0 0 1px rgba(255,255,255,0.08) !important;
+  text-shadow: none !important;
+}
+.panel-list.is-scrolling .player-track-item::before,
+.panel-list.is-scrolling .hr-item::before {
+  box-shadow: none;
+}
+.panel-list.is-scrolling .player-track-item.is-expectation-hit::after,
+.panel-list.is-scrolling .hr-item.hr-item-walkoff::after {
+  animation: none;
+  opacity: 0;
+}
 .hr-logo {
   width: 40px;
   height: 40px;
@@ -11255,6 +11586,7 @@ body[data-overlay-dock='bottom'] .player-stat-overlay {
   -webkit-overflow-scrolling: touch;
   overscroll-behavior: contain;
   touch-action: pan-y;
+  contain: layout style paint;
 }
 
 .player-stat-modal {
@@ -11265,6 +11597,9 @@ body[data-overlay-dock='bottom'] .player-stat-overlay {
   overflow: visible;
   display: grid;
   grid-template-rows: auto minmax(0, 1fr) auto;
+  transform: translateZ(0);
+  will-change: transform, opacity;
+  contain: layout paint;
 }
 
 .player-stat-modal > :not(.player-stat-header):not(.player-stat-heatmap):not(.player-stat-body) {
@@ -11535,6 +11870,41 @@ body[data-overlay-dock='bottom'] .player-stat-overlay {
     gap: 0;
     padding: 0;
     min-height: 17px;
+  }
+
+  .player-heatmap-pitch-table .compact-pitch-row {
+    grid-template-columns: minmax(31px, 0.82fr) repeat(4, minmax(27px, 1fr));
+  }
+
+  .player-heatmap-pitch-table .compact-pitch-row.hitter-pitch-row {
+    grid-template-columns: minmax(29px, 0.78fr) repeat(6, minmax(24px, 1fr));
+  }
+
+  .visible-pitch-strip {
+    grid-template-columns: repeat(var(--pitch-count, 7), minmax(0, 1fr));
+    min-height: 70px;
+    gap: 2px;
+  }
+
+  .visible-pitch-strip.pitcher {
+    min-height: 54px;
+  }
+
+  .visible-pitch-strip[data-pitch-count="7"] {
+    gap: 1px;
+    min-height: 66px;
+  }
+
+  .visible-pitch-card {
+    padding: 2px 1px;
+  }
+
+  .visible-pitch-card span {
+    font-size: 0.48rem;
+  }
+
+  .visible-pitch-card .pitch {
+    font-size: 0.52rem;
   }
 
   .player-heatmap-split-table .player-heatmap-metric-row {
