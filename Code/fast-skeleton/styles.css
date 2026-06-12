@@ -5827,6 +5827,40 @@ body[data-overlay-dock='bottom'] .team-left {
     inset 0 1px 0 rgba(255, 255, 255, 0.08);
 }
 
+.lineup-logo.away-lineup-logo.is-pick-selected,
+.lineup-logo.away-lineup-logo.is-game-pick-leading,
+.lineup-logo.away-lineup-logo.is-game-pick-trailing,
+.lineup-logo.away-lineup-logo.is-game-pick-hit,
+.lineup-logo.away-lineup-logo.is-game-pick-miss {
+  border-color: color-mix(in srgb, var(--away-color, #66d9ff) 82%, white 10%);
+  background:
+    radial-gradient(circle at 50% 42%, rgba(var(--away-rgb, 102, 217, 255), 0.28), transparent 68%),
+    linear-gradient(180deg, rgba(255,255,255,0.12), rgba(var(--away-rgb, 102, 217, 255), 0.10));
+  box-shadow:
+    0 0 0 2px color-mix(in srgb, var(--away-color, #66d9ff) 78%, black 18%),
+    0 0 18px rgba(var(--away-rgb, 102, 217, 255), 0.42),
+    0 0 32px rgba(var(--away-rgb, 102, 217, 255), 0.20),
+    0 10px 18px rgba(0, 0, 0, 0.28),
+    inset 0 1px 0 rgba(255, 255, 255, 0.12);
+}
+
+.lineup-logo.home-lineup-logo.is-pick-selected,
+.lineup-logo.home-lineup-logo.is-game-pick-leading,
+.lineup-logo.home-lineup-logo.is-game-pick-trailing,
+.lineup-logo.home-lineup-logo.is-game-pick-hit,
+.lineup-logo.home-lineup-logo.is-game-pick-miss {
+  border-color: color-mix(in srgb, var(--home-color, #f0da99) 82%, white 10%);
+  background:
+    radial-gradient(circle at 50% 42%, rgba(var(--home-rgb, 240, 218, 153), 0.28), transparent 68%),
+    linear-gradient(180deg, rgba(255,255,255,0.12), rgba(var(--home-rgb, 240, 218, 153), 0.10));
+  box-shadow:
+    0 0 0 2px color-mix(in srgb, var(--home-color, #f0da99) 78%, black 18%),
+    0 0 18px rgba(var(--home-rgb, 240, 218, 153), 0.42),
+    0 0 32px rgba(var(--home-rgb, 240, 218, 153), 0.20),
+    0 10px 18px rgba(0, 0, 0, 0.28),
+    inset 0 1px 0 rgba(255, 255, 255, 0.12);
+}
+
 body[data-overlay-dock='top'] .team-logo,
 body[data-overlay-dock='top'] .lineup-logo,
 body[data-overlay-dock='bottom'] .team-logo,
@@ -8639,6 +8673,7 @@ body[data-overlay-dock='bottom'] .score-state-strip,
   overflow: auto;
   padding: 8px;
   display: grid;
+  grid-auto-rows: max-content;
   gap: 6px;
   align-content: start;
   position: relative;
@@ -8915,15 +8950,13 @@ body[data-overlay-dock='bottom'] .score-state-strip,
 }
 .hr-item {
   position: relative;
-  contain: layout paint style;
-  content-visibility: auto;
-  contain-intrinsic-size: 78px;
   display: grid;
   grid-template-columns: 40px minmax(0, 1fr) 64px;
   gap: 8px;
   align-items: start;
+  min-height: 58px;
   overflow-x: clip;
-  overflow-y: hidden;
+  overflow-y: visible;
   border-color: color-mix(in srgb, var(--hr-team-color, var(--accent)) 46%, var(--line));
   background:
     linear-gradient(90deg, rgba(var(--hr-team-rgb, 102, 217, 255), 0.24), transparent 52%),

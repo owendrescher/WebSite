@@ -7559,26 +7559,31 @@ function pitcherOpponentHandHtml(splits = null, starts = null, graphLabel = 'Las
 function hydrateVisiblePlayerCardPitchTables(profile, game, token) {
   const shells = [...(playerStatExtraEl?.querySelectorAll?.('[data-visible-card-pitch]') || [])];
   if (!shells.length) return;
-  Promise.all(shells.map(async (shell) => {
+  const paintShell = (shell, html) => {
+    if (!playerStatExtraEl || playerStatExtraEl.dataset.splitToken !== token || !shell?.isConnected) return;
+    shell.innerHTML = html;
+  };
+  for (const shell of shells) {
     const kind = shell.dataset.visibleCardPitch === 'pitcher' ? 'pitcher' : 'batter';
     const playerId = Number(shell.dataset.playerId || profile?.id);
     const pitcherId = Number(shell.dataset.pitcherId || currentMatchupPitcher(profile, game)?.id);
-    try {
-      if (kind === 'pitcher') {
-        const rows = await getSavantExactPitchBreakdown(playerId, 'pitcher');
-        return [shell, visiblePlayerCardPitchStripHtml(rows, 'pitcher')];
+    (async () => {
+      try {
+        if (kind === 'pitcher') {
+          const rows = await withTimeoutValue(getSavantExactPitchBreakdown(playerId, 'pitcher'), 4200, []);
+          return visiblePlayerCardPitchStripHtml(rows, 'pitcher');
+        }
+        const pitcherRows = Number.isFinite(pitcherId) && pitcherId > 0
+          ? await withTimeoutValue(getSavantExactPitchBreakdown(pitcherId, 'pitcher'), 2600, [])
+          : [];
+        const pitcherOrder = pitcherRows.map((item) => ({ category: item.category, pct: item.pct })).filter((item) => item.category);
+        const rows = await withTimeoutValue(getSavantExactPitchBreakdown(playerId, 'batter'), 4200, []);
+        return visiblePlayerCardPitchStripHtml(rows, 'batter', pitcherOrder);
+      } catch {
+        return visiblePlayerCardPitchStripHtml([], kind === 'pitcher' ? 'pitcher' : 'batter');
       }
-      const pitcherRows = Number.isFinite(pitcherId) && pitcherId > 0 ? await getSavantExactPitchBreakdown(pitcherId, 'pitcher').catch(() => []) : [];
-      const pitcherOrder = pitcherRows.map((item) => ({ category: item.category, pct: item.pct })).filter((item) => item.category);
-      const rows = await getSavantExactPitchBreakdown(playerId, 'batter');
-      return [shell, visiblePlayerCardPitchStripHtml(rows, 'batter', pitcherOrder)];
-    } catch {
-      return [shell, visiblePlayerCardPitchStripHtml([], kind === 'pitcher' ? 'pitcher' : 'batter')];
-    }
-  })).then((results) => {
-    if (!playerStatExtraEl || playerStatExtraEl.dataset.splitToken !== token) return;
-    for (const [shell, html] of results) shell.innerHTML = html;
-  });
+    })().then((html) => paintShell(shell, html));
+  }
 }
 
 async function getPitcherLastFiveStarts(playerId, game = null, profile = null) {
@@ -29103,14 +29108,14 @@ function playerStatHeatMapSavantShell(side, playerId) {
 
 async function hydratePlayerStatHeatMapSavant(profile, row = {}) {
   const shells = [...(playerStatHeatmapEl?.querySelectorAll?.('[data-player-heatmap-savant]') || [])];
-  const pitcherRows = row.starter_id ? await getSavantExactPitchBreakdown(row.starter_id, 'pitcher').catch(() => []) : [];
+  const pitcherRows = row.starter_id ? await withTimeoutValue(getSavantExactPitchBreakdown(row.starter_id, 'pitcher'), 3200, []) : [];
   const pitcherOrder = pitcherRows.map((item) => ({ category: item.category, pct: item.pct })).filter((item) => item.category);
-  await Promise.all(shells.map(async (shell) => {
+  await Promise.allSettled(shells.map(async (shell) => {
     const side = shell.dataset.playerHeatmapSavant === 'pitcher' ? 'pitcher' : 'batter';
     const shellPlayerId = shell.dataset.playerId;
     const playerId = side === 'pitcher' ? (shellPlayerId || row.starter_id) : (shellPlayerId || profile?.id || row.batter_id);
     try {
-      const rows = side === 'pitcher' ? pitcherRows : await getSavantExactPitchBreakdown(playerId, side);
+      const rows = side === 'pitcher' ? pitcherRows : await withTimeoutValue(getSavantExactPitchBreakdown(playerId, side), 4200, []);
       shell.innerHTML = playerStatHeatMapSavantRows(rows, side, side === 'batter' ? pitcherOrder : null);
     } catch {
       shell.innerHTML = playerStatHeatMapSavantRows([], side);
@@ -31072,7 +31077,7 @@ async function hydratePitchMatchupShells(root = playerStatPitchMatchupEl || play
   const shells = [...(root?.querySelectorAll?.('[data-pitch-matchup]') || [])];
   if (!shells.length) return;
   ensurePitchMatchupStyles();
-  await Promise.all(shells.map(async (shell) => {
+  await Promise.allSettled(shells.map(async (shell) => {
     const body = shell.querySelector('.pitch-matchup-body') || shell;
     const uiSummary = {
       hrScoreV7: shell.dataset.hrV7 || '',
@@ -31106,12 +31111,12 @@ async function hydratePitchMatchupShells(root = playerStatPitchMatchupEl || play
       pitcherInfoHtml: shell.querySelector('template[data-pitcher-info]')?.innerHTML || '',
     };
     try {
-      const payload = await getPitchMatchupContext({
+      const payload = await withTimeoutValue(getPitchMatchupContext({
         batterId: shell.dataset.batterId,
         pitcherId: shell.dataset.pitcherId,
         season: shell.dataset.season,
         date: shell.dataset.date,
-      });
+      }), 5200, null);
       body.innerHTML = renderPitchMatchupContextHtml(payload, uiSummary, renderOptions);
     } catch (error) {
       body.innerHTML = renderPitchMatchupContextHtml(null, uiSummary, renderOptions);
