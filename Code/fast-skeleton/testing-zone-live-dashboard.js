@@ -7488,16 +7488,18 @@ function visiblePlayerCardPitchTableShell(kind = 'pitcher', playerId = '', pitch
 
 function normalizedPitchUsagePercent(row = {}, keys = ['pitcherUsagePct', 'pct', 'usagePct', 'usage', 'pitch_percent']) {
   for (const key of keys) {
-    const value = Number(row?.[key]);
+    const raw = row?.[key];
+    const text = String(raw ?? '').trim();
+    const value = typeof raw === 'number' ? raw : Number(text.replace(/%/g, ''));
     if (!Number.isFinite(value)) continue;
-    return Math.abs(value) <= 1 ? value * 100 : value;
+    return !/%/.test(text) && Math.abs(value) <= 1 ? value * 100 : value;
   }
   return null;
 }
 
 function pitchClearsVisibleUsageThreshold(row = {}, keys) {
   const usage = normalizedPitchUsagePercent(row, keys);
-  return !Number.isFinite(usage) || usage > 3;
+  return Number.isFinite(usage) && usage > 3;
 }
 
 function visiblePlayerCardPitchStripHtml(rows = null, kind = 'pitcher', orderedCategories = []) {
@@ -8051,6 +8053,8 @@ function canAnimateScoreIncrease(game, prev, currentRuns, previousRuns, side = '
   const previous = Number(previousRuns);
   if (!prev || !Number.isFinite(current) || !Number.isFinite(previous)) return false;
   if (gameIsFinalForTeamRecord(game) || isCompletedGameCard(game)) return false;
+  const highWater = side === 'home' ? Number(prev.homeHighWaterRuns) : Number(prev.awayHighWaterRuns);
+  if (Number.isFinite(highWater) && current <= highWater) return false;
   const delta = current - previous;
   const lastRendered = side === 'home' ? Number(prev.homeRuns) : Number(prev.awayRuns);
   if (!Number.isFinite(lastRendered) || current !== lastRendered + delta) return false;
@@ -15918,6 +15922,45 @@ async function fetchTeamRispStatsMap(season) {
   return map;
 }
 
+function teamHandSplitKey(split = {}, statBlock = {}) {
+  const code = String(split?.split?.code || split?.split?.type || split?.split?.sitCode || split?.sitCode || statBlock?.type?.code || '').toLowerCase();
+  const desc = String(
+    split?.split?.description
+      || split?.split?.displayName
+      || split?.split?.name
+      || split?.description
+      || statBlock?.type?.displayName
+      || statBlock?.type?.description
+      || statBlock?.group?.displayName
+      || '',
+  ).toLowerCase();
+  if (/\b(vl|vsleft|vs_l|lhp|left)\b/.test(code) || /vs\.?\s*left|left-handed|left handed|lhp/.test(desc)) return 'L';
+  if (/\b(vr|vsright|vs_r|rhp|right)\b/.test(code) || /vs\.?\s*right|right-handed|right handed|rhp/.test(desc)) return 'R';
+  return '';
+}
+
+async function fetchTeamHandedBattingStatsMap(season) {
+  const url = new URL(`${MLB_API_BASE}/teams/stats`);
+  url.searchParams.set('stats', 'statSplits');
+  url.searchParams.set('group', 'hitting');
+  url.searchParams.set('sitCodes', 'vl,vr');
+  url.searchParams.set('season', String(season));
+  url.searchParams.set('gameType', 'R');
+  url.searchParams.set('sportIds', '1');
+  const response = await getJson(url.toString());
+  const map = new Map();
+  for (const statBlock of listify(response?.stats)) {
+    for (const split of listify(statBlock?.splits)) {
+      const teamId = Number(split?.team?.id);
+      const hand = teamHandSplitKey(split, statBlock);
+      if (!Number.isFinite(teamId) || !hand) continue;
+      if (!map.has(teamId)) map.set(teamId, { vsL: {}, vsR: {} });
+      map.get(teamId)[hand === 'L' ? 'vsL' : 'vsR'] = split?.stat || {};
+    }
+  }
+  return map;
+}
+
 async function fetchTeamRecordMap(season) {
   const url = new URL(`${MLB_API_BASE}/standings`);
   url.searchParams.set('sportId', '1');
@@ -15939,6 +15982,59 @@ async function fetchTeamRecordMap(season) {
         lastTen: lastTenRecordText(teamRecord),
       });
     }
+  }
+  return map;
+}
+
+function seasonDateRangeForStats(season) {
+  const year = Number(season) || new Date().getFullYear();
+  const selected = parseLocalDateValue(parseFlexibleDateInput(dateInput?.value || '') || formatDate(new Date()));
+  const end = selected.getFullYear() === year ? selected : new Date(year, 9, 31);
+  return {
+    start: `${year}-03-01`,
+    end: formatDate(end),
+  };
+}
+
+function recordBucketText(bucket = {}) {
+  const wins = Number(bucket.wins) || 0;
+  const losses = Number(bucket.losses) || 0;
+  return wins + losses ? `${wins}-${losses}` : '--';
+}
+
+function updateStarterHandRecord(map, teamId, hand, won) {
+  const normalizedHand = handednessCode(hand);
+  if (!Number.isFinite(Number(teamId)) || !['L', 'R'].includes(normalizedHand)) return;
+  if (!map.has(Number(teamId))) map.set(Number(teamId), { vsLStarter: { wins: 0, losses: 0 }, vsRStarter: { wins: 0, losses: 0 } });
+  const bucket = map.get(Number(teamId))[normalizedHand === 'L' ? 'vsLStarter' : 'vsRStarter'];
+  if (won) bucket.wins += 1;
+  else bucket.losses += 1;
+}
+
+async function fetchTeamRecordVsStarterHandMap(season) {
+  const { start, end } = seasonDateRangeForStats(season);
+  const url = new URL(`${MLB_API_BASE}/schedule`);
+  url.searchParams.set('sportId', '1');
+  url.searchParams.set('season', String(season));
+  url.searchParams.set('gameType', 'R');
+  url.searchParams.set('startDate', start);
+  url.searchParams.set('endDate', end);
+  url.searchParams.set('hydrate', 'probablePitcher');
+  const response = await getJson(url.toString());
+  const map = new Map();
+  for (const game of listify(response?.dates).flatMap((date) => listify(date?.games))) {
+    const away = game?.teams?.away || {};
+    const home = game?.teams?.home || {};
+    const awayScore = Number(away?.score);
+    const homeScore = Number(home?.score);
+    if (!Number.isFinite(awayScore) || !Number.isFinite(homeScore)) continue;
+    if (!/final|game over|completed/i.test(String(game?.status?.detailedState || game?.status?.abstractGameState || ''))) continue;
+    const awayTeamId = Number(away?.team?.id);
+    const homeTeamId = Number(home?.team?.id);
+    const awayStarterHand = handednessCode(away?.probablePitcher?.pitchHand?.code || away?.probablePitcher?.pitchHand?.description || '');
+    const homeStarterHand = handednessCode(home?.probablePitcher?.pitchHand?.code || home?.probablePitcher?.pitchHand?.description || '');
+    updateStarterHandRecord(map, awayTeamId, homeStarterHand, awayScore > homeScore);
+    updateStarterHandRecord(map, homeTeamId, awayStarterHand, homeScore > awayScore);
   }
   return map;
 }
@@ -16004,6 +16100,10 @@ function teamStatsRowHtml(row) {
       <td>${row.leftOnBase}</td>
       <td>${escapeHtml(row.avg)}</td>
       <td>${escapeHtml(row.rispAvg)}</td>
+      <td>${escapeHtml(row.avgVsLhp)}</td>
+      <td>${escapeHtml(row.avgVsRhp)}</td>
+      <td>${escapeHtml(row.recordVsLsp)}</td>
+      <td>${escapeHtml(row.recordVsRsp)}</td>
       <td>${escapeHtml(row.era)}</td>
       <td>${escapeHtml(row.slg)}</td>
       <td>${row.errors}</td>
@@ -16026,6 +16126,10 @@ function teamStatsSortValue(row, key) {
     case 'leftOnBase': return Number(row.leftOnBase) || 0;
     case 'avg': return statRate(row.avg) ?? -1;
     case 'rispAvg': return statRate(row.rispAvg) ?? -1;
+    case 'avgVsLhp': return statRate(row.avgVsLhp) ?? -1;
+    case 'avgVsRhp': return statRate(row.avgVsRhp) ?? -1;
+    case 'recordVsLsp': return numberFromRecordPct(row.recordVsLsp);
+    case 'recordVsRsp': return numberFromRecordPct(row.recordVsRsp);
     case 'era': return statRate(row.era) ?? Number.POSITIVE_INFINITY;
     case 'slg': return statRate(row.slg) ?? -1;
     case 'errors': return Number(row.errors) || 0;
@@ -16065,17 +16169,20 @@ function teamStatsHeaderHtml(key, label) {
 }
 
 async function getTeamStatsRows(season) {
-  const cacheKey = String(season);
+  const cacheDate = parseFlexibleDateInput(dateInput?.value || '') || formatDate(new Date());
+  const cacheKey = `${season}:${cacheDate}`;
   let promise = teamStatsCache.get(cacheKey);
   if (!promise) {
     promise = (async () => {
-      const [teams, hittingMap, pitchingMap, fieldingMap, recordMap, rispMap] = await Promise.all([
+      const [teams, hittingMap, pitchingMap, fieldingMap, recordMap, rispMap, handedBattingMap, starterHandRecordMap] = await Promise.all([
         getTeamsForSeason(season),
         fetchTeamStatsGroup(season, 'hitting'),
         fetchTeamStatsGroup(season, 'pitching'),
         fetchTeamStatsGroup(season, 'fielding').catch(() => new Map()),
         fetchTeamRecordMap(season).catch(() => new Map()),
         fetchTeamRispStatsMap(season).catch(() => new Map()),
+        fetchTeamHandedBattingStatsMap(season).catch(() => new Map()),
+        fetchTeamRecordVsStarterHandMap(season).catch(() => new Map()),
       ]);
       return teams.map((team) => {
         const teamId = Number(team.id);
@@ -16083,6 +16190,8 @@ async function getTeamStatsRows(season) {
         const pitching = pitchingMap.get(teamId) || {};
         const fielding = fieldingMap.get(teamId) || {};
         const risp = rispMap.get(teamId) || {};
+        const handedBatting = handedBattingMap.get(teamId) || {};
+        const starterHandRecords = starterHandRecordMap.get(teamId) || {};
         const abbrev = displayTeamAbbrev(team.abbreviation);
         const recordInfo = recordMap.get(teamId) || null;
         const record = recordInfo?.text || latestRenderedRecordForTeam(abbrev);
@@ -16104,6 +16213,10 @@ async function getTeamStatsRows(season) {
           leftOnBase: statNumber(hitting.leftOnBase ?? hitting.lob ?? hitting.teamLeftOnBase),
           avg: formatTeamRate(hitting.avg ?? hitting.battingAverage),
           rispAvg: formatTeamRate(risp.avg ?? risp.battingAverage ?? hitting.avgWithRisp ?? hitting.rispAvg),
+          avgVsLhp: formatTeamRate(handedBatting.vsL?.avg ?? handedBatting.vsL?.battingAverage),
+          avgVsRhp: formatTeamRate(handedBatting.vsR?.avg ?? handedBatting.vsR?.battingAverage),
+          recordVsLsp: recordBucketText(starterHandRecords.vsLStarter),
+          recordVsRsp: recordBucketText(starterHandRecords.vsRStarter),
           era: cleanSummary(pitching.era) || '---',
           slg: formatTeamRate(hitting.slg ?? hitting.sluggingPercentage),
           errors: statNumber(fielding.errors),
@@ -16139,6 +16252,10 @@ function teamStatsTableHtml(rows) {
             ${teamStatsHeaderHtml('leftOnBase', 'LOB')}
             ${teamStatsHeaderHtml('avg', 'AVG')}
             ${teamStatsHeaderHtml('rispAvg', 'AVG/RISP')}
+            ${teamStatsHeaderHtml('avgVsLhp', 'AVG vLHP')}
+            ${teamStatsHeaderHtml('avgVsRhp', 'AVG vRHP')}
+            ${teamStatsHeaderHtml('recordVsLsp', 'REC vLSP')}
+            ${teamStatsHeaderHtml('recordVsRsp', 'REC vRSP')}
             ${teamStatsHeaderHtml('era', 'ERA')}
             ${teamStatsHeaderHtml('slg', 'SLG')}
             ${teamStatsHeaderHtml('errors', 'E')}
@@ -16148,7 +16265,7 @@ function teamStatsTableHtml(rows) {
             ${teamStatsHeaderHtml('hitterWalks', 'BB (H)')}
           </tr>
         </thead>
-        <tbody>${rows.map(teamStatsRowHtml).join('') || '<tr><td colspan="17">No team stats loaded</td></tr>'}</tbody>
+        <tbody>${rows.map(teamStatsRowHtml).join('') || '<tr><td colspan="21">No team stats loaded</td></tr>'}</tbody>
       </table>
     </div>
   `;

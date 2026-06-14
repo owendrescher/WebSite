@@ -6918,16 +6918,18 @@ function visiblePlayerCardPitchTableShell(kind = 'pitcher', playerId = '', pitch
 
 function normalizedPitchUsagePercent(row = {}, keys = ['pitcherUsagePct', 'pct', 'usagePct', 'usage', 'pitch_percent']) {
   for (const key of keys) {
-    const value = Number(row?.[key]);
+    const raw = row?.[key];
+    const text = String(raw ?? '').trim();
+    const value = typeof raw === 'number' ? raw : Number(text.replace(/%/g, ''));
     if (!Number.isFinite(value)) continue;
-    return Math.abs(value) <= 1 ? value * 100 : value;
+    return !/%/.test(text) && Math.abs(value) <= 1 ? value * 100 : value;
   }
   return null;
 }
 
 function pitchClearsVisibleUsageThreshold(row = {}, keys) {
   const usage = normalizedPitchUsagePercent(row, keys);
-  return !Number.isFinite(usage) || usage > 3;
+  return Number.isFinite(usage) && usage > 3;
 }
 
 function visiblePlayerCardPitchStripHtml(rows = null, kind = 'pitcher', orderedCategories = []) {
@@ -7482,6 +7484,8 @@ function canAnimateScoreIncrease(game, prev, currentRuns, previousRuns, side = '
   const previous = Number(previousRuns);
   if (!prev || !Number.isFinite(current) || !Number.isFinite(previous)) return false;
   if (gameIsFinalForTeamRecord(game) || isCompletedGameCard(game)) return false;
+  const highWater = side === 'home' ? Number(prev.homeHighWaterRuns) : Number(prev.awayHighWaterRuns);
+  if (Number.isFinite(highWater) && current <= highWater) return false;
   const delta = current - previous;
   const lastRendered = side === 'home' ? Number(prev.homeRuns) : Number(prev.awayRuns);
   if (!Number.isFinite(lastRendered) || current !== lastRendered + delta) return false;
