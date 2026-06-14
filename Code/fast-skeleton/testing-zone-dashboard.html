@@ -334,6 +334,7 @@
                         <button type="button" data-live-replay-speed="5">5x</button>
                       </div>
                       <button id="liveLabReplayPauseBtn" class="live-lab-replay-pause-btn" type="button" hidden>Pause</button>
+                      <button id="liveLabLiveBtn" class="live-lab-live-btn" type="button">Live</button>
                       <button id="liveLabReplayBtn" class="live-lab-replay-btn" type="button">Game Replay</button>
                     </section>
                     <section class="live-lab-play">
@@ -582,20 +583,15 @@
     <script src="../shared/supabase-config.js?v=20260521heatmap"></script>
     <script>
       window.OWENTOOLS_SYNC = {
-        toolId: "baseball-live-prototype",
-        label: "Baseball live prototype",
+        toolId: "baseball-dashboard",
+        label: "Baseball dashboard",
         include: [
-          "__baseball-manual-state-is-local-only__"
-        ],
-        exclude: [
-          "player-tracker",
-          "pending-game-picks",
-          "tossup-scoreboards"
+          "manual-state-mirror:v1"
         ]
       };
     </script>
     <script src="../shared/owentools-sync.js?v=20260610manual2"></script>
     <script src="rotowire-default-lineups.js?v=20260610manual1"></script>
-    <script src="testing-zone-live-dashboard.js?v=20260612testing-zone70"></script>
+    <script src="testing-zone-live-dashboard.js?v=20260614testing-zone73"></script>
   </body>
 </html>

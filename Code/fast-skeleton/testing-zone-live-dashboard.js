@@ -179,6 +179,7 @@ const lineupEmbedView = ['lineups', 'pitching', 'roster', 'live'].includes(lineu
   : 'live';
 
 const previousState = new Map();
+const scoreAnimationMemory = new Map();
 let currentLineupView = lineupEmbedMode ? lineupEmbedView : 'lineups';
 let lineupSplitMode = 'none';
 let lineupSplitPeerGamePk = '';
@@ -6848,7 +6849,13 @@ function pitchStrengthTableHtml(rows = null, playerType = 'batter') {
   if (!rows.length) {
     return `<strong>${title} <span class="player-stat-source">Savant</span></strong><div class="player-stat-loading">Pitch type data unavailable</div>`;
   }
-  const body = rows.map((row) => `
+  const visibleRows = playerType === 'pitcher'
+    ? rows.filter((row) => pitchClearsVisibleUsageThreshold(row, ['pct', 'usage', 'usagePct', 'pitch_percent']))
+    : rows;
+  if (!visibleRows.length) {
+    return `<strong>${title} <span class="player-stat-source">Savant</span></strong><div class="player-stat-loading">Pitch type data unavailable</div>`;
+  }
+  const body = visibleRows.map((row) => `
     <tr>
       <th>${escapeHtml(row.category)}</th>
       ${playerType === 'pitcher'
@@ -7479,13 +7486,31 @@ function visiblePlayerCardPitchTableShell(kind = 'pitcher', playerId = '', pitch
   return `<div class="visible-player-card-pitch-shell" data-visible-card-pitch="${escapeHtml(kind)}" data-player-id="${escapeHtml(playerId || '')}" data-pitcher-id="${escapeHtml(pitcherId || '')}">${visiblePlayerCardPitchStripHtml(null, kind)}</div>`;
 }
 
+function normalizedPitchUsagePercent(row = {}, keys = ['pitcherUsagePct', 'pct', 'usagePct', 'usage', 'pitch_percent']) {
+  for (const key of keys) {
+    const value = Number(row?.[key]);
+    if (!Number.isFinite(value)) continue;
+    return Math.abs(value) <= 1 ? value * 100 : value;
+  }
+  return null;
+}
+
+function pitchClearsVisibleUsageThreshold(row = {}, keys) {
+  const usage = normalizedPitchUsagePercent(row, keys);
+  return !Number.isFinite(usage) || usage > 3;
+}
+
 function visiblePlayerCardPitchStripHtml(rows = null, kind = 'pitcher', orderedCategories = []) {
   if (!Array.isArray(rows)) return '<div class="visible-pitch-strip is-loading">Loading pitches</div>';
   const pitcherMode = kind === 'pitcher';
   let displayRows = pitcherMode
-    ? [...rows].sort((a, b) => (Number(b?.pct) || 0) - (Number(a?.pct) || 0))
+    ? [...rows]
+      .filter((row) => cleanSummary(row.category))
+      .filter((row) => pitchClearsVisibleUsageThreshold(row, ['pct', 'usage', 'usagePct', 'pitch_percent']))
+      .sort((a, b) => (Number(b?.pct) || 0) - (Number(a?.pct) || 0))
     : playerStatHeatMapAlignPitchRows(rows, orderedCategories)
         .filter((row) => cleanSummary(row.category))
+        .filter((row) => pitchClearsVisibleUsageThreshold(row, ['pitcherUsagePct', 'pct', 'usage', 'usagePct', 'pitch_percent']))
         .sort((a, b) => Number(b?.pitcherUsagePct ?? b?.pct ?? b?.usagePct ?? b?.pitch_percent ?? 0) - Number(a?.pitcherUsagePct ?? a?.pct ?? a?.usagePct ?? a?.pitch_percent ?? 0));
   displayRows = displayRows.slice(0, 7);
   if (!displayRows.length) return '<div class="visible-pitch-strip is-loading">Pitch data unavailable</div>';
@@ -7808,7 +7833,7 @@ function latestBaseballPlayEventText(play = null) {
 
 function eventLabel(play) {
   const batterName = cleanPlayText(play?.matchup?.batter?.fullName || 'Unknown');
-  const shortName = batterName.split(' ').slice(-1)[0];
+  const shortName = lastName(batterName);
   const event = cleanPlayText(play?.result?.event || play?.result?.eventType || 'Play') || 'Play';
   const description = cleanPlayText(play?.result?.description || '');
   if (isAdministrativePlayText(event) || isAdministrativePlayText(description)) {
@@ -8008,13 +8033,27 @@ function suppressScoreAnimations(ms = 8000) {
   suppressScoreAnimationsUntil = Math.max(suppressScoreAnimationsUntil, Date.now() + ms);
 }
 
-function canAnimateScoreIncrease(game, prev, currentRuns, previousRuns) {
+function scoreAnimationMemoryKey(game, side, runs) {
+  return [String(game?.gamePk || ''), String(side || ''), Number(runs)].join(':');
+}
+
+function rememberScoreAnimation(game, side, runs) {
+  scoreAnimationMemory.set(scoreAnimationMemoryKey(game, side, runs), Date.now());
+  if (scoreAnimationMemory.size <= 240) return;
+  const cutoff = Date.now() - (6 * 60 * 60 * 1000);
+  for (const [key, savedAt] of scoreAnimationMemory.entries()) {
+    if (savedAt < cutoff || scoreAnimationMemory.size > 240) scoreAnimationMemory.delete(key);
+  }
+}
+
+function canAnimateScoreIncrease(game, prev, currentRuns, previousRuns, side = '') {
   const current = Number(currentRuns);
   const previous = Number(previousRuns);
   if (!prev || !Number.isFinite(current) || !Number.isFinite(previous)) return false;
   if (gameIsFinalForTeamRecord(game) || isCompletedGameCard(game)) return false;
   const delta = current - previous;
   if (!Number.isInteger(delta) || delta <= 0 || delta > 4) return false;
+  if (scoreAnimationMemory.has(scoreAnimationMemoryKey(game, side, current))) return false;
   if (Date.now() < suppressScoreAnimationsUntil) return false;
   if (document.visibilityState === 'hidden') return false;
   if (!lineupGameShouldAutoRefresh(game)) return false;
@@ -8142,6 +8181,19 @@ function gameWithInferredFinalStatus(game, isFinal) {
   };
 }
 
+function linescoreLastCompletedInningNumber(linescore = {}, play = null) {
+  const innings = Array.isArray(linescore?.innings) ? linescore.innings : [];
+  const lastLineInning = innings.reduce((max, inning) => {
+    const n = Number(inning?.num ?? inning?.ordinalNum);
+    return Number.isFinite(n) && n > max ? n : max;
+  }, 0);
+  if (lastLineInning > 0) return lastLineInning;
+  const playInning = Number(play?.about?.inning);
+  if (Number.isFinite(playInning) && playInning > 0) return playInning;
+  const current = Number(linescore?.currentInning);
+  return Number.isFinite(current) && current > 0 ? current : 0;
+}
+
 function gameLooksFinalByScore(game, linescore = {}, allPlays = [], activePlay = null) {
   const statusText = `${game?.status?.abstractGameState || ''} ${game?.status?.detailedState || ''} ${game?.status || ''}`.toLowerCase();
   if (/final|game over|completed/.test(statusText)) return true;
@@ -8155,7 +8207,9 @@ function gameLooksFinalByScore(game, linescore = {}, allPlays = [], activePlay =
   if (!Number.isFinite(away) || !Number.isFinite(home) || away === home) return false;
   const inningState = String(linescore?.inningState || '').toLowerCase();
   const stateHalf = normalizeHalfInning(linescore?.inningHalf || linescore?.inningState);
-  if (stateHalf === 'end' || /over|final|complete/.test(inningState)) return true;
+  if (stateHalf === 'end' || /over|final|complete/.test(inningState)) {
+    return linescoreLastCompletedInningNumber(linescore, play) >= 9;
+  }
   const playHalf = normalizeHalfInning(play?.about?.halfInning);
   const outsAfter = liveLabReplayOutsAfterPlay(play);
   if (playHalf === 'top' && outsAfter >= 3 && home > away) return true;
@@ -9786,9 +9840,9 @@ function readPendingGamePickStore() {
   const dateKey = `${PENDING_GAME_PICKS_STORAGE_KEY}:${dateInput.value || formatDate(new Date())}`;
   const date = dateInput.value || formatDate(new Date());
   const candidates = [];
-  const rememberCandidate = (value) => {
+  const rememberCandidate = (value, updatedAt = 0) => {
     const normalized = normalizePendingGamePickEntries(value);
-    if (normalized.length) candidates.push(normalized);
+    if (normalized.length) candidates.push({ items: normalized, updatedAt: Number(updatedAt) || 0 });
   };
   try {
     const keys = [dateKey, PENDING_GAME_PICKS_STORAGE_KEY];
@@ -9807,12 +9861,16 @@ function readPendingGamePickStore() {
   } catch {
     // Fall through to the protected same-day backup.
   }
-  rememberCandidate(readManualStateBackup(date).pendingGamePicks);
-  rememberCandidate(readManualStateMirror(date).pendingGamePicks);
+  const backupState = readManualStateBackup(date);
+  const mirrorState = readManualStateMirror(date);
+  rememberCandidate(backupState.pendingGamePicks, backupState.updatedAt);
+  rememberCandidate(mirrorState.pendingGamePicks, mirrorState.updatedAt);
   try {
-    rememberCandidate(JSON.parse(sessionStorage.getItem(manualStateBackupKey(date)) || '{}')?.pendingGamePicks);
+    const sessionState = JSON.parse(sessionStorage.getItem(manualStateBackupKey(date)) || '{}');
+    rememberCandidate(sessionState?.pendingGamePicks, sessionState?.updatedAt);
   } catch {}
-  const best = candidates.sort((a, b) => manualStateWeight(b) - manualStateWeight(a))[0] || [];
+  const best = candidates
+    .sort((a, b) => manualStateWeight(b.items) - manualStateWeight(a.items) || b.updatedAt - a.updatedAt)[0]?.items || [];
   if (best.length) {
     writePendingGamePickStore(best, { backup: false });
     return best;
@@ -12959,9 +13017,21 @@ function getTrackedPlayers(date = dateInput.value || formatDate(new Date())) {
     if (Array.isArray(parsed)) {
       const filtered = normalizeTrackedPlayerEntries(parsed);
       if (!filtered.length) return restoreFromBackup();
-      trackedPlayersMemoryByDate.set(key, filtered);
-      writeManualStateBackupPatch({ trackedPlayers: filtered }, date);
-      return filtered;
+      const mirrorState = readManualStateMirror(date);
+      const backupState = readManualStateBackup(date);
+      const best = [
+        { items: filtered, updatedAt: 0 },
+        { items: normalizeTrackedPlayerEntries(mirrorState.trackedPlayers || []), updatedAt: Number(mirrorState.updatedAt) || 0 },
+        { items: normalizeTrackedPlayerEntries(backupState.trackedPlayers || []), updatedAt: Number(backupState.updatedAt) || 0 },
+      ]
+        .filter((candidate) => candidate.items.length)
+        .sort((a, b) => manualStateWeight(b.items) - manualStateWeight(a.items) || b.updatedAt - a.updatedAt)[0]?.items || filtered;
+      trackedPlayersMemoryByDate.set(key, best);
+      if (best !== filtered) {
+        try { localStorage.setItem(key, JSON.stringify(best)); } catch {}
+      }
+      writeManualStateBackupPatch({ trackedPlayers: best }, date);
+      return best;
     }
   } catch {
     return restoreFromBackup();
@@ -24830,13 +24900,14 @@ function liveLabStableMergedGame(incoming, stable) {
   };
 }
 
-async function hydrateLiveLabGame(game) {
+async function hydrateLiveLabGame(game, options = {}) {
   if (!game?.gamePk) return game;
   const key = String(game.gamePk);
   const cached = liveLabFeedCache.get(key);
+  const forceRefresh = Boolean(options.forceRefresh);
   const needsFullPlayHistory = currentLineupView === 'live' || isCompletedGameCard(game) || gameIsFinalForTeamRecord(game);
   const cachedHasPlayHistory = liveLabHasPlayHistory(cached?.game);
-  if (cached && Date.now() - cached.at < 4500 && (!needsFullPlayHistory || cachedHasPlayHistory)) {
+  if (!forceRefresh && cached && Date.now() - cached.at < 4500 && (!needsFullPlayHistory || cachedHasPlayHistory)) {
     const mergedCached = liveLabStableMergedGame(game, cached.game);
     liveLabFeedCache.set(key, { at: cached.at, game: mergedCached });
     if (liveLabHasPlayHistory(mergedCached)) liveLabStableGameByPk.set(key, mergedCached);
@@ -29087,10 +29158,13 @@ function playerStatHeatMapSavantRows(rows = null, playerType = 'batter', ordered
   if (!Array.isArray(rows)) {
     return '<div class="player-heatmap-metric-table player-heatmap-pitch-table"><div class="player-heatmap-metric-row"><span>Savant</span><b>Loading</b></div></div>';
   }
-  const displayRows = playerType === 'batter' && Array.isArray(orderedCategories) && orderedCategories.length
+  const displayRowsRaw = playerType === 'batter' && Array.isArray(orderedCategories) && orderedCategories.length
     ? playerStatHeatMapAlignPitchRows(rows, orderedCategories)
       .sort((a, b) => Number(b?.pitcherUsagePct ?? b?.pct ?? b?.usagePct ?? b?.pitch_percent ?? 0) - Number(a?.pitcherUsagePct ?? a?.pct ?? a?.usagePct ?? a?.pitch_percent ?? 0))
     : [...rows].sort((a, b) => Number(b?.pct ?? b?.usagePct ?? b?.pitch_percent ?? 0) - Number(a?.pct ?? a?.usagePct ?? a?.pitch_percent ?? 0));
+  const displayRows = displayRowsRaw.filter((row) => playerType === 'pitcher'
+    ? pitchClearsVisibleUsageThreshold(row, ['pct', 'usage', 'usagePct', 'pitch_percent'])
+    : pitchClearsVisibleUsageThreshold(row, ['pitcherUsagePct', 'pct', 'usage', 'usagePct', 'pitch_percent']));
   if (!displayRows.length) {
     return '<div class="player-heatmap-metric-table player-heatmap-pitch-table"><div class="player-heatmap-metric-row"><span>Savant</span><b>--</b></div></div>';
   }
@@ -29147,6 +29221,35 @@ function readPitchMatchupLocalCache(key = '') {
   } catch {
     return null;
   }
+}
+
+function resetLiveLabToRealtime(game = activeLineupGame) {
+  stopLiveLabReplay({ force: true, restore: false });
+  liveLabManualPlayerSelection = false;
+  liveLabSelectedPlayerId = '';
+  liveLabSelectedOutcomeKey = '';
+  liveLabSelectedPitchKey = '';
+  liveLabPitchFingerprint = '';
+  liveLabOutcomeFingerprint = '';
+  liveLabFollowPlayKey = '';
+  liveLabLiveOverlayKey = '';
+  liveLabLiveInPlayTraceKey = '';
+  liveLabCurrentPitchKey = '';
+  const renderGame = game || activeLineupGame;
+  if (renderGame) renderLineupLiveLab(renderGame);
+  if (!renderGame?.gamePk) return;
+  hydrateLiveLabGame(renderGame, { forceRefresh: true }).then((liveGame) => {
+    if (!liveGame || String(activeLineupGame?.gamePk || '') !== String(renderGame.gamePk || '')) return;
+    activeLineupGame = liveGame;
+    liveLabManualPlayerSelection = false;
+    liveLabSelectedPlayerId = '';
+    liveLabSelectedOutcomeKey = '';
+    liveLabSelectedPitchKey = '';
+    liveLabPitchFingerprint = '';
+    liveLabOutcomeFingerprint = '';
+    liveLabFollowPlayKey = '';
+    renderLineupLiveLab(liveGame);
+  }).catch(() => {});
 }
 
 function writePitchMatchupLocalCache(key = '', payload = null) {
@@ -33845,7 +33948,7 @@ function playerStatHeatMapPitchLabel(pitch = '') {
 function playerStatHeatMapPitchList(row = {}) {
   return PLAYER_HEATMAP_PITCHES
     .map((pitch) => ({ pitch, usage: Number(row[`pitcher_${pitch}_usage_pct`]) }))
-    .filter((item) => Number.isFinite(item.usage) && item.usage > 0.05)
+    .filter((item) => Number.isFinite(item.usage) && pitchClearsVisibleUsageThreshold(item, ['usage']))
     .sort((a, b) => b.usage - a.usage)
     .map((item) => item.pitch);
 }
@@ -33860,7 +33963,7 @@ function playerStatHeatMapPitchRows(row = {}, side = 'batter') {
     const label = playerStatHeatMapPitchLabel(pitch);
     if (side === 'pitcher') {
       const usage = Number(row[`pitcher_${pitch}_usage_pct`]);
-      if (!Number.isFinite(usage) || usage <= 0.05) continue;
+      if (!Number.isFinite(usage) || !pitchClearsVisibleUsageThreshold({ usage }, ['usage'])) continue;
       const slgHeat = Number.isFinite(Number(row[`pitcher_${pitch}_slg_allowed`])) ? clamp(Number(row[`pitcher_${pitch}_slg_allowed`]) / 0.700, 0, 1) : 0.5;
       rowsHtml.push(`<div class="player-heatmap-metric-row pitcher-slg-row" style="--pitch-heat:${slgHeat};"><span>${escapeHtml(label)}</span><b>${escapeHtml(usage.toFixed(1))}</b><b>${escapeHtml(row[`pitcher_${pitch}_pa`] || '--')}</b><b>${escapeHtml(row[`pitcher_${pitch}_slg_allowed`] || '--')}</b><b>${escapeHtml(row[`pitcher_${pitch}_hr_allowed`] || '--')}</b><b>${escapeHtml(row[`pitcher_${pitch}_k_pct`] || '--')}</b></div>`);
     } else {
@@ -35619,17 +35722,7 @@ function initLineupOverlay() {
     if (liveBtn) {
       e.preventDefault();
       e.stopPropagation();
-      stopLiveLabReplay();
-      liveLabManualPlayerSelection = false;
-      liveLabSelectedPlayerId = '';
-      liveLabSelectedOutcomeKey = '';
-      liveLabSelectedPitchKey = '';
-      liveLabPitchFingerprint = '';
-      liveLabOutcomeFingerprint = '';
-      liveLabFollowPlayKey = '';
-      liveLabLiveOverlayKey = '';
-      liveLabLiveInPlayTraceKey = '';
-      if (activeLineupGame) renderLineupLiveLab(activeLineupGame);
+      resetLiveLabToRealtime(activeLineupGame);
       return;
     }
     const replayBtn = e.target.closest('#liveLabReplayBtn');
@@ -36361,16 +36454,18 @@ function upsertCard(game) {
   if (prev) {
     const awayScoringSignature = scoreRunAnimationSignature(game, 'away');
     const homeScoringSignature = scoreRunAnimationSignature(game, 'home');
-    if (awayScoringSignature && awayScoringSignature !== prev.lastScoringSignature && canAnimateScoreIncrease(game, prev, awayRuns, prev.awayHighWaterRuns ?? prev.awayRuns)) {
-      lastScoringSignature = awayScoringSignature;
-      animateScoreChange(card, game.awayColor, game.currentEvent === 'Home Run');
-      flashHomePlate(card);
-      animateNumericChange(card.querySelector('.away-score'), game.awayColor);
-    } else if (homeScoringSignature && homeScoringSignature !== prev.lastScoringSignature && canAnimateScoreIncrease(game, prev, homeRuns, prev.homeHighWaterRuns ?? prev.homeRuns)) {
-      lastScoringSignature = homeScoringSignature;
-      animateScoreChange(card, game.homeColor, game.currentEvent === 'Home Run');
-      flashHomePlate(card);
-      animateNumericChange(card.querySelector('.home-score'), game.homeColor);
+  if (awayScoringSignature && awayScoringSignature !== prev.lastScoringSignature && canAnimateScoreIncrease(game, prev, awayRuns, prev.awayHighWaterRuns ?? prev.awayRuns, 'away')) {
+    lastScoringSignature = awayScoringSignature;
+    rememberScoreAnimation(game, 'away', awayRuns);
+    animateScoreChange(card, game.awayColor, game.currentEvent === 'Home Run');
+    flashHomePlate(card);
+    animateNumericChange(card.querySelector('.away-score'), game.awayColor);
+  } else if (homeScoringSignature && homeScoringSignature !== prev.lastScoringSignature && canAnimateScoreIncrease(game, prev, homeRuns, prev.homeHighWaterRuns ?? prev.homeRuns, 'home')) {
+    lastScoringSignature = homeScoringSignature;
+    rememberScoreAnimation(game, 'home', homeRuns);
+    animateScoreChange(card, game.homeColor, game.currentEvent === 'Home Run');
+    flashHomePlate(card);
+    animateNumericChange(card.querySelector('.home-score'), game.homeColor);
     }
     if (balls !== prev.balls) animateNumericChange(card.querySelector('.score-mini-balls strong'), '#5aa7ff');
     if (strikes !== prev.strikes) animateNumericChange(card.querySelector('.score-mini-strikes strong'), '#ffd166');
