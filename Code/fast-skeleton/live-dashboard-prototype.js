@@ -8024,6 +8024,8 @@ function canAnimateScoreIncrease(game, prev, currentRuns, previousRuns, side = '
   if (!prev || !Number.isFinite(current) || !Number.isFinite(previous)) return false;
   if (gameIsFinalForTeamRecord(game) || isCompletedGameCard(game)) return false;
   const delta = current - previous;
+  const lastRendered = side === 'home' ? Number(prev.homeRuns) : Number(prev.awayRuns);
+  if (!Number.isFinite(lastRendered) || current !== lastRendered + delta) return false;
   if (!Number.isInteger(delta) || delta <= 0 || delta > 4) return false;
   if (scoreAnimationMemory.has(scoreAnimationMemoryKey(game, side, current))) return false;
   if (Date.now() < suppressScoreAnimationsUntil) return false;
@@ -24316,7 +24318,9 @@ function animateScoreChange(card, flashColor, isHomeRun) {
   card.style.setProperty('--flash-rgb', hexToRgb(flashColor));
   card.classList.remove('score-flash', 'hr-flash');
   void card.offsetWidth;
-  card.classList.add(isHomeRun ? 'hr-flash' : 'score-flash');
+  const className = isHomeRun ? 'hr-flash' : 'score-flash';
+  card.classList.add(className);
+  window.setTimeout(() => card.classList.remove(className), isHomeRun ? 6500 : 3500);
 }
 
 function setLineupView(view, options = {}) {
@@ -24669,6 +24673,26 @@ function liveLabBetterPlay(preferred, fallback) {
   return liveLabMergePlay(preferred, fallback);
 }
 
+function liveLabPlayOrderValue(play) {
+  const atBatIndex = Number(play?.about?.atBatIndex);
+  if (Number.isFinite(atBatIndex)) return atBatIndex;
+  const inning = Number(play?.about?.inning);
+  if (!Number.isFinite(inning)) return null;
+  const half = normalizeHalfInning(play?.about?.halfInning);
+  const halfOffset = half === 'bottom' ? 0.5 : half === 'top' ? 0 : 0.25;
+  return (inning * 2) + halfOffset;
+}
+
+function liveLabLatestActivePlay(incomingPlay, stablePlay) {
+  if (!incomingPlay) return stablePlay || null;
+  if (!stablePlay) return incomingPlay;
+  if (liveLabSameAtBat(incomingPlay, stablePlay)) return liveLabBetterPlay(incomingPlay, stablePlay);
+  const incomingOrder = liveLabPlayOrderValue(incomingPlay);
+  const stableOrder = liveLabPlayOrderValue(stablePlay);
+  if (incomingOrder != null && stableOrder != null && stableOrder > incomingOrder) return stablePlay;
+  return incomingPlay;
+}
+
 function liveLabPlayMergeKey(play) {
   const atBatIndex = play?.about?.atBatIndex;
   if (atBatIndex != null) return `ab:${atBatIndex}`;
@@ -24752,12 +24776,17 @@ function liveLabStableMergedGame(incoming, stable) {
   if (!incoming || !stable) return incoming || stable || null;
   if (String(incoming?.gamePk || '') !== String(stable?.gamePk || '')) return incoming;
 
-  const incomingBatterId = Number(incoming?.activeBatterId || 0);
-  const stableBatterId = Number(stable?.activePlay?.matchup?.batter?.id || stable?.activeBatterId || 0);
-  const keepStablePlay = !incomingBatterId || !stableBatterId || incomingBatterId === stableBatterId;
-  const activePlay = keepStablePlay
-    ? liveLabBetterPlay(incoming.activePlay, stable.activePlay)
-    : incoming.activePlay;
+  const activePlay = liveLabLatestActivePlay(incoming.activePlay, stable.activePlay);
+  const incomingOrder = liveLabPlayOrderValue(incoming.activePlay);
+  const stableOrder = liveLabPlayOrderValue(stable.activePlay);
+  const incomingPlayWentBackward = Boolean(
+    incoming.activePlay
+      && stable.activePlay
+      && !liveLabSameAtBat(incoming.activePlay, stable.activePlay)
+      && incomingOrder != null
+      && stableOrder != null
+      && stableOrder > incomingOrder,
+  );
   const allPlays = liveLabMergePlayLists(stable.allPlays, incoming.allPlays, activePlay ? [activePlay] : []);
   const incomingTicker = Array.isArray(incoming?.ticker) && incoming.ticker.some((item) => !isPlaceholderPlay(item?.text))
     ? incoming.ticker
@@ -24769,16 +24798,25 @@ function liveLabStableMergedGame(incoming, stable) {
     ...incoming,
     activePlay,
     allPlays: allPlays.length ? allPlays : (incoming.allPlays || stable.allPlays),
-    activeBatterId: incoming.activeBatterId || activePlay?.matchup?.batter?.id || stable.activeBatterId,
-    battingSide: incoming.battingSide || stable.battingSide,
-    bases: liveLabPreferBaseState(incoming.bases, stable.bases, incoming, stable, activePlay),
+    activeBatterId: activePlay?.matchup?.batter?.id || incoming.activeBatterId || stable.activeBatterId,
+    battingSide: activePlay?.matchup ? liveLabReplayBattingSide(activePlay) : (incoming.battingSide || stable.battingSide),
+    inning: incomingPlayWentBackward ? stable.inning : incoming.inning,
+    inningShort: incomingPlayWentBackward ? stable.inningShort : incoming.inningShort,
+    balls: incomingPlayWentBackward ? stable.balls : incoming.balls,
+    strikes: incomingPlayWentBackward ? stable.strikes : incoming.strikes,
+    outs: incomingPlayWentBackward ? stable.outs : incoming.outs,
+    bases: incomingPlayWentBackward
+      ? stable.bases
+      : liveLabPreferBaseState(incoming.bases, stable.bases, incoming, stable, activePlay),
     lineup: chooseBetterLineup(incoming.lineup, stable.lineup),
     pitching: chooseBetterPitching(incoming.pitching, stable.pitching),
     playerLookup: { ...(stable.playerLookup || {}), ...(incoming.playerLookup || {}) },
     ticker: incomingTicker || stableTicker,
-    lastPlay: firstRealPlayText(incoming.lastPlay, incomingTicker?.[0]?.text, stable.lastPlay, stableTicker?.[0]?.text)
-      || incoming.lastPlay
-      || stable.lastPlay,
+    lastPlay: (incomingPlayWentBackward
+      ? firstRealPlayText(stable.lastPlay, stableTicker?.[0]?.text, incoming.lastPlay, incomingTicker?.[0]?.text)
+      : firstRealPlayText(incoming.lastPlay, incomingTicker?.[0]?.text, stable.lastPlay, stableTicker?.[0]?.text))
+      || (incomingPlayWentBackward ? stable.lastPlay : incoming.lastPlay)
+      || (incomingPlayWentBackward ? incoming.lastPlay : stable.lastPlay),
     liveLabStableMerged: true,
   };
 }
@@ -29739,12 +29777,12 @@ async function openPlayerStatOverlay(playerId, game, options = {}) {
     if (playerStatPitchMatchupEl) playerStatPitchMatchupEl.innerHTML = '<div class="player-stat-loading">Loading pitch matchup...</div>';
   }
   let profile = game?.playerLookup?.[String(playerId)];
-  if (Number.isFinite(Number(playerId)) && Number(playerId) > 0) {
+  if (Number.isFinite(Number(playerId)) && Number(playerId) > 0 && !playerProfileHasMeaningfulStats(profile)) {
     await hydratePlayerLookupForGame(game);
     if (!stillRenderingPlayer()) return;
     profile = game?.playerLookup?.[String(playerId)];
   }
-  if (Number.isFinite(Number(playerId)) && Number(playerId) > 0) {
+  if (Number.isFinite(Number(playerId)) && Number(playerId) > 0 && !playerProfileHasMeaningfulStats(profile)) {
     const fetchedProfile = await fetchMlbPlayerProfile(playerId, game).catch(() => null);
     if (!stillRenderingPlayer()) return;
     if (fetchedProfile && (!profile || playerProfileHasMeaningfulStats(fetchedProfile))) {
@@ -29851,6 +29889,12 @@ async function openPlayerStatOverlay(playerId, game, options = {}) {
   playerStatOverlayEl.hidden = false;
   updatePlayerStatBackButton();
   setPlayerStatTab(currentPlayerStatTab);
+  if (Number.isFinite(Number(playerId)) && Number(playerId) > 0) {
+    fetchMlbPlayerProfile(playerId, game).then((freshProfile) => {
+      if (!freshProfile || !stillRenderingPlayer() || !playerProfileHasMeaningfulStats(freshProfile)) return;
+      persistPlayerLookupForGame(game, { [String(playerId)]: freshProfile });
+    }).catch(() => {});
+  }
   if (pitcherProfile) {
     hydratePitcherFireStreaks(playerStatOverlayEl);
     hydratePitcherColdStreaks(playerStatOverlayEl);
@@ -31601,13 +31645,13 @@ function upsertCard(game) {
   if (prev) {
     const awayScoringSignature = scoreRunAnimationSignature(game, 'away');
     const homeScoringSignature = scoreRunAnimationSignature(game, 'home');
-  if (awayScoringSignature && awayScoringSignature !== prev.lastScoringSignature && canAnimateScoreIncrease(game, prev, awayRuns, prev.awayHighWaterRuns ?? prev.awayRuns, 'away')) {
+  if (awayScoringSignature && awayScoringSignature !== prev.lastScoringSignature && canAnimateScoreIncrease(game, prev, awayRuns, prev.awayRuns, 'away')) {
     lastScoringSignature = awayScoringSignature;
     rememberScoreAnimation(game, 'away', awayRuns);
     animateScoreChange(card, game.awayColor, game.currentEvent === 'Home Run');
     flashHomePlate(card);
     animateNumericChange(card.querySelector('.away-score'), game.awayColor);
-  } else if (homeScoringSignature && homeScoringSignature !== prev.lastScoringSignature && canAnimateScoreIncrease(game, prev, homeRuns, prev.homeHighWaterRuns ?? prev.homeRuns, 'home')) {
+  } else if (homeScoringSignature && homeScoringSignature !== prev.lastScoringSignature && canAnimateScoreIncrease(game, prev, homeRuns, prev.homeRuns, 'home')) {
     lastScoringSignature = homeScoringSignature;
     rememberScoreAnimation(game, 'home', homeRuns);
     animateScoreChange(card, game.homeColor, game.currentEvent === 'Home Run');

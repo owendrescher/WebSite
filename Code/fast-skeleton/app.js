@@ -7483,7 +7483,10 @@ function canAnimateScoreIncrease(game, prev, currentRuns, previousRuns, side = '
   if (!prev || !Number.isFinite(current) || !Number.isFinite(previous)) return false;
   if (gameIsFinalForTeamRecord(game) || isCompletedGameCard(game)) return false;
   const delta = current - previous;
+  const lastRendered = side === 'home' ? Number(prev.homeRuns) : Number(prev.awayRuns);
+  if (!Number.isFinite(lastRendered) || current !== lastRendered + delta) return false;
   if (!Number.isInteger(delta) || delta <= 0 || delta > 4) return false;
+  if (current <= Math.max(Number(prev.awayHighWaterRuns) || 0, Number(prev.homeHighWaterRuns) || 0) && side === '') return false;
   if (scoreAnimationMemory.has(scoreAnimationMemoryKey(game, side, current))) return false;
   if (Date.now() < suppressScoreAnimationsUntil) return false;
   if (document.visibilityState === 'hidden') return false;
@@ -21800,7 +21803,9 @@ function animateScoreChange(card, flashColor, isHomeRun) {
   card.style.setProperty('--flash-rgb', hexToRgb(flashColor));
   card.classList.remove('score-flash', 'hr-flash');
   void card.offsetWidth;
-  card.classList.add(isHomeRun ? 'hr-flash' : 'score-flash');
+  const className = isHomeRun ? 'hr-flash' : 'score-flash';
+  card.classList.add(className);
+  window.setTimeout(() => card.classList.remove(className), isHomeRun ? 6500 : 3500);
 }
 
 function setLineupView(view, options = {}) {
@@ -24036,12 +24041,12 @@ async function openPlayerStatOverlay(playerId, game, options = {}) {
     if (playerStatHeatmapEl) playerStatHeatmapEl.innerHTML = '<div class="player-stat-loading">Loading heat map...</div>';
   }
   let profile = game?.playerLookup?.[String(playerId)];
-  if (Number.isFinite(Number(playerId)) && Number(playerId) > 0) {
+  if (Number.isFinite(Number(playerId)) && Number(playerId) > 0 && !playerProfileHasMeaningfulStats(profile)) {
     await hydratePlayerLookupForGame(game);
     if (!stillRenderingPlayer()) return;
     profile = game?.playerLookup?.[String(playerId)];
   }
-  if (Number.isFinite(Number(playerId)) && Number(playerId) > 0) {
+  if (Number.isFinite(Number(playerId)) && Number(playerId) > 0 && !playerProfileHasMeaningfulStats(profile)) {
     const fetchedProfile = await fetchMlbPlayerProfile(playerId, game).catch(() => null);
     if (!stillRenderingPlayer()) return;
     if (fetchedProfile && (!profile || playerProfileHasMeaningfulStats(fetchedProfile))) {
@@ -24138,6 +24143,12 @@ async function openPlayerStatOverlay(playerId, game, options = {}) {
   }
   playerStatOverlayEl.hidden = false;
   setPlayerStatTab(currentPlayerStatTab);
+  if (Number.isFinite(Number(playerId)) && Number(playerId) > 0) {
+    fetchMlbPlayerProfile(playerId, game).then((freshProfile) => {
+      if (!freshProfile || !stillRenderingPlayer() || !playerProfileHasMeaningfulStats(freshProfile)) return;
+      persistPlayerLookupForGame(game, { [String(playerId)]: freshProfile });
+    }).catch(() => {});
+  }
   if (pitcherProfile) {
     hydratePitcherFireStreaks(playerStatOverlayEl);
     hydratePitcherColdStreaks(playerStatOverlayEl);
@@ -25687,13 +25698,13 @@ function upsertCard(game) {
   if (prev) {
     const awayScoringSignature = scoreRunAnimationSignature(game, 'away');
     const homeScoringSignature = scoreRunAnimationSignature(game, 'home');
-  if (awayScoringSignature && awayScoringSignature !== prev.lastScoringSignature && canAnimateScoreIncrease(game, prev, awayRuns, prev.awayHighWaterRuns ?? prev.awayRuns, 'away')) {
+  if (awayScoringSignature && awayScoringSignature !== prev.lastScoringSignature && canAnimateScoreIncrease(game, prev, awayRuns, prev.awayRuns, 'away')) {
     lastScoringSignature = awayScoringSignature;
     rememberScoreAnimation(game, 'away', awayRuns);
     animateScoreChange(card, game.awayColor, game.currentEvent === 'Home Run');
     flashHomePlate(card);
     animateNumericChange(card.querySelector('.away-score'), game.awayColor);
-  } else if (homeScoringSignature && homeScoringSignature !== prev.lastScoringSignature && canAnimateScoreIncrease(game, prev, homeRuns, prev.homeHighWaterRuns ?? prev.homeRuns, 'home')) {
+  } else if (homeScoringSignature && homeScoringSignature !== prev.lastScoringSignature && canAnimateScoreIncrease(game, prev, homeRuns, prev.homeRuns, 'home')) {
     lastScoringSignature = homeScoringSignature;
     rememberScoreAnimation(game, 'home', homeRuns);
     animateScoreChange(card, game.homeColor, game.currentEvent === 'Home Run');
