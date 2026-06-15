@@ -4152,7 +4152,7 @@ body[data-overlay-dock='bottom'] .player-stat-overlay {
 }
 
 .player-heatmap-pitch-table .compact-pitch-row.hitter-pitch-row {
-  grid-template-columns: minmax(34px, 0.8fr) repeat(6, minmax(30px, 1fr));
+  grid-template-columns: minmax(34px, 0.8fr) repeat(5, minmax(30px, 1fr));
   background:
     linear-gradient(90deg,
       rgba(76, 159, 255, calc((1 - var(--pitch-heat, 0.5)) * 0.30)),
@@ -6175,6 +6175,33 @@ body[data-overlay-dock='bottom'] .score {
   display: none;
 }
 
+.lineup-team-hand-chip {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  flex: 0 1 auto;
+  max-width: min(260px, 36vw);
+  min-width: 0;
+  padding: 3px 6px;
+  border: 1px solid color-mix(in srgb, var(--team-color, var(--accent)) 56%, transparent);
+  border-radius: 7px;
+  background:
+    linear-gradient(180deg, rgba(255,255,255,0.07), transparent 62%),
+    color-mix(in srgb, var(--team-color, var(--accent)) 12%, var(--panel-item));
+  color: color-mix(in srgb, var(--team-color, var(--accent)) 62%, white 38%);
+  font: 900 0.56rem/1 var(--font-ui);
+  letter-spacing: 0.01em;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+  font-variant-numeric: tabular-nums;
+  box-shadow: inset 0 1px 0 rgba(255,255,255,0.06);
+}
+
+.lineup-team-hand-chip[hidden] {
+  display: none;
+}
+
 .lineup-prediction-chip.is-soft-refreshing {
   opacity: 0.96;
   animation: none;
@@ -6208,6 +6235,10 @@ body[data-overlay-dock='bottom'] .score {
 
 .lineup-team-header-home .lineup-prediction-chip {
   order: 0;
+}
+
+.lineup-team-header-home .lineup-team-hand-chip {
+  order: 1;
 }
 
 .lineup-team-pitcher {
@@ -11910,7 +11941,7 @@ body[data-overlay-dock='bottom'] .player-stat-overlay {
   }
 
   .player-heatmap-pitch-table .compact-pitch-row.hitter-pitch-row {
-    grid-template-columns: minmax(29px, 0.78fr) repeat(6, minmax(24px, 1fr));
+    grid-template-columns: minmax(29px, 0.78fr) repeat(5, minmax(24px, 1fr));
   }
 
   .visible-pitch-strip {

@@ -17,7 +17,7 @@
     <meta name="twitter:description" content="Live MLB scoreboard, lineups, pitcher trends, hot players, and betting stat tools." />
     <link rel="icon" type="image/png" href="baseball.png" />
     <link rel="apple-touch-icon" href="baseball.png" />
-    <link rel="stylesheet" href="styles.css?v=20260612perf10" />
+    <link rel="stylesheet" href="styles.css?v=20260612perf12" />
   </head>
   <body>
     <section id="betInputPanel" class="utility-panel bet-input-panel">
@@ -303,6 +303,7 @@
                   <span class="away-lineup-team"></span>
                   <span class="team-streak lineup-team-streak away-lineup-streak"></span>
                   <button type="button" class="lineup-prediction-chip away-lineup-prediction" data-lineup-prediction-side="away" hidden>--</button>
+                  <span class="lineup-team-hand-chip away-lineup-hand-chip" data-lineup-hand-side="away" hidden></span>
                 </div>
                 <div class="lineup-state-scoreboard">
                   <span id="lineupStateAwayCode" class="lineup-state-away-code"></span>
@@ -314,6 +315,7 @@
                 <div class="lineup-team-header lineup-team-header-home">
                   <span class="home-lineup-team"></span>
                   <span class="team-streak lineup-team-streak home-lineup-streak"></span>
+                  <span class="lineup-team-hand-chip home-lineup-hand-chip" data-lineup-hand-side="home" hidden></span>
                   <button type="button" class="lineup-prediction-chip home-lineup-prediction" data-lineup-prediction-side="home" hidden>--</button>
                   <img class="lineup-logo home-lineup-logo lineup-logo-pick-trigger" data-lineup-pick-side="home" role="button" tabindex="0" src="placeholder.png" alt="Home logo" title="Pick home team to win" />
                 </div>
@@ -505,6 +507,6 @@
     </script>
     <script src="../shared/owentools-sync.js?v=20260610manual2"></script>
     <script src="rotowire-default-lineups.js?v=20260610manual1"></script>
-    <script src="app.js?v=20260614manual44"></script>
+    <script src="app.js?v=20260614manual49"></script>
   </body>
 </html>

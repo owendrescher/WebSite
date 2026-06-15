@@ -1017,6 +1017,18 @@
         return denominator ? (numerator / denominator).toFixed(digits) : '--';
       }
 
+      function normalizedPitchUsagePercent(value) {
+        const text = String(value ?? '').trim();
+        const parsed = typeof value === 'number' ? value : Number(text.replace(/%/g, ''));
+        if (!Number.isFinite(parsed)) return null;
+        return !/%/.test(text) && Math.abs(parsed) <= 1 ? parsed * 100 : parsed;
+      }
+
+      function pitchUsageClearsThreshold(value) {
+        const usage = normalizedPitchUsagePercent(value);
+        return Number.isFinite(usage) && usage >= 4;
+      }
+
       function handedSplitRows(row) {
         const split = (label, prefix) => `
           <div class="metric-row">
@@ -1045,8 +1057,8 @@
 
       function pitcherPitchList(row) {
         return PITCHES
-          .map((pitch) => ({ pitch, usage: Number(row[`pitcher_${pitch}_usage_pct`]) }))
-          .filter((item) => Number.isFinite(item.usage) && item.usage > 0.05)
+          .map((pitch) => ({ pitch, usage: normalizedPitchUsagePercent(row[`pitcher_${pitch}_usage_pct`]) }))
+          .filter((item) => pitchUsageClearsThreshold(item.usage))
           .sort((a, b) => b.usage - a.usage)
           .map((item) => item.pitch);
       }
@@ -1059,8 +1071,8 @@
         const usablePitches = pitchList.length ? pitchList : PITCHES;
         for (const pitch of usablePitches) {
           if (side === 'pitcher') {
-            const usage = Number(row[`pitcher_${pitch}_usage_pct`]);
-            if (!Number.isFinite(usage) || usage <= 0.05) continue;
+            const usage = normalizedPitchUsagePercent(row[`pitcher_${pitch}_usage_pct`]);
+            if (!pitchUsageClearsThreshold(usage)) continue;
             rowsHtml.push(`<div class="metric-row"><span>${esc(pitch.replace('_', ' '))}</span><b>${esc(usage.toFixed(1))}</b><b>${esc(row[`pitcher_${pitch}_pa`] || '--')}</b><b>${esc(row[`pitcher_${pitch}_slg_allowed`] || '--')}</b></div>`);
           } else {
             const pa = Number(row[`batter_${pitch}_pa`]);

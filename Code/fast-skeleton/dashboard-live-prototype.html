@@ -17,7 +17,7 @@
     <meta name="twitter:description" content="Live MLB scoreboard, lineups, pitcher trends, hot players, and betting stat tools." />
     <link rel="icon" type="image/png" href="baseball.png" />
     <link rel="apple-touch-icon" href="baseball.png" />
-    <link rel="stylesheet" href="styles.css?v=20260612perf10" />
+    <link rel="stylesheet" href="styles.css?v=20260612perf12" />
     <link rel="stylesheet" href="dashboard.css?v=20260612perf6" />
     <link rel="stylesheet" href="live-prototype.css?v=20260612perf6" />
   </head>
@@ -198,6 +198,7 @@
                         <div class="lineup-team-score-line">
                           <span class="away-lineup-team"></span>
                           <button type="button" class="lineup-prediction-chip away-lineup-prediction" data-lineup-prediction-side="away" hidden>--</button>
+                          <span class="lineup-team-hand-chip away-lineup-hand-chip" data-lineup-hand-side="away" hidden></span>
                         </div>
                       </div>
                     </div>
@@ -215,6 +216,7 @@
                         </div>
                         <div class="lineup-team-score-line">
                           <span class="home-lineup-team"></span>
+                          <span class="lineup-team-hand-chip home-lineup-hand-chip" data-lineup-hand-side="home" hidden></span>
                           <button type="button" class="lineup-prediction-chip home-lineup-prediction" data-lineup-prediction-side="home" hidden>--</button>
                         </div>
                       </div>
@@ -566,6 +568,6 @@
     </script>
     <script src="../shared/owentools-sync.js?v=20260610manual2"></script>
     <script src="rotowire-default-lineups.js?v=20260610manual1"></script>
-    <script src="live-dashboard-prototype.js?v=20260614live76"></script>
+    <script src="live-dashboard-prototype.js?v=20260614live81"></script>
   </body>
 </html>
