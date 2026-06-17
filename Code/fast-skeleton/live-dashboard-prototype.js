@@ -7002,6 +7002,7 @@ function savantExactPitchCategory(row = {}) {
   const raw = cleanSummary(csvValue(row, ['Pitch Type', 'pitch_name', 'Pitch Name', 'pitch_type', 'pitch', 'Pitch Group']));
   const key = raw.toLowerCase();
   if (!key) return '';
+  if (excludedVisiblePitchCategory(key)) return '';
   if (['ff', 'fa'].includes(key)) return '4-Seam';
   if (key === 'si') return 'Sinker';
   if (key === 'ft') return '2-Seam';
@@ -7012,6 +7013,16 @@ function savantExactPitchCategory(row = {}) {
   if (key === 'ch') return 'Changeup';
   if (key === 'fs') return 'Splitter';
   return raw;
+}
+
+function excludedVisiblePitchCategory(value = '') {
+  const key = String(value || '').trim().toLowerCase().replace(/[_\s-]+/g, ' ');
+  return ['po', 'pitchout', 'pitch out', 'intentional ball', 'unknown', 'undefined', 'null'].includes(key);
+}
+
+function visiblePitchCategoryName(value = '') {
+  const raw = cleanSummary(value);
+  return excludedVisiblePitchCategory(raw) ? '' : raw;
 }
 
 function emptyPitchStrengthBucket(category) {
@@ -8260,8 +8271,9 @@ function visiblePitchUsagePercent(row = {}, keys = ['pct', 'usagePct', 'usage', 
 
 function visiblePitchRowsForPlayerType(rows = [], playerType = 'batter') {
   if (!Array.isArray(rows)) return [];
-  if (playerType !== 'pitcher') return rows;
-  return rows.filter((row) => visiblePitchUsagePercent(row, ['pct', 'usage', 'usagePct', 'pitch_percent']) > 4);
+  const validRows = rows.filter((row) => visiblePitchCategoryName(row?.category));
+  if (playerType !== 'pitcher') return validRows;
+  return validRows.filter((row) => visiblePitchUsagePercent(row, ['pct', 'usage', 'usagePct', 'pitch_percent']) > 4);
 }
 
 function visiblePlayerCardPitchStripHtml(rows = null, kind = 'pitcher', orderedCategories = []) {
@@ -8269,15 +8281,14 @@ function visiblePlayerCardPitchStripHtml(rows = null, kind = 'pitcher', orderedC
   const pitcherMode = kind === 'pitcher';
   let displayRows = pitcherMode
     ? [...rows]
-      .filter((row) => cleanSummary(row.category))
+      .filter((row) => visiblePitchCategoryName(row.category))
       .map((row) => ({ ...row, visibleUsagePct: visiblePitchUsagePercent(row, ['pct', 'usage', 'usagePct', 'pitch_percent']) }))
       .filter((row) => Number(row.visibleUsagePct) > 4)
       .sort((a, b) => (Number(b.visibleUsagePct) || 0) - (Number(a.visibleUsagePct) || 0))
     : playerStatHeatMapAlignPitchRows(rows, orderedCategories)
-        .filter((row) => cleanSummary(row.category))
+        .filter((row) => visiblePitchCategoryName(row.category))
         .map((row) => ({ ...row, visibleUsagePct: visiblePitchUsagePercent(row, ['pitcherUsagePct', 'pct', 'usage', 'usagePct', 'pitch_percent']) }))
-        .filter((row) => Number(row.visibleUsagePct) > 4)
-        .sort((a, b) => (Number(b.visibleUsagePct) || 0) - (Number(a.visibleUsagePct) || 0));
+        .filter((row) => Number(row.visibleUsagePct) > 4);
   displayRows = displayRows.slice(0, 7);
   if (!displayRows.length) return '<div class="visible-pitch-strip is-loading">Pitch data unavailable</div>';
   while (displayRows.length < 3) displayRows.push({ category: '--', pct: '', avg: '', ops: '', hardHit: '', homeRuns: '', pitcherUsagePct: '' });
@@ -8410,13 +8421,19 @@ function hydrateVisiblePlayerCardPitchTables(profile, game, token) {
           ? await getVisiblePitchBreakdown(pitcherId, 'pitcher', 2800, { stand: batterStand })
           : [];
         const pitcherOrder = pitcherRows
+          .filter((item) => visiblePitchCategoryName(item.category))
+          .map((item) => ({
+            ...item,
+            visibleUsagePct: visiblePitchUsagePercent(item, ['pct', 'usage', 'usagePct', 'pitch_percent'])
+          }))
+          .filter((item) => Number(item.visibleUsagePct) > 4)
+          .sort((a, b) => (Number(b.visibleUsagePct) || 0) - (Number(a.visibleUsagePct) || 0))
           .map((item) => ({
             category: item.category,
-            pct: item.pct,
+            pct: item.visibleUsagePct ?? item.pct,
             homeRuns: savantRowHomeRuns(item),
             pitcherThrowHand: matchupPitcherThrowHand,
-          }))
-          .filter((item) => cleanSummary(item.category));
+          }));
 
         let rows = matchupPitcherThrowHand
           ? await getVisiblePitchBreakdown(playerId, 'batter', 5200, { pThrows: matchupPitcherThrowHand })
@@ -8987,7 +9004,7 @@ function renderPlayerHandedSplits(profile, game, token) {
     playerStatGameLogSplits(matchupPitcher.id, 'pitching', game)
       .then((splits) => {
         if (!playerStatExtraEl || playerStatExtraEl.dataset.splitToken !== token) return null;
-        const starts = listify(splits).filter(isPitchingStartSplit).slice(0, 3);
+        const starts = filteredRecentHistorySplits(splits, game).filter(isPitchingStartSplit).slice(0, 3);
         return getPitcherRecentOpponentHandSplits(matchupPitcher.id, starts);
       })
       .then((recentHand) => {
@@ -31288,27 +31305,29 @@ function playerStatHeatMapPark(row = {}) {
 function playerStatHeatMapAlignPitchRows(rows = [], orderedCategories = []) {
   const byCategory = new Map();
   for (const row of rows || []) {
-    const raw = cleanSummary(row?.category);
+    const raw = visiblePitchCategoryName(row?.category);
     if (!raw) continue;
     const normalized = savantPitchCategoryKey(raw) || raw.toLowerCase();
     if (!byCategory.has(normalized)) byCategory.set(normalized, row);
     if (!byCategory.has(raw.toLowerCase())) byCategory.set(raw.toLowerCase(), row);
   }
   return orderedCategories
-    .map((category) => {
+    .map((category, index) => {
       const pitchCategory = typeof category === 'object' ? category.category : category;
+      if (!visiblePitchCategoryName(pitchCategory)) return null;
       const rawKey = cleanSummary(pitchCategory).toLowerCase();
       const normalizedKey = savantPitchCategoryKey(pitchCategory) || rawKey;
       const matched = byCategory.get(normalizedKey) || byCategory.get(rawKey) || { category: pitchCategory, pa: '', avg: '', slg: '', ev: '', hardHit: '', missingBatterPitchSplit: true };
       return {
         ...matched,
-        category: matched.category || pitchCategory,
+        category: visiblePitchCategoryName(matched.category || pitchCategory),
         pitcherUsagePct: typeof category === 'object' ? category.pct : null,
         pitcherHomeRuns: typeof category === 'object' ? category.homeRuns : null,
         pitcherThrowHand: matched.pitcherThrowHand || (typeof category === 'object' ? category.pitcherThrowHand : ''),
+        pitcherOrderIndex: index,
       };
     })
-    .filter((row) => cleanSummary(row.category));
+    .filter((row) => row && visiblePitchCategoryName(row.category));
 }
 
 function playerStatHeatMapPitchDisplayLabel(item = {}, playerType = 'batter') {
@@ -31332,8 +31351,7 @@ function playerStatHeatMapSavantRows(rows = null, playerType = 'batter', ordered
   }
   const displayRowsRaw = playerType === 'batter' && Array.isArray(orderedCategories) && orderedCategories.length
     ? playerStatHeatMapAlignPitchRows(rows, orderedCategories)
-      .sort((a, b) => Number(b?.pitcherUsagePct ?? b?.pct ?? b?.usagePct ?? b?.pitch_percent ?? 0) - Number(a?.pitcherUsagePct ?? a?.pct ?? a?.usagePct ?? a?.pitch_percent ?? 0))
-    : [...rows].sort((a, b) => Number(b?.pct ?? b?.usagePct ?? b?.pitch_percent ?? 0) - Number(a?.pct ?? a?.usagePct ?? a?.pitch_percent ?? 0));
+    : [...rows].filter((row) => visiblePitchCategoryName(row?.category)).sort((a, b) => Number(b?.pct ?? b?.usagePct ?? b?.pitch_percent ?? 0) - Number(a?.pct ?? a?.usagePct ?? a?.pitch_percent ?? 0));
   const displayRows = displayRowsRaw.filter((row) => playerType === 'pitcher'
     ? pitchClearsVisibleUsageThreshold(row, ['pct', 'usage', 'usagePct', 'pitch_percent'])
     : pitchClearsVisibleUsageThreshold(row, ['pitcherUsagePct', 'pct', 'usage', 'usagePct', 'pitch_percent']));
@@ -31373,12 +31391,20 @@ async function hydratePlayerStatHeatMapSavant(profile, row = {}) {
     )
     : null;
   const pitcherRows = mergePreviousStartPitchMix(rawPitcherRows, previousStartMix);
-  const pitcherOrder = pitcherRows.map((item) => ({
-    category: item.category,
-    pct: item.pct,
-    homeRuns: savantRowHomeRuns(item),
-    pitcherThrowHand: starterPitcherHand,
-  })).filter((item) => item.category);
+  const pitcherOrder = pitcherRows
+    .filter((item) => visiblePitchCategoryName(item.category))
+    .map((item) => ({
+      ...item,
+      visibleUsagePct: visiblePitchUsagePercent(item, ['pct', 'usage', 'usagePct', 'pitch_percent'])
+    }))
+    .filter((item) => Number(item.visibleUsagePct) > 4)
+    .sort((a, b) => (Number(b.visibleUsagePct) || 0) - (Number(a.visibleUsagePct) || 0))
+    .map((item) => ({
+      category: item.category,
+      pct: item.visibleUsagePct ?? item.pct,
+      homeRuns: savantRowHomeRuns(item),
+      pitcherThrowHand: starterPitcherHand,
+    }));
   await Promise.allSettled(shells.map(async (shell) => {
     const side = shell.dataset.playerHeatmapSavant === 'pitcher' ? 'pitcher' : 'batter';
     const shellPlayerId = shell.dataset.playerId;
