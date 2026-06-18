@@ -3875,3 +3875,12 @@ body.dashboard-page .player-outcome-field,
 body.dashboard-page .player-outcome-field-svg {
   cursor: default;
 }
+
+/* Outcome Viewer v12: quieter HR/XBH labels and stable layer behavior */
+body.dashboard-page .player-outcome-hr-batter-label {
+  font: 950 21px var(--font-ui) !important;
+}
+
+body.dashboard-page .player-outcome-distance {
+  font: 950 14.5px var(--font-ui) !important;
+}

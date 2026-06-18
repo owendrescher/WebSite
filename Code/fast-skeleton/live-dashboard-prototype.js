@@ -32652,6 +32652,36 @@ function playerOutcomeBatterLabel(outcome = {}) {
   return `${name}${hand ? ` ${hand}` : ''}`.trim();
 }
 
+function playerOutcomeLastNameWithSuffix(name = '') {
+  const cleaned = cleanSummary(name || '').replace(/,/g, '').trim();
+  if (!cleaned) return '';
+  const parts = cleaned.split(/\s+/).filter(Boolean);
+  if (!parts.length) return '';
+  const suffixSet = new Set(['jr', 'jr.', 'sr', 'sr.', 'ii', 'iii', 'iv', 'v']);
+  const last = parts[parts.length - 1] || '';
+  if (parts.length >= 2 && suffixSet.has(last.toLowerCase())) {
+    return `${parts[parts.length - 2]} ${last}`.trim();
+  }
+  return last;
+}
+
+function playerOutcomeExtraBaseCode(outcome = {}) {
+  const text = `${outcome?.play?.result?.eventType || ''} ${outcome?.play?.result?.event || ''} ${outcome?.label || ''}`.toLowerCase();
+  if (playerOutcomeIsHomeRun(outcome)) return 'HR';
+  if (/triple/.test(text)) return '3B';
+  if (/double|ground_rule_double/.test(text)) return '2B';
+  return '';
+}
+
+function playerOutcomeFieldHitLabel(outcome = {}) {
+  const code = playerOutcomeExtraBaseCode(outcome);
+  if (!code) return '';
+  const batter = playerOutcomeBatterForOutcome(outcome) || {};
+  const lastName = playerOutcomeLastNameWithSuffix(batter.fullName || batter.name || 'Batter') || 'Batter';
+  const hand = handednessCode(outcome?.play?.matchup?.batSide?.code || outcome?.play?.matchup?.batSide?.description || '');
+  return `${code} ${lastName}${hand ? ` (${hand})` : ''}`;
+}
+
 function playerOutcomeFieldGame(profile = {}, contextGame = null) {
   const team = playerOutcomeSelectedTeam(profile, contextGame) || canonicalTeamAbbrev(contextGame?.home || '') || '';
   const color = getTeamColor(team);
@@ -32879,8 +32909,13 @@ function playerOutcomeFieldSvgHtml(payload = null, selectedKey = '') {
   const outcomes = listify(payload?.outcomes);
   const selectedKeyText = String(selectedKey || '');
   const traceSource = outcomes
-    .map((outcome, index) => ({ outcome, index, selected: String(outcome?.key || '') === selectedKeyText }))
-    .sort((a, b) => Number(a.selected) - Number(b.selected));
+    .map((outcome, index) => ({
+      outcome,
+      index,
+      selected: String(outcome?.key || '') === selectedKeyText,
+      layer: playerOutcomeIsHomeRun(outcome) ? 3 : playerOutcomeIsExtraBase(outcome) ? 2 : 1,
+    }))
+    .sort((a, b) => (a.layer - b.layer) || (Number(a.selected) - Number(b.selected)));
   const traces = traceSource.map(({ outcome, index }) => {
     const hit = outcome.hit;
     const key = escapeHtml(outcome.key || `${outcome.gamePk}:${index}`);
@@ -32904,7 +32939,7 @@ function playerOutcomeFieldSvgHtml(payload = null, selectedKey = '') {
         <path d="M ${liveLabPointAttr(model.home)} Q ${liveLabPointAttr(control)} ${liveLabPointAttr(end)}"></path>
         <circle cx="${end.x.toFixed(1)}" cy="${end.y.toFixed(1)}" r="8"></circle>
         <text x="${end.x.toFixed(1)}" y="${(end.y + 3.5).toFixed(1)}">${index + 1}</text>
-        ${(isHr || isXbh) && outcome.pitcherMode ? `<text class="player-outcome-hr-batter-label" x="${labelX.toFixed(1)}" y="${batterLabelY.toFixed(1)}" data-player-outcome-key="${key}">${escapeHtml(playerOutcomeBatterLabel(outcome))}</text>` : ''}
+        ${(isHr || isXbh) && outcome.pitcherMode ? `<text class="player-outcome-hr-batter-label" x="${labelX.toFixed(1)}" y="${batterLabelY.toFixed(1)}" data-player-outcome-key="${key}">${escapeHtml(playerOutcomeFieldHitLabel(outcome))}</text>` : ''}
         ${(isHr || isXbh) && hit.distance ? `<text class="player-outcome-distance" x="${labelX.toFixed(1)}" y="${distanceLabelY.toFixed(1)}" data-player-outcome-key="${key}">${Math.round(hit.distance)} ft</text>` : ''}
       </g>`;
   }).join('');
@@ -34909,6 +34944,12 @@ function initLineupOverlay() {
         e.preventDefault();
         navigatePlayerStatCard(e.key === 'ArrowRight' ? 1 : -1);
         return;
+      }
+      if (e.key === 'ArrowUp' || e.key === 'ArrowDown') {
+        if (!isTextEntryTarget(e.target) && navigatePlayerStatCard(e.key === 'ArrowDown' ? 1 : -1)) {
+          e.preventDefault();
+          return;
+        }
       }
     }
     if (e.key === 'Escape' && !lineupOverlayEl.hidden) closeLineupOverlay();
