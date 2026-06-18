@@ -3255,3 +3255,75 @@ body.dashboard-page .player-batted-ball-profile-table .player-batted-ball-stacke
   font-size: 0.98rem;
 }
 
+
+
+/* v17: tighter pitch-card fitting, AB sample row, and persistent lock icon after first pitch. */
+.visible-pitch-card span {
+  text-overflow: clip;
+}
+.visible-pitch-card span.is-tight {
+  font-size: .45rem;
+  letter-spacing: -0.05em;
+}
+.visible-pitch-card span.is-extra-tight {
+  font-size: .39rem;
+  letter-spacing: -0.085em;
+}
+.visible-pitch-card span.is-micro-tight {
+  font-size: .34rem;
+  letter-spacing: -0.11em;
+}
+.visible-pitch-strip[data-pitch-count="6"] .visible-pitch-card span.is-tight,
+.visible-pitch-strip[data-pitch-count="7"] .visible-pitch-card span.is-tight {
+  font-size: .39rem;
+  letter-spacing: -0.075em;
+}
+.visible-pitch-strip[data-pitch-count="6"] .visible-pitch-card span.is-extra-tight,
+.visible-pitch-strip[data-pitch-count="7"] .visible-pitch-card span.is-extra-tight {
+  font-size: .34rem;
+  letter-spacing: -0.105em;
+}
+.visible-pitch-strip[data-pitch-count="6"] .visible-pitch-card span.is-micro-tight,
+.visible-pitch-strip[data-pitch-count="7"] .visible-pitch-card span.is-micro-tight {
+  font-size: .30rem;
+  letter-spacing: -0.13em;
+}
+.player-heatmap-pitch-table .compact-pitch-row.hitter-pitch-row b {
+  padding-inline: 2px;
+  font-size: 0.55rem;
+  letter-spacing: -0.035em;
+}
+.score-mini-inning.is-tossup-locked,
+.lineup-state-inning.is-tossup-locked {
+  position: relative;
+  border-color: rgba(205, 210, 220, 0.92) !important;
+  box-shadow: 0 0 16px rgba(210, 215, 225, 0.34) !important;
+}
+.score-mini-inning.is-tossup-locked::before,
+.lineup-state-inning.is-tossup-locked::before {
+  content: '🔒';
+  position: absolute;
+  left: 50%;
+  top: -1.35em;
+  transform: translateX(-50%);
+  font-size: 0.86rem;
+  line-height: 1;
+  text-shadow: 0 1px 4px rgba(0,0,0,0.85);
+  pointer-events: none;
+}
+
+/* v18: only shrink visible pitch-card values after measured overflow; normal values retain the base card font. */
+.visible-pitch-card span:not(.pitch):not(.is-tight):not(.is-extra-tight):not(.is-micro-tight) {
+  letter-spacing: normal;
+}
+
+/* v18: do not shrink all pitch-card cells just because there are 6-7 cards. Shrinking is JS-measured only when a value would overflow. */
+.visible-pitch-strip[data-pitch-count="6"] .visible-pitch-card span:not(.is-tight):not(.is-extra-tight):not(.is-micro-tight),
+.visible-pitch-strip[data-pitch-count="7"] .visible-pitch-card span:not(.is-tight):not(.is-extra-tight):not(.is-micro-tight) {
+  font-size: .54rem;
+  letter-spacing: normal;
+}
+.visible-pitch-strip[data-pitch-count="6"] .visible-pitch-card .pitch:not(.is-tight):not(.is-extra-tight):not(.is-micro-tight),
+.visible-pitch-strip[data-pitch-count="7"] .visible-pitch-card .pitch:not(.is-tight):not(.is-extra-tight):not(.is-micro-tight) {
+  font-size: .58rem;
+}
