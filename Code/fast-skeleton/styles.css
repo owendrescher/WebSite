@@ -12495,13 +12495,31 @@ body.dashboard-page .player-batted-ball-profile-table .player-batted-ball-stacke
   letter-spacing: normal;
 }
 
-/* v18: do not shrink all pitch-card cells just because there are 6-7 cards. Shrinking is JS-measured only when a value would overflow. */
-.visible-pitch-strip[data-pitch-count="6"] .visible-pitch-card span:not(.is-tight):not(.is-extra-tight):not(.is-micro-tight),
-.visible-pitch-strip[data-pitch-count="7"] .visible-pitch-card span:not(.is-tight):not(.is-extra-tight):not(.is-micro-tight) {
-  font-size: .54rem;
-  letter-spacing: normal;
+/* v19: larger batter pitch cards for added HH/Whiff rows; shrink only after measured overflow. */
+.visible-pitch-strip.batter {
+  min-height: 102px;
 }
-.visible-pitch-strip[data-pitch-count="6"] .visible-pitch-card .pitch:not(.is-tight):not(.is-extra-tight):not(.is-micro-tight),
-.visible-pitch-strip[data-pitch-count="7"] .visible-pitch-card .pitch:not(.is-tight):not(.is-extra-tight):not(.is-micro-tight) {
-  font-size: .58rem;
+.visible-pitch-strip.batter[data-pitch-count="6"],
+.visible-pitch-strip.batter[data-pitch-count="7"] {
+  min-height: 98px;
+}
+.player-heatmap-pitch-table .compact-pitch-row.hitter-pitch-row {
+  grid-template-columns: minmax(32px, 0.75fr) repeat(7, minmax(23px, 1fr));
+}
+
+/* v24: batter pitch cards are SLG-colored; fiery outline means pitcher also allows .600+ SLG on that pitch. */
+.visible-pitch-card.batter.is-fiery-pitch {
+  border-color: var(--pitch-fire-border, rgba(255, 209, 102, .95));
+  box-shadow:
+    0 0 0 1px rgba(255, 224, 128, .48),
+    0 0 12px var(--pitch-fire-glow, rgba(255, 92, 40, .58)),
+    0 0 22px rgba(255, 128, 42, .22),
+    inset 0 1px 0 rgba(255, 255, 255, .1);
+}
+.player-heatmap-metric-row.hitter-pitch-row.is-fiery-pitch {
+  border-color: var(--pitch-fire-border, rgba(255, 209, 102, .95));
+  box-shadow:
+    0 0 0 1px rgba(255, 224, 128, .38),
+    0 0 12px var(--pitch-fire-glow, rgba(255, 92, 40, .52)),
+    inset 0 1px 0 rgba(255, 255, 255, .08);
 }

@@ -3509,7 +3509,12 @@ function pitcherUsageRole(player) {
 function isReliefPitcherProfile(player) {
   const gp = pitcherGamesPlayed(player);
   const gs = pitcherGamesStarted(player);
-  return gp > 0 && !isStarterLikePitcher(player);
+  if (gp <= 0) return false;
+  const outs = inningsToOuts(pitcherInningsPitched(player));
+  const startsShare = gp > 0 ? gs / Math.max(1, gp) : 0;
+  const avgStartIp = gs > 0 && outs > 0 ? (outs / 3) / Math.max(1, gs) : 0;
+  if (gs > 0 && avgStartIp >= 4.0 && startsShare >= 0.40) return false;
+  return !isStarterLikePitcher(player);
 }
 
 function pitcherShouldUseStartHistory(player) {
@@ -5690,10 +5695,15 @@ function lineupPitcherSideForGame(game = null, pitcher = null) {
 }
 
 function pitcherIsGameStarterContext(profile = null, game = null) {
-  const side = lineupPitcherSideForGame(game || activeLineupGame || activePlayerStatContext?.game || null, profile);
+  const contextGame = game || activeLineupGame || activePlayerStatContext?.game || null;
+  const side = lineupPitcherSideForGame(contextGame, profile);
   if (!side) return false;
-  const summary = resolveLineupPitcherForDisplay(game || activeLineupGame || activePlayerStatContext?.game || null, side);
-  const starter = summary?.starter || summary?.current || null;
+  const summary = resolveLineupPitcherForDisplay(contextGame, side);
+  const probable = contextGame?.probablePitchers?.[side] || contextGame?.teams?.[side]?.probablePitcher || null;
+  // Do not treat the generic/current pitcher slot as the starter in pregame contexts.
+  // That slot can be a bullpen fallback and was causing RP/openers to overwrite LHSP/RHSP buckets.
+  const starter = summary?.starter || probable || null;
+  if (!starter) return false;
   const id = Number(profile?.id || profile?.person?.id);
   const starterId = Number(starter?.id || starter?.person?.id);
   if (Number.isFinite(id) && Number.isFinite(starterId) && id === starterId) return true;
@@ -5713,12 +5723,26 @@ function pitcherIsLikelyOpenerForGame(pitcher = null, game = null) {
   if (!pitcher || !game) return false;
   if (!pitcherIsGameStarterContext(pitcher, game)) return false;
   const usageRole = cleanSummary(pitcher?.rankRole || pitcher?.usageRole || pitcherUsageRole(pitcher)).toUpperCase();
-  if (usageRole === 'RP' || usageRole === 'CP') return true;
-  if (usageRole === 'SP') return false;
   const started = pitcherGamesStarted(pitcher);
+  const gp = statNumber(pitcherGamesPlayed(pitcher));
   const outs = inningsToOuts(pitcherInningsPitched(pitcher));
-  const startsShare = statNumber(pitcherGamesPlayed(pitcher)) > 0 ? started / Math.max(1, statNumber(pitcherGamesPlayed(pitcher))) : 0;
-  return started <= 3 && startsShare < 0.35 && outs > 0 && outs / Math.max(1, started || 1) < 10;
+  const startsShare = gp > 0 ? started / Math.max(1, gp) : 0;
+  const avgStartIp = started > 0 && outs > 0 ? (outs / 3) / Math.max(1, started) : 0;
+  const avgAppIp = gp > 0 && outs > 0 ? (outs / 3) / Math.max(1, gp) : 0;
+  const reliefRole = usageRole === 'RP' || usageRole === 'CP';
+
+  // Be conservative: only move a listed starter into the opener bucket with
+  // strong pregame evidence that he is a true opener. Bulk starters must stay in
+  // LHSP/RHSP team splits so vLHP/vRHP matchup data does not get erased.
+  if (!(gp > 0 || started > 0 || outs > 0)) return false;
+  if (usageRole === 'SP' || isStarterLikePitcher(pitcher)) return false;
+  if (started >= 3) return false;
+  if (started > 0 && (avgStartIp >= 3.0 || startsShare >= 0.35)) return false;
+
+  // Only call something an opener when there is actual historical evidence of short starts.
+  // A reliever-like usage profile alone is not enough because probable-starter fallbacks can be noisy.
+  const priorOpenerStarts = started > 0 && started <= 2 && startsShare < 0.25 && avgStartIp > 0 && avgStartIp < 2.75;
+  return priorOpenerStarts;
 }
 
 function lineupOpenerBadgeHtml(pitcher = null, game = null, opponentTeamAbbrev = '') {
@@ -7377,6 +7401,36 @@ function savantRowHomeRuns(row = {}) {
   return savantRowNumber(row, ['homeRuns', 'home_runs', 'home_run', 'hr', 'HR', 'hrs', 'Hrs']) ?? 0;
 }
 
+const PITCHER_ALLOWED_AVG_KEYS = ['pitcherAvg', 'pitcherBAA', 'pitcherAvgAllowed', 'avgAllowedByPitcher', 'baa', 'BAA', 'avg', 'AVG', 'batting_average_against'];
+const PITCHER_ALLOWED_SLG_KEYS = ['pitcherSlg', 'pitcherSLG', 'pitcherSlgAllowed', 'slgAllowedByPitcher', 'slg', 'SLG', 'slugging', 'slugging_allowed'];
+const PITCHER_ALLOWED_AB_KEYS = ['pitcherAb', 'pitcherAB', 'pitcherAbs', 'pitcherAtBats', 'abAllowedByPitcher', 'ab', 'AB', 'abs', 'at_bats', 'At Bats'];
+const PITCHER_ALLOWED_HH_KEYS = ['pitcherHardHit', 'pitcherHardHitAllowed', 'pitcherHardHitPct', 'pitcherHardHitPercent', 'pitcherHardHitRate', 'pitcherHH', 'pitcherHhPct', 'pHardHit', 'pHardHitPct', 'pHardHitPercent', 'pHardHitAllowed', 'pHH', 'hardHitAllowedByPitcher', 'hardHitAllowed', 'hard_hit_allowed_percent', 'hard_hit_allowed_pct', 'hard_hit_percent_allowed', 'hard_hit_rate_allowed', 'allowed_hard_hit_percent', 'allowed_hard_hit_pct'];
+const PITCHER_ALLOWED_WHIFF_KEYS = ['pitcherWhiff', 'pitcherWhiffAllowed', 'pitcherWhiffPct', 'pitcherWhiffPercent', 'pitcherWhiffRate', 'pWhiff', 'pWhiffPct', 'pWhiffPercent', 'pWhiffAllowed', 'whiffAllowedByPitcher', 'whiffAllowed', 'whiff_allowed_percent', 'whiff_allowed_pct', 'whiff_percent_allowed', 'whiff_rate_allowed', 'allowed_whiff_percent', 'allowed_whiff_pct'];
+const GENERIC_HH_KEYS = ['hardHit', 'HardHit%', 'hardHit%', 'HH%', 'hhPct', 'hard_hit_percent', 'hard_hit_pct', 'hardhit_percent', 'hard_hit_rate', 'Hard Hit %', 'Hard Hit%', 'hard_hit'];
+const GENERIC_WHIFF_KEYS = ['whiff', 'Whiff%', 'whiff%', 'whiff_percent', 'whiff_pct', 'whiff_rate', 'swing_miss_percent', 'swinging_strike_percent', 'Swinging Strike%', 'Whiff %', 'swstr_pct'];
+const PITCHER_OWN_HH_KEYS = [...PITCHER_ALLOWED_HH_KEYS, ...GENERIC_HH_KEYS];
+const PITCHER_OWN_WHIFF_KEYS = [...PITCHER_ALLOWED_WHIFF_KEYS, ...GENERIC_WHIFF_KEYS];
+
+function pitcherMetricSourceLooksPitcherOwned(row = {}) {
+  return row?.pitcherMetricSource === true
+    || row?.pitcherSource === true
+    || row?.playerType === 'pitcher'
+    || row?.sourcePlayerType === 'pitcher'
+    || row?.isPitcherPitchRow === true;
+}
+
+function pitcherAllowedHardHitNumber(row = {}) {
+  const explicit = savantRowNumber(row, PITCHER_ALLOWED_HH_KEYS);
+  if (Number.isFinite(explicit)) return explicit;
+  return pitcherMetricSourceLooksPitcherOwned(row) ? savantRowNumber(row, GENERIC_HH_KEYS) : null;
+}
+
+function pitcherAllowedWhiffNumber(row = {}) {
+  const explicit = savantRowNumber(row, PITCHER_ALLOWED_WHIFF_KEYS);
+  if (Number.isFinite(explicit)) return explicit;
+  return pitcherMetricSourceLooksPitcherOwned(row) ? savantRowNumber(row, GENERIC_WHIFF_KEYS) : null;
+}
+
 function savantRowOps(row = {}) {
   const direct = savantRowNumber(row, ['ops', 'OPS', 'on_base_plus_slg', 'on_base_plus_slugging']);
   if (Number.isFinite(direct)) return direct;
@@ -7894,7 +7948,7 @@ async function getSavantPitchStrength(playerId, playerType = 'batter', season = 
   const promise = (async () => {
     const rows = parseCsvRows(await getText(savantPitchStrengthUrl(id, type, season, filters)));
     const pitcherThrowHand = savantPitchFilterThrowHand(filters);
-    return aggregateSavantPitchRows(rows, false, false).map((row) => ({ ...row, pitcherThrowHand }));
+    return aggregateSavantPitchRows(rows, false, false).map((row) => ({ ...row, pitcherThrowHand, playerType: type, pitcherMetricSource: type === 'pitcher', pitcherSource: type === 'pitcher' }));
   })().catch((error) => {
     savantPitchStrengthCache.delete(cacheKey);
     throw error;
@@ -7912,7 +7966,7 @@ async function getSavantExactPitchBreakdown(playerId, playerType = 'batter', sea
   if (savantPitchStrengthCache.has(cacheKey)) return savantPitchStrengthCache.get(cacheKey);
   const promise = (async () => {
     const groupedRows = parseCsvRows(await getText(savantPitchStrengthUrl(id, type, season, filters)));
-    const grouped = aggregateSavantPitchRows(groupedRows, true, false).map((row) => ({ ...row, pitcherThrowHand }));
+    const grouped = aggregateSavantPitchRows(groupedRows, true, false).map((row) => ({ ...row, pitcherThrowHand, playerType: type, pitcherMetricSource: type === 'pitcher', pitcherSource: type === 'pitcher' }));
     if (grouped.length) return grouped;
     if (type === 'batter' && pitcherThrowHand) {
       return getSavantHandedPitchBreakdownFromEvents(id, type, season, filters);
@@ -8766,11 +8820,13 @@ function visiblePlayerCardPitchStripHtml(rows = null, kind = 'pitcher', orderedC
   if (!displayRows.length) return '<div class="visible-pitch-strip is-loading">Pitch data unavailable</div>';
   while (displayRows.length < 3) displayRows.push({ category: '--', pct: '', avg: '', ops: '', hardHit: '', homeRuns: '', pitcherUsagePct: '' });
   const cards = displayRows.map((item) => {
-    const iso = savantRowIso(item);
-    const slgAllowed = savantRowNumber(item, ['slg', 'SLG', 'slugging', 'xslg', 'xSLG']);
+    const hitterSlg = savantRowNumber(item, ['slg', 'SLG', 'slugging', 'xslg', 'xSLG']);
+    const pitcherAvgAllowed = savantRowNumber(item, PITCHER_ALLOWED_AVG_KEYS);
+    const pitcherSlgAllowed = savantRowNumber(item, PITCHER_ALLOWED_SLG_KEYS);
+    const pitcherCardSlgAllowed = savantRowNumber(item, ['slg', 'SLG', 'slugging', 'xslg', 'xSLG']);
     const heat = pitcherMode
-      ? (Number.isFinite(slgAllowed) ? clamp(slgAllowed / 0.700, 0, 1) : 0.5)
-      : (Number.isFinite(iso) ? clamp(iso / 0.350, 0, 1) : 0.5);
+      ? (Number.isFinite(pitcherCardSlgAllowed) ? clamp(pitcherCardSlgAllowed / 0.700, 0, 1) : 0.5)
+      : (Number.isFinite(hitterSlg) ? clamp(hitterSlg / 0.600, 0, 1) : 0.5);
     const heatRgb = pitcherMode
       ? [
           Math.round(255 + ((62 - 255) * heat)),
@@ -8782,14 +8838,18 @@ function visiblePlayerCardPitchStripHtml(rows = null, kind = 'pitcher', orderedC
           Math.round(154 + ((69 - 154) * heat)),
           Math.round(244 + ((48 - 244) * heat)),
         ];
-    const heatStyle = `--pitch-bg:linear-gradient(180deg, rgba(${heatRgb[0]}, ${heatRgb[1]}, ${heatRgb[2]}, .42), rgba(10, 27, 42, .78));`;
-    const hitterSlg = savantRowNumber(item, ['slg', 'SLG', 'slugging', 'xslg', 'xSLG']);
-    const pitcherAvgAllowed = savantRowNumber(item, ['pitcherAvg', 'pitcherBAA', 'pitcherAvgAllowed', 'avgAllowedByPitcher']);
-    const pitcherSlgAllowed = savantRowNumber(item, ['pitcherSlg', 'pitcherSLG', 'pitcherSlgAllowed', 'slgAllowedByPitcher']);
+    const fieryPitcherSlug = !pitcherMode && Number.isFinite(pitcherSlgAllowed) && pitcherSlgAllowed >= 0.600;
+    const heatStyle = `--pitch-bg:linear-gradient(180deg, rgba(${heatRgb[0]}, ${heatRgb[1]}, ${heatRgb[2]}, .42), rgba(10, 27, 42, .78));${fieryPitcherSlug ? '--pitch-fire-border:rgba(255, 209, 102, .95);--pitch-fire-glow:rgba(255, 92, 40, .58);' : ''}`;
     const hitterAb = savantRowNumber(item, ['ab', 'AB', 'abs', 'at_bats', 'At Bats']);
-    const pitcherAb = savantRowNumber(item, ['pitcherAb', 'pitcherAB', 'pitcherAbs', 'pitcherAtBats', 'abAllowedByPitcher']);
+    const pitcherAb = savantRowNumber(item, PITCHER_ALLOWED_AB_KEYS);
+    const hitterHardHit = savantRowNumber(item, ['hardHit', 'HardHit%', 'hard_hit_percent', 'hard_hit_pct', 'hardhit_percent']);
+    const pitcherHardHit = pitcherAllowedHardHitNumber(item);
+    const hitterWhiff = savantRowNumber(item, ['whiff', 'Whiff%', 'whiff_percent', 'swing_miss_percent', 'swinging_strike_percent']);
+    const pitcherWhiff = pitcherAllowedWhiffNumber(item);
     const splitPair = (left, right, decimals = 3, signed = true) => `${playerStatHeatMapSavantRate(left, decimals, signed)}|${playerStatHeatMapSavantRate(right, decimals, signed)}`;
+    const percentPair = (left, right) => `${playerStatHeatMapPercentValue(left)}|${playerStatHeatMapPercentValue(right)}`;
     const abPair = `${Number.isFinite(hitterAb) ? Math.round(hitterAb) : '--'}|${Number.isFinite(pitcherAb) ? Math.round(pitcherAb) : '--'} AB`;
+    const hrPair = `${savantRowHomeRuns(item)}|${statNumber(item.pitcherHomeRuns ?? item.hrAllowedByPitcher ?? item.pitcherHrAllowed)} HR`;
     const values = pitcherMode
       ? [
         playerStatHeatMapPitchDisplayLabel(item, 'pitcher'),
@@ -8802,18 +8862,19 @@ function visiblePlayerCardPitchStripHtml(rows = null, kind = 'pitcher', orderedC
         playerStatHeatMapPitchDisplayLabel(item, 'batter'),
         splitPair(item.avg, pitcherAvgAllowed, 3, true),
         splitPair(hitterSlg, pitcherSlgAllowed, 3, true),
-        `${savantRowHomeRuns(item)} HR`,
-        `${statNumber(item.pitcherHomeRuns ?? item.hrAllowedByPitcher ?? item.pitcherHrAllowed)} HR A`,
+        hrPair,
         playerStatHeatMapSavantRate(item.ev, 1, false),
+        percentPair(hitterHardHit, pitcherHardHit),
+        percentPair(hitterWhiff, pitcherWhiff),
         abPair,
       ];
-    const title = pitcherMode ? 'Pitch / Usage / BAA / HardHit% / HR allowed' : 'Pitch / AVG batter|pitcher allowed / SLG batter|pitcher allowed / HR / HR allowed by starter / EV / batter AB|pitcher AB';
+    const title = pitcherMode ? 'Pitch / Usage / BAA / HardHit% / HR allowed' : 'Pitch / AVG batter|pitcher allowed / SLG batter|pitcher allowed / batter HR|pitcher HRA / EV / HH% batter|pitcher allowed / Whiff% batter|pitcher / batter AB|pitcher AB';
     const cardCells = values.map((value, index) => {
       const rawValue = String(value ?? '');
       const cellClasses = index === 0 ? 'pitch' : '';
       return `<span class="${cellClasses}" title="${escapeHtml(rawValue.replace(/<[^>]*>/g, ''))}">${pitcherMode && index === 1 ? value : escapeHtml(value)}</span>`;
     }).join('');
-    return `<div class="visible-pitch-card${pitcherMode ? ' pitcher' : ' batter'}" style="--pitch-heat:${heat};${heatStyle}" title="${escapeHtml(title)}">${cardCells}</div>`;
+    return `<div class="visible-pitch-card${pitcherMode ? ' pitcher' : ' batter'}${fieryPitcherSlug ? ' is-fiery-pitch' : ''}" style="--pitch-heat:${heat};${heatStyle}" title="${escapeHtml(title)}">${cardCells}</div>`;
   }).join('');
   const count = Math.max(1, displayRows.length);
   return `<div class="visible-pitch-strip${pitcherMode ? ' pitcher' : ' batter'}" data-pitch-count="${count}" style="--pitch-count:${count}">${cards}</div>`;
@@ -8918,9 +8979,15 @@ function hydrateVisiblePlayerCardPitchTables(profile, game, token) {
           .map((item) => ({
             category: item.category,
             pct: item.visibleUsagePct ?? item.pct,
-            avg: item.avg ?? item.baa ?? item.ba ?? item.pitcherAvgAllowed ?? item.pitcherBAA,
-            slg: item.slg ?? item.slugging ?? item.pitcherSlgAllowed ?? item.pitcherSLG,
-            ab: savantRowNumber(item, ['ab', 'AB', 'abs', 'at_bats', 'At Bats', 'pa', 'PA', 'plateAppearances', 'pitches']),
+            avg: savantRowNumber(item, PITCHER_ALLOWED_AVG_KEYS),
+            slg: savantRowNumber(item, PITCHER_ALLOWED_SLG_KEYS),
+            hardHit: pitcherAllowedHardHitNumber({ ...item, pitcherMetricSource: true, pitcherSource: true }),
+            whiff: pitcherAllowedWhiffNumber({ ...item, pitcherMetricSource: true, pitcherSource: true }),
+            pitcherHardHit: pitcherAllowedHardHitNumber({ ...item, pitcherMetricSource: true, pitcherSource: true }),
+            pitcherWhiff: pitcherAllowedWhiffNumber({ ...item, pitcherMetricSource: true, pitcherSource: true }),
+            pitcherMetricSource: true,
+            pitcherSource: true,
+            ab: savantRowNumber(item, [...PITCHER_ALLOWED_AB_KEYS, 'pa', 'PA', 'plateAppearances', 'pitches']),
             homeRuns: savantRowHomeRuns(item),
             pitcherThrowHand: matchupPitcherThrowHand,
           }));
@@ -18013,6 +18080,19 @@ async function fetchTeamVsPitcherHandBattingMap(season) {
   return map;
 }
 
+function isHistoricalOpenerStartProfile(player = null) {
+  const gp = pitcherGamesPlayed(player);
+  const gs = pitcherGamesStarted(player);
+  const outs = inningsToOuts(pitcherInningsPitched(player));
+  if (gp <= 0 || gs <= 0 || outs <= 0) return false;
+  const startsShare = gs / Math.max(1, gp);
+  const avgStartIp = (outs / 3) / Math.max(1, gs);
+  if (isStarterLikePitcher(player)) return false;
+  if (avgStartIp >= 3.0) return false;
+  if (gs >= 3 && startsShare >= 0.25) return false;
+  return avgStartIp < 2.75 && startsShare < 0.35;
+}
+
 async function fetchTeamVsStarterHandRecordMap(season) {
   const { start, end } = seasonDateRangeForStarterHandStats(season);
   const url = new URL(`${MLB_API_BASE}/schedule`);
@@ -18042,8 +18122,8 @@ async function fetchTeamVsStarterHandRecordMap(season) {
       boxscoreStarterUsageProfile(awayStarter, season),
       boxscoreStarterUsageProfile(homeStarter, season),
     ]);
-    const awayUsedOpener = isReliefPitcherProfile(awayStarterProfile);
-    const homeUsedOpener = isReliefPitcherProfile(homeStarterProfile);
+    const awayUsedOpener = isHistoricalOpenerStartProfile(awayStarterProfile);
+    const homeUsedOpener = isHistoricalOpenerStartProfile(homeStarterProfile);
     const awayStarterHand = await teamStatsPitcherHandForPerson(awayStarter)
       || handednessCode(away?.probablePitcher?.pitchHand?.code || away?.probablePitcher?.pitchHand?.description || '');
     const homeStarterHand = await teamStatsPitcherHandForPerson(homeStarter)
@@ -32180,9 +32260,11 @@ function playerStatHeatMapAlignPitchRows(rows = [], orderedCategories = []) {
         category: visiblePitchCategoryName(matched.category || pitchCategory),
         pitcherUsagePct: typeof category === 'object' ? category.pct : null,
         pitcherHomeRuns: typeof category === 'object' ? category.homeRuns : null,
-        pitcherAvg: typeof category === 'object' ? category.avg : null,
-        pitcherSlg: typeof category === 'object' ? category.slg : null,
-        pitcherAb: typeof category === 'object' ? category.ab : null,
+        pitcherAvg: typeof category === 'object' ? savantRowNumber(category, PITCHER_ALLOWED_AVG_KEYS) : null,
+        pitcherSlg: typeof category === 'object' ? savantRowNumber(category, PITCHER_ALLOWED_SLG_KEYS) : null,
+        pitcherHardHit: typeof category === 'object' ? pitcherAllowedHardHitNumber({ ...category, pitcherMetricSource: true, pitcherSource: true }) : null,
+        pitcherWhiff: typeof category === 'object' ? pitcherAllowedWhiffNumber({ ...category, pitcherMetricSource: true, pitcherSource: true }) : null,
+        pitcherAb: typeof category === 'object' ? savantRowNumber(category, PITCHER_ALLOWED_AB_KEYS) : null,
         pitcherThrowHand: matched.pitcherThrowHand || (typeof category === 'object' ? category.pitcherThrowHand : ''),
         pitcherOrderIndex: index,
       };
@@ -32220,21 +32302,29 @@ function playerStatHeatMapSavantRows(rows = null, playerType = 'batter', ordered
   }
   const header = playerType === 'pitcher'
     ? '<div class="player-heatmap-metric-row header compact-pitch-row"><span>Pitch</span><b>Use</b><b>BAA</b><b>HH%</b><b>HR</b></div>'
-    : '<div class="player-heatmap-metric-row header compact-pitch-row hitter-pitch-row"><span>Pitch</span><b>AVG</b><b>SLG</b><b>HR</b><b>HR A</b><b>EV</b><b>AB</b></div>';
+    : '<div class="player-heatmap-metric-row header compact-pitch-row hitter-pitch-row"><span>Pitch</span><b>AVG</b><b>SLG</b><b>HR</b><b>EV</b><b>HH%</b><b>Whiff</b><b>AB</b></div>';
   const body = displayRows.slice(0, 7).map((item) => {
     const hitterSlg = savantRowNumber(item, ['slg', 'SLG', 'slugging', 'xslg', 'xSLG']);
-    const hitterHeat = Number.isFinite(hitterSlg) ? clamp(hitterSlg / 0.700, 0, 1) : 0.5;
+    const hitterHeat = Number.isFinite(hitterSlg) ? clamp(hitterSlg / 0.600, 0, 1) : 0.5;
     const slgAllowed = savantRowNumber(item, ['slg', 'SLG', 'slugging', 'xslg', 'xSLG']);
     const pitcherHeat = Number.isFinite(slgAllowed) ? clamp(slgAllowed / 0.700, 0, 1) : 0.5;
-    const pitcherAvgAllowed = savantRowNumber(item, ['pitcherAvg', 'pitcherBAA', 'pitcherAvgAllowed', 'avgAllowedByPitcher']);
-    const pitcherSlgAllowed = savantRowNumber(item, ['pitcherSlg', 'pitcherSLG', 'pitcherSlgAllowed', 'slgAllowedByPitcher']);
+    const pitcherAvgAllowed = savantRowNumber(item, PITCHER_ALLOWED_AVG_KEYS);
+    const pitcherSlgAllowed = savantRowNumber(item, PITCHER_ALLOWED_SLG_KEYS);
     const hitterAb = savantRowNumber(item, ['ab', 'AB', 'abs', 'at_bats', 'At Bats']);
-    const pitcherAb = savantRowNumber(item, ['pitcherAb', 'pitcherAB', 'pitcherAbs', 'pitcherAtBats', 'abAllowedByPitcher']);
+    const pitcherAb = savantRowNumber(item, PITCHER_ALLOWED_AB_KEYS);
+    const hitterHardHit = savantRowNumber(item, ['hardHit', 'HardHit%', 'hard_hit_percent', 'hard_hit_pct', 'hardhit_percent']);
+    const pitcherHardHit = pitcherAllowedHardHitNumber(item);
+    const hitterWhiff = savantRowNumber(item, ['whiff', 'Whiff%', 'whiff_percent', 'swing_miss_percent', 'swinging_strike_percent']);
+    const pitcherWhiff = pitcherAllowedWhiffNumber(item);
     const compactPair = (left, right, decimals = 3, signed = true) => `${playerStatHeatMapSavantRate(left, decimals, signed)}|${playerStatHeatMapSavantRate(right, decimals, signed)}`;
+    const compactPercentPair = (left, right) => `${playerStatHeatMapPercentValue(left)}|${playerStatHeatMapPercentValue(right)}`;
     const compactAbPair = `${Number.isFinite(hitterAb) ? Math.round(hitterAb) : '--'}|${Number.isFinite(pitcherAb) ? Math.round(pitcherAb) : '--'}`;
+    const compactHrPair = `${savantRowHomeRuns(item)}|${statNumber(item.pitcherHomeRuns ?? item.hrAllowedByPitcher ?? item.pitcherHrAllowed)} HR`;
+    const fieryPitcherSlug = playerType !== 'pitcher' && Number.isFinite(pitcherSlgAllowed) && pitcherSlgAllowed >= 0.600;
+    const hitterPitchStyle = `--pitch-heat:${hitterHeat};${fieryPitcherSlug ? '--pitch-fire-border:rgba(255, 209, 102, .95);--pitch-fire-glow:rgba(255, 92, 40, .58);' : ''}`;
     return playerType === 'pitcher'
       ? `<div class="player-heatmap-metric-row compact-pitch-row pitcher-pitch-row" style="--pitch-heat:${pitcherHeat};"><span>${escapeHtml(playerStatHeatMapPitchDisplayLabel(item, playerType))}</span><b class="pitch-use-cell">${playerStatHeatMapUsageWithPreviousStartHtml(item)}</b><b>${escapeHtml(playerStatHeatMapSavantRate(item.avg, 3, true))}</b><b>${escapeHtml(playerStatHeatMapPercentValue(item.hardHit))}</b><b>${escapeHtml(savantRowHomeRuns(item))}</b></div>`
-      : `<div class="player-heatmap-metric-row compact-pitch-row hitter-pitch-row" style="--pitch-heat:${hitterHeat};"><span>${escapeHtml(playerStatHeatMapPitchDisplayLabel(item, playerType))}</span><b>${escapeHtml(compactPair(item.avg, pitcherAvgAllowed, 3, true))}</b><b>${escapeHtml(compactPair(hitterSlg, pitcherSlgAllowed, 3, true))}</b><b>${escapeHtml(`${savantRowHomeRuns(item)} HR`)}</b><b>${escapeHtml(`${statNumber(item.pitcherHomeRuns ?? item.hrAllowedByPitcher ?? item.pitcherHrAllowed)} HR A`)}</b><b>${escapeHtml(playerStatHeatMapSavantRate(item.ev, 1, false))}</b><b>${escapeHtml(compactAbPair)}</b></div>`;
+      : `<div class="player-heatmap-metric-row compact-pitch-row hitter-pitch-row${fieryPitcherSlug ? ' is-fiery-pitch' : ''}" style="${hitterPitchStyle}"><span>${escapeHtml(playerStatHeatMapPitchDisplayLabel(item, playerType))}</span><b>${escapeHtml(compactPair(item.avg, pitcherAvgAllowed, 3, true))}</b><b>${escapeHtml(compactPair(hitterSlg, pitcherSlgAllowed, 3, true))}</b><b>${escapeHtml(compactHrPair)}</b><b>${escapeHtml(playerStatHeatMapSavantRate(item.ev, 1, false))}</b><b>${escapeHtml(compactPercentPair(hitterHardHit, pitcherHardHit))}</b><b>${escapeHtml(compactPercentPair(hitterWhiff, pitcherWhiff))}</b><b>${escapeHtml(compactAbPair)}</b></div>`;
   }).join('');
   return `<div class="player-heatmap-metric-table player-heatmap-pitch-table compact-pitch-table${playerType === 'batter' ? ' hitter-pitch-table' : ''}">${header}${body}</div>`;
 }
@@ -32243,11 +32333,53 @@ function playerStatHeatMapSavantShell(side, playerId) {
   return `<div class="player-heatmap-savant-shell" data-player-heatmap-savant="${escapeHtml(side)}" data-player-id="${escapeHtml(playerId || '')}">${playerStatHeatMapSavantRows(null, side)}</div>`;
 }
 
+function mergePitcherArsenalRowsForBatterCard(primaryRows = [], fallbackRows = []) {
+  const byCategory = new Map();
+  const mergePitchRows = (base = {}, incoming = {}, category = '') => {
+    const merged = { ...base, category };
+    for (const [key, value] of Object.entries(incoming || {})) {
+      const text = String(value ?? '').trim();
+      if (value === undefined || value === null || text === '') continue;
+      merged[key] = value;
+    }
+    if (!Number.isFinite(pitcherAllowedHardHitNumber(merged))) {
+      const fallbackHH = pitcherAllowedHardHitNumber({ ...base, pitcherMetricSource: true, pitcherSource: true });
+      if (Number.isFinite(fallbackHH)) merged.pitcherHardHit = fallbackHH;
+    }
+    if (!Number.isFinite(pitcherAllowedWhiffNumber(merged))) {
+      const fallbackWhiff = pitcherAllowedWhiffNumber({ ...base, pitcherMetricSource: true, pitcherSource: true });
+      if (Number.isFinite(fallbackWhiff)) merged.pitcherWhiff = fallbackWhiff;
+    }
+    return { ...merged, pitcherMetricSource: true, pitcherSource: true };
+  };
+  const addRows = (rows, prefer = false) => {
+    for (const row of rows || []) {
+      const category = visiblePitchCategoryName(row?.category);
+      if (!category) continue;
+      const key = savantPitchCategoryKey(category) || category.toLowerCase();
+      const existing = byCategory.get(key);
+      if (!existing) byCategory.set(key, mergePitchRows({}, row, category));
+      else if (prefer) byCategory.set(key, mergePitchRows(existing, row, category));
+    }
+  };
+  addRows(fallbackRows, false);
+  addRows(primaryRows, true);
+  return Array.from(byCategory.values())
+    .map((item) => ({ ...item, visibleUsagePct: visiblePitchUsagePercent(item, ['pct', 'usage', 'usagePct', 'pitch_percent']) }))
+    .sort((a, b) => (Number(b.visibleUsagePct) || 0) - (Number(a.visibleUsagePct) || 0));
+}
+
 async function hydratePlayerStatHeatMapSavant(profile, row = {}) {
   const shells = [...(playerStatHeatmapEl?.querySelectorAll?.('[data-player-heatmap-savant]') || [])];
   const batterStand = effectiveBatterHandForPitcher(profile?.bats || row.batter_hand, row.starter_hand) || handednessCode(profile?.bats || row.batter_hand);
   const starterPitcherHand = handednessCode(row.starter_hand || row.pitcher_hand || row.pitcherThrowHand);
-  const rawPitcherRows = row.starter_id ? await getVisiblePitchBreakdown(row.starter_id, 'pitcher', 3200, { stand: batterStand }) : [];
+  const [rawPitcherRowsForHand, rawPitcherRowsAll] = row.starter_id
+    ? await Promise.all([
+      getVisiblePitchBreakdown(row.starter_id, 'pitcher', 3200, { stand: batterStand }).catch(() => []),
+      getVisiblePitchBreakdown(row.starter_id, 'pitcher', 3200, {}).catch(() => []),
+    ])
+    : [[], []];
+  const rawPitcherRows = mergePitcherArsenalRowsForBatterCard(rawPitcherRowsForHand, rawPitcherRowsAll);
   const previousStartMix = row.starter_id
     ? await withTimeoutValue(
       getMlbPitcherPreviousStartPitchMix(row.starter_id)
@@ -32268,9 +32400,15 @@ async function hydratePlayerStatHeatMapSavant(profile, row = {}) {
     .map((item) => ({
       category: item.category,
       pct: item.visibleUsagePct ?? item.pct,
-      avg: item.avg ?? item.baa ?? item.ba ?? item.pitcherAvgAllowed ?? item.pitcherBAA,
-      slg: item.slg ?? item.slugging ?? item.pitcherSlgAllowed ?? item.pitcherSLG,
-      ab: savantRowNumber(item, ['ab', 'AB', 'abs', 'at_bats', 'At Bats', 'pa', 'PA', 'plateAppearances', 'pitches']),
+      avg: savantRowNumber(item, PITCHER_ALLOWED_AVG_KEYS),
+      slg: savantRowNumber(item, PITCHER_ALLOWED_SLG_KEYS),
+      hardHit: pitcherAllowedHardHitNumber({ ...item, pitcherMetricSource: true, pitcherSource: true }),
+      whiff: pitcherAllowedWhiffNumber({ ...item, pitcherMetricSource: true, pitcherSource: true }),
+      pitcherHardHit: pitcherAllowedHardHitNumber({ ...item, pitcherMetricSource: true, pitcherSource: true }),
+      pitcherWhiff: pitcherAllowedWhiffNumber({ ...item, pitcherMetricSource: true, pitcherSource: true }),
+      pitcherMetricSource: true,
+      pitcherSource: true,
+      ab: savantRowNumber(item, [...PITCHER_ALLOWED_AB_KEYS, 'pa', 'PA', 'plateAppearances', 'pitches']),
       homeRuns: savantRowHomeRuns(item),
       pitcherThrowHand: starterPitcherHand,
     }));
@@ -34649,13 +34787,17 @@ async function syncLineupOverlay(game, options = {}) {
   activeLineupGame = refreshedLiveLabGame || game;
   if (currentLineupView === 'live' && !liveLabReplayActive) renderLineupLiveLab(activeLineupGame);
   syncLineupGamePickState(game);
-  const awayOpponentPitcher = homePitcherSummary?.current || homePitcherSummary?.starter || null;
-  const homeOpponentPitcher = awayPitcherSummary?.current || awayPitcherSummary?.starter || null;
+  const shouldShowLineupHandStats = lineupGameIsPregame(game);
+  const awayOpponentPitcher = shouldShowLineupHandStats
+    ? (predictionOpponentPitcherForHrScore(game, 'away') || predictionProbableStarterForSide(game, 'home') || homePitcherSummary?.starter || null)
+    : (homePitcherSummary?.starter || homePitcherSummary?.current || null);
+  const homeOpponentPitcher = shouldShowLineupHandStats
+    ? (predictionOpponentPitcherForHrScore(game, 'home') || predictionProbableStarterForSide(game, 'away') || awayPitcherSummary?.starter || null)
+    : (awayPitcherSummary?.starter || awayPitcherSummary?.current || null);
   const awayOpponentHand = pitcherThrowHandValue(awayOpponentPitcher);
   const homeOpponentHand = pitcherThrowHandValue(homeOpponentPitcher);
-  const awayOpponentIsOpener = pitcherIsLikelyOpenerForGame(awayOpponentPitcher, game);
-  const homeOpponentIsOpener = pitcherIsLikelyOpenerForGame(homeOpponentPitcher, game);
-  const shouldShowLineupHandStats = lineupGameIsPregame(game);
+  const awayOpponentIsOpener = shouldShowLineupHandStats ? pitcherIsLikelyOpenerForGame(awayOpponentPitcher, game) : false;
+  const homeOpponentIsOpener = shouldShowLineupHandStats ? pitcherIsLikelyOpenerForGame(homeOpponentPitcher, game) : false;
   const lineupStarterHandStatsFastPromise = shouldShowLineupHandStats
     ? Promise.all([
       getLineupTeamSeasonStats(game.away, officialDateForGame(game), awayOpponentHand, { includeRecord: false, opponentIsOpener: awayOpponentIsOpener }).catch(() => null),
