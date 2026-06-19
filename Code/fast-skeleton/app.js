@@ -8802,6 +8802,29 @@ function filterStarterEventRowsForPitcherArchetype(rows = [], arch = {}, seasonP
   const letter = String(arch?.letter || '').toUpperCase();
   const sourceRows = listify(rows);
   if (!letter || !sourceRows.length) return [];
+  const arsenalEventQualifiedIds = new Set();
+  if (letter === 'I' || letter === 'A') {
+    const grouped = new Map();
+    for (const row of sourceRows) {
+      const id = savantPitchEventPitcherId(row);
+      if (!Number.isFinite(id) || id <= 0) continue;
+      const category = visiblePitchCategoryName(savantExactPitchCategory(row) || savantPitchCategory(row) || pitchRowCategoryText(row));
+      const family = archetypePitchFamilyName(category) || category;
+      if (!family) continue;
+      const bucket = grouped.get(id) || { total: 0, families: new Map() };
+      bucket.total += 1;
+      bucket.families.set(family, (bucket.families.get(family) || 0) + 1);
+      grouped.set(id, bucket);
+    }
+    for (const [id, bucket] of grouped.entries()) {
+      const profile = seasonProfiles.get(id);
+      if (!profile?.isStarter || bucket.total < 20) continue;
+      const counts = [...bucket.families.values()].sort((a, b) => b - a);
+      const topOne = counts[0] || 0;
+      const topTwo = (counts[0] || 0) + (counts[1] || 0);
+      if ((topOne / bucket.total) >= 0.45 || (topTwo / bucket.total) >= 0.70) arsenalEventQualifiedIds.add(id);
+    }
+  }
   return sourceRows.filter((row) => {
     const id = savantPitchEventPitcherId(row);
     const profile = Number.isFinite(id) && id > 0 ? seasonProfiles.get(id) : null;
@@ -8810,6 +8833,7 @@ function filterStarterEventRowsForPitcherArchetype(rows = [], arch = {}, seasonP
       return Boolean(flame?.isStarter && flame?.qualifies);
     }
     if (!profile?.isStarter) return false;
+    if (letter === 'I' || letter === 'A') return profile.letters?.has('I') === true || profile.letters?.has('A') === true || arsenalEventQualifiedIds.has(id);
     return profile.letters?.has(letter) === true;
   });
 }
@@ -9028,9 +9052,15 @@ function archetypeEventRowSummary(arch = {}, batterEventRows = [], pitcher = nul
   }
 
   // No handedness-split fallback here. These rows are player-vs-archetype only.
-  // Until a real season-wide pitcher-archetype index exists for K/I/L/R, keep the sample blank
-  // instead of copying generic vs-RHP/vs-LHP data into archetype rows.
-  return { h: null, ab: null, slg: null, hr: null, limited: true, source: 'event-archetype', pitchers: [], pitcherIds: [] };
+  // For K/I/L/R, the input rows have already been filtered to starting pitchers
+  // that qualify for the displayed archetype, so summarize the real batter events
+  // instead of falling back to generic handedness data.
+  const label = String(arch?.label || arch?.title || letter || 'Archetype').replace(/^vs\s+/i, '');
+  return summarizeArchetypeEventRows(rows, {
+    source: 'starter-only-archetype-events',
+    categories: [label],
+    excludeNames: [profile?.fullName, profile?.name],
+  });
 }
 
 
@@ -31675,6 +31705,17 @@ async function loadGames(options = {}) {
     let { cards, homeRuns } = await fetchGamesAndHomeRuns(selectedDate, { onCard: onProgressiveCard });
     if (!isCurrentLoadGamesRequest(requestId)) return;
     cards = dedupeGameCards(mergeCardsWithArchive(cards.map(normalizeCompletedCard), archived), selectedDate);
+    const progressiveSeeds = Array.from(progressiveCards.values()).filter((game) => game?.officialScheduleSeed);
+    if (progressiveSeeds.length) {
+      const existingKeys = new Set(cards.map((game) => gameCardInstanceKey(game, selectedDate) || String(game?.gamePk || '')).filter(Boolean));
+      for (const seed of progressiveSeeds) {
+        const key = gameCardInstanceKey(seed, selectedDate) || String(seed?.gamePk || '');
+        if (!key || existingKeys.has(key)) continue;
+        cards.push(seed);
+        existingKeys.add(key);
+      }
+      cards = dedupeGameCards(cards, selectedDate);
+    }
     const existingEmpty = gamesEl.querySelector('.empty');
     if (existingEmpty) existingEmpty.remove();
 
@@ -31858,6 +31899,17 @@ initMatchupExportWidget();
 renderHomeRunFeed([]);
 loadGames();
 
+function scoreboardHydrationIncomplete() {
+  const cards = listify(latestRenderedGames);
+  if (!cards.length) return Boolean(gamesEl?.querySelector?.('.games-loading'));
+  return cards.some((game) => Boolean(
+    game?.officialScheduleSeed
+    || game?.hydrationPending
+    || game?.loading
+    || /loading/i.test(String(game?.status || ''))
+  ));
+}
+
 function scoreboardGameLooksLiveForAutoRefresh(game) {
   const text = [
     game?.status,
@@ -31873,8 +31925,9 @@ function scoreboardGameLooksLiveForAutoRefresh(game) {
 }
 
 function scoreboardAutoRefreshStaleMs() {
-  if (document.hidden) return 120000;
+  if (document.hidden) return scoreboardHydrationIncomplete() ? 45000 : 120000;
   if (loadGamesInFlight) return 60000;
+  if (scoreboardHydrationIncomplete()) return 12000;
   const hasLiveGame = latestRenderedGames.some(scoreboardGameLooksLiveForAutoRefresh);
   // Once the full slate has loaded, do not cycle the entire scoreboard every 10s.
   // Only truly live games get a full refresh cadence. Pregame/final slates stay stable
@@ -31901,8 +31954,9 @@ function scheduleAutoRefresh() {
     const staleMs = scoreboardAutoRefreshStaleMs();
     const isToday = selectedDate === formatDate(new Date());
     const hasLiveGame = latestRenderedGames.some(scoreboardGameLooksLiveForAutoRefresh);
+    const needsHydration = scoreboardHydrationIncomplete();
     const isStale = Date.now() - (lastLoadFinishedAt || 0) >= staleMs;
-    if (isToday && hasLiveGame && isStale) loadGames({ showLoading: false });
+    if (isStale && (needsHydration || (isToday && hasLiveGame))) loadGames({ showLoading: false });
     scheduleAutoRefresh();
   }, autoRefreshDelayMs());
 }
@@ -31920,7 +31974,8 @@ window.addEventListener('focus', () => {
   const selectedDate = dateInput.value || formatDate(new Date());
   if (selectedDate !== formatDate(new Date())) return;
   const hasLiveGame = latestRenderedGames.some(scoreboardGameLooksLiveForAutoRefresh);
-  const staleMs = hasLiveGame ? 30000 : 5 * 60_000;
+  const needsHydration = scoreboardHydrationIncomplete();
+  const staleMs = needsHydration ? 12000 : (hasLiveGame ? 30000 : 5 * 60_000);
   if (Date.now() - (lastLoadFinishedAt || 0) > staleMs) loadGames({ showLoading: false });
 });
 scheduleAutoRefresh();

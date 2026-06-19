@@ -1,25 +1,18 @@
-# Progressive order + vs-archetype pitcher detail fix
+# Shell hydration refresh + real L/A archetype samples
 
 Changes:
-- Progressive scoreboard hydration now starts in chronological game order and keeps DOM order earliest-to-latest as each card updates.
-- Live feed hydration is limited to small ordered batches instead of firing the whole slate at once.
-- Card updates still paint progressively without fake AWAY/HOME placeholder shells.
-- Batter-side Vs Pitcher Type hover text now includes per-pitcher statlines for the qualifying starter archetype sample.
-- Per-pitcher statlines show H-AB, SLG, and HR for each qualifying pitcher.
-- Pitcher statlines with 0 AB are removed from the hover detail.
-- Existing Flame Thrower max/avg qualification and SP-only archetype sample logic is preserved.
+- Kept the shell-first loading pattern.
+- Keeps real official schedule shells visible if a full card times out instead of deleting that matchup.
+- If any shell/hydration-pending game remains, auto-refresh retries on a short controlled cadence until the slate is actually hydrated.
+- Once every visible card is fully hydrated, the no-refresh-cycle behavior remains in place.
+- Batter Vs Pitcher Type rows for K/I/L/R now summarize real starter-only event rows filtered to pitchers that qualify for that archetype instead of leaving L/A blank.
+- Arsenal Imbalance can additionally qualify from real starter event-row pitch concentration when season-wide pitch-usage is not available.
+- Still no generic handedness fallback.
+- Still no fake AWAY/HOME shells.
+- No lineup-source changes.
+- No Rotowire changes.
+- No cache-key changes.
 
 Validation:
 - node --check app.js
 - node --check live-dashboard-prototype.js
-
-
-## Shell-first ordered hydration fix
-
-Changes:
-- Official MLB schedule shells now paint first for every game in chronological order.
-- Shells are real matchup shells from MLB schedule data, not fake AWAY/HOME placeholders.
-- Full card hydration still fetches in small batches, but visible full-card updates are released earliest-to-latest.
-- Final full-data completion no longer repaints every card if the progressive full-card updates already rendered them.
-- Existing no-refresh-cycle behavior is preserved.
-- No lineup-source, Rotowire, archetype, or cache-key changes.
