@@ -1,0 +1,19 @@
+{
+  "package": "mlb-dashboard-shells-first-ordered-hydration-fix",
+  "base": "mlb-dashboard-progressive-no-refresh-cycle-fix",
+  "changes": [
+    "Paint all real MLB schedule shells first",
+    "Release full card updates in chronological order",
+    "Avoid final repaint of already-hydrated cards",
+    "No lineup/archetype/cache-key changes"
+  ],
+  "files": [
+    "app.js",
+    "live-dashboard-prototype.js",
+    "styles.css",
+    "dashboard.css",
+    "live-prototype.css",
+    "dashboard-live-prototype.html",
+    "LINEUP_HR_FIX_NOTES.md"
+  ]
+}

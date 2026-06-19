@@ -12523,3 +12523,235 @@ body.dashboard-page .player-batted-ball-profile-table .player-batted-ball-stacke
     0 0 12px var(--pitch-fire-glow, rgba(255, 92, 40, .52)),
     inset 0 1px 0 rgba(255, 255, 255, .08);
 }
+
+
+.lineup-archetype-badge {
+  display: inline-grid;
+  place-items: center;
+  min-width: 1.15rem;
+  height: 1.15rem;
+  margin-left: 0.28rem;
+  padding: 0 0.18rem;
+  border-radius: 999px;
+  border: 1px solid rgba(255, 190, 90, 0.32);
+  background: linear-gradient(180deg, rgba(255, 190, 90, 0.24), rgba(255, 190, 90, 0.08));
+  color: #ffe0ab;
+  font-size: 0.64rem;
+  font-weight: 900;
+  line-height: 1;
+  vertical-align: middle;
+  box-shadow: inset 0 1px 0 rgba(255,255,255,0.08), 0 0 10px rgba(0,0,0,0.18);
+  cursor: help;
+}
+
+
+.lineup-archetype-badge.is-pitcher {
+  border-color: rgba(102, 217, 255, 0.34);
+  background: linear-gradient(180deg, rgba(102, 217, 255, 0.26), rgba(102, 217, 255, 0.08));
+  color: #d6f6ff;
+}
+
+
+.pitcher-archetype-card,
+.player-archetype-matchup-card {
+  margin-top: 6px;
+}
+
+.pitcher-archetype-card details {
+  margin-top: 4px;
+}
+
+.pitcher-archetype-card summary {
+  cursor: pointer;
+  color: var(--muted);
+  font: 900 0.55rem var(--font-ui, sans-serif);
+  letter-spacing: 0.05em;
+  text-transform: uppercase;
+}
+
+.lineup-archetype-badge.is-secondary {
+  opacity: 0.68;
+}
+
+
+/* v26: player-vs-pitcher-archetype belongs in a compact table, not pitch-card tiles. */
+.player-archetype-matchup-table {
+  width: 100%;
+  border-collapse: collapse;
+  margin-top: 6px;
+  overflow: hidden;
+  border: 1px solid color-mix(in srgb, var(--line) 55%, transparent);
+  border-radius: 8px;
+  background: rgba(255, 255, 255, 0.025);
+}
+.player-archetype-matchup-table th,
+.player-archetype-matchup-table td {
+  padding: 6px 8px;
+  border-bottom: 1px solid color-mix(in srgb, var(--line) 32%, transparent);
+  color: var(--text);
+  font: 850 0.66rem var(--font-ui, sans-serif);
+  text-align: right;
+  white-space: nowrap;
+}
+.player-archetype-matchup-table thead th {
+  color: var(--muted);
+  font-size: 0.58rem;
+  letter-spacing: 0.07em;
+  text-transform: uppercase;
+  background: rgba(255, 255, 255, 0.035);
+}
+.player-archetype-matchup-table th:first-child,
+.player-archetype-matchup-table td:first-child {
+  text-align: left;
+}
+.player-archetype-matchup-table tbody tr:last-child th,
+.player-archetype-matchup-table tbody tr:last-child td {
+  border-bottom: 0;
+}
+.player-archetype-matchup-table tbody tr.is-batter {
+  background: linear-gradient(90deg, rgba(102, 217, 255, 0.10), transparent 82%);
+}
+.player-archetype-matchup-table tbody tr.is-pitcher {
+  background: linear-gradient(90deg, rgba(255, 105, 97, 0.10), transparent 82%);
+}
+.player-archetype-matchup-table tbody th b {
+  display: inline-grid;
+  place-items: center;
+  min-width: 1.15rem;
+  height: 1.15rem;
+  margin-right: 0.35rem;
+  border-radius: 999px;
+  border: 1px solid rgba(102, 217, 255, 0.34);
+  background: rgba(102, 217, 255, 0.14);
+  color: #d6f6ff;
+  font-size: 0.58rem;
+}
+.player-archetype-matchup-table tbody th span {
+  color: var(--text);
+}
+
+
+/* v27: keep player-vs-pitcher-archetype subtle like the other stat tables. */
+.player-archetype-matchup-card {
+  grid-column: 1 / -1;
+  margin-top: 4px;
+  padding: 0;
+  border: 0;
+  background: transparent;
+  box-shadow: none;
+}
+
+.player-archetype-matchup-card[hidden],
+.player-heatmap-table-panel[hidden],
+.visible-player-card-pitch-shell[hidden] {
+  display: none !important;
+}
+
+.player-archetype-matchup-table {
+  width: 100%;
+  margin-top: 0;
+  border-collapse: collapse;
+  border: 0;
+  border-radius: 0;
+  background: transparent;
+  overflow: hidden;
+}
+
+.player-archetype-matchup-table th,
+.player-archetype-matchup-table td {
+  padding: 4px 7px;
+  border-bottom: 1px solid color-mix(in srgb, var(--line) 28%, transparent);
+  color: var(--text);
+  font: 850 0.58rem var(--font-ui, sans-serif);
+  line-height: 1.05;
+  text-align: right;
+  white-space: nowrap;
+}
+
+.player-archetype-matchup-table thead th {
+  color: var(--muted);
+  font-size: 0.52rem;
+  letter-spacing: 0.07em;
+  text-transform: uppercase;
+  background: rgba(255, 255, 255, 0.025);
+}
+
+.player-archetype-matchup-table th:first-child,
+.player-archetype-matchup-table td:first-child {
+  text-align: left;
+}
+
+.player-archetype-matchup-table tbody tr:last-child th,
+.player-archetype-matchup-table tbody tr:last-child td {
+  border-bottom: 0;
+}
+
+.player-archetype-matchup-table tbody tr.is-batter {
+  background: linear-gradient(90deg, rgba(102, 217, 255, 0.075), transparent 84%);
+}
+
+.player-archetype-matchup-table tbody tr.is-pitcher {
+  background: linear-gradient(90deg, rgba(255, 105, 97, 0.06), transparent 84%);
+}
+
+.player-archetype-matchup-table .player-archetype-letter {
+  display: inline;
+  margin-right: 0.35em;
+  padding: 0;
+  border: 0;
+  background: transparent;
+  color: color-mix(in srgb, var(--team-color, var(--accent)) 64%, white 36%);
+  font-weight: 950;
+}
+
+.player-archetype-matchup-table tbody th span:not(.player-archetype-letter) {
+  color: var(--text);
+}
+
+
+body.dashboard-page .player-archetype-matchup-card {
+  margin-top: 8px;
+}
+
+body.dashboard-page .player-archetype-matchup-table th,
+body.dashboard-page .player-archetype-matchup-table td {
+  white-space: nowrap;
+}
+
+body.dashboard-page .player-archetype-matchup-table tr.is-fallback td {
+  color: color-mix(in srgb, var(--text) 84%, var(--muted) 16%);
+}
+
+
+/* Compact vs-archetype table in the left season/stat column */
+[data-player-season-archetype-slot] {
+  margin-top: 6px;
+}
+[data-player-season-archetype-slot] .player-archetype-matchup-card {
+  margin: 0;
+  padding: 0;
+  border: 0;
+  background: transparent;
+  box-shadow: none;
+}
+[data-player-season-archetype-slot] .player-archetype-matchup-table {
+  margin: 0;
+  width: 100%;
+  font-size: 0.68rem;
+}
+[data-player-season-archetype-slot] .player-archetype-matchup-table th,
+[data-player-season-archetype-slot] .player-archetype-matchup-table td {
+  padding: 4px 7px;
+}
+[data-player-season-archetype-slot] .player-archetype-matchup-table th:first-child {
+  width: auto;
+}
+[data-player-season-archetype-slot] .player-archetype-matchup-table .player-archetype-letter {
+  width: 18px;
+  height: 18px;
+  min-width: 18px;
+  font-size: 0.64rem;
+}
+[data-player-season-archetype-slot] .player-archetype-matchup-table tr.is-limited td {
+  opacity: 0.72;
+}
