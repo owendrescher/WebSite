@@ -1,18 +1,16 @@
-# Shell hydration refresh + real L/A archetype samples
+# Date switch full-slate retention fix
 
 Changes:
-- Kept the shell-first loading pattern.
-- Keeps real official schedule shells visible if a full card times out instead of deleting that matchup.
-- If any shell/hydration-pending game remains, auto-refresh retries on a short controlled cadence until the slate is actually hydrated.
-- Once every visible card is fully hydrated, the no-refresh-cycle behavior remains in place.
-- Batter Vs Pitcher Type rows for K/I/L/R now summarize real starter-only event rows filtered to pitchers that qualify for that archetype instead of leaving L/A blank.
-- Arsenal Imbalance can additionally qualify from real starter event-row pitch concentration when season-wide pitch-usage is not available.
-- Still no generic handedness fallback.
-- Still no fake AWAY/HOME shells.
-- No lineup-source changes.
-- No Rotowire changes.
-- No cache-key changes.
+- Keeps the previous shell-first chronological hydration behavior.
+- When moving forward or backward dates, cards from the old date are still cleared immediately.
+- Current-date schedule seeds are now always included in the final card set, even when live-feed hydration times out for some games.
+- Cached/archive cards are now hard-filtered by official game date before they can seed or merge into the current slate.
+- Cached-card lookup is keyed by game id, matchup, and date-aware matchup identity, but only after date filtering.
+- Late progressive updates from an old date are still ignored.
+- This prevents the slate from collapsing to only matchups that happened to overlap with the previous date.
+- No lineup, archetype, Rotowire, or cache-key changes.
 
 Validation:
 - node --check app.js
 - node --check live-dashboard-prototype.js
+- node --check live-dashboard-prototype.20260619-dateclear1.js

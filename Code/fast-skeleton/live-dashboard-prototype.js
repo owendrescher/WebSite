@@ -209,6 +209,7 @@ let selectedPlayerOutcomePitchKey = '';
 let playerOutcomeMenuLevel = 'games';
 let latestPlayerOutcomePayload = null;
 let latestRenderedGames = [];
+let latestRenderedGamesDate = '';
 let loadGamesInFlight = false;
 let loadGamesQueued = false;
 let loadGamesRequestSeq = 0;
@@ -1861,7 +1862,8 @@ function formatGoalTimeStamp(ts) {
 }
 
 function getCachedGames() {
-  return dedupeGameCards(JSON.parse(localStorage.getItem(gameCacheKey()) || '[]')).map(sanitizeStoredGameCard);
+  const selectedDate = dateInput?.value || formatDate(new Date());
+  return filterGameCardsForDate(dedupeGameCards(JSON.parse(localStorage.getItem(gameCacheKey()) || '[]'), selectedDate), selectedDate).map(sanitizeStoredGameCard);
 }
 
 function compactStoredGame(card) {
@@ -1909,19 +1911,22 @@ function compactExistingStorage() {
 
 function saveCachedGames(games) {
   try {
-    localStorage.setItem(gameCacheKey(), JSON.stringify(dedupeGameCards(games).map(sanitizeStoredGameCard).map(compactStoredGame)));
+    const selectedDate = dateInput?.value || formatDate(new Date());
+    const cleaned = filterGameCardsForDate(dedupeGameCards(games, selectedDate), selectedDate);
+    localStorage.setItem(gameCacheKey(), JSON.stringify(cleaned.map(sanitizeStoredGameCard).map(compactStoredGame)));
     cachedArchiveCardsBeforeDateKey = '';
     cachedArchiveCardsBeforeDateValue = [];
   } catch {}
 }
 
 function getArchivedGames(date) {
-  return dedupeGameCards(JSON.parse(localStorage.getItem(archiveKey(date)) || '[]'), date).map(sanitizeStoredGameCard);
+  return filterGameCardsForDate(dedupeGameCards(JSON.parse(localStorage.getItem(archiveKey(date)) || '[]'), date), date).map(sanitizeStoredGameCard);
 }
 
 function saveArchivedGames(date, games) {
   try {
-    localStorage.setItem(archiveKey(date), JSON.stringify(dedupeGameCards(games, date).map(sanitizeStoredGameCard).map(compactStoredGame)));
+    const cleaned = filterGameCardsForDate(dedupeGameCards(games, date), date);
+    localStorage.setItem(archiveKey(date), JSON.stringify(cleaned.map(sanitizeStoredGameCard).map(compactStoredGame)));
     cachedArchiveCardsBeforeDateKey = '';
     cachedArchiveCardsBeforeDateValue = [];
   } catch {}
@@ -6208,6 +6213,45 @@ function gameCardInstanceKey(card, fallbackDate = '') {
   const gameNumber = normalizedGameNumber(card?.gameNumber) || 1;
   if (!away || !home || !date || !gameNumber) return '';
   return `${away}@${home}|${date}|${gameNumber}`;
+}
+
+
+function gameCardDateKey(card, fallbackDate = '') {
+  const official = calendarDateOnly(card?.officialDate || '');
+  if (official) return official;
+  const fallback = calendarDateOnly(fallbackDate || '');
+  const gameDate = calendarDateOnly(card?.gameDate || '');
+  if (gameDate && (!fallback || gameDate === fallback)) return gameDate;
+  return fallback || gameDate || '';
+}
+
+function gameCardBelongsToDate(card, date = '') {
+  const target = calendarDateOnly(date || '');
+  if (!target || !card) return Boolean(card);
+  const official = calendarDateOnly(card?.officialDate || '');
+  if (official) return official === target;
+  const fallback = calendarDateOnly(date || '');
+  const gameDate = calendarDateOnly(card?.gameDate || '');
+  if (gameDate && gameDate !== target && fallback) return false;
+  return true;
+}
+
+function filterGameCardsForDate(cards = [], date = '') {
+  const target = calendarDateOnly(date || dateInput?.value || formatDate(new Date()));
+  return listify(cards).filter((card) => gameCardBelongsToDate(card, target));
+}
+
+function mapCachedCardsForDate(cards = [], date = '') {
+  const map = new Map();
+  for (const card of filterGameCardsForDate(cards, date)) {
+    const pk = String(card?.gamePk || '');
+    const identityKey = gameCardInstanceKey(card, date);
+    const matchupKey = gameMatchKey(card?.away, card?.home);
+    if (pk) map.set(pk, card);
+    if (identityKey) map.set(identityKey, card);
+    if (matchupKey) map.set(matchupKey, card);
+  }
+  return map;
 }
 
 function manualGameStateKey(game, fallbackDate = dateInput.value || formatDate(new Date())) {
@@ -17768,22 +17812,29 @@ function emitOfficialScheduleSeedCards(games = [], date = '', cachedCards = new 
 
 function upsertProgressiveGameCard(game = null, selectedDate = '') {
   if (!game || !game.gamePk || !gamesEl) return;
+  const targetDate = String(selectedDate || dateInput?.value || formatDate(new Date()));
+  if (String(dateInput?.value || '') && String(dateInput.value) !== targetDate) return;
+  if (gamesEl.dataset.scoreboardDate && gamesEl.dataset.scoreboardDate !== targetDate) return;
+  latestRenderedGamesDate = targetDate;
+  gamesEl.dataset.scoreboardDate = targetDate;
   const normalized = normalizeCompletedCard(game);
-  const incomingKey = gameCardInstanceKey(normalized, selectedDate) || String(normalized.gamePk || '');
+  const incomingKey = gameCardInstanceKey(normalized, targetDate) || String(normalized.gamePk || '');
   const next = [];
   for (const existing of latestRenderedGames || []) {
-    const existingKey = gameCardInstanceKey(existing, selectedDate) || String(existing?.gamePk || '');
+    const existingKey = gameCardInstanceKey(existing, targetDate) || String(existing?.gamePk || '');
     if (String(existing?.gamePk || '') === String(normalized.gamePk || '') || (incomingKey && existingKey === incomingKey)) continue;
     next.push(existing);
   }
   next.push(normalized);
-  latestRenderedGames = dedupeGameCards(next, selectedDate);
+  latestRenderedGames = dedupeGameCards(next, targetDate);
   gamesEl.querySelectorAll('.empty, .games-loading').forEach((el) => el.remove());
   updateDashboardSummary(latestRenderedGames);
   upsertCard(normalized);
   syncGameCardDomOrder(latestRenderedGames);
   syncAllCardGamePickStates(latestRenderedGames);
   syncTossupScoreboardStates(latestRenderedGames);
+  renderPlayerTrackerList(latestRenderedGames);
+  renderBetList(latestRenderedGames);
 }
 
 function syncGameCardDomOrder(games = latestRenderedGames) {
@@ -17798,12 +17849,88 @@ function syncGameCardDomOrder(games = latestRenderedGames) {
   }
 }
 
+
+function scoreboardGameDateKey(game = null, fallbackDate = '') {
+  return String(game?.officialDate || game?.gameDate || fallbackDate || dateInput?.value || formatDate(new Date())).slice(0, 10);
+}
+
+function mergeRetainedScoreboardCardsForDate(cards = [], selectedDate = '') {
+  const dateKey = String(selectedDate || dateInput?.value || formatDate(new Date()));
+  const merged = new Map();
+  const addCard = (game, incoming = false) => {
+    if (!game || !game.gamePk) return;
+    if (scoreboardGameDateKey(game, dateKey) !== dateKey) return;
+    const normalized = normalizeCompletedCard(game);
+    const key = gameCardInstanceKey(normalized, dateKey) || String(normalized.gamePk || '');
+    if (!key) return;
+    const existing = merged.get(key);
+    if (!existing) {
+      merged.set(key, normalized);
+      return;
+    }
+    merged.set(key, incoming ? chooseBestGameCard(existing, normalized) : chooseBestGameCard(normalized, existing));
+  };
+  if (latestRenderedGamesDate === dateKey) {
+    for (const game of listify(latestRenderedGames)) addCard(game, false);
+  }
+  if (gamesEl?.dataset?.scoreboardDate === dateKey) {
+    for (const card of gamesEl.querySelectorAll('.game-card')) {
+      if (card?._game) addCard(card._game, false);
+    }
+  }
+  for (const game of listify(cards)) addCard(game, true);
+  return dedupeGameCards(Array.from(merged.values()), dateKey);
+}
+
+function scheduleGameHasTrackedPlayerTeam(game = null, date = '') {
+  const tracked = normalizeTrackedPlayerEntries(getTrackedPlayers(date || dateInput?.value || formatDate(new Date())));
+  if (!tracked.length || !game) return false;
+  const away = game?.teams?.away?.team?.abbreviation || game?.teams?.away?.team?.teamCode || game?.away || '';
+  const home = game?.teams?.home?.team?.abbreviation || game?.teams?.home?.team?.teamCode || game?.home || '';
+  return tracked.some((entry) => sameTeamAbbrev(entry.teamAbbrev, away) || sameTeamAbbrev(entry.teamAbbrev, home));
+}
+
+function scheduleGameStatusLooksLive(game = null) {
+  const text = [
+    game?.status?.abstractGameState,
+    game?.status?.detailedState,
+    game?.status?.codedGameState,
+    game?.status,
+  ].map((part) => String(part || '')).join(' ').toLowerCase();
+  if (/final|game over|completed|postpon|cancel|suspend/.test(text)) return false;
+  return /live|in progress|warmup|delayed|top|bottom|bot|mid|end/.test(text);
+}
+
+function homeRunGamePkPrioritySetForDate(date = '') {
+  const set = new Set();
+  for (const hr of [...listify(latestRenderedHomeRuns), ...listify(cachedHomeRunsForSelectedDate())]) {
+    const gamePk = String(hr?.gamePk || '');
+    if (gamePk) set.add(gamePk);
+  }
+  return set;
+}
+
+function sortScheduleGamesForHydration(games = [], date = '') {
+  const selectedDate = String(date || dateInput?.value || formatDate(new Date()));
+  const hrGamePks = homeRunGamePkPrioritySetForDate(selectedDate);
+  const chrono = sortGameCardsChronologically(listify(games));
+  const indexByPk = new Map(chrono.map((game, index) => [String(game?.gamePk || ''), index]));
+  const priority = (game) => {
+    if (hrGamePks.has(String(game?.gamePk || ''))) return 0;
+    if (scheduleGameStatusLooksLive(game)) return 1;
+    if (scheduleGameHasTrackedPlayerTeam(game, selectedDate)) return 2;
+    return 3;
+  };
+  return chrono.slice().sort((a, b) => priority(a) - priority(b)
+    || (indexByPk.get(String(a?.gamePk || '')) ?? 9999) - (indexByPk.get(String(b?.gamePk || '')) ?? 9999));
+}
+
 async function fetchGamesAndHomeRuns(date, options = {}) {
   const schedule = await getSchedule(date);
   const games = sortGameCardsChronologically((schedule?.dates?.[0]?.games || []).filter((game) => !isPostponedGameStatus(game)));
   const homeRuns = [];
   const matchupEvents = [];
-  const cachedCards = new Map(getCachedGames().map((card) => [card.gamePk, card]));
+  const cachedCards = mapCachedCardsForDate(getCachedGames(), date);
   const onCard = typeof options?.onCard === 'function' ? options.onCard : null;
   const orderedFullCardBuffer = [];
   let nextOrderedFullCardIndex = 0;
@@ -17834,7 +17961,8 @@ async function fetchGamesAndHomeRuns(date, options = {}) {
       emitOfficialScheduleSeedCards(games, date, cachedCards, onCard);
     } catch {}
   }
-  const cardResults = await mapWithConcurrency(games, 3, async (game, gameIndex) => {
+  const hydrationGames = sortScheduleGamesForHydration(games, date);
+  const cardResults = await mapWithConcurrency(hydrationGames, 2, async (game, gameIndex) => {
     const emitGameCard = (card) => emitCard(card, gameIndex);
     const gamePk = game.gamePk;
     const gameOfficialDate = officialDateForGame(game, date);
@@ -18009,6 +18137,10 @@ async function fetchGamesAndHomeRuns(date, options = {}) {
             teamLogo: getLogoPath(battingTeamAbbr),
             order: play?.about?.atBatIndex ?? 0,
           });
+          if (onCard) {
+            latestRenderedHomeRuns = homeRuns.slice();
+            renderHomeRunFeed(homeRuns);
+          }
         }
       }
 
@@ -18207,7 +18339,10 @@ async function fetchGamesAndHomeRuns(date, options = {}) {
     }
   });
 
-  const cards = dedupeGameCards(cardResults.filter(Boolean), date);
+  const scheduleSeedCards = games
+    .map((game) => buildOfficialScheduleSeedCard(game, date, cachedCards))
+    .filter(Boolean);
+  const cards = dedupeGameCards([...scheduleSeedCards, ...cardResults.filter(Boolean)], date);
   saveAnalyticsDayIndex(date, buildDailyAnalyticsIndex(date, cards, matchupEvents));
   homeRuns.sort((a, b) => (Number(b.eventTimeMs) || 0) - (Number(a.eventTimeMs) || 0) || b.gamePk - a.gamePk || b.order - a.order);
   try {
@@ -38503,8 +38638,9 @@ function prewarmLineupHrScoresForGames(games = []) {
 
 async function finalizeRenderedGames(cards, homeRuns = []) {
   const selectedDate = dateInput.value || formatDate(new Date());
-  const initialCards = dedupeGameCards(cards, selectedDate);
-  let dedupedCards = initialCards;
+  latestRenderedGamesDate = selectedDate;
+  if (gamesEl) gamesEl.dataset.scoreboardDate = selectedDate;
+  let dedupedCards = mergeRetainedScoreboardCardsForDate(cards, selectedDate);
   const hasFastScheduleShell = dedupedCards.some((game) => game?.fastScheduleShell);
   latestRenderedGames = dedupedCards;
   restorePendingGamePicks();
@@ -38569,8 +38705,24 @@ function isCurrentLoadGamesRequest(requestId) {
   return requestId === loadGamesRequestSeq;
 }
 
+function clearScoreboardForDate(date = '') {
+  const nextDate = String(date || dateInput?.value || formatDate(new Date()));
+  latestRenderedGames = [];
+  latestRenderedGamesDate = nextDate;
+  if (gamesEl) {
+    gamesEl.dataset.scoreboardDate = nextDate;
+    gamesEl.replaceChildren();
+  }
+  updateDashboardSummary([]);
+  syncAllCardGamePickStates([]);
+  syncTossupScoreboardStates([]);
+}
+
 function renderGamesLoadingState(date) {
   if (!gamesEl) return;
+  const selected = String(date || dateInput?.value || formatDate(new Date()));
+  latestRenderedGamesDate = selected;
+  gamesEl.dataset.scoreboardDate = selected;
   gamesEl.replaceChildren();
   const loading = document.createElement('div');
   loading.className = 'games-loading';
@@ -38578,7 +38730,7 @@ function renderGamesLoadingState(date) {
   loading.setAttribute('aria-live', 'polite');
   const label = document.createElement('div');
   label.className = 'games-loading-label';
-  label.textContent = `Loading ${formatLongDateLabel(date)} MLB Games`;
+  label.textContent = `Loading ${formatLongDateLabel(selected)} MLB Games`;
   const bar = document.createElement('div');
   bar.className = 'games-loading-bar';
   const fill = document.createElement('span');
@@ -38588,6 +38740,9 @@ function renderGamesLoadingState(date) {
 }
 
 async function renderGamesEmptyState(message) {
+  const selected = String(dateInput?.value || formatDate(new Date()));
+  latestRenderedGamesDate = selected;
+  if (gamesEl) gamesEl.dataset.scoreboardDate = selected;
   gamesEl.replaceChildren();
   const empty = document.createElement('div');
   empty.className = 'empty';
@@ -38622,21 +38777,22 @@ async function loadGames(options = {}) {
   loadGamesStartedAt = Date.now();
   lineupHotRecognitionCache.clear();
   const selectedDate = dateInput.value || formatDate(new Date());
+  const currentDomDate = String(gamesEl?.dataset?.scoreboardDate || latestRenderedGamesDate || '');
+  const dateChanged = Boolean(currentDomDate && currentDomDate !== selectedDate);
+  if (dateChanged) {
+    clearScoreboardForDate(selectedDate);
+    initialGamesLoadingShown = false;
+  }
   const shouldShowLoadingState = options.showLoading === true
-    || (options.showLoading !== false && !hadRenderedGames && !initialGamesLoadingShown);
+    || (options.showLoading !== false && (!hadRenderedGames || dateChanged) && !initialGamesLoadingShown);
   if (shouldShowLoadingState) {
     initialGamesLoadingShown = true;
     renderGamesLoadingState(selectedDate);
   }
-  const cached = getCachedGames();
-  const archived = getArchivedGames(selectedDate);
+  const cached = filterGameCardsForDate(getCachedGames(), selectedDate);
+  const archived = filterGameCardsForDate(getArchivedGames(selectedDate), selectedDate);
   const mergedCached = dedupeGameCards(mergeCardsWithArchive(cached, archived), selectedDate);
-  const cachedByTeams = new Map();
-  for (const game of mergedCached) {
-    cachedByTeams.set(gameMatchKey(game.away, game.home), game);
-    const identityKey = gameCardInstanceKey(game, selectedDate);
-    if (identityKey) cachedByTeams.set(identityKey, game);
-  }
+  const cachedByTeams = mapCachedCardsForDate(mergedCached, selectedDate);
   if (mergedCached.length && shouldShowLoadingState) {
     // Fast paint may use real cached/archive cards, but never a schedule-only placeholder shell.
     finalizeRenderedGames(mergedCached.map(normalizeCompletedCard), []).catch(() => {});
@@ -38696,16 +38852,13 @@ async function loadGames(options = {}) {
       return;
     }
 
-    const latestDate = latestArchiveDate(selectedDate);
-    if (latestDate) {
-      const latestArchive = getArchivedGames(latestDate).map(normalizeCompletedCard);
-      if (latestArchive.length) {
-        if (!isCurrentLoadGamesRequest(requestId)) return;
-        await finalizeRenderedGames(latestArchive, []);
-        return;
-      }
-    }
 
+    const retainedCards = mergeRetainedScoreboardCardsForDate([], selectedDate);
+    if (retainedCards.length) {
+      if (!isCurrentLoadGamesRequest(requestId)) return;
+      await finalizeRenderedGames(retainedCards, homeRuns || []);
+      return;
+    }
     if (!isCurrentLoadGamesRequest(requestId)) return;
     await renderGamesEmptyState(`No games for ${selectedDate}.`);
   } catch (error) {
@@ -38734,16 +38887,13 @@ async function loadGames(options = {}) {
       return;
     }
 
-    const latestDate = latestArchiveDate(selectedDate);
-    if (latestDate) {
-      const latestArchive = getArchivedGames(latestDate).map(normalizeCompletedCard);
-      if (latestArchive.length) {
-        if (!isCurrentLoadGamesRequest(requestId)) return;
-        await finalizeRenderedGames(latestArchive, []);
-        return;
-      }
-    }
 
+    const retainedCards = mergeRetainedScoreboardCardsForDate([], selectedDate);
+    if (retainedCards.length) {
+      if (!isCurrentLoadGamesRequest(requestId)) return;
+      await finalizeRenderedGames(retainedCards, []);
+      return;
+    }
     if (!isCurrentLoadGamesRequest(requestId)) return;
     await renderGamesEmptyState(`Could not load MLB data (${error.message}).`);
   } finally {
@@ -38786,7 +38936,10 @@ function refreshForSelectedDate(options = {}) {
   resetHomeRunAudioAlerts();
   latestRenderedHomeRuns = [];
   renderHomeRunFeed([]);
-  loadGames({ invalidate: true });
+  clearScoreboardForDate(dateInput.value);
+  initialGamesLoadingShown = false;
+  renderGamesLoadingState(dateInput.value);
+  loadGames({ invalidate: true, showLoading: true });
   return true;
 }
 
