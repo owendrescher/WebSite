@@ -23582,8 +23582,9 @@ async function getLineupHrScoreSnapshot(game, awayLineup = [], homeLineup = []) 
 }
 
 function lineupHrScoreClass(score = 0, isTopPick = false, isSecondPick = false) {
+  const numeric = Number(score) || 0;
   return [
-    score >= 95 ? 'is-fire' : score >= 80 ? 'is-hot' : '',
+    numeric >= 80 ? 'is-fire' : numeric >= 70 ? 'is-hot' : '',
     isTopPick ? 'is-top-pick' : '',
     !isTopPick && isSecondPick ? 'is-second-pick' : '',
   ].filter(Boolean).join(' ');
@@ -33688,14 +33689,35 @@ function activePitcherNavEntriesForGame(game) {
     .filter(Boolean);
 }
 
+function playerStatVisibleLineupNavEntries(side = '') {
+  if (!lineupOverlayEl || lineupOverlayEl.hidden || !side) return [];
+  const listEl = lineupOverlayEl.querySelector(`.${side}-lineup-list`);
+  if (!listEl) return [];
+  const seen = new Set();
+  return Array.from(listEl.querySelectorAll(':scope > li[data-player-id]'))
+    .map((row) => ({
+      id: Number(row.dataset.playerId),
+      side,
+      nameKey: normalizeNameKey(row.dataset.playerName || row.querySelector('.lineup-name-text')?.textContent || ''),
+    }))
+    .filter((entry) => {
+      if (!Number.isFinite(Number(entry.id)) || Number(entry.id) <= 0 || seen.has(String(entry.id))) return false;
+      seen.add(String(entry.id));
+      return true;
+    });
+}
+
 function playerStatNavEntriesForProfile(profile, game, pitcherProfile) {
   if (!game || !profile) return [];
   if (pitcherProfile) return activePitcherNavEntriesForGame(game);
   const side = playerStatSideForProfile(profile, game);
   if (!side) return [];
-  return playerStatLineupForSide(game, side)
+  const lineupEntries = playerStatLineupForSide(game, side)
     .map((entry) => ({ id: Number(entry.id), side, nameKey: normalizeNameKey(entry?.fullName || entry?.name || '') }))
     .filter((entry) => Number.isFinite(Number(entry.id)) && Number(entry.id) > 0);
+  if (lineupEntries.length >= 2) return lineupEntries;
+  const visibleEntries = playerStatVisibleLineupNavEntries(side);
+  return visibleEntries.length >= 2 ? visibleEntries : lineupEntries;
 }
 
 function playerStatFallbackLogoForGame(game, playerId) {
@@ -34339,6 +34361,16 @@ function pitcherSosCurrentComparisonLine(current = null, avgRank = null, metricL
   return `Today vs ${team}: #${rank}/${total} in team ${metricLabel}${valueText}${compareText}`;
 }
 
+function pitcherSosSplitStatLine(split = {}) {
+  const stat = split?.stat || {};
+  const outs = inningsToOuts(stat.inningsPitched);
+  const innings = cleanSummary(stat.inningsPitched) || (outs > 0 ? outsToInnings(outs) : '0.0');
+  const strikeOuts = statNumber(stat.strikeOuts ?? stat.so ?? stat.strikeouts);
+  const earnedRuns = statNumber(stat.earnedRuns);
+  const homeRuns = statNumber(stat.homeRuns ?? stat.hrAllowed ?? stat.hr);
+  return `${innings} IP, ${strikeOuts} K, ${earnedRuns} ER, ${homeRuns} HRs`;
+}
+
 function pitcherOpponentStrengthSummaryCell(summary = null, metricLabel = 'AVG') {
   if (!summary || !Number.isFinite(Number(summary.count)) || Number(summary.count) <= 0) return '--';
   const avgRank = Number(summary.averageRank);
@@ -34348,9 +34380,10 @@ function pitcherOpponentStrengthSummaryCell(summary = null, metricLabel = 'AVG')
   if (currentLine) titleParts.push(currentLine);
   if (Number.isFinite(avgRank)) titleParts.push(`Average ${metricLabel} opponent rank faced: ${avgRank.toFixed(1)}`);
   if (summary.items?.length) {
-    titleParts.push(`${metricLabel} opponent ranks faced:`);
-    summary.items.slice(0, 14).forEach((item) => {
-      titleParts.push(`${item.date ? `${item.date} ` : ''}${item.team || '--'} ${item.rank ? `#${Math.round(item.rank)}` : '--'}${item.value ? ` (${item.value})` : ''}`);
+    titleParts.push(`${metricLabel} opponent ranks faced with pitcher statline:`);
+    summary.items.forEach((item) => {
+      const statLine = item.statLine ? ` | ${item.statLine}` : '';
+      titleParts.push(`${item.date ? `${item.date} ` : ''}${item.team || '--'} ${item.rank ? `#${Math.round(item.rank)}` : '--'}${item.value ? ` (${item.value})` : ''}${statLine}`);
     });
   }
   if (!equivalent?.team || !Number.isFinite(Number(equivalent.rank))) {
@@ -34397,7 +34430,7 @@ function summarizePitcherOpponentStrengthItems(items = [], metric = 'avgRank', c
           rankTotal: currentOpponent.rankTotal || 30,
         }
       : null,
-    items: usable.map((item) => ({ date: item.date, team: item.opponent, rank: Number(item[metric]), value: metric === 'slgRank' ? item.slg : item.avg })),
+    items: usable.map((item) => ({ date: item.date, team: item.opponent, rank: Number(item[metric]), value: metric === 'slgRank' ? item.slg : item.avg, statLine: item.statLine || '' })),
   };
 }
 
@@ -34430,6 +34463,7 @@ async function pitcherOpponentStrengthSummaryForSplits(splits = [], game = null,
       slg: hitting.slg || '---',
       avgRank: Number(hitting.avgRank) || 0,
       slgRank: Number(hitting.slgRank) || 0,
+      statLine: pitcherSosSplitStatLine(split),
     };
   }).filter((item) => item.opponent);
   return {
@@ -40124,7 +40158,169 @@ window.addEventListener('scroll', scheduleDatePickerPosition, true);
 window.addEventListener('pagehide', () => persistManualStateSnapshot());
 window.addEventListener('beforeunload', () => persistManualStateSnapshot());
 
+
+function initThemedTooltips() {
+  if (window.__mlbThemedTooltipsInitialized) return;
+  window.__mlbThemedTooltipsInitialized = true;
+  const tooltipEl = document.createElement('div');
+  tooltipEl.className = 'theme-tooltip';
+  tooltipEl.setAttribute('role', 'tooltip');
+  tooltipEl.hidden = true;
+  document.body.appendChild(tooltipEl);
+  let activeEl = null;
+  let lastPointerEvent = null;
+
+  const tooltipTeamTokens = (() => {
+    const tokens = new Set([
+      ...Object.keys(TEAM_COLORS || {}),
+      ...Object.keys(TEAM_ABBREV_CANONICAL || {}),
+      ...Object.values(TEAM_ABBREV_DISPLAY || {}),
+    ].filter(Boolean).map((value) => String(value).toUpperCase()));
+    return Array.from(tokens).sort((a, b) => b.length - a.length);
+  })();
+  const tooltipTeamRegex = tooltipTeamTokens.length
+    ? new RegExp(`\\b(${tooltipTeamTokens.map((token) => token.replace(/[.*+?^${}()|[\\]\\]/g, '\\$&')).join('|')})\\b`, 'g')
+    : null;
+  const tooltipNumberRegex = /(^|[^\w#])([+-]?(?:(?:\d{1,3}(?:,\d{3})+|\d+)(?:\.\d+)?|\.\d+)(?:-\d+(?:\.\d+)?)?(?:\s?(?:%|mph|MPH))?)/g;
+
+  function stripNativeTooltip(el) {
+    if (!el || el === tooltipEl || tooltipEl.contains(el) || !el.getAttribute) return;
+    const title = String(el.getAttribute('title') || '').trim();
+    if (title) {
+      el.dataset.themeTooltipTitle = title;
+      const ariaWasSynced = el.dataset.themeTooltipAriaSynced === '1';
+      if (!el.hasAttribute('aria-label') || ariaWasSynced) {
+        el.setAttribute('aria-label', title);
+        el.dataset.themeTooltipAriaSynced = '1';
+      }
+    }
+    if (el.hasAttribute('title')) el.removeAttribute('title');
+  }
+
+  function stripNativeTooltipsIn(root) {
+    if (!root || root === tooltipEl || tooltipEl.contains(root)) return;
+    if (root.matches?.('[title]')) stripNativeTooltip(root);
+    if (root.querySelectorAll) root.querySelectorAll('[title]').forEach(stripNativeTooltip);
+  }
+
+  function formatTooltipHtml(rawTitle = '') {
+    let html = escapeHtml(String(rawTitle || '').trim()).replace(/\r\n?/g, '\n');
+    html = html.replace(tooltipNumberRegex, (match, prefix, value) => `${prefix}<strong class="theme-tooltip-number">${value}</strong>`);
+    if (tooltipTeamRegex) {
+      html = html.replace(tooltipTeamRegex, (token) => {
+        const color = getTeamColor(token) || '#66d9ff';
+        return `<span class="theme-tooltip-team" style="--tooltip-team-color:${escapeHtml(color)}">${token}</span>`;
+      });
+    }
+    return html.replace(/\n/g, '<br>');
+  }
+
+  const titleTarget = (target) => {
+    if (!target?.closest) return null;
+    const themed = target.closest('[data-theme-tooltip-title]');
+    if (themed) return themed;
+    const native = target.closest('[title]');
+    if (native) {
+      stripNativeTooltip(native);
+      return native.dataset.themeTooltipTitle ? native : null;
+    }
+    return null;
+  };
+
+  const readableTitle = (el) => String(el?.dataset?.themeTooltipTitle || '').trim();
+
+  function positionTooltip(event = lastPointerEvent) {
+    if (!activeEl || tooltipEl.hidden) return;
+    const margin = 10;
+    const rect = activeEl.getBoundingClientRect();
+    const tipRect = tooltipEl.getBoundingClientRect();
+    let x = event && Number.isFinite(event.clientX) ? event.clientX + 14 : rect.left + Math.min(rect.width / 2, 160);
+    let y = event && Number.isFinite(event.clientY) ? event.clientY + 16 : rect.bottom + 8;
+    if (x + tipRect.width > window.innerWidth - margin) x = window.innerWidth - tipRect.width - margin;
+    if (x < margin) x = margin;
+    if (y + tipRect.height > window.innerHeight - margin) {
+      const anchorY = event && Number.isFinite(event.clientY) ? event.clientY : rect.top;
+      y = anchorY - tipRect.height - 12;
+    }
+    if (y < margin) y = margin;
+    tooltipEl.style.transform = `translate3d(${Math.round(x)}px, ${Math.round(y)}px, 0)`;
+  }
+
+  function showTooltip(el, event = null) {
+    if (!el || el === tooltipEl || tooltipEl.contains(el)) return;
+    stripNativeTooltip(el);
+    const title = readableTitle(el);
+    if (!title) return;
+    if (activeEl && activeEl !== el) hideTooltip(activeEl);
+    activeEl = el;
+    lastPointerEvent = event;
+    tooltipEl.innerHTML = formatTooltipHtml(title);
+    tooltipEl.hidden = false;
+    tooltipEl.classList.add('is-visible');
+    positionTooltip(event);
+  }
+
+  function hideTooltip(el = activeEl) {
+    if (!activeEl) return;
+    const target = activeEl;
+    if (el && target !== el) return;
+    activeEl = null;
+    lastPointerEvent = null;
+    tooltipEl.classList.remove('is-visible');
+    tooltipEl.hidden = true;
+    tooltipEl.innerHTML = '';
+  }
+
+  stripNativeTooltipsIn(document.body);
+  const nativeTooltipObserver = new MutationObserver((mutations) => {
+    for (const mutation of mutations) {
+      if (mutation.type === 'attributes' && mutation.attributeName === 'title') {
+        stripNativeTooltip(mutation.target);
+        continue;
+      }
+      if (mutation.type === 'childList') {
+        mutation.addedNodes.forEach((node) => {
+          if (node.nodeType === Node.ELEMENT_NODE) stripNativeTooltipsIn(node);
+        });
+      }
+    }
+  });
+  nativeTooltipObserver.observe(document.body, { subtree: true, childList: true, attributes: true, attributeFilter: ['title'] });
+
+  document.addEventListener('pointerover', (event) => {
+    const target = titleTarget(event.target);
+    if (!target) return;
+    showTooltip(target, event);
+  }, true);
+
+  document.addEventListener('pointermove', (event) => {
+    if (!activeEl) return;
+    lastPointerEvent = event;
+    positionTooltip(event);
+  }, true);
+
+  document.addEventListener('pointerout', (event) => {
+    if (!activeEl) return;
+    if (event.relatedTarget && activeEl.contains(event.relatedTarget)) return;
+    hideTooltip(activeEl);
+  }, true);
+
+  document.addEventListener('focusin', (event) => {
+    const target = titleTarget(event.target);
+    if (!target) return;
+    showTooltip(target, null);
+  }, true);
+
+  document.addEventListener('focusout', () => hideTooltip(activeEl), true);
+  document.addEventListener('keydown', (event) => {
+    if (event.key === 'Escape') hideTooltip(activeEl);
+  }, true);
+  window.addEventListener('scroll', () => positionTooltip(lastPointerEvent), true);
+  window.addEventListener('resize', () => positionTooltip(lastPointerEvent));
+}
+
 compactExistingStorage();
+initThemedTooltips();
 initThemePicker();
 initOverlayPageControl();
 initOverlayKeyboardShortcuts();

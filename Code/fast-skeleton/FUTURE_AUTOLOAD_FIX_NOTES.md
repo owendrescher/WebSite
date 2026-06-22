@@ -21,3 +21,19 @@ Validation:
 Deploy notes:
 - Replace your existing `app.js` and `live-dashboard-prototype.js` with these files.
 - The zip also includes the current HTML/CSS files you uploaded, renamed to their deploy filenames.
+
+Additional v4 tooltip/theme readability fix:
+- Added a global custom tooltip layer for elements that use `title`, so SoS/pitcher/stat hover text now inherits the active site theme instead of browser-native tooltip styling.
+- Custom tooltips use `--accent`, `--panel-bg`, `--panel-head`, `--line`, and `--text`, so they adjust with existing themes.
+- Changed 80+ HR score fire text away from transparent gradient clipping to a bright readable fire glow on dark backgrounds.
+- Split View button remains hidden while split functionality stays in code.
+
+Validation:
+- node --check app.js
+- node --check live-dashboard-prototype.js
+
+
+V5 tooltip polish:
+- Native browser `title` bubbles are now stripped into `data-theme-tooltip-title`, including dynamically rendered content, so only the custom themed tooltip appears.
+- The custom tooltip now renders MLB team abbreviations using the matching team color.
+- Tooltip numbers/stat values are bolded while the surrounding label text remains non-bold.
