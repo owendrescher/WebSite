@@ -3884,3 +3884,249 @@ body.dashboard-page .player-outcome-hr-batter-label {
 body.dashboard-page .player-outcome-distance {
   font: 950 14.5px var(--font-ui) !important;
 }
+
+
+/* v10: TBD probable fallback display and unclipped opponent/start cards */
+.lineup-team-pitcher-main.has-tbd-fallback {
+  align-items: start;
+}
+
+.lineup-team-pitcher-name.has-tbd-fallback {
+  display: grid;
+  justify-items: start;
+  align-items: start;
+  gap: 2px;
+  line-height: 1.05;
+}
+
+.lineup-team-pitcher-tbd {
+  color: color-mix(in srgb, var(--text) 92%, white 8%);
+  font-weight: 950;
+  letter-spacing: 0.04em;
+}
+
+.lineup-team-pitcher-fallback {
+  display: inline-flex;
+  align-items: center;
+  gap: 4px;
+  color: var(--muted);
+  font-size: 0.66rem;
+  font-weight: 850;
+  white-space: nowrap;
+}
+
+.lineup-team-pitcher-fallback .player-card-link {
+  color: inherit;
+  font: inherit;
+}
+
+body.dashboard-page .player-stat-body,
+body.dashboard-page .player-stat-right,
+body.dashboard-page #playerStatMatchup {
+  padding-bottom: 18px;
+}
+
+body.dashboard-page #playerStatMatchup {
+  overflow: visible;
+}
+
+body.dashboard-page .pitcher-opponent-history-grid {
+  align-items: stretch;
+  padding-bottom: 8px;
+}
+
+body.dashboard-page .pitcher-opponent-history-col {
+  min-height: 128px;
+  overflow: visible;
+}
+
+
+/* v11: player-card history crop guard */
+body.dashboard-page .player-stat-right {
+  padding-bottom: 54px !important;
+  contain: layout !important;
+  box-sizing: border-box;
+}
+
+body.dashboard-page #playerStatMatchup {
+  overflow: visible !important;
+  padding-bottom: 42px !important;
+}
+
+body.dashboard-page .pitcher-opponent-history-grid {
+  padding-bottom: 18px !important;
+  margin-bottom: 10px !important;
+}
+
+body.dashboard-page .pitcher-opponent-history-col {
+  min-height: 132px !important;
+  padding-bottom: 12px !important;
+}
+
+
+/* v12: keep unconfirmed fallback starters visibly TBD and one-line */
+body.dashboard-page .lineup-team-pitcher-main.has-tbd-fallback,
+body.dashboard-page .pitching-card-main.has-tbd-fallback {
+  align-items: baseline !important;
+  gap: 6px !important;
+  flex-wrap: nowrap !important;
+  min-width: 0 !important;
+}
+
+body.dashboard-page .lineup-team-pitcher-name.has-tbd-fallback,
+body.dashboard-page .pitching-card-name.has-tbd-fallback {
+  display: inline-flex !important;
+  flex-flow: row nowrap !important;
+  align-items: baseline !important;
+  justify-items: initial !important;
+  gap: 5px !important;
+  min-width: 0 !important;
+  max-width: min(46%, 250px) !important;
+  overflow: hidden !important;
+  white-space: nowrap !important;
+  line-height: 1 !important;
+}
+
+body.dashboard-page .lineup-team-pitcher-tbd {
+  flex: 0 0 auto !important;
+  color: color-mix(in srgb, var(--text) 94%, white 6%) !important;
+  font-size: 0.82em !important;
+  font-weight: 950 !important;
+  letter-spacing: 0.045em !important;
+}
+
+body.dashboard-page .lineup-team-pitcher-fallback {
+  display: inline-flex !important;
+  align-items: baseline !important;
+  gap: 3px !important;
+  min-width: 0 !important;
+  max-width: 100% !important;
+  overflow: hidden !important;
+  text-overflow: ellipsis !important;
+  white-space: nowrap !important;
+  color: var(--muted) !important;
+  font-size: 0.58rem !important;
+  font-weight: 850 !important;
+}
+
+body.dashboard-page .lineup-team-pitcher-fallback .player-card-link,
+body.dashboard-page .lineup-team-pitcher-name.has-tbd-fallback .player-card-link,
+body.dashboard-page .pitching-card-name.has-tbd-fallback .player-card-link {
+  min-width: 0 !important;
+  max-width: 100% !important;
+  overflow: hidden !important;
+  text-overflow: ellipsis !important;
+  white-space: nowrap !important;
+}
+
+body.dashboard-page .lineup-team-pitcher-main.has-tbd-fallback .pitcher-priority-meta,
+body.dashboard-page .pitching-card-main.has-tbd-fallback .pitcher-priority-meta {
+  flex: 1 1 auto !important;
+  min-width: 0 !important;
+  font-size: 0.66rem !important;
+  overflow: hidden !important;
+  text-overflow: ellipsis !important;
+  white-space: nowrap !important;
+}
+
+/* v12: make the player card body own vertical scroll so start/opponent cards are not clipped */
+body.dashboard-page .player-stat-modal {
+  overflow: hidden !important;
+}
+
+body.dashboard-page .player-stat-body {
+  overflow-y: auto !important;
+  overflow-x: hidden !important;
+  padding-bottom: 96px !important;
+  align-items: start !important;
+}
+
+body.dashboard-page .player-stat-right {
+  overflow: visible !important;
+  contain: none !important;
+  padding-bottom: 96px !important;
+}
+
+body.dashboard-page #playerStatMatchup {
+  overflow: visible !important;
+  padding-bottom: 88px !important;
+  margin-bottom: 22px !important;
+}
+
+body.dashboard-page .pitcher-opponent-history-grid {
+  overflow: visible !important;
+  padding-bottom: 42px !important;
+  margin-bottom: 24px !important;
+}
+
+body.dashboard-page .pitcher-opponent-history-col {
+  min-height: 142px !important;
+  padding-bottom: 18px !important;
+  overflow: visible !important;
+}
+
+
+/* v13: keep TBD primary in Pitching tab and make full staff/starters readable */
+body.dashboard-page .pitching-card-main.has-tbd-fallback {
+  display: grid !important;
+  grid-template-columns: minmax(150px, auto) minmax(0, 1fr) !important;
+  align-items: baseline !important;
+  column-gap: 8px !important;
+  row-gap: 2px !important;
+}
+body.dashboard-page .lineup-team-pitcher-main.has-tbd-fallback {
+  display: flex !important;
+  align-items: baseline !important;
+  gap: 6px !important;
+}
+body.dashboard-page .pitching-card-name.has-tbd-fallback,
+body.dashboard-page .lineup-team-pitcher-name.has-tbd-fallback {
+  display: inline-flex !important;
+  align-items: baseline !important;
+  gap: 5px !important;
+  min-width: 0 !important;
+  max-width: none !important;
+  overflow: hidden !important;
+  white-space: nowrap !important;
+  line-height: 1.05 !important;
+}
+body.dashboard-page .pitching-card-name.has-tbd-fallback {
+  font-size: clamp(0.64rem, 0.72vw, 0.82rem) !important;
+}
+body.dashboard-page .lineup-team-pitcher-tbd {
+  flex: 0 0 auto !important;
+  color: color-mix(in srgb, var(--text) 96%, white 4%) !important;
+  font-weight: 950 !important;
+  letter-spacing: 0.045em !important;
+}
+body.dashboard-page .lineup-team-pitcher-fallback {
+  display: inline-flex !important;
+  align-items: baseline !important;
+  gap: 3px !important;
+  min-width: 0 !important;
+  overflow: hidden !important;
+  text-overflow: ellipsis !important;
+  white-space: nowrap !important;
+  color: var(--muted) !important;
+  font-size: 0.62em !important;
+  font-weight: 850 !important;
+}
+body.dashboard-page .lineup-team-pitcher-fallback .player-card-link,
+body.dashboard-page .pitching-card-name.has-tbd-fallback .player-card-link,
+body.dashboard-page .lineup-team-pitcher-name.has-tbd-fallback .player-card-link {
+  min-width: 0 !important;
+  max-width: 100% !important;
+  overflow: hidden !important;
+  text-overflow: ellipsis !important;
+  white-space: nowrap !important;
+}
+body.dashboard-page .pitching-card-main.has-tbd-fallback .pitcher-priority-meta {
+  min-width: 0 !important;
+  overflow: hidden !important;
+  text-overflow: ellipsis !important;
+  white-space: nowrap !important;
+  font-size: clamp(0.58rem, 0.64vw, 0.72rem) !important;
+}
+body.dashboard-page .rotation-list {
+  min-height: 0 !important;
+}
