@@ -313,6 +313,7 @@ const mlbStartingLineupPageCache = new Map();
 const mlbPreviousLineupCache = new Map();
 const rotowireBattingOrderCache = new Map();
 const rotowireLineupPrewarmKeys = new Set();
+const pregamePreviewHydrationAttempts = new Map();
 const playerNameSearchCache = new Map();
 const matchupHistoryCache = new Map();
 const teamMatchupHistoryCache = new Map();
@@ -5009,7 +5010,7 @@ async function hydrateRelieverUsagePredictionFlags(listEl, teamCode, relievers =
     if (ar !== br) return ar - br;
     return String(a?.name || '').localeCompare(String(b?.name || ''));
   });
-  renderPitcherListItems(listEl, enriched, color, 'Awaiting relief data');
+  renderPitcherListItems(listEl, enriched, color, 'Awaiting relief data', officialDateForGame(game) || dateInput?.value || formatDate(new Date()));
 }
 
 async function potentialStarterFromRotationMemory(teamAbbrev, game, targetDate, excludedPitcherIds = new Set()) {
@@ -5034,10 +5035,24 @@ async function potentialStarterFromRotationMemory(teamAbbrev, game, targetDate, 
       .slice(0, 8);
   const eligibleCandidates = candidates.filter((profile) => !excludedIds.has(String(Number(profile?.id))));
   if (!eligibleCandidates.length) return null;
-  const memories = await mapWithConcurrency(eligibleCandidates, 5, async (profile) => {
+  const quickStarterProfile = eligibleCandidates[0] || null;
+  const memories = await withTimeoutValue(mapWithConcurrency(eligibleCandidates, 5, async (profile) => {
     const memory = await pitcherLastPitchedMemory(profile.id, date, game);
     return { profile, memory };
-  });
+  }), 4500, null).catch(() => null);
+  if (!Array.isArray(memories)) {
+    if (!quickStarterProfile) return null;
+    return normalizeProbablePitcher({
+      ...quickStarterProfile,
+      id: quickStarterProfile.id,
+      fullName: quickStarterProfile.fullName || quickStarterProfile.name || 'Pitcher',
+      name: lastName(quickStarterProfile.fullName || quickStarterProfile.name || 'Pitcher'),
+      source: 'rotation-roster-fallback',
+      sourceDate: date,
+      isPotentialStarter: true,
+      teamAbbrev: canonicalTeamAbbrev(teamAbbrev),
+    }, teamAbbrev);
+  }
   const ranked = memories
     .filter((entry) => Number.isFinite(Number(entry?.memory?.daysSinceStarterWorkload ?? entry?.memory?.daysSinceLastPitched)))
     .sort((a, b) => {
@@ -5091,6 +5106,29 @@ async function fillPotentialStartersForTbdProbables(probables, game, awayAbbrev,
     return potential || sanitized?.[side] || null;
   }));
   return sanitizeProbablePitchers({ away: replacements[0], home: replacements[1] }, game, awayAbbrev, homeAbbrev);
+}
+
+async function fetchScheduleProbablesForGameFast(game, awayAbbrev, homeAbbrev, targetDate, timeoutMs = 2200) {
+  const promise = Promise.all([
+    fetchOfficialProbablePitcherForSide(awayAbbrev, homeAbbrev, targetDate, game?.gamePk),
+    fetchOfficialProbablePitcherForSide(homeAbbrev, awayAbbrev, targetDate, game?.gamePk),
+  ]).catch(() => [null, null]);
+  const [away, home] = await withTimeoutValue(promise, timeoutMs, [null, null]).catch(() => [null, null]);
+  return { away, home };
+}
+
+async function resolvePregameProbablePitchersFastFallback(baseProbables, game, awayAbbrev, homeAbbrev, targetDate, options = {}) {
+  const date = targetDate || officialDateForGame(game);
+  const scheduleTimeoutMs = Number.isFinite(Number(options.scheduleTimeoutMs)) ? Number(options.scheduleTimeoutMs) : 2200;
+  const rotationTimeoutMs = Number.isFinite(Number(options.rotationTimeoutMs)) ? Number(options.rotationTimeoutMs) : 9000;
+  let resolved = sanitizeProbablePitchers(baseProbables || {}, game, awayAbbrev, homeAbbrev);
+  const scheduleProbables = await fetchScheduleProbablesForGameFast(game, awayAbbrev, homeAbbrev, date, scheduleTimeoutMs).catch(() => ({}));
+  resolved = mergeProbablePitchers(resolved, scheduleProbables || {}, game, awayAbbrev, homeAbbrev);
+  if (probablePitchersNeedFallback(resolved) && rotationTimeoutMs > 0) {
+    const rotationPromise = fillPotentialStartersForTbdProbables(resolved, game, awayAbbrev, homeAbbrev, date);
+    resolved = await withTimeoutValue(rotationPromise, rotationTimeoutMs, resolved).catch(() => resolved);
+  }
+  return sanitizeProbablePitchers(resolved, game, awayAbbrev, homeAbbrev);
 }
 
 function formatTeamRecord(teamNode) {
@@ -11462,6 +11500,8 @@ function scoreboardPitcherForSide(game, side) {
   if (!pitcherSide) return null;
   const pitcher = (shouldPreferProbablePitcher(game)
     ? previewProbableForSide(game, pitcherSide)
+      || game?.pitching?.[pitcherSide]?.current
+      || game?.probablePitchers?.[pitcherSide]
       || null
     : game?.pitching?.[pitcherSide]?.current
       || game?.probablePitchers?.[pitcherSide]
@@ -12393,6 +12433,29 @@ function scoreCardData(card) {
   return lineup + pitching + ticker + Math.min(lookup, 25) + scoreKnown + playKnown;
 }
 
+function probablePitcherEntryIsUsableForMerge(pitcher = null) {
+  return Boolean(pitcher && !probablePitcherIsTbd(pitcher) && cleanSummary(pitcher.fullName || pitcher.name || ''));
+}
+
+function mergeCardProbablePitchers(primary = {}, secondary = {}, tertiary = {}) {
+  const game = { ...(tertiary || {}), ...(secondary || {}), ...(primary || {}) };
+  const chooseSide = (side) => {
+    const candidates = [
+      primary?.probablePitchers?.[side],
+      secondary?.probablePitchers?.[side],
+      tertiary?.probablePitchers?.[side],
+      primary?.pitching?.[side]?.current,
+      secondary?.pitching?.[side]?.current,
+      tertiary?.pitching?.[side]?.current,
+    ];
+    return candidates.find(probablePitcherEntryIsUsableForMerge) || candidates.find(Boolean) || null;
+  };
+  return sanitizeProbablePitchers({
+    away: chooseSide('away'),
+    home: chooseSide('home'),
+  }, game, game?.away, game?.home);
+}
+
 function chooseBestGameCard(existing, incoming) {
   if (!existing) return incoming;
   if (!incoming) return existing;
@@ -12418,6 +12481,7 @@ function chooseBestGameCard(existing, incoming) {
       lastPlay: !isPlaceholderPlay(finalized.lastPlay) ? finalized.lastPlay : (existing.lastPlay || incoming.lastPlay || 'Final'),
       awayStreak: finalized.awayStreak || incoming.awayStreak || existing.awayStreak || '',
       homeStreak: finalized.homeStreak || incoming.homeStreak || existing.homeStreak || '',
+      probablePitchers: mergeCardProbablePitchers(finalized, incoming, existing),
       playerLookup: { ...(existing.playerLookup || {}), ...(incoming.playerLookup || {}) },
     };
   }
@@ -12449,6 +12513,7 @@ function chooseBestGameCard(existing, incoming) {
     activeBatterId: pregame ? null : (liveState?.activeBatterId ?? preferred.activeBatterId ?? fallback.activeBatterId ?? null),
     battingSide: pregame ? 'away' : (liveState?.battingSide || preferred.battingSide || fallback.battingSide || 'away'),
     currentEvent: pregame ? '' : (liveState?.currentEvent || preferred.currentEvent || fallback.currentEvent || ''),
+    probablePitchers: mergeCardProbablePitchers(preferred, fallback, incoming),
     lineup: chooseBetterLineup(preferred.lineup, fallback.lineup),
     pitching: chooseBetterPitching(preferred.pitching, fallback.pitching),
     ticker: pregame ? [] : chooseBetterTicker(preferred.ticker, fallback.ticker),
@@ -16251,7 +16316,10 @@ async function fetchGamesAndHomeRuns(date, options = {}) {
         away: game?.teams?.away?.probablePitcher || null,
         home: game?.teams?.home?.probablePitcher || null,
       }, game, awayAbbrev, homeAbbrev);
-      probablePitchers = await withTimeoutValue(resolveOfficialPregameProbablePitchers(probablePitchers, game, awayAbbrev, homeAbbrev, gameOfficialDate), 700, probablePitchers);
+      probablePitchers = await resolvePregameProbablePitchersFastFallback(probablePitchers, game, awayAbbrev, homeAbbrev, gameOfficialDate, {
+        scheduleTimeoutMs: 1200,
+        rotationTimeoutMs: 0,
+      }).catch(() => probablePitchers);
       return emitGameCard({
         gamePk,
         gameDate: game?.gameDate || '',
@@ -16847,6 +16915,18 @@ function cachedHomeRunsForSelectedDate() {
   } catch {
     return [];
   }
+}
+
+function clearHomeRunFeedForDate(date = '') {
+  const nextDate = String(date || dateInput?.value || formatDate(new Date()));
+  latestRenderedHomeRuns = [];
+  latestHomeRunFeedDate = nextDate;
+  latestHomeRunFeedSignature = homeRunFeedDataSignature([]);
+  if (hrListEl) {
+    hrListEl.querySelectorAll('.hr-item[data-hr-key]').forEach((item) => item.remove());
+    hrListEl.querySelectorAll('.empty').forEach((item) => item.remove());
+  }
+  renderHomeRunFeed([], { forceClear: true });
 }
 
 function homeRunEventKey(hr = {}) {
@@ -17570,10 +17650,16 @@ function refreshScoreboardPageOnReturn() {
   const selectedDate = String(dateInput?.value || formatDate(new Date()));
   renderHomeRunFeed(latestRenderedHomeRuns.length ? latestRenderedHomeRuns : cachedHomeRunsForSelectedDate());
   const dateMismatch = Boolean(latestRenderedGamesDate && latestRenderedGamesDate !== selectedDate);
-  if (!latestRenderedGames.length || dateMismatch || scoreboardHydrationIncomplete()) {
+  if (dateMismatch) {
+    loadGames({ invalidate: true, showLoading: true });
+    return;
+  }
+  if (!latestRenderedGames.length) {
     loadGames({ showLoading: false, passive: true });
     return;
   }
+  // Returning from another page should not repaint already-hydrated pitcher rows.
+  // Let the normal timer handle stale/live hydration; keep the visible board stable here.
   refreshHomeRunFeedOnlyQuiet({ minGapMs: 30000 });
 }
 
@@ -25905,10 +25991,11 @@ function formatEasternClock(timestampMs) {
   }).format(new Date(Number(timestampMs)));
 }
 
-function renderPitcherListItems(listEl, pitchers, color, emptyText) {
+function renderPitcherListItems(listEl, pitchers, color, emptyText, contextDate = '') {
   if (!listEl) return;
   const items = Array.isArray(pitchers) ? pitchers : [];
   const fingerprint = JSON.stringify([
+    String(contextDate || dateInput?.value || formatDate(new Date())),
     color || '',
     emptyText || '',
     items.map((arm) => [
@@ -25965,14 +26052,16 @@ function pitcherHistoryMetaLine(entry) {
   ].filter(Boolean).join(' | ');
 }
 
-function renderPitchingHistory(containerEl, history = [], color = '') {
+function renderPitchingHistory(containerEl, history = [], color = '', contextDate = '') {
   if (!containerEl) return;
   const items = Array.isArray(history) ? history.filter(Boolean) : [];
   if (!items.length) {
     containerEl.replaceChildren();
     return;
   }
-  const fingerprint = JSON.stringify(items.map((entry) => [
+  const fingerprint = JSON.stringify([
+    String(contextDate || dateInput?.value || formatDate(new Date())),
+    items.map((entry) => [
     entry?.id || '',
     entry?.name || entry?.fullName || '',
     entry?.inningsText || entry?.innings || '',
@@ -25982,7 +26071,7 @@ function renderPitchingHistory(containerEl, history = [], color = '') {
     entry?.bb ?? entry?.walks ?? '',
     entry?.k ?? entry?.strikeOuts ?? '',
     entry?.hits ?? '',
-  ]));
+  ])]);
   const existing = containerEl.querySelector('.pitching-history-menu');
   if (containerEl.dataset.renderFingerprint === fingerprint && existing) return;
   const wasOpen = Boolean(existing?.open);
@@ -26111,6 +26200,7 @@ function renderPitchingSide(sectionEl, teamCode, color, staff, game = null) {
   }
 
   const current = staff?.current;
+  const renderDate = officialDateForGame(game) || dateInput?.value || formatDate(new Date());
   if (currentEl) {
     currentEl.dataset.playerId = String(current?.id ?? '');
     const side = sameTeamAbbrev(teamCode, game?.away) ? 'away' : sameTeamAbbrev(teamCode, game?.home) ? 'home' : '';
@@ -26119,22 +26209,36 @@ function renderPitchingSide(sectionEl, teamCode, color, staff, game = null) {
     const currentLabel = current?.isPotentialStarter ? 'Potential Starter:' : current?.role === 'starter' ? 'Starter' : 'Current Pitcher';
     const currentPitchCount = pitchCount(current);
     const currentPitchChip = currentPitchCount > 0 ? `<span class="current-pitch-count" title="Live pitch count">${currentPitchCount}P</span>` : '';
-    currentEl.innerHTML = current ? `
+    const html = current ? `
       <div class="pitching-card-label">${currentLabel}${currentPitchChip}</div>
       <div class="pitching-card-main pitcher-priority-line">
-        <div class="pitching-card-name pitcher-priority-name" title="${escapeHtml(current.fullName || current.name || 'Pitcher')}" style="color:${color}">${lineupPitcherNameHtml(current)}</div>
+        <div class="pitching-card-name pitcher-priority-name" title="${escapeHtml(current.fullName || current.name || 'Pitcher')}" style="color:${color}">${lineupPitcherNameHtml(current, game)}</div>
         <div class="pitching-card-meta pitcher-priority-meta">${pitcherSeasonMetaLine(current)}</div>
       </div>
       ${starterExited ? `<div class="pitcher-substitution-note">Starter ${escapeHtml(lastName(starter.fullName || starter.name || 'Pitcher'))} has exited</div>` : ''}
     ` : '<div class="pitching-card-empty">Awaiting pitcher</div>';
+    const fingerprint = JSON.stringify([
+      renderDate,
+      current?.id || '',
+      current?.fullName || current?.name || '',
+      currentLabel,
+      currentPitchCount || '',
+      pitcherSeasonMetaLine(current),
+      starterExited ? starter?.id || starter?.fullName || starter?.name || '' : '',
+      color || ''
+    ]);
+    if (currentEl.dataset.renderFingerprint !== fingerprint) {
+      currentEl.dataset.renderFingerprint = fingerprint;
+      currentEl.innerHTML = html;
+    }
   }
 
-  renderPitchingHistory(historyEl, staff?.history || [], color);
+  renderPitchingHistory(historyEl, staff?.history || [], color, renderDate);
   const groups = splitPitchingDisplayGroups(staff);
-  renderPitcherListItems(rotationEl, groups.starters, color, 'No additional starters loaded');
+  renderPitcherListItems(rotationEl, groups.starters, color, 'No additional starters loaded', renderDate);
   renderBullpenSummary(bullpenSummaryEl, groups.relievers, color);
   hydrateBullpenSummaryRanks(bullpenSummaryEl, teamCode, groups.relievers, color, game);
-  renderPitcherListItems(bullpenEl, groups.relievers, color, 'Awaiting relief data');
+  renderPitcherListItems(bullpenEl, groups.relievers, color, 'Awaiting relief data', renderDate);
   const side = sameTeamAbbrev(teamCode, game?.away) ? 'away' : sameTeamAbbrev(teamCode, game?.home) ? 'home' : '';
   hydrateRelieverUsagePredictionFlags(bullpenEl, teamCode, groups.relievers, color, game, side);
 }
@@ -26320,6 +26424,7 @@ function renderLineupPitcherSummary(containerEl, color, staff) {
     : '';
   const label = displayPitcher?.isPotentialStarter ? 'Potential Starter:' : showingCurrent ? 'Current Pitcher' : 'Starter';
   const contextGame = activeLineupGame || null;
+  const renderDate = officialDateForGame(contextGame) || dateInput?.value || formatDate(new Date());
   const html = `
     <span class="lineup-team-pitcher-label">${label}</span>
     <span class="lineup-team-pitcher-main pitcher-priority-line">
@@ -26328,7 +26433,7 @@ function renderLineupPitcherSummary(containerEl, color, staff) {
     </span>
     ${detailLine}
   `;
-  const fingerprint = JSON.stringify([displayPitcher?.id || '', displayPitcher?.fullName || displayPitcher?.name || '', label, pitcherSeasonMetaLine(displayPitcher), detailLine, color || '']);
+  const fingerprint = JSON.stringify([renderDate, displayPitcher?.id || '', displayPitcher?.fullName || displayPitcher?.name || '', label, pitcherSeasonMetaLine(displayPitcher), detailLine, color || '']);
   if (containerEl.dataset.renderFingerprint === fingerprint) return;
   containerEl.dataset.renderFingerprint = fingerprint;
   containerEl.innerHTML = html;
@@ -32120,6 +32225,20 @@ function scoreboardCardRenderFingerprint(game = {}) {
   const probable = game?.probablePitchers || {};
   const lineup = game?.lineup || {};
   const pitching = game?.pitching || {};
+  const pitcherFingerprint = (pitcher) => {
+    if (!pitcher) return '';
+    return [
+      pitcher?.id || '',
+      pitcher?.fullName || pitcher?.name || '',
+      pitcherThrowHandValue(pitcher),
+      pitcherEra(pitcher),
+      pitcherWhip(pitcher),
+      pitcherHomeRunsAllowed(pitcher),
+      pitcher?.rankRole || pitcher?.usageRole || pitcher?.role || '',
+    ].join(':');
+  };
+  const awayDisplayPitcher = scoreboardPitcherForSide(game, 'away');
+  const homeDisplayPitcher = scoreboardPitcherForSide(game, 'home');
   return JSON.stringify([
     game?.gamePk || '',
     game?.officialScheduleSeed ? 1 : 0,
@@ -32140,6 +32259,10 @@ function scoreboardCardRenderFingerprint(game = {}) {
     lineupCount(lineup), lineupCount(lineup?.away), lineupCount(lineup?.home),
     pitching?.away?.current?.id || pitching?.away?.starter?.id || '',
     pitching?.home?.current?.id || pitching?.home?.starter?.id || '',
+    pitcherFingerprint(awayDisplayPitcher),
+    pitcherFingerprint(homeDisplayPitcher),
+    lineupIdSignature(game?.previewLineupFallback?.away || []),
+    lineupIdSignature(game?.previewLineupFallback?.home || []),
     listify(game?.ticker).slice(0, 3).map((item) => item?.text || item).join('|'),
   ]);
 }
@@ -32288,6 +32411,194 @@ function removeStaleCards(games) {
   syncFocusedGameLayout();
 }
 
+
+function cloneGameCardForBackgroundHydration(game = {}) {
+  try {
+    if (typeof structuredClone === 'function') return structuredClone(game);
+  } catch {}
+  try {
+    return JSON.parse(JSON.stringify(game || {}));
+  } catch {
+    return { ...(game || {}) };
+  }
+}
+
+function pregamePreviewHydrationKey(game = null, date = '') {
+  const selectedDate = String(date || officialDateForGame(game) || dateInput?.value || formatDate(new Date()));
+  return `${selectedDate}:${gameCardInstanceKey(game, selectedDate) || String(game?.gamePk || '')}`;
+}
+
+function pregamePreviewHydrationRecentlyAttempted(key = '', ttlMs = 45_000) {
+  if (!key) return true;
+  const last = Number(pregamePreviewHydrationAttempts.get(key) || 0);
+  return last > 0 && Date.now() - last < ttlMs;
+}
+
+function markPregamePreviewHydrationAttempt(key = '') {
+  if (!key) return;
+  pregamePreviewHydrationAttempts.set(key, Date.now());
+  if (pregamePreviewHydrationAttempts.size > 300) {
+    const cutoff = Date.now() - 30 * 60_000;
+    for (const [storedKey, ts] of pregamePreviewHydrationAttempts.entries()) {
+      if (Number(ts) < cutoff) pregamePreviewHydrationAttempts.delete(storedKey);
+    }
+  }
+}
+
+function previewLineupReadyForAutoHydration(game, side) {
+  if (!game || !side) return false;
+  if (hasTrustedLineupOrder(game, side)) return true;
+  return isUsableLineupCandidate(game?.previewLineupFallback?.[side] || []);
+}
+
+function previewPitcherNeedsAutoHydration(game, side) {
+  if (!game || !side) return true;
+  const probable = previewProbableForSide(game, side) || game?.probablePitchers?.[side] || null;
+  if (!probable || probablePitcherIsTbd(probable)) return true;
+  const profile = probable?.id ? game?.playerLookup?.[String(probable.id)] || null : null;
+  return pitcherEntryNeedsProfile(profile || probable);
+}
+
+function pregamePreviewCardNeedsAutoHydration(game = null) {
+  if (!game || !game?.gamePk || !shouldPreferProbablePitcher(game)) return false;
+  if (probablePitchersNeedFallback(game?.probablePitchers || {})) return true;
+  if (previewPitcherNeedsAutoHydration(game, 'away') || previewPitcherNeedsAutoHydration(game, 'home')) return true;
+  if (!previewLineupReadyForAutoHydration(game, 'away') || !previewLineupReadyForAutoHydration(game, 'home')) return true;
+  return false;
+}
+
+async function hydratePregamePreviewGameCard(baseGame = null, selectedDate = '') {
+  if (!baseGame || !shouldPreferProbablePitcher(baseGame)) return null;
+  const currentGame = latestRenderedGames.find((game) => String(game?.gamePk || '') === String(baseGame?.gamePk || '')) || baseGame;
+  const game = normalizeCompletedCard(cloneGameCardForBackgroundHydration(currentGame));
+  const targetDate = String(selectedDate || officialDateForGame(game) || dateInput?.value || formatDate(new Date()));
+  const awayAbbrev = canonicalTeamAbbrev(game?.away || game?.teams?.away?.team?.abbreviation || 'AWAY');
+  const homeAbbrev = canonicalTeamAbbrev(game?.home || game?.teams?.home?.team?.abbreviation || 'HOME');
+  game.away = awayAbbrev;
+  game.home = homeAbbrev;
+  game.awayColor = game.awayColor || getTeamColor(awayAbbrev);
+  game.homeColor = game.homeColor || getTeamColor(homeAbbrev);
+  game.awayLogo = game.awayLogo || getLogoPath(awayAbbrev);
+  game.homeLogo = game.homeLogo || getLogoPath(homeAbbrev);
+  game.playerLookup = { ...(game.playerLookup || {}) };
+  game.pitching = game.pitching || emptyPitchingData();
+
+  let probablePitchers = sanitizeProbablePitchers({
+    away: game?.probablePitchers?.away || game?.teams?.away?.probablePitcher || null,
+    home: game?.probablePitchers?.home || game?.teams?.home?.probablePitcher || null,
+  }, game, awayAbbrev, homeAbbrev);
+  probablePitchers = await resolvePregameProbablePitchersFastFallback(
+    probablePitchers,
+    game,
+    awayAbbrev,
+    homeAbbrev,
+    targetDate,
+    { scheduleTimeoutMs: 2500, rotationTimeoutMs: 10000 },
+  ).catch(() => probablePitchers);
+  game.probablePitchers = probablePitchers;
+
+  const starterTargets = ['away', 'home']
+    .map((side) => previewProbableForSide(game, side) || game?.probablePitchers?.[side] || null)
+    .filter(Boolean);
+  await ensurePitcherProfiles(game, starterTargets).catch(() => {});
+  await ensurePitcherRankRoles(game, starterTargets).catch(() => {});
+
+  for (const side of ['away', 'home']) {
+    const probable = previewProbableForSide(game, side) || game?.probablePitchers?.[side] || null;
+    const profile = probable?.id ? game?.playerLookup?.[String(probable.id)] || null : null;
+    const starter = normalizePitcherDisplayEntry(profile ? { ...probable, ...profile, role: 'starter' } : probable, 'starter');
+    if (starter) {
+      game.pitching[side] = {
+        ...(game.pitching?.[side] || { current: null, bullpen: [] }),
+        current: starter,
+      };
+    }
+  }
+
+  if (game.pitching?.away?.current || game.pitching?.home?.current || previewProbableForSide(game, 'away') || previewProbableForSide(game, 'home')) {
+    try {
+      applyPregamePreviewHydratedCard(normalizeCompletedCard({
+        ...game,
+        previewAutoHydrated: true,
+        hydrationPending: false,
+        officialScheduleSeed: false,
+      }), targetDate);
+    } catch {}
+  }
+
+  await withTimeoutValue(ensurePreviewBullpen(game), 6500, null).catch(() => null);
+
+  const awayOpponentPitcher = previewProbableForSide(game, 'home') || game?.probablePitchers?.home || resolveLineupPitcherForDisplay(game, 'home')?.starter || null;
+  const homeOpponentPitcher = previewProbableForSide(game, 'away') || game?.probablePitchers?.away || resolveLineupPitcherForDisplay(game, 'away')?.starter || null;
+  const awayOpponentHand = pitcherThrowHandValue(awayOpponentPitcher);
+  const homeOpponentHand = pitcherThrowHandValue(homeOpponentPitcher);
+
+  const loadPreviewLineup = async (side, opponentHand) => {
+    if (hasTrustedLineupOrder(game, side)) return normalizeLineupCollectionForSide(game, side, side === 'away' ? game?.lineup?.away : game?.lineup?.home);
+    let lineup = game?.previewLineupFallback?.[side] || [];
+    if (!isUsableLineupCandidate(lineup)) {
+      lineup = await fetchMlbStartingLineupFallback(game, side, { opponentHand }).catch(() => []);
+    }
+    if (!lineup.length) lineup = fallbackTeamLineupFromLookup(game, side);
+    lineup = normalizeLineupCollectionForSide(game, side, lineup);
+    lineup = await completeLineupToNine(game, side, lineup).catch(() => lineup);
+    lineup = await enrichFallbackLineupDisplay(game, side, lineup).catch(() => lineup);
+    return normalizeLineupCollectionForSide(game, side, lineup);
+  };
+
+  const [awayLineup, homeLineup] = await Promise.all([
+    loadPreviewLineup('away', awayOpponentHand),
+    loadPreviewLineup('home', homeOpponentHand),
+  ]);
+  game.previewLineupFallback = { ...(game.previewLineupFallback || {}) };
+  if (isUsableLineupCandidate(awayLineup)) game.previewLineupFallback.away = awayLineup;
+  if (isUsableLineupCandidate(homeLineup)) game.previewLineupFallback.home = homeLineup;
+
+  game.previewAutoHydrated = true;
+  game.hydrationPending = false;
+  game.officialScheduleSeed = false;
+  return normalizeCompletedCard(game);
+}
+
+function applyPregamePreviewHydratedCard(hydratedGame = null, selectedDate = '') {
+  if (!hydratedGame?.gamePk) return;
+  const targetDate = String(selectedDate || officialDateForGame(hydratedGame) || dateInput?.value || formatDate(new Date()));
+  if (String(dateInput?.value || '') && String(dateInput.value) !== targetDate) return;
+  const current = latestRenderedGames.find((game) => String(game?.gamePk || '') === String(hydratedGame.gamePk)) || null;
+  const merged = normalizeCompletedCard(chooseBestGameCard(current, hydratedGame));
+  upsertProgressiveGameCard(merged, targetDate);
+  saveCachedGames(latestRenderedGames);
+  saveArchivedGames(targetDate, latestRenderedGames);
+  prewarmLineupHrScoresForGames([merged]);
+  if (activeLineupGame && String(activeLineupGame?.gamePk || '') === String(merged.gamePk)) {
+    activeLineupGame = chooseBestGameCard(activeLineupGame, merged);
+    syncLineupOverlay(activeLineupGame, { forceOpen: true }).catch(() => {});
+  }
+  if (currentOverlayPage === 'predictions') refreshPredictionsView({ showLoading: false });
+  if (currentOverlayPage === 'hot') refreshHotView({ showLoading: false });
+}
+
+function hydratePregamePreviewCardsInBackground(cards = [], selectedDate = '') {
+  const targetDate = String(selectedDate || dateInput?.value || formatDate(new Date()));
+  const targets = dedupeGameCards(listify(cards), targetDate)
+    .filter(pregamePreviewCardNeedsAutoHydration)
+    .filter((game) => {
+      const key = pregamePreviewHydrationKey(game, targetDate);
+      if (!key || pregamePreviewHydrationRecentlyAttempted(key)) return false;
+      markPregamePreviewHydrationAttempt(key);
+      return true;
+    });
+  if (!targets.length) return;
+  window.setTimeout(() => {
+    mapWithConcurrency(targets, 3, async (game) => {
+      if (String(dateInput?.value || '') !== targetDate) return;
+      const hydrated = await hydratePregamePreviewGameCard(game, targetDate).catch(() => null);
+      if (!hydrated || String(dateInput?.value || '') !== targetDate) return;
+      applyPregamePreviewHydratedCard(hydrated, targetDate);
+    }).catch(() => {});
+  }, 150);
+}
+
 function prewarmLineupHrScoresForGames(games = []) {
   const selectedGames = listify(games).filter((game) => game?.gamePk);
   if (!selectedGames.length) return;
@@ -32340,6 +32651,7 @@ async function finalizeRenderedGames(cards, homeRuns = [], options = {}) {
     renderActiveLineupOverlay(dedupedCards).catch(() => {});
   }
   prewarmLineupHrScoresForGames(dedupedCards);
+  hydratePregamePreviewCardsInBackground(dedupedCards, selectedDate);
   renderBetList(dedupedCards);
   renderPendingGamePicks(dedupedCards);
   syncAllCardGamePickStates(dedupedCards);
@@ -32390,6 +32702,55 @@ function clearScoreboardForDate(date = '') {
   updateDashboardSummary([]);
   syncAllCardGamePickStates([]);
   syncTossupScoreboardStates([]);
+}
+
+function resetDateScopedScoreboardState(date = '', options = {}) {
+  const nextDate = String(date || dateInput?.value || formatDate(new Date()));
+  latestRenderedGames = [];
+  latestRenderedGamesDate = nextDate;
+  latestRenderedHomeRuns = [];
+  latestHomeRunFeedDate = nextDate;
+  latestHomeRunFeedSignature = '';
+  homeRunOnlyRefreshInFlight = false;
+  lastHomeRunOnlyRefreshAt = 0;
+  priorityHydrationGamePk = '';
+  focusedGamePk = null;
+  focusedGameHydrationSeq += 1;
+  nonLiveLineupRenderSignature = '';
+  activeLineupGame = null;
+  openLineupGamePkMemory = '';
+  playerStatHeatMapDate = '';
+  pitcherHeatMapSelectedBatterId = '';
+  playerHeatMapRows = [];
+  playerHeatMapSource = '';
+  if (playerTrackerListEl) playerTrackerListEl.dataset.renderFingerprint = '';
+  for (const root of [gamesEl, lineupOverlayEl, playerStatOverlayEl]) {
+    root?.querySelectorAll?.([
+      '[data-render-fingerprint]',
+      '[data-scoreboard-render-fingerprint]',
+      '[data-fire-hydrated-date]',
+      '[data-cold-hydrated-date]',
+      '[data-last-hr-hydrated-date]',
+      '[data-hand-hydrated-date]'
+    ].join(',')).forEach((el) => {
+      delete el.dataset.renderFingerprint;
+      delete el.dataset.scoreboardRenderFingerprint;
+      delete el.dataset.fireHydratedDate;
+      delete el.dataset.fireHydratedId;
+      delete el.dataset.coldHydratedDate;
+      delete el.dataset.coldHydratedId;
+      delete el.dataset.lastHrHydratedDate;
+      delete el.dataset.lastHrHydratedId;
+      delete el.dataset.handHydratedDate;
+      delete el.dataset.handHydratedId;
+    });
+  }
+  if (options.closeLineup !== false && typeof closeLineupOverlay === 'function') {
+    closeLineupOverlay();
+  }
+  if (options.clearHrFeed && typeof clearHomeRunFeedForDate === 'function') {
+    clearHomeRunFeedForDate(nextDate);
+  }
 }
 
 function renderGamesLoadingState(date) {
@@ -32453,7 +32814,9 @@ async function loadGames(options = {}) {
   const selectedDate = dateInput.value || formatDate(new Date());
   const currentDomDate = String(gamesEl?.dataset?.scoreboardDate || latestRenderedGamesDate || '');
   const dateChanged = Boolean(currentDomDate && currentDomDate !== selectedDate);
+  const effectivePassive = options.passive === true && !dateChanged;
   if (dateChanged) {
+    resetDateScopedScoreboardState(selectedDate, { clearHrFeed: true, closeLineup: true });
     clearScoreboardForDate(selectedDate);
     initialGamesLoadingShown = false;
   }
@@ -32469,7 +32832,7 @@ async function loadGames(options = {}) {
   const cachedByTeams = mapCachedCardsForDate(mergedCached, selectedDate);
   if (mergedCached.length && shouldShowLoadingState) {
     // Fast paint may use real cached/archive cards, but never a schedule-only placeholder shell.
-    finalizeRenderedGames(mergedCached.map(normalizeCompletedCard), [], { passive: options.passive === true }).catch(() => {});
+    finalizeRenderedGames(mergedCached.map(normalizeCompletedCard), [], { passive: effectivePassive }).catch(() => {});
   }
   try {
     const progressiveCards = new Map();
@@ -32514,7 +32877,7 @@ async function loadGames(options = {}) {
       saveCachedGames(cards);
       saveArchivedGames(selectedDate, cards);
       if (!isCurrentLoadGamesRequest(requestId)) return;
-      await finalizeRenderedGames(cards, homeRuns, { passive: options.passive === true });
+      await finalizeRenderedGames(cards, homeRuns, { passive: effectivePassive });
       return;
     }
 
@@ -32522,7 +32885,7 @@ async function loadGames(options = {}) {
       const archivedCards = dedupeGameCards(archived.map(normalizeCompletedCard), selectedDate);
       saveCachedGames(archivedCards);
       if (!isCurrentLoadGamesRequest(requestId)) return;
-      await finalizeRenderedGames(archivedCards, [], { passive: options.passive === true });
+      await finalizeRenderedGames(archivedCards, [], { passive: effectivePassive });
       return;
     }
 
@@ -32530,11 +32893,11 @@ async function loadGames(options = {}) {
     const retainedCards = mergeRetainedScoreboardCardsForDate([], selectedDate);
     if (retainedCards.length) {
       if (!isCurrentLoadGamesRequest(requestId)) return;
-      await finalizeRenderedGames(retainedCards, homeRuns || [], { passive: options.passive === true });
+      await finalizeRenderedGames(retainedCards, homeRuns || [], { passive: effectivePassive });
       return;
     }
     if (!isCurrentLoadGamesRequest(requestId)) return;
-    if (!(options.passive && hadRenderedGames)) await renderGamesEmptyState(`No games for ${selectedDate}.`);
+    if (!(effectivePassive && hadRenderedGames)) await renderGamesEmptyState(`No games for ${selectedDate}.`);
   } catch (error) {
     const fallbackCards = await fetchMlbFallbackCards(selectedDate, cachedByTeams);
     if (!isCurrentLoadGamesRequest(requestId)) return;
@@ -32543,21 +32906,21 @@ async function loadGames(options = {}) {
       saveCachedGames(normalizedFallback);
       saveArchivedGames(selectedDate, normalizedFallback);
       if (!isCurrentLoadGamesRequest(requestId)) return;
-      await finalizeRenderedGames(normalizedFallback, [], { passive: options.passive === true });
+      await finalizeRenderedGames(normalizedFallback, [], { passive: effectivePassive });
       return;
     }
 
     if (mergedCached.length) {
       const normalizedCached = dedupeGameCards(mergedCached.map(normalizeCompletedCard), selectedDate);
       if (!isCurrentLoadGamesRequest(requestId)) return;
-      await finalizeRenderedGames(normalizedCached, [], { passive: options.passive === true });
+      await finalizeRenderedGames(normalizedCached, [], { passive: effectivePassive });
       return;
     }
 
     if (archived.length) {
       const normalizedArchived = dedupeGameCards(archived.map(normalizeCompletedCard), selectedDate);
       if (!isCurrentLoadGamesRequest(requestId)) return;
-      await finalizeRenderedGames(normalizedArchived, [], { passive: options.passive === true });
+      await finalizeRenderedGames(normalizedArchived, [], { passive: effectivePassive });
       return;
     }
 
@@ -32565,11 +32928,11 @@ async function loadGames(options = {}) {
     const retainedCards = mergeRetainedScoreboardCardsForDate([], selectedDate);
     if (retainedCards.length) {
       if (!isCurrentLoadGamesRequest(requestId)) return;
-      await finalizeRenderedGames(retainedCards, [], { passive: options.passive === true });
+      await finalizeRenderedGames(retainedCards, [], { passive: effectivePassive });
       return;
     }
     if (!isCurrentLoadGamesRequest(requestId)) return;
-    if (!(options.passive && hadRenderedGames)) await renderGamesEmptyState(`Could not load MLB data (${error.message}).`);
+    if (!(effectivePassive && hadRenderedGames)) await renderGamesEmptyState(`Could not load MLB data (${error.message}).`);
   } finally {
     loadGamesInFlight = false;
     loadGamesStartedAt = 0;
@@ -32602,13 +32965,11 @@ function refreshForSelectedDate(options = {}) {
     localStorage.setItem('dashboard-date:v1', dateInput.value);
   } catch {}
   if (playerTrackerListEl) playerTrackerListEl.dataset.renderFingerprint = '';
-  closeLineupOverlay();
+  resetDateScopedScoreboardState(dateInput.value, { clearHrFeed: true, closeLineup: true });
   clearDraftBetSlip();
   closeGamePickDialog();
   renderBetList();
   renderGoalTracker(true);
-  latestRenderedHomeRuns = [];
-  renderHomeRunFeed([], { forceClear: true });
   clearScoreboardForDate(dateInput.value);
   initialGamesLoadingShown = false;
   renderGamesLoadingState(dateInput.value);

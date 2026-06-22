@@ -25,3 +25,14 @@ Additional pitcher retention fix:
 Validation:
 - node --check app.js
 - node --check live-dashboard-prototype.js
+
+Additional day-switch and pitcher SoS hover fix:
+- Date changes now call a dedicated `clearHomeRunFeedForDate()` helper before scoreboard hydration, so the visible HR list, retained HR array, and HR signature are cleared for the newly selected date.
+- Same-date scoreboard/menu/tab returns still retain HRs and avoid the old wipe/reload behavior.
+- Pitcher `Opp AVG SoS` and `Opp SLG SoS` hover text now starts with the current opponent they are facing.
+- Current-opponent SoS uses team hitting ranks through the prior date, then compares that rank to the pitcher's average opponent rank faced.
+- The equivalent-team logo/rank chip remains the visible compact display.
+
+Validation:
+- node --check app.js
+- node --check live-dashboard-prototype.js
