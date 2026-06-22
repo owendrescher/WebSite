@@ -68,3 +68,15 @@ v16 scoreboard fallback priority fix:
 - High-confidence probable pages can still replace TBD/fallback if a real official probable is published.
 - Scoreboard, lineup card, and Pitching tab now use the same probable selection priority.
 - Validation: node --check app.js; node --check live-dashboard-prototype.js
+
+
+v17 starter-memory / live-lineup correction:
+- Bumped pitcher start memory storage to v3 so stale live-site v2 rest ledgers cannot keep showing yesterday's starter as 7d rested.
+- Added TTL-based refresh for recent target dates; near-live starter/rest memory now refreshes quickly instead of persisting stale pre-final gameLog reads.
+- Added team recent starter reconciliation from final schedule boxscores before picking a TBD fallback starter, so a pitcher who actually started yesterday is marked as 1d rest and not selected as the longest-rest fallback.
+- `completeLineupToNine()` now really completes short lineups from bench, player lookup, and active roster candidates instead of returning 8-man arrays unchanged.
+- Lineup rendering no longer treats any non-empty partial lineup as ready; it requires a usable 9-hitter lineup before final paint.
+
+Validation:
+- node --check app.js
+- node --check live-dashboard-prototype.js

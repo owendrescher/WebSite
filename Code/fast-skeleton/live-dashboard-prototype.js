@@ -284,7 +284,7 @@ const LOCKED_TOSSUP_SCOREBOARD_STORAGE_KEY = 'locked-tossup-scoreboards:v1';
 const MANUAL_STATE_BACKUP_KEY = 'manual-state-backup:v1';
 const MANUAL_STATE_MIRROR_KEY = 'manual-state-mirror:v1';
 const STORAGE_COMPACTED_KEY = 'storage-compacted:v2';
-const PITCHER_START_MEMORY_KEY = 'pitcher-start-memory:v2';
+const PITCHER_START_MEMORY_KEY = 'pitcher-start-memory:v3';
 const LEGACY_BET_PREFIX = 'bets:';
 const MLB_API_BASE = 'https://statsapi.mlb.com/api/v1';
 const MLB_API_BASE_LIVE = 'https://statsapi.mlb.com/api/v1.1';
@@ -419,6 +419,7 @@ const teamInjuryRosterCache = new Map();
 const teamProspectsCache = new Map();
 const pitcherUsageDateCache = new Map();
 const pitcherLastPitchedCache = new Map();
+const teamRecentStarterWorkloadCache = new Map();
 const relieverUsagePredictionCache = new Map();
 const playerHandedSplitsCache = new Map();
 const pitcherOpponentHandSplitsCache = new Map();
@@ -5345,6 +5346,51 @@ function dateDiffDays(fromDate, toDate) {
   return Math.max(0, Math.floor((to.getTime() - from.getTime()) / 86400000));
 }
 
+const PITCHER_START_MEMORY_SCHEMA_VERSION = 3;
+const PITCHER_START_MEMORY_RECENT_TTL_MS = 45 * 60 * 1000;
+const PITCHER_START_MEMORY_STABLE_TTL_MS = 7 * 24 * 60 * 60 * 1000;
+
+function absoluteDateDiffDays(dateA, dateB) {
+  const a = parseLocalDateValue(dateA);
+  const b = parseLocalDateValue(dateB);
+  return Math.abs(Math.floor((a.getTime() - b.getTime()) / 86400000));
+}
+
+function pitcherStartMemoryIsFresh(stored, targetDate) {
+  if (!stored || stored.targetDate !== targetDate) return false;
+  if (Number(stored.memorySchemaVersion) !== PITCHER_START_MEMORY_SCHEMA_VERSION) return false;
+  const fetchedAt = Number(stored.fetchedAt);
+  if (!Number.isFinite(fetchedAt) || fetchedAt <= 0) return false;
+  const today = formatDate(new Date());
+  const nearLiveWindow = absoluteDateDiffDays(targetDate, today) <= 3;
+  const ttl = nearLiveWindow ? PITCHER_START_MEMORY_RECENT_TTL_MS : PITCHER_START_MEMORY_STABLE_TTL_MS;
+  return Date.now() - fetchedAt < ttl;
+}
+
+function mergePitcherStartMemoryWithRecentStarterWorkload(memory = null, workload = null, targetDate = '') {
+  if (!workload?.date) return memory;
+  const date = calendarDateOnly(targetDate || memory?.targetDate || '');
+  const workloadDate = calendarDateOnly(workload.date);
+  if (!date || !workloadDate || workloadDate >= date) return memory;
+  const base = memory ? { ...memory } : {};
+  const currentStarterDate = calendarDateOnly(base.lastStarterWorkloadDate || '');
+  const currentLastDate = calendarDateOnly(base.lastPitchedDate || '');
+  if (!currentStarterDate || workloadDate > currentStarterDate) {
+    base.lastStarterWorkloadDate = workloadDate;
+    base.daysSinceStarterWorkload = dateDiffDays(workloadDate, date);
+  }
+  if (!currentLastDate || workloadDate > currentLastDate) {
+    base.lastPitchedDate = workloadDate;
+    base.daysSinceLastPitched = dateDiffDays(workloadDate, date);
+  }
+  base.playerId = Number(base.playerId || workload.playerId || workload.id) || base.playerId || null;
+  base.targetDate = date;
+  base.memorySchemaVersion = PITCHER_START_MEMORY_SCHEMA_VERSION;
+  base.fetchedAt = Date.now();
+  base.reconciledFromRecentSchedule = true;
+  return base;
+}
+
 async function pitcherLastPitchedMemory(playerId, targetDate, game) {
   const id = Number(playerId);
   const date = calendarDateOnly(targetDate || officialDateForGame(game));
@@ -5352,11 +5398,15 @@ async function pitcherLastPitchedMemory(playerId, targetDate, game) {
   const cacheKey = `${id}:${date}:last-pitched`;
   if (pitcherLastPitchedCache.has(cacheKey)) return pitcherLastPitchedCache.get(cacheKey);
 
+  let staleStoredPitcherMemory = null;
   const promise = (async () => {
     const storageKey = pitcherMemoryStorageKey(id, date);
     try {
       const stored = JSON.parse(localStorage.getItem(storageKey) || 'null');
-      if (stored?.targetDate === date && stored?.playerId === id) return stored;
+      if (stored?.targetDate === date && stored?.playerId === id) {
+        if (pitcherStartMemoryIsFresh(stored, date)) return stored;
+        staleStoredPitcherMemory = stored;
+      }
     } catch {}
 
     const url = new URL(`${MLB_API_BASE}/people/${id}/stats`);
@@ -5378,6 +5428,8 @@ async function pitcherLastPitchedMemory(playerId, targetDate, game) {
     const memory = {
       playerId: id,
       targetDate: date,
+      memorySchemaVersion: PITCHER_START_MEMORY_SCHEMA_VERSION,
+      fetchedAt: Date.now(),
       lastPitchedDate: lastSplit?.date || '',
       daysSinceLastPitched: lastSplit?.date ? dateDiffDays(lastSplit.date, date) : null,
       lastStarterWorkloadDate: lastStarterWorkloadSplit?.date || '',
@@ -5387,7 +5439,7 @@ async function pitcherLastPitchedMemory(playerId, targetDate, game) {
       localStorage.setItem(storageKey, JSON.stringify(memory));
     } catch {}
     return memory;
-  })().catch(() => null);
+  })().catch(() => staleStoredPitcherMemory || null);
 
   pitcherLastPitchedCache.set(cacheKey, promise);
   return promise;
@@ -5637,6 +5689,76 @@ async function hydrateRelieverUsagePredictionFlags(listEl, teamCode, relievers =
   renderPitcherListItems(listEl, enriched, color, 'Awaiting relief data', officialDateForGame(game) || dateInput?.value || formatDate(new Date()));
 }
 
+
+async function recentTeamStarterWorkloadMap(teamAbbrev, targetDate, game = null) {
+  const team = canonicalTeamAbbrev(teamAbbrev || '');
+  const date = calendarDateOnly(targetDate || officialDateForGame(game));
+  const teamId = Number(TEAM_IDS[team] || game?.[sameTeamAbbrev(game?.away, team) ? 'awayTeamId' : sameTeamAbbrev(game?.home, team) ? 'homeTeamId' : 'teamId']);
+  if (!team || !date || !Number.isFinite(teamId) || teamId <= 0) return new Map();
+  const cacheKey = `${team}:${date}:recent-starter-workload:v2`;
+  if (teamRecentStarterWorkloadCache.has(cacheKey)) return teamRecentStarterWorkloadCache.get(cacheKey);
+
+  const promise = (async () => {
+    const endDate = addDaysToDateValue(date, -1);
+    const startDate = addDaysToDateValue(date, -12);
+    if (!endDate || !startDate || endDate >= date) return new Map();
+    const url = new URL(`${MLB_API_BASE}/schedule`);
+    url.searchParams.set('sportId', '1');
+    url.searchParams.set('teamId', String(teamId));
+    url.searchParams.set('startDate', startDate);
+    url.searchParams.set('endDate', endDate);
+    url.searchParams.set('gameType', 'R');
+    url.searchParams.set('gameTypes', 'R');
+    const schedule = await getJson(url.toString());
+    const games = listify(schedule?.dates)
+      .flatMap((day) => listify(day?.games).map((scheduleGame) => ({ ...scheduleGame, officialDate: scheduleGame?.officialDate || day?.date || String(scheduleGame?.gameDate || '').slice(0, 10) })))
+      .filter((scheduleGame) => {
+        const state = [scheduleGame?.status?.detailedState, scheduleGame?.status?.abstractGameState, scheduleGame?.status?.codedGameState].join(' ');
+        return /final|completed|game over/i.test(state) || String(scheduleGame?.status?.codedGameState || '').toUpperCase() === 'F';
+      })
+      .sort((a, b) => String(b?.officialDate || b?.gameDate || '').localeCompare(String(a?.officialDate || a?.gameDate || '')))
+      .slice(0, 12);
+
+    const byId = new Map();
+    await mapWithConcurrency(games, 3, async (scheduleGame) => {
+      const gameDate = calendarDateOnly(scheduleGame?.officialDate || String(scheduleGame?.gameDate || '').slice(0, 10));
+      if (!gameDate || gameDate >= date) return;
+      const side = sameTeamAbbrev(scheduleTeamAbbrev(scheduleGame?.teams?.away?.team), team)
+        ? 'away'
+        : sameTeamAbbrev(scheduleTeamAbbrev(scheduleGame?.teams?.home?.team), team)
+          ? 'home'
+          : '';
+      if (!side) return;
+      const boxscore = await getGameBoxscore(scheduleGame.gamePk).catch(() => null);
+      const teamBox = boxscore?.teams?.[side] || {};
+      const players = teamBox.players || {};
+      const orderedPitcherIds = listify(teamBox.pitchers).map(numericPlayerId).filter((id) => Number.isFinite(id) && id > 0);
+      let starterId = orderedPitcherIds.find((id) => statNumber(players[`ID${id}`]?.stats?.pitching?.gamesStarted ?? players[`ID${id}`]?.stats?.pitching?.gameStarted ?? players[`ID${id}`]?.stats?.pitching?.starts) > 0) || orderedPitcherIds[0];
+      if (!Number.isFinite(starterId) || starterId <= 0) return;
+      const player = players[`ID${starterId}`] || {};
+      const stat = player?.stats?.pitching || {};
+      const entry = {
+        id: starterId,
+        playerId: starterId,
+        date: gameDate,
+        gamePk: scheduleGame.gamePk,
+        ip: stat?.inningsPitched || '',
+        outs: inningsToOuts(stat?.inningsPitched),
+        pitches: statNumber(stat?.numberOfPitches ?? stat?.pitchesThrown),
+        gamesStarted: statNumber(stat?.gamesStarted ?? stat?.gameStarted ?? stat?.starts) || 1,
+      };
+      const previous = byId.get(starterId);
+      if (!previous || gameDate > previous.date) byId.set(starterId, entry);
+    });
+    return byId;
+  })().catch((error) => {
+    teamRecentStarterWorkloadCache.delete(cacheKey);
+    throw error;
+  });
+  teamRecentStarterWorkloadCache.set(cacheKey, promise);
+  return promise;
+}
+
 async function potentialStarterFromRotationMemory(teamAbbrev, game, targetDate, excludedPitcherIds = new Set()) {
   const date = calendarDateOnly(targetDate || officialDateForGame(game));
   const excludedIds = new Set([...excludedPitcherIds].map((id) => String(Number(id))).filter((id) => id !== 'NaN'));
@@ -5660,10 +5782,12 @@ async function potentialStarterFromRotationMemory(teamAbbrev, game, targetDate, 
   const eligibleCandidates = candidates.filter((profile) => !excludedIds.has(String(Number(profile?.id))));
   if (!eligibleCandidates.length) return null;
   const quickStarterProfile = eligibleCandidates[0] || null;
+  const recentStarterWorkloads = await recentTeamStarterWorkloadMap(teamAbbrev, date, game).catch(() => new Map());
   const memories = await withTimeoutValue(mapWithConcurrency(eligibleCandidates, 5, async (profile) => {
     const memory = await pitcherLastPitchedMemory(profile.id, date, game);
-    return { profile, memory };
-  }), 4500, null).catch(() => null);
+    const recentWorkload = recentStarterWorkloads.get(Number(profile.id));
+    return { profile, memory: mergePitcherStartMemoryWithRecentStarterWorkload(memory, recentWorkload, date) };
+  }), 6500, null).catch(() => null);
   if (!Array.isArray(memories)) {
     if (!quickStarterProfile) return null;
     return normalizeProbablePitcher({
@@ -37819,8 +37943,8 @@ async function completeLineupToNine(game, side, lineup = []) {
   if (!game) return lineup;
   const seen = new Set();
   const completed = [];
-  const addEntry = (entry) => {
-    const normalized = normalizeLineupEntryForSide(game, side, entry, completed.length + 1);
+  const addEntry = (entry, sourceOverride = '') => {
+    const normalized = normalizeLineupEntryForSide(game, side, sourceOverride ? { ...entry, source: sourceOverride } : entry, completed.length + 1);
     const id = Number(normalized?.id);
     const trustedNameOnly = /rotowire-default/i.test(String(normalized?.source || ''));
     const nameKey = normalizeNameKey(normalized?.fullName || normalized?.name || '');
@@ -37832,8 +37956,30 @@ async function completeLineupToNine(game, side, lineup = []) {
     completed.push(normalized);
   };
 
-  normalizeLineupCollectionForSide(game, side, lineup).forEach(addEntry);
+  normalizeLineupCollectionForSide(game, side, lineup).forEach((entry) => addEntry(entry));
   if (completed.length >= 9) return renumberLineup(completed);
+
+  const benchKey = side === 'away' ? 'awayBench' : 'homeBench';
+  normalizeLineupCollectionForSide(game, side, game?.lineup?.[benchKey] || []).forEach((entry) => addEntry(entry, entry?.source || 'bench-lineup-completion'));
+  if (completed.length >= 9) return renumberLineup(completed);
+
+  const team = canonicalTeamAbbrev(side === 'away' ? game?.away : game?.home);
+  const lookupProfiles = Object.values(game?.playerLookup || {})
+    .filter((profile) => sameTeamAbbrev(profile?.teamAbbrev || profile?.currentTeam?.abbreviation || profile?.currentTeam?.teamCode, team))
+    .filter((profile) => !lineupEntryIsPitcherOnly(profile));
+  lookupProfiles
+    .sort((a, b) => fallbackLineupCandidateScore(b, b) - fallbackLineupCandidateScore(a, a) || String(a?.fullName || a?.name || '').localeCompare(String(b?.fullName || b?.name || '')))
+    .forEach((profile) => addEntry(fallbackLineupEntryFromProfile(profile, completed.length + 1), 'lookup-lineup-completion'));
+  if (completed.length >= 9) return renumberLineup(completed);
+
+  const activeRoster = await fetchTeamActiveRoster(team, game).catch(() => []);
+  const activeCandidates = listify(activeRoster)
+    .filter((player) => Number.isFinite(Number(player?.id)) && Number(player.id) > 0)
+    .filter((player) => String(player?.position || '').toUpperCase() !== 'P')
+    .map((player) => ({ ...(game?.playerLookup?.[String(player.id)] || {}), ...player, teamAbbrev: team }))
+    .sort((a, b) => fallbackLineupCandidateScore(b, b) - fallbackLineupCandidateScore(a, a) || String(a?.fullName || a?.name || '').localeCompare(String(b?.fullName || b?.name || '')));
+  activeCandidates.forEach((profile) => addEntry(fallbackLineupEntryFromProfile(profile, completed.length + 1), 'active-roster-lineup-completion'));
+
   return renumberLineup(completed);
 }
 
@@ -38373,8 +38519,8 @@ async function syncLineupOverlay(game, options = {}) {
     !homeHasConfirmedLineup ? enrichFallbackLineupDisplay(game, 'home', homeDisplayLineup) : Promise.resolve(homeDisplayLineup),
   ]);
   if (!stillRenderingLineup()) return;
-  const awayLineupReady = Array.isArray(awayDisplayLineup) && awayDisplayLineup.length > 0;
-  const homeLineupReady = Array.isArray(homeDisplayLineup) && homeDisplayLineup.length > 0;
+  const awayLineupReady = isUsableLineupCandidate(awayDisplayLineup);
+  const homeLineupReady = isUsableLineupCandidate(homeDisplayLineup);
   setLineupListLoadingFallback(awayLineupListEl, false, awayFallbackMode);
   setLineupListLoadingFallback(homeLineupListEl, false, homeFallbackMode);
   const awayRenderLineup = awayLineupReady ? awayDisplayLineup : [];
