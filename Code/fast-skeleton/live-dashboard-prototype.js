@@ -10180,13 +10180,19 @@ function pitcherArchetypeRowBadgesHtml(pitcher = null, row = null) {
 }
 
 function pitcherArchetypeShortLabel(row = {}, pitcher = null) {
-  const rawLetter = String(row.letter || '');
-  const letter = escapeHtml(rawLetter);
-  const labelText = String(row.label || '').replace(/^vs\s+/i, '');
-  const label = escapeHtml(labelText);
-  const fullTitle = `${rawLetter || ''}${labelText ? ` ${labelText}` : ''}`.trim();
-  const lowerLetter = escapeHtml(rawLetter.toLowerCase());
-  return `<span class="player-archetype-label-wrap player-archetype-label-wrap-${lowerLetter}" data-archetype-letter="${escapeHtml(String(rawLetter).toUpperCase())}"><span class="player-archetype-fixed-head"><span class="player-archetype-letter" title="${escapeHtml(fullTitle)}">${letter}</span>${pitcherArchetypeRowBadgesHtml(pitcher, row)}</span><span class="player-archetype-label-main" title="${escapeHtml(fullTitle)}">${label}</span></span>`;
+  const rawLetter = String(row?.letter || '').trim().toUpperCase();
+  const fallbackLabels = {
+    F: 'Flame Thrower',
+    K: 'Finesse Killer',
+    L: 'Mistake Leaker',
+    I: 'Arsenal Imbalance',
+    R: 'Repeat Pattern',
+  };
+  const labelText = String(row?.label || row?.name || row?.title || fallbackLabels[rawLetter] || 'Pitcher archetype')
+    .replace(/^vs\s+/i, '')
+    .trim();
+  const titleText = labelText || fallbackLabels[rawLetter] || 'Pitcher archetype';
+  return `<span class="player-archetype-name-only" title="${escapeHtml(titleText)}">${escapeHtml(titleText)}</span>`;
 }
 
 function ensurePlayerArchetypeBadgeVisibility(rootEl = null, pitcher = null) {
@@ -40968,24 +40974,33 @@ async function finalizeRenderedGames(cards, homeRuns = [], options = {}) {
   clearCompletedPendingGamePicks(dedupedCards);
   updateDashboardSummary(dedupedCards);
   gamesEl.querySelectorAll('.empty, .games-loading').forEach((el) => el.remove());
-  const needsCardPaint = dedupedCards.some((game) => {
+  for (const game of dedupedCards) {
     const card = gamesEl.querySelector(`.game-card[data-game-pk='${game.gamePk}']`);
-    if (!card) return true;
-    const existing = card._game || {};
-    return Boolean(existing.officialScheduleSeed && !game.officialScheduleSeed);
-  });
-  if (needsCardPaint) {
-    for (const game of dedupedCards) upsertCard(game);
-  } else {
-    for (const game of dedupedCards) {
-      const card = gamesEl.querySelector(`.game-card[data-game-pk='${game.gamePk}']`);
-      if (card) card._game = chooseBestGameCard(card._game || game, game);
+    const nextFingerprint = scoreboardCardRenderFingerprint(game);
+    const existing = card?._game || {};
+    const mustPaint = !card
+      || card.dataset.scoreboardRenderFingerprint !== nextFingerprint
+      || Boolean(existing.officialScheduleSeed && !game.officialScheduleSeed);
+    if (mustPaint) {
+      upsertCard(game);
+    } else if (card) {
+      card._game = chooseBestGameCard(card._game || game, game);
     }
   }
   syncGameCardDomOrder(dedupedCards);
   removeStaleCards(dedupedCards);
   scheduleVisibleTeamStreakHydration(selectedDate, hasFastScheduleShell ? 500 : 150);
-  if (!options.passive && !scoreboardOverlayInteractionActive()) {
+  const activeLineupCard = activeLineupGame
+    ? dedupedCards.find((game) => String(game?.gamePk || '') === String(activeLineupGame?.gamePk || ''))
+    : null;
+  const shouldRefreshOpenLineup = Boolean(
+    activeLineupCard
+      && lineupOverlayEl
+      && !lineupOverlayEl.hidden
+      && typeof lineupGameShouldAutoRefresh === 'function'
+      && lineupGameShouldAutoRefresh(activeLineupCard)
+  );
+  if ((!options.passive && !scoreboardOverlayInteractionActive()) || shouldRefreshOpenLineup) {
     renderActiveLineupOverlay(dedupedCards).catch(() => {});
   }
   prewarmLineupHrScoresForGames(dedupedCards);
@@ -41664,15 +41679,27 @@ function scoreboardGameLooksLiveForAutoRefresh(game) {
   return /top|bot|bottom|mid|end\s+\d/.test(text);
 }
 
+
+function liveLineupOverlayNeedsAutoRefresh() {
+  return Boolean(
+    lineupOverlayEl
+      && !lineupOverlayEl.hidden
+      && activeLineupGame
+      && typeof lineupGameShouldAutoRefresh === 'function'
+      && lineupGameShouldAutoRefresh(activeLineupGame)
+  );
+}
+
+function scoreboardHasLiveGameForAutoRefresh() {
+  return latestRenderedGames.some(scoreboardGameLooksLiveForAutoRefresh);
+}
+
 function scoreboardAutoRefreshStaleMs() {
-  if (document.hidden) return scoreboardHydrationIncomplete() ? 45000 : 120000;
-  if (loadGamesInFlight) return 60000;
-  if (scoreboardHydrationIncomplete()) return 12000;
-  const hasLiveGame = latestRenderedGames.some(scoreboardGameLooksLiveForAutoRefresh);
-  // Once the full slate has loaded, do not cycle the entire scoreboard every 10s.
-  // Only truly live games get a full refresh cadence. Pregame/final slates stay stable
-  // until manual refresh, date change, visibility/focus stale check, or a live game appears.
-  return hasLiveGame ? 30000 : 5 * 60_000;
+  if (document.hidden) return scoreboardHydrationIncomplete() ? 30000 : 120000;
+  if (loadGamesInFlight) return 10000;
+  if (scoreboardHydrationIncomplete()) return 8000;
+  const hasLiveGame = scoreboardHasLiveGameForAutoRefresh() || liveLineupOverlayNeedsAutoRefresh();
+  return hasLiveGame ? 8000 : 5 * 60_000;
 }
 
 function autoRefreshDelayMs() {
@@ -41685,26 +41712,30 @@ function scheduleAutoRefresh() {
   autoRefreshTimerId = window.setTimeout(() => {
     const selectedDate = dateInput.value || formatDate(new Date());
     const needsHydration = scoreboardHydrationIncomplete();
+    const isToday = selectedDate === formatDate(new Date());
+    const hasLiveGame = scoreboardHasLiveGameForAutoRefresh() || liveLineupOverlayNeedsAutoRefresh();
     if (loadGamesInFlight && loadGamesStartedAt && Date.now() - loadGamesStartedAt > 90000) {
       loadGamesInFlight = false;
       loadGamesQueued = false;
-      if (!scoreboardOverlayInteractionActive()) loadGames({ invalidate: true, showLoading: false });
+      loadGames({ invalidate: true, showLoading: false });
       scheduleAutoRefresh();
       return;
     }
     if (scoreboardOverlayInteractionActive()) {
-      // Keep the HR feed alive while menus/cards are open, but do not repaint the scoreboard.
       refreshHomeRunFeedOnlyQuiet({ minGapMs: 30000 });
+      const staleWhileOpen = Date.now() - (lastLoadFinishedAt || 0) >= scoreboardAutoRefreshStaleMs();
+      if (staleWhileOpen && !loadGamesInFlight && (needsHydration || (isToday && hasLiveGame))) {
+        lastPassiveRefreshAttemptAt = Date.now();
+        loadGames({ showLoading: false, passive: true });
+      }
       scheduleAutoRefresh();
       return;
     }
-    if (passiveScoreboardRefreshHeld()) {
+    if (passiveScoreboardRefreshHeld() && !needsHydration && !(isToday && hasLiveGame)) {
       scheduleAutoRefresh();
       return;
     }
     const staleMs = scoreboardAutoRefreshStaleMs();
-    const isToday = selectedDate === formatDate(new Date());
-    const hasLiveGame = latestRenderedGames.some(scoreboardGameLooksLiveForAutoRefresh);
     const isStale = Date.now() - (lastLoadFinishedAt || 0) >= staleMs;
     if (isStale && (needsHydration || (isToday && hasLiveGame))) {
       lastPassiveRefreshAttemptAt = Date.now();

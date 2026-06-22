@@ -14458,3 +14458,41 @@ body.dashboard-page .scoreboard-main > .score-state-strip .score-mini-last-play.
   animation-delay: var(--marquee-delay, 0s) !important;
 }
 
+
+/* v39: make locked tossup icon visible on scoreboard cards too.
+   The scoreboard strip clips its own play-by-play marquee, so the lock cannot live
+   above the PRE chip like it does in the lineup header. Keep the marquee clipped,
+   but let the inning chip draw the lock inside the scoreboard strip. */
+body.dashboard-page .scoreboard-main > .score-state-strip {
+  overflow: visible !important;
+  z-index: 6 !important;
+}
+
+body.dashboard-page .scoreboard-main > .score-state-strip .score-mini-context {
+  overflow: visible !important;
+}
+
+body.dashboard-page .scoreboard-main > .score-state-strip .score-mini-last-play {
+  overflow: hidden !important;
+}
+
+body.dashboard-page .scoreboard-main > .score-state-strip .score-mini-inning.is-tossup-locked {
+  position: relative !important;
+  z-index: 7 !important;
+  padding-inline: 7px !important;
+}
+
+body.dashboard-page .scoreboard-main > .score-state-strip .score-mini-inning.is-tossup-locked::before {
+  content: '🔒' !important;
+  position: absolute !important;
+  left: 50% !important;
+  top: -0.72em !important;
+  transform: translateX(-50%) !important;
+  display: block !important;
+  font-size: 0.68rem !important;
+  line-height: 1 !important;
+  opacity: 1 !important;
+  z-index: 8 !important;
+  text-shadow: 0 1px 4px rgba(0, 0, 0, 0.9) !important;
+  pointer-events: none !important;
+}
