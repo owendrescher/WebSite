@@ -205,6 +205,7 @@ let lineupStatGameWindow = 7;
 let nonLiveLineupRenderSignature = '';
 let playerStatRecentGameWindow = 5;
 const playerCalendarStatCache = new Map();
+const playerBattingSeasonBlockCache = new Map();
 const playerOutcomeViewerCache = new Map();
 let currentPlayerOutcomeFilter = 'last1';
 let selectedPlayerOutcomeKey = '';
@@ -413,6 +414,7 @@ const playerCareerStartCache = new Map();
 const betPlayerLastFiveCache = new Map();
 const pitcherFireStreakCache = new Map();
 const pitcherColdStreakCache = new Map();
+const pitcherAsyncMarkerValueCache = new Map();
 const teamPitcherRosterCache = new Map();
 const teamActiveRosterCache = new Map();
 const teamInjuryRosterCache = new Map();
@@ -6874,8 +6876,9 @@ function gameHasLiveProgress(game) {
 }
 
 function defaultPlayText(game) {
+  if (shouldPreferProbablePitcher(game)) return `Starts ${gameStartTimeText(game)}`;
   if (gameHasLiveProgress(game)) return 'Live feed updating';
-  return shouldPreferProbablePitcher(game) ? `Starts ${gameStartTimeText(game)}` : 'Awaiting first pitch';
+  return 'Awaiting first pitch';
 }
 
 async function getJson(url) {
@@ -9679,10 +9682,17 @@ async function filterBatterEventRowsToStartingPitchers(rows = [], targetDate = '
   if (!sourceRows.length) return [];
   const ids = uniquePitcherIdsFromRows(sourceRows);
   const eligibility = await startingPitcherEligibilityForIds(ids, targetDate).catch(() => new Map());
+  const eligibilityReady = eligibility instanceof Map && eligibility.size > 0;
   return sourceRows.filter((row) => {
     if (savantPitchEventRoleSaysRelief(row)) return false;
     const id = savantPitchEventPitcherId(row);
-    if (Number.isFinite(id) && id > 0) return eligibility.get(id) === true;
+    if (Number.isFinite(id) && id > 0) {
+      if (eligibility.has(id)) return eligibility.get(id) === true;
+      // Live/cold-load guard: do not throw away batter archetype history just because
+      // the season SP eligibility map has not hydrated for this id yet. Downstream
+      // archetype filters still re-check season profiles/letters before counting rows.
+      return !eligibilityReady && !savantPitchEventRoleSaysRelief(row);
+    }
     // Only keep id-less rows when the source explicitly says the pitcher was a starter.
     // Otherwise the batter-side archetype table would silently mix in relievers/closers.
     return savantPitchEventRoleSaysStarter(row);
@@ -9774,6 +9784,28 @@ function filterStarterEventRowsForPitcherArchetype(rows = [], arch = {}, seasonP
   const letter = String(arch?.letter || '').toUpperCase();
   const sourceRows = listify(rows);
   if (!letter || !sourceRows.length) return [];
+  const flameEventQualifiedIds = new Set();
+  if (letter === 'F') {
+    const grouped = new Map();
+    for (const row of sourceRows) {
+      const id = savantPitchEventPitcherId(row);
+      if (!Number.isFinite(id) || id <= 0) continue;
+      const category = savantExactPitchCategory(row) || savantPitchCategory(row) || pitchRowCategoryText(row);
+      const pitchName = csvValue(row, ['pitch_name', 'Pitch Name', 'pitch_type', 'Pitch Type']);
+      if (!isFastballVelocityFamily(category) && !isFastballVelocityFamily(pitchName)) continue;
+      const velocity = savantPitchEventReleaseSpeed(row);
+      if (!Number.isFinite(velocity)) continue;
+      const bucket = grouped.get(id) || { max: 0, total: 0, count: 0 };
+      bucket.max = Math.max(bucket.max, velocity);
+      bucket.total += velocity;
+      bucket.count += 1;
+      grouped.set(id, bucket);
+    }
+    for (const [id, bucket] of grouped.entries()) {
+      const avg = bucket.count > 0 ? bucket.total / bucket.count : null;
+      if (Number.isFinite(bucket.max) && bucket.max > 97.0 && Number.isFinite(avg) && avg >= 95.0) flameEventQualifiedIds.add(id);
+    }
+  }
   const arsenalEventQualifiedIds = new Set();
   if (letter === 'I' || letter === 'A' || letter === 'R') {
     const grouped = new Map();
@@ -9825,7 +9857,11 @@ function filterStarterEventRowsForPitcherArchetype(rows = [], arch = {}, seasonP
     const profile = Number.isFinite(id) && id > 0 ? seasonProfiles.get(id) : null;
     if (letter === 'F') {
       const flame = Number.isFinite(id) && id > 0 ? flameEligibility.get(id) : null;
-      return Boolean(flame?.isStarter && flame?.qualifies);
+      return Boolean(
+        flame?.isStarter && flame?.qualifies
+        || flameEventQualifiedIds.has(id) && (profile?.isStarter !== false)
+        || profile?.isStarter && profile.letters?.has('F') === true
+      );
     }
     if (letter === 'I' || letter === 'A') {
       return Boolean(arsenalEventQualifiedIds.has(id) || (profile?.isStarter && (profile.letters?.has('I') === true || profile.letters?.has('A') === true)));
@@ -10101,10 +10137,75 @@ function archetypeDisplaySummary(row = {}, handed = null, matchupHand = '') {
   return { h: null, ab: null, slg: null, hr: null, limited: true };
 }
 
-function pitcherArchetypeShortLabel(row = {}) {
-  const letter = escapeHtml(row.letter || '');
-  const label = escapeHtml(String(row.label || '').replace(/^vs\s+/i, ''));
-  return `<span class="player-archetype-letter">${letter}</span>${label ? ` ${label}` : ''}`;
+function pitcherArchetypeRowBadgesHtml(pitcher = null, row = null) {
+  const parts = [];
+  const rowLetter = String(row?.letter || '').toUpperCase();
+  const hand = pitcher ? handednessHtml(pitcherThrowHandValue(pitcher)) : '';
+  // Handedness is the highest-value compact marker, so render it first and outside
+  // the shrinking label text. This prevents F/Flame Thrower from visually eating L/R.
+  if (hand) parts.push(`<span class="player-archetype-hand-anchor">${hand}</span>`);
+  if (pitcher) {
+    const visibleArchetypes = listify(lineupPitcherArchetypes(pitcher))
+      .filter((arch) => arch?.letter)
+      .filter((arch) => {
+        const letter = String(arch?.letter || '').toUpperCase();
+        return letter === rowLetter || arch.isPrimary || (letter === 'K' && arch.isSecondary);
+      })
+      .sort((a, b) => {
+        const al = String(a?.letter || '').toUpperCase();
+        const bl = String(b?.letter || '').toUpperCase();
+        if (al === rowLetter && bl !== rowLetter) return -1;
+        if (bl === rowLetter && al !== rowLetter) return 1;
+        return Number(b?.confidence || b?.score || 0) - Number(a?.confidence || a?.score || 0);
+      })
+      .slice(0, 3)
+      .map((arch) => pitcherArchetypeBadgeHtml(arch, arch.isPrimary ? '' : 'is-secondary'))
+      .join('');
+    if (visibleArchetypes) parts.push(visibleArchetypes);
+    const hrRisk = pitcherHomeRunRiskMarkerHtml(pitcher);
+    if (hrRisk) parts.push(hrRisk);
+    const whipRisk = pitcherWhipRiskMarkerHtml(pitcher);
+    if (whipRisk) parts.push(whipRisk);
+  }
+  if (!parts.length && rowLetter && rowLetter !== '…' && rowLetter !== '—') {
+    parts.push(pitcherArchetypeBadgeHtml({
+      letter: rowLetter,
+      label: String(row?.label || row?.title || 'Pitcher archetype').replace(/^vs\s+/i, ''),
+      title: row?.title || row?.label || 'Pitcher archetype',
+      confidence: Number(row?.score),
+    }, 'is-row-archetype'));
+  }
+  const html = parts.filter(Boolean).join('');
+  return `<span class="player-archetype-pitcher-badges" data-required-pitcher-badges="1" aria-label="Pitcher archetype markers">${html}</span>`;
+}
+
+function pitcherArchetypeShortLabel(row = {}, pitcher = null) {
+  const rawLetter = String(row.letter || '');
+  const letter = escapeHtml(rawLetter);
+  const labelText = String(row.label || '').replace(/^vs\s+/i, '');
+  const label = escapeHtml(labelText);
+  const fullTitle = `${rawLetter || ''}${labelText ? ` ${labelText}` : ''}`.trim();
+  const lowerLetter = escapeHtml(rawLetter.toLowerCase());
+  return `<span class="player-archetype-label-wrap player-archetype-label-wrap-${lowerLetter}" data-archetype-letter="${escapeHtml(String(rawLetter).toUpperCase())}"><span class="player-archetype-fixed-head"><span class="player-archetype-letter" title="${escapeHtml(fullTitle)}">${letter}</span>${pitcherArchetypeRowBadgesHtml(pitcher, row)}</span><span class="player-archetype-label-main" title="${escapeHtml(fullTitle)}">${label}</span></span>`;
+}
+
+function ensurePlayerArchetypeBadgeVisibility(rootEl = null, pitcher = null) {
+  if (!rootEl || !pitcher) return;
+  rootEl.querySelectorAll?.('.player-archetype-label-wrap').forEach((wrap) => {
+    const letter = String(wrap.dataset.archetypeLetter || wrap.querySelector('.player-archetype-letter')?.textContent || '').trim().toUpperCase();
+    if (!letter) return;
+    const badgeEl = wrap.querySelector('.player-archetype-pitcher-badges');
+    const hasMarker = badgeEl && badgeEl.querySelector('.handed-badge, .handedness-tag, .lineup-archetype-badge, .pitcher-hr-risk, .pitcher-whip-risk, .pitcher-used-yesterday');
+    if (hasMarker) return;
+    const headEl = wrap.querySelector('.player-archetype-fixed-head') || wrap;
+    const label = String(wrap.querySelector('.player-archetype-label-main')?.textContent || letter || 'Pitcher archetype');
+    const html = pitcherArchetypeRowBadgesHtml(pitcher, { letter, label });
+    if (badgeEl) {
+      badgeEl.outerHTML = html;
+    } else {
+      headEl.insertAdjacentHTML('beforeend', html);
+    }
+  });
 }
 
 function scoreBatterVsPitcherArchetype(arch = {}, batterRows = [], pitcherRows = [], arsenalMatchup = null, pitcher = null) {
@@ -10190,13 +10291,15 @@ function scoreBatterVsPitcherArchetype(arch = {}, batterRows = [], pitcherRows =
 }
 
 const playerVsPitcherArchetypeCache = new Map();
+const playerExtraArchetypeSlotHtmlCache = new Map();
+const playerCardFastStatHydrationCache = new Map();
 
 async function getPlayerVsPitcherArchetypeMatchup(profile = null, pitcher = null, game = null) {
   const batterId = Number(profile?.id);
   const pitcherId = Number(pitcher?.id ?? pitcher?.person?.id);
   if (!Number.isFinite(batterId) || batterId <= 0 || !Number.isFinite(pitcherId) || pitcherId <= 0) return null;
   const targetDate = typeof playerStatTargetDate === 'function' ? playerStatTargetDate(game) : (dateInput.value || formatDate(new Date()));
-  const cacheKey = `${batterId}:${pitcherId}:${targetDate}:archetype-match-v2`;
+  const cacheKey = `${batterId}:${pitcherId}:${targetDate}:archetype-match-v4`;
   if (playerVsPitcherArchetypeCache.has(cacheKey)) return playerVsPitcherArchetypeCache.get(cacheKey);
   const promise = (async () => {
     const pitcherHand = pitcherThrowHandValue(pitcher);
@@ -10204,14 +10307,14 @@ async function getPlayerVsPitcherArchetypeMatchup(profile = null, pitcher = null
     const [batterRows, pitcherRows, batterEventRows] = await Promise.all([
       pitcherHand ? getVisiblePitchBreakdown(batterId, 'batter', 5200, { pThrows: pitcherHand }).catch(() => []) : getVisiblePitchBreakdown(batterId, 'batter', 4200).catch(() => []),
       getVisiblePitchBreakdown(pitcherId, 'pitcher', 4200, { stand: batterStand }).catch(() => []),
-      withTimeoutValue(getSavantPitchEventRows(batterId, 'batter'), 4200, []).catch(() => []),
+      withTimeoutValue(getSavantPitchEventRows(batterId, 'batter'), 10500, []).catch(() => []),
     ]);
     const starterOnlyEventRows = await filterBatterEventRowsToStartingPitchers(batterEventRows, targetDate).catch(() => []);
     const starterPitcherIds = uniquePitcherIdsFromRows(starterOnlyEventRows);
     const eventDerivedFlameIds = flameQualifiedPitcherIdsFromAvailableEvents(starterOnlyEventRows);
     const [starterPitcherProfiles, flamePitcherEligibility] = await Promise.all([
-      withTimeoutValue(pitcherSeasonProfilesForArchetypeIds(starterPitcherIds, targetDate), 2600, new Map()).catch(() => new Map()),
-      withTimeoutValue(flamePitcherEligibilityForArchetypeIds(starterPitcherIds, targetDate), 3600, new Map()).catch(() => new Map()),
+      withTimeoutValue(pitcherSeasonProfilesForArchetypeIds(starterPitcherIds, targetDate), 5200, new Map()).catch(() => new Map()),
+      withTimeoutValue(flamePitcherEligibilityForArchetypeIds(starterPitcherIds, targetDate), 5600, new Map()).catch(() => new Map()),
     ]);
     for (const flameId of eventDerivedFlameIds) {
       const current = flamePitcherEligibility.get(flameId) || {};
@@ -10306,7 +10409,7 @@ function archetypeStatlineHoverTitle(row = {}, pitcherName = '') {
   return lines.filter(Boolean).join('\n');
 }
 
-function playerVsPitcherArchetypeLoadingRows(pitcherForRows = {}, loading = false) {
+function playerVsPitcherArchetypeLoadingRows(pitcherForRows = {}, loading = false, noSample = false) {
   const existing = listify(lineupPitcherArchetypes(pitcherForRows))
     .filter((arch) => arch?.letter && (arch.isPrimary || arch.isSecondary || Number(arch.confidence) >= 52));
   const rows = existing.map((arch) => ({
@@ -10319,7 +10422,8 @@ function playerVsPitcherArchetypeLoadingRows(pitcherForRows = {}, loading = fals
       ab: null,
       slg: null,
       hr: null,
-      loading,
+      loading: Boolean(loading),
+      noSample: Boolean(noSample || !loading),
       limited: true,
       starterOnly: true,
       categories: archetypePitchCategories(arch, pitcherForRows.pitchMix || []),
@@ -10327,15 +10431,15 @@ function playerVsPitcherArchetypeLoadingRows(pitcherForRows = {}, loading = fals
   }));
 
   // Do not show every possible archetype as a placeholder. Only show the archetypes
-  // the opposing pitcher currently qualifies for. If the pitcher profile itself is still
-  // loading, show one diagnostic loading row instead of faking F/K/L/I/R rows.
-  if (!rows.length && loading) {
+  // the opposing pitcher currently qualifies for. If the async sample finishes with no
+  // usable rows, make that a final state instead of leaving the card stuck on loading.
+  if (!rows.length && (loading || noSample || pitcherForRows?.id || pitcherForRows?.person?.id)) {
     rows.push({
-      letter: '…',
-      label: 'Loading pitcher type',
-      title: 'Loading the opposing pitcher archetype profile.',
+      letter: loading ? '…' : '—',
+      label: loading ? 'Loading pitcher type' : 'No archetype sample',
+      title: loading ? 'Loading the opposing pitcher archetype profile.' : 'No qualifying starter-only batter-vs-archetype sample found for this matchup.',
       score: 50,
-      summary: { h: null, ab: null, slg: null, hr: null, loading: true, limited: true, starterOnly: true, categories: [] },
+      summary: { h: null, ab: null, slg: null, hr: null, loading: Boolean(loading), noSample: !loading, limited: true, starterOnly: true, categories: [] },
     });
   }
   return rows;
@@ -10394,7 +10498,7 @@ function playerVsPitcherArchetypeCardHtml(matchup = null, pitcher = null, loadin
             const loadingClass = row.displaySummary?.loading ? ' is-loading' : '';
             return `
             <tr class="${row.score >= 66 ? 'is-batter' : row.score <= 42 ? 'is-pitcher' : 'is-neutral'}${row.displaySummary?.limited ? ' is-limited' : ''}${loadingClass}" title="${escapeHtml(hoverTitle)}">
-              <th title="${escapeHtml(hoverTitle)}">${pitcherArchetypeShortLabel(row)}</th>
+              <th title="${escapeHtml(hoverTitle)}">${pitcherArchetypeShortLabel(row, pitcherForRows)}</th>
               <td title="${escapeHtml(hoverTitle)}">${row.displaySummary?.loading ? playerStatLoadingDotsHtml('Loading H-AB') : escapeHtml(formatArchetypeHab(row.displaySummary))}</td>
               <td title="${escapeHtml(hoverTitle)}">${row.displaySummary?.loading ? playerStatLoadingDotsHtml('Loading SLG') : escapeHtml(formatArchetypeSlg(row.displaySummary))}</td>
               <td title="${escapeHtml(hoverTitle)}">${row.displaySummary?.loading ? playerStatLoadingDotsHtml('Loading HR') : escapeHtml(formatArchetypeHr(row.displaySummary))}</td>
@@ -11163,13 +11267,19 @@ function renderPitcherOpponentHandSplits(profile, token, game = null) {
 function hydratePitcherOpponentHandMarkers(rootEl) {
   const markers = Array.from(rootEl?.querySelectorAll?.('.pitcher-hand-markers[data-pitcher-hand-id]') || []);
   if (!markers.length) return;
-  const selectedDate = dateInput?.value || formatDate(new Date());
+  const selectedDate = selectedPitcherMarkerDate();
   const pendingMarkers = markers.filter((marker) => marker.dataset.handHydratedDate !== selectedDate || marker.dataset.handHydratedId !== marker.dataset.pitcherHandId);
   if (!pendingMarkers.length) return;
   const ids = [...new Set(pendingMarkers.map((marker) => Number(marker.dataset.pitcherHandId)).filter((id) => Number.isFinite(id) && id > 0))];
   if (!ids.length) return;
-  const token = `${selectedDate}:${ids.join(',')}:${markers.length}`;
-  rootEl.dataset.pitcherHandMarkerToken = token;
+  for (const marker of pendingMarkers) {
+    const cached = pitcherCachedMarkerValue('hand', marker.dataset.pitcherHandId, selectedDate);
+    if (cached !== undefined) {
+      marker.innerHTML = cached || '';
+      marker.dataset.handHydratedDate = selectedDate;
+      marker.dataset.handHydratedId = String(marker.dataset.pitcherHandId || '');
+    }
+  }
   Promise.all(ids.map(async (id) => {
     const profile = latestRenderedGames
       .map((game) => game?.playerLookup?.[String(id)])
@@ -11177,18 +11287,24 @@ function hydratePitcherOpponentHandMarkers(rootEl) {
     const splits = await getPitcherOpponentHandSplits(profile).catch(() => null);
     return [id, splits];
   })).then((results) => {
-    if (rootEl.dataset.pitcherHandMarkerToken !== token) return;
     const splitMap = new Map(results);
-    for (const marker of markers) {
-      const id = Number(marker.dataset.pitcherHandId);
-      const splits = splitMap.get(id);
-      marker.innerHTML = splits
+    for (const [id, splits] of splitMap.entries()) {
+      const html = splits
         ? `${pitcherOpponentHandAvgMarker(splits.vsLeft, 'L')}${pitcherOpponentHandAvgMarker(splits.vsRight, 'R')}`
         : '';
+      pitcherSetCachedMarkerValue('hand', id, html, selectedDate);
+    }
+    if (selectedPitcherMarkerDate() !== selectedDate) return;
+    const currentMarkers = Array.from(rootEl?.querySelectorAll?.('.pitcher-hand-markers[data-pitcher-hand-id]') || []);
+    for (const marker of currentMarkers) {
+      const id = Number(marker.dataset.pitcherHandId);
+      if (!splitMap.has(id)) continue;
+      const html = pitcherCachedMarkerValue('hand', id, selectedDate) || '';
+      marker.innerHTML = html;
       marker.dataset.handHydratedDate = selectedDate;
       marker.dataset.handHydratedId = String(marker.dataset.pitcherHandId || '');
     }
-  });
+  }).catch(() => {});
 }
 
 
@@ -11647,18 +11763,27 @@ function renderPlayerHandedSplits(profile, game, token) {
   let archetypeMatchup = null;
   let archetypeMatchupLoading = Boolean(matchupPitcher?.id);
   let showPitchTable = false;
+  const archetypeSlotKey = `${profile.id || ''}:${matchupPitcherId || ''}:${typeof playerStatTargetDate === 'function' ? playerStatTargetDate(game) : (dateInput.value || formatDate(new Date()))}:extra-archetype:v1`;
   const archetypeHtml = () => playerVsPitcherArchetypeCardHtml(archetypeMatchup, matchupPitcher, archetypeMatchupLoading, handed, matchupHand);
   const pitchHtml = () => showPitchTable
     ? playerStatHeatMapTable('', visiblePlayerCardPitchTableShell('batter', profile.id, matchupPitcherId, matchupHand))
     : '';
   const archetypeBlockHtml = () => {
     const html = archetypeHtml();
-    return html ? `<div data-player-extra-archetype-slot class="player-extra-archetype-slot">${html}</div>` : '';
+    const isLoadingHtml = /Loading pitcher type|Archetype sample loading|player-stat-loading-dots/.test(html);
+    if (html && !isLoadingHtml) playerExtraArchetypeSlotHtmlCache.set(archetypeSlotKey, html);
+    const stableHtml = html || playerExtraArchetypeSlotHtmlCache.get(archetypeSlotKey) || '';
+    return stableHtml ? `<div data-player-extra-archetype-slot class="player-extra-archetype-slot">${stableHtml}</div>` : '';
   };
   const paint = () => {
     if (!playerStatExtraEl || playerStatExtraEl.dataset.splitToken !== token) return;
     updatePlayerSeasonArchetypeTable('');
-    playerStatExtraEl.innerHTML = `${battingContextHtml(handed, matchupHand)}${batterStarterHandednessHtml(matchupPitcher, starterSplits, profile?.bats, starterRecentHand)}${pitchHtml()}${archetypeBlockHtml()}`;
+    playerStatExtraEl.innerHTML = `${battingContextHtml(handed, matchupHand)}${batterStarterHandednessHtml(matchupPitcher, starterSplits, profile?.bats, starterRecentHand)}${archetypeBlockHtml()}${pitchHtml()}`;
+    ensurePlayerArchetypeBadgeVisibility(playerStatExtraEl, matchupPitcher);
+    hydratePitcherFireStreaks(playerStatExtraEl);
+    hydratePitcherColdStreaks(playerStatExtraEl);
+    hydratePitcherLastStartHrMarkers(playerStatExtraEl);
+    hydratePitcherOpponentHandMarkers(playerStatExtraEl);
     if (showPitchTable) hydrateVisiblePlayerCardPitchTables(profile, game, token);
   };
   paint();
@@ -11675,16 +11800,52 @@ function renderPlayerHandedSplits(profile, game, token) {
   });
   if (matchupPitcher?.id) {
     // Archetypes are now core player-card content, so start them immediately and keep
-    // them independent from the slower pitch-card/table hydration path.
-    getPlayerVsPitcherArchetypeMatchup(profile, matchupPitcher, game)
+    // them independent from the slower pitch-card/table hydration path. A slow live-site
+    // archetype request should stay in a loading state, then replace itself when the
+    // real sample arrives. Do not convert a timeout into a permanent no-sample row.
+    const settleArchetypePayload = (payload) => {
+      if (!playerStatExtraEl || playerStatExtraEl.dataset.splitToken !== token) return;
+      const hasRows = listify(payload?.matchups).some((row) => row?.letter);
+      archetypeMatchup = hasRows
+        ? payload
+        : {
+          ...(payload || {}),
+          pitcherName: payload?.pitcherName || matchupPitcher?.fullName || matchupPitcher?.name || 'Pitcher',
+          matchups: playerVsPitcherArchetypeLoadingRows(matchupPitcher, false, true),
+          noSample: true,
+        };
+      archetypeMatchupLoading = false;
+      paint();
+    };
+    const archetypePromise = getPlayerVsPitcherArchetypeMatchup(profile, matchupPitcher, game);
+    withTimeoutValue(
+      archetypePromise,
+      6500,
+      { __timeout: true, matchups: [], pitcherName: matchupPitcher?.fullName || matchupPitcher?.name || 'Pitcher' },
+    )
       .then((payload) => {
         if (!playerStatExtraEl || playerStatExtraEl.dataset.splitToken !== token) return;
-        archetypeMatchup = payload;
-        archetypeMatchupLoading = false;
-        paint();
+        if (payload?.__timeout) {
+          archetypeMatchup = {
+            matchups: playerVsPitcherArchetypeLoadingRows(matchupPitcher, true, false),
+            pitcherName: matchupPitcher?.fullName || matchupPitcher?.name || 'Pitcher',
+          };
+          archetypeMatchupLoading = true;
+          paint();
+          return;
+        }
+        settleArchetypePayload(payload);
       })
+      .catch(() => {});
+    archetypePromise
+      .then(settleArchetypePayload)
       .catch(() => {
         if (!playerStatExtraEl || playerStatExtraEl.dataset.splitToken !== token) return;
+        archetypeMatchup = {
+          matchups: playerVsPitcherArchetypeLoadingRows(matchupPitcher, false, true),
+          noSample: true,
+          pitcherName: matchupPitcher?.fullName || matchupPitcher?.name || 'Pitcher',
+        };
         archetypeMatchupLoading = false;
         paint();
       });
@@ -11953,19 +12114,35 @@ function gameHitsForSide(linescore, side) {
 function setupOverflowMarquee(el) {
   if (!el) return;
   const text = String(el.dataset.renderValue ?? el.textContent ?? '');
-  const width = Math.round(el.clientWidth || 0);
+  const visibleWidth = Math.round(el.clientWidth || el.getBoundingClientRect?.().width || 0);
+
+  // During first dashboard paint the scoreboard can briefly report a 0px text box.
+  // Do not lock that bad measurement into the marquee state. Retry on the next
+  // frame so pregame start times and pitcher names become visible without a hover.
+  if (visibleWidth <= 5) {
+    el.dataset.marqueePending = '1';
+    requestAnimationFrame(() => {
+      if (el.dataset.renderValue === text) setupOverflowMarquee(el);
+    });
+    return;
+  }
+
   if (
     el.dataset.marqueeMode === 'single'
     && el.dataset.marqueeText === text
-    && Number(el.dataset.marqueeWidth || 0) === width
+    && Number(el.dataset.marqueeWidth || 0) === visibleWidth
     && el.querySelector('.marquee-track')
   ) return;
+
+  el.dataset.marqueePending = '';
   el.dataset.marqueeMode = 'single';
   el.dataset.marqueeText = text;
-  el.dataset.marqueeWidth = String(width);
+  el.dataset.marqueeWidth = String(visibleWidth);
   el.classList.remove('overflow-marquee');
   el.style.removeProperty('--marquee-distance');
   el.style.removeProperty('--marquee-duration');
+  el.style.removeProperty('--marquee-delay');
+
   let track = el.querySelector('.marquee-track');
   if (!track) {
     el.replaceChildren();
@@ -11973,14 +12150,26 @@ function setupOverflowMarquee(el) {
     track.className = 'marquee-track';
     el.appendChild(track);
   }
+
   track.textContent = text;
+  // Force a true content-width measurement. Some compact dashboard overrides
+  // set min-width: 0 before the overflow class is added, which made scrollWidth
+  // equal the clipped container and prevented the marquee from ever starting.
+  track.style.display = 'inline-block';
+  track.style.whiteSpace = 'nowrap';
+  track.style.minWidth = 'max-content';
+  track.style.width = 'max-content';
+  track.style.transform = 'translate3d(0, 0, 0)';
+
   void track.offsetWidth;
-  const overflow = Math.ceil(track.scrollWidth - el.clientWidth);
+  const contentWidth = Math.ceil(track.scrollWidth || track.getBoundingClientRect?.().width || 0);
+  const overflow = Math.ceil(contentWidth - visibleWidth);
   if (overflow <= 10) {
     el.textContent = text;
     return;
   }
-  const travel = overflow + 4;
+
+  const travel = overflow + 8;
   const duration = SCOREBOARD_MARQUEE_DURATION_S;
   const elapsed = typeof performance !== 'undefined' ? (performance.now() / 1000) % duration : 0;
   el.style.setProperty('--marquee-distance', `${travel}px`);
@@ -12168,8 +12357,13 @@ function statusLine(game) {
   if (/cancel|postpon|suspend|delay|makeup/i.test(detailed) || ['C', 'D'].includes(coded)) return detailed || 'Game status unavailable';
   if (!gameHasReachedOfficialStart(game)) return `Not Started | ${gameStartTimeText(game)}`;
   const st = game?.status?.abstractGameState;
-  if (st === 'Preview') return `Not Started | ${estTime(game.gameDate)} EST`;
+  if (st === 'Preview') return `Not Started | ${gameStartTimeText(game)}`;
   if (st === 'Final') return 'Final';
+  if (/^(live|in progress)$/i.test(detailed)) {
+    const text = cleanSummary(game?.inning || game?.inningShort || '');
+    if (/(top|bot|bottom|mid|middle)\s*\d+/i.test(text)) return text.replace(/\bBottom\b/i, 'Bot').replace(/\bMiddle\b/i, 'Mid');
+    return 'Top 1';
+  }
   return detailed || 'Unknown';
 }
 
@@ -12274,20 +12468,36 @@ function inningDisplay(linescore, game, activePlay) {
   if (/cancel|postpon|suspend|delay|makeup/i.test(unavailable)) return { short: unavailable, long: unavailable };
   if (!gameHasReachedOfficialStart(game)) return { short: 'PRE', long: `Starts ${gameStartTimeText(game)}` };
   const st = game?.status?.abstractGameState;
-  if (st === 'Preview') return { short: 'PRE', long: `Starts ${estTime(game.gameDate)} EST` };
+  if (st === 'Preview') return { short: 'PRE', long: `Starts ${gameStartTimeText(game)}` };
   if (st === 'Final') return { short: 'F', long: 'Final' };
 
-  const ordinal = ordinalForDisplay(linescore);
+  const rawOrdinal = ordinalForDisplay(linescore);
+  const activeInning = Number(activePlay?.about?.inning);
+  const lineInning = Number(linescore?.currentInning);
+  const textInning = String(game?.inningShort || game?.inning || '').match(/(\d+)/)?.[1] || '';
+  const ordinal = rawOrdinal && rawOrdinal !== '-'
+    ? rawOrdinal
+    : Number.isFinite(activeInning) && activeInning > 0
+      ? String(activeInning)
+      : Number.isFinite(lineInning) && lineInning > 0
+        ? String(lineInning)
+        : textInning || '1';
   const liveHalf = normalizeHalfInning(activePlay?.about?.halfInning);
   const stateHalf = normalizeHalfInning(linescore?.inningHalf || linescore?.inningState);
-  const half = stateHalf || liveHalf;
+  const textHalf = normalizeHalfInning(game?.inningShort || game?.inning || game?.status?.detailedState || game?.status || '');
+  let half = stateHalf || liveHalf || textHalf;
+  if (!half && linescore?.isTopInning === true) half = 'top';
+  if (!half && linescore?.isTopInning === false) half = 'bottom';
 
   if (half === 'top') return { short: `TOP ${ordinal}`, long: `Top ${ordinal}` };
-  if (half === 'bottom') return { short: `BOT ${ordinal}`, long: `Bottom ${ordinal}` };
-  if (half === 'middle') return { short: `MID ${ordinal}`, long: `Mid ${ordinal}` };
-  if (half === 'end') return { short: `END ${ordinal}`, long: `End ${ordinal}` };
+  if (half === 'bottom') return { short: `BOT ${ordinal}`, long: `Bot ${ordinal}` };
+  if (half === 'middle' || half === 'end') return { short: `MID ${ordinal}`, long: `Mid ${ordinal}` };
 
-  return { short: game?.status?.codedGameState === 'D' ? 'DEL' : 'LIVE', long: game?.status?.detailedState || 'Live' };
+  const statusText = `${game?.status?.abstractGameState || ''} ${game?.status?.detailedState || ''} ${game?.status || ''}`;
+  if (/live|in progress|warmup/i.test(statusText) || gameHasLiveProgressSignals(game)) {
+    return { short: `TOP ${ordinal}`, long: `Top ${ordinal}` };
+  }
+  return { short: game?.status?.codedGameState === 'D' ? 'DEL' : 'PRE', long: `Starts ${gameStartTimeText(game)}` };
 }
 
 function countForGame(linescore, currentPlay) {
@@ -16158,28 +16368,69 @@ async function getPitcherLastStartHomeRun(playerId) {
   return promise;
 }
 
+
+function selectedPitcherMarkerDate() {
+  return dateInput?.value || formatDate(new Date());
+}
+
+function pitcherAsyncMarkerCacheKey(type, playerId, selectedDate = selectedPitcherMarkerDate()) {
+  const id = Number(playerId);
+  return Number.isFinite(id) && id > 0 ? `${type}:${id}:${selectedDate}` : '';
+}
+
+function pitcherCachedMarkerValue(type, playerId, selectedDate = selectedPitcherMarkerDate()) {
+  const key = pitcherAsyncMarkerCacheKey(type, playerId, selectedDate);
+  return key && pitcherAsyncMarkerValueCache.has(key) ? pitcherAsyncMarkerValueCache.get(key) : undefined;
+}
+
+function pitcherSetCachedMarkerValue(type, playerId, value, selectedDate = selectedPitcherMarkerDate()) {
+  const key = pitcherAsyncMarkerCacheKey(type, playerId, selectedDate);
+  if (key) pitcherAsyncMarkerValueCache.set(key, value);
+}
+
 function pitcherFireMarkerHtml(playerId) {
   const id = Number(playerId);
   if (!Number.isFinite(id) || id <= 0) return '';
-  return `<span class="pitcher-fire-streak" data-pitcher-fire-id="${id}" aria-label="Pitcher hot streak"></span>`;
+  const selectedDate = selectedPitcherMarkerDate();
+  const cached = pitcherCachedMarkerValue('fire', id, selectedDate);
+  const count = Math.max(0, Math.min(3, Number(cached) || 0));
+  const text = count > 0 ? '🔥'.repeat(count) : '';
+  const title = count > 0 ? `${count} straight strong pitching ${count === 1 ? 'appearance' : 'appearances'}` : '';
+  const hydrated = cached !== undefined ? ` data-fire-hydrated-date="${escapeHtml(selectedDate)}" data-fire-hydrated-id="${id}"` : '';
+  return `<span class="pitcher-fire-streak" data-pitcher-fire-id="${id}"${hydrated} title="${escapeHtml(title)}" aria-label="Pitcher hot streak">${text}</span>`;
 }
 
 function pitcherColdMarkerHtml(playerId) {
   const id = Number(playerId);
   if (!Number.isFinite(id) || id <= 0) return '';
-  return `<span class="pitcher-cold-streak" data-pitcher-cold-id="${id}" aria-label="Pitcher cold streak"></span>`;
+  const selectedDate = selectedPitcherMarkerDate();
+  const cached = pitcherCachedMarkerValue('cold', id, selectedDate);
+  const count = Math.max(0, Math.min(3, Number(cached) || 0));
+  const text = count ? '❄️'.repeat(count) : '';
+  const title = count ? `Cold streak: ${count} straight poor outings` : '';
+  const hydrated = cached !== undefined ? ` data-cold-hydrated-date="${escapeHtml(selectedDate)}" data-cold-hydrated-id="${id}"` : '';
+  return `<span class="pitcher-cold-streak" data-pitcher-cold-id="${id}"${hydrated} title="${escapeHtml(title)}" aria-label="Pitcher cold streak">${text}</span>`;
 }
 
 function pitcherLastStartHrMarkerHtml(playerId) {
   const id = Number(playerId);
   if (!Number.isFinite(id) || id <= 0) return '';
-  return `<span class="pitcher-last-start-hr" data-pitcher-last-hr-id="${id}" aria-label="Allowed home run in last start"></span>`;
+  const selectedDate = selectedPitcherMarkerDate();
+  const cached = pitcherCachedMarkerValue('lastHr', id, selectedDate);
+  const allowed = cached === true;
+  const text = allowed ? 'HR' : '';
+  const title = allowed ? 'Allowed a home run in last start' : '';
+  const hydrated = cached !== undefined ? ` data-last-hr-hydrated-date="${escapeHtml(selectedDate)}" data-last-hr-hydrated-id="${id}"` : '';
+  return `<span class="pitcher-last-start-hr" data-pitcher-last-hr-id="${id}"${hydrated} title="${escapeHtml(title)}" aria-label="Allowed home run in last start">${text}</span>`;
 }
 
 function pitcherHandAvgMarkersHtml(playerId) {
   const id = Number(playerId);
   if (!Number.isFinite(id) || id <= 0) return '';
-  return `<span class="pitcher-hand-markers" data-pitcher-hand-id="${id}" aria-label="Opponent handed average markers"></span>`;
+  const selectedDate = selectedPitcherMarkerDate();
+  const cached = pitcherCachedMarkerValue('hand', id, selectedDate);
+  const hydrated = cached !== undefined ? ` data-hand-hydrated-date="${escapeHtml(selectedDate)}" data-hand-hydrated-id="${id}"` : '';
+  return `<span class="pitcher-hand-markers" data-pitcher-hand-id="${id}"${hydrated} aria-label="Opponent handed average markers">${cached || ''}</span>`;
 }
 
 function pitcherHomeRunRatePerNine(pitcher) {
@@ -16225,74 +16476,126 @@ function pitcherNameHtml(pitcher, contextGame = null) {
   return `${escapeHtml(pitcher?.fullName || pitcher?.name || 'Unknown')}${handednessHtml(pitcherThrowHandValue(pitcher))}${usedYesterday}${pitcherFireMarkerHtml(pitcher?.id)}${pitcherColdMarkerHtml(pitcher?.id)}${pitcherLastStartHrMarkerHtml(pitcher?.id)}${pitcherHandAvgMarkersHtml(pitcher?.id)}${pitcherHomeRunRiskMarkerHtml(pitcher)}${pitcherWhipRiskMarkerHtml(pitcher)}${openerBadge}`;
 }
 
-function lineupPitcherNameHtml(pitcher, contextGame = null) {
-  const fullName = pitcher?.fullName || pitcher?.name || 'Unknown';
+function lineupPitcherArchetypeTextHtml(pitcher = null) {
+  const archetypes = listify(lineupPitcherArchetypes(pitcher))
+    .filter((arch) => arch?.letter && (arch.isPrimary || arch.isSecondary || Number(arch.confidence) >= 52))
+    .sort((a, b) => {
+      if (a.isPrimary && !b.isPrimary) return -1;
+      if (b.isPrimary && !a.isPrimary) return 1;
+      return Number(b.confidence || b.score || 0) - Number(a.confidence || a.score || 0);
+    });
+  const primary = archetypes.find((arch) => arch.isPrimary) || archetypes[0] || null;
+  if (!primary) return '';
+  const label = String(primary.label || primary.name || primary.title || primary.letter || 'Pitcher archetype').replace(/^Pitcher\s+/i, '').trim();
+  const title = `${label}${primary.title ? `: ${primary.title}` : ''}${Number.isFinite(Number(primary.confidence)) ? ` Confidence ${Math.round(primary.confidence)}/100.` : ''}`;
+  return `<span class="pitcher-identity-archetype" title="${escapeHtml(title)}">${pitcherArchetypeBadgeHtml(primary)}</span>`;
+}
+
+function lineupPitcherMarkerClusterHtml(pitcher = null, contextGame = null) {
   const usedYesterday = pitcher?.usedYesterday
     ? '<span class="pitcher-used-yesterday" title="Pitched yesterday" aria-label="Pitched yesterday">Y</span>'
     : '';
+  return [
+    usedYesterday,
+    pitcherFireMarkerHtml(pitcher?.id),
+    pitcherColdMarkerHtml(pitcher?.id),
+    pitcherLastStartHrMarkerHtml(pitcher?.id),
+    pitcherHandAvgMarkersHtml(pitcher?.id),
+    pitcherHomeRunRiskMarkerHtml(pitcher),
+    pitcherWhipRiskMarkerHtml(pitcher),
+    typeof lineupOpenerBadgeHtml === 'function' ? lineupOpenerBadgeHtml(pitcher, contextGame || activeLineupGame || activePlayerStatContext?.game || null, '') : '',
+  ].filter(Boolean).join('');
+}
+
+function lineupPitcherNameHtml(pitcher, contextGame = null) {
+  const fullName = pitcher?.fullName || pitcher?.name || 'Unknown';
+  const id = pitcher?.id || pitcher?.person?.id || pitcher?.playerId || '';
+  const hand = handednessHtml(pitcherThrowHandValue(pitcher)) || '<span class="handedness-tag is-muted" title="Throwing hand unavailable">?</span>';
+  const archetypeText = lineupPitcherArchetypeTextHtml(pitcher);
+  const markers = lineupPitcherMarkerClusterHtml(pitcher, contextGame);
+  const fingerprint = [
+    id,
+    fullName,
+    pitcherThrowHandValue(pitcher),
+    listify(lineupPitcherArchetypes(pitcher)).map((arch) => `${arch.letter || ''}:${Math.round(Number(arch.confidence || 0))}:${arch.isPrimary ? 1 : 0}:${arch.isSecondary ? 1 : 0}`).join('|'),
+    pitcher?.usedYesterday ? 1 : 0,
+    pitcher?.isOpener ? 1 : 0,
+    pitcher?.isBulkFollower ? 1 : 0,
+  ].join('~');
   return `
-    <span class="pitcher-name-text">${escapeHtml(lastName(fullName) || fullName)}</span>
-    ${handednessHtml(pitcherThrowHandValue(pitcher))}
-    ${usedYesterday}
-    ${pitcherFireMarkerHtml(pitcher?.id)}
-    ${pitcherColdMarkerHtml(pitcher?.id)}
-    ${pitcherLastStartHrMarkerHtml(pitcher?.id)}
-    ${pitcherHandAvgMarkersHtml(pitcher?.id)}
-    ${pitcherHomeRunRiskMarkerHtml(pitcher)}
-    ${pitcherWhipRiskMarkerHtml(pitcher)}
-    ${typeof lineupOpenerBadgeHtml === 'function' ? lineupOpenerBadgeHtml(pitcher, contextGame || activeLineupGame || null, '') : ''}
+    <span class="pitcher-identity-row" data-pitcher-identity-row="1" data-pitcher-id="${escapeHtml(String(id))}" data-pitcher-identity-fingerprint="${escapeHtml(fingerprint)}">
+      <span class="pitcher-name-text pitcher-identity-name">${escapeHtml(lastName(fullName) || fullName)}</span>
+      <span class="pitcher-identity-hand">${hand}</span>
+      ${archetypeText}
+      <span class="pitcher-identity-markers" aria-label="Pitcher markers">${markers}</span>
+    </span>
   `;
 }
 
 function hydratePitcherFireStreaks(rootEl) {
   const markers = Array.from(rootEl?.querySelectorAll?.('.pitcher-fire-streak[data-pitcher-fire-id]') || []);
   if (!markers.length) return;
-  const selectedDate = dateInput?.value || formatDate(new Date());
+  const selectedDate = selectedPitcherMarkerDate();
   const pendingMarkers = markers.filter((marker) => marker.dataset.fireHydratedDate !== selectedDate || marker.dataset.fireHydratedId !== marker.dataset.pitcherFireId);
   if (!pendingMarkers.length) return;
   const ids = [...new Set(pendingMarkers.map((marker) => Number(marker.dataset.pitcherFireId)).filter((id) => Number.isFinite(id) && id > 0))];
   if (!ids.length) return;
-  const token = `${selectedDate}:${ids.join(',')}:${markers.length}`;
-  rootEl.dataset.pitcherFireToken = token;
   for (const marker of pendingMarkers) {
-    marker.textContent = '';
-    marker.title = '';
+    const cached = pitcherCachedMarkerValue('fire', marker.dataset.pitcherFireId, selectedDate);
+    if (cached !== undefined) {
+      const count = Math.max(0, Math.min(3, Number(cached) || 0));
+      marker.textContent = count > 0 ? '🔥'.repeat(count) : '';
+      marker.title = count > 0 ? `${count} straight strong pitching ${count === 1 ? 'appearance' : 'appearances'}` : '';
+      marker.dataset.fireHydratedDate = selectedDate;
+      marker.dataset.fireHydratedId = String(marker.dataset.pitcherFireId || '');
+    }
   }
   Promise.all(ids.map((id) => getPitcherFireStreak(id).then((count) => [id, count]).catch(() => [id, 0])))
     .then((results) => {
-      if (rootEl.dataset.pitcherFireToken !== token) return;
+      for (const [id, count] of results) pitcherSetCachedMarkerValue('fire', id, count, selectedDate);
+      if (selectedPitcherMarkerDate() !== selectedDate) return;
       const counts = new Map(results);
-      for (const marker of markers) {
+      const currentMarkers = Array.from(rootEl?.querySelectorAll?.('.pitcher-fire-streak[data-pitcher-fire-id]') || []);
+      for (const marker of currentMarkers) {
         const markerId = Number(marker.dataset.pitcherFireId);
+        if (!counts.has(markerId)) continue;
         const count = Math.max(0, Math.min(3, Number(counts.get(markerId)) || 0));
         marker.textContent = count > 0 ? '🔥'.repeat(count) : '';
         marker.title = count > 0 ? `${count} straight strong pitching ${count === 1 ? 'appearance' : 'appearances'}` : '';
         marker.dataset.fireHydratedDate = selectedDate;
         marker.dataset.fireHydratedId = String(marker.dataset.pitcherFireId || '');
       }
-    });
+    })
+    .catch(() => {});
 }
 
 function hydratePitcherColdStreaks(rootEl) {
   const markers = Array.from(rootEl?.querySelectorAll?.('.pitcher-cold-streak[data-pitcher-cold-id]') || []);
   if (!markers.length) return;
-  const selectedDate = dateInput?.value || formatDate(new Date());
+  const selectedDate = selectedPitcherMarkerDate();
   const pendingMarkers = markers.filter((marker) => marker.dataset.coldHydratedDate !== selectedDate || marker.dataset.coldHydratedId !== marker.dataset.pitcherColdId);
   if (!pendingMarkers.length) return;
   const ids = [...new Set(pendingMarkers.map((marker) => Number(marker.dataset.pitcherColdId)).filter((id) => Number.isFinite(id) && id > 0))];
   if (!ids.length) return;
-  const token = `${selectedDate}:${ids.join(',')}:${markers.length}`;
-  rootEl.dataset.pitcherColdToken = token;
   for (const marker of pendingMarkers) {
-    marker.textContent = '';
-    marker.title = '';
+    const cached = pitcherCachedMarkerValue('cold', marker.dataset.pitcherColdId, selectedDate);
+    if (cached !== undefined) {
+      const count = Math.max(0, Math.min(3, Number(cached) || 0));
+      marker.textContent = count ? '❄️'.repeat(count) : '';
+      marker.title = count ? `Cold streak: ${count} straight poor outings` : '';
+      marker.dataset.coldHydratedDate = selectedDate;
+      marker.dataset.coldHydratedId = String(marker.dataset.pitcherColdId || '');
+    }
   }
   Promise.all(ids.map((id) => getPitcherColdStreak(id).then((count) => [id, count]).catch(() => [id, 0])))
     .then((results) => {
-      if (rootEl.dataset.pitcherColdToken !== token) return;
+      for (const [id, count] of results) pitcherSetCachedMarkerValue('cold', id, count, selectedDate);
+      if (selectedPitcherMarkerDate() !== selectedDate) return;
       const counts = new Map(results);
-      for (const marker of markers) {
+      const currentMarkers = Array.from(rootEl?.querySelectorAll?.('.pitcher-cold-streak[data-pitcher-cold-id]') || []);
+      for (const marker of currentMarkers) {
         const markerId = Number(marker.dataset.pitcherColdId);
+        if (!counts.has(markerId)) continue;
         const count = Math.max(0, Math.min(3, Number(counts.get(markerId))) || 0);
         marker.textContent = count ? '❄️'.repeat(count) : '';
         marker.title = count ? `Cold streak: ${count} straight poor outings` : '';
@@ -16306,23 +16609,30 @@ function hydratePitcherColdStreaks(rootEl) {
 function hydratePitcherLastStartHrMarkers(rootEl) {
   const markers = Array.from(rootEl?.querySelectorAll?.('.pitcher-last-start-hr[data-pitcher-last-hr-id]') || []);
   if (!markers.length) return;
-  const selectedDate = dateInput?.value || formatDate(new Date());
+  const selectedDate = selectedPitcherMarkerDate();
   const pendingMarkers = markers.filter((marker) => marker.dataset.lastHrHydratedDate !== selectedDate || marker.dataset.lastHrHydratedId !== marker.dataset.pitcherLastHrId);
   if (!pendingMarkers.length) return;
   const ids = [...new Set(pendingMarkers.map((marker) => Number(marker.dataset.pitcherLastHrId)).filter((id) => Number.isFinite(id) && id > 0))];
   if (!ids.length) return;
-  const token = `${selectedDate}:${ids.join(',')}:${markers.length}`;
-  rootEl.dataset.pitcherLastHrToken = token;
   for (const marker of pendingMarkers) {
-    marker.textContent = '';
-    marker.title = '';
+    const cached = pitcherCachedMarkerValue('lastHr', marker.dataset.pitcherLastHrId, selectedDate);
+    if (cached !== undefined) {
+      const allowed = cached === true;
+      marker.textContent = allowed ? 'HR' : '';
+      marker.title = allowed ? 'Allowed a home run in last start' : '';
+      marker.dataset.lastHrHydratedDate = selectedDate;
+      marker.dataset.lastHrHydratedId = String(marker.dataset.pitcherLastHrId || '');
+    }
   }
   Promise.all(ids.map((id) => getPitcherLastStartHomeRun(id).then((allowed) => [id, allowed]).catch(() => [id, false])))
     .then((results) => {
-      if (rootEl.dataset.pitcherLastHrToken !== token) return;
+      for (const [id, allowed] of results) pitcherSetCachedMarkerValue('lastHr', id, Boolean(allowed), selectedDate);
+      if (selectedPitcherMarkerDate() !== selectedDate) return;
       const allowedMap = new Map(results);
-      for (const marker of markers) {
+      const currentMarkers = Array.from(rootEl?.querySelectorAll?.('.pitcher-last-start-hr[data-pitcher-last-hr-id]') || []);
+      for (const marker of currentMarkers) {
         const markerId = Number(marker.dataset.pitcherLastHrId);
+        if (!allowedMap.has(markerId)) continue;
         const allowed = Boolean(allowedMap.get(markerId));
         marker.textContent = allowed ? 'HR' : '';
         marker.title = allowed ? 'Allowed a home run in last start' : '';
@@ -29145,8 +29455,8 @@ function renderPitchingSide(sectionEl, teamCode, color, staff, game = null) {
     const fallbackTitleName = current?.fullName || current?.name || 'Pitcher';
     const currentTitle = currentIsTbdFallback ? `TBD probable | fallback ${fallbackTitleName}` : fallbackTitleName;
     const currentNameHtml = currentIsTbdFallback
-      ? `<span class="lineup-team-pitcher-tbd">TBD</span><span class="lineup-team-pitcher-fallback">Fallback: ${lineupPitcherNameHtml(current, game)}${lineupPitcherArchetypeBadgeHtml(current)}</span>`
-      : `${lineupPitcherNameHtml(current, game)}${lineupPitcherArchetypeBadgeHtml(current)}`;
+      ? `<span class="lineup-team-pitcher-tbd">TBD</span><span class="lineup-team-pitcher-fallback">Fallback: ${lineupPitcherNameHtml(current, game)}</span>`
+      : `${lineupPitcherNameHtml(current, game)}`;
     const currentMetaLine = pitcherSeasonMetaLine(current);
     const currentHtml = current ? `
       <div class="pitching-card-label">${currentLabel}${currentPitchChip}</div>
@@ -29389,8 +29699,8 @@ function renderLineupPitcherSummary(containerEl, color, staff, game = null) {
     ? `TBD probable | fallback ${displayPitcherForRender?.fullName || displayPitcherForRender?.name || 'Pitcher'}`
     : (displayPitcherForRender?.fullName || displayPitcherForRender?.name || 'Pitcher');
   const pitcherNameBlock = displayPitcherForRender?.isTbdFallbackStarter
-    ? `<span class="lineup-team-pitcher-tbd">TBD</span><span class="lineup-team-pitcher-fallback">Fallback: ${lineupPitcherNameHtml(displayPitcherForRender, game)}${lineupPitcherArchetypeBadgeHtml(displayPitcherForRender)}</span>`
-    : `${lineupPitcherNameHtml(displayPitcherForRender, game)}${lineupPitcherArchetypeBadgeHtml(displayPitcherForRender)}`;
+    ? `<span class="lineup-team-pitcher-tbd">TBD</span><span class="lineup-team-pitcher-fallback">Fallback: ${lineupPitcherNameHtml(displayPitcherForRender, game)}</span>`
+    : `${lineupPitcherNameHtml(displayPitcherForRender, game)}`;
   const metaLine = pitcherSeasonMetaLine(displayPitcherForRender);
   const html = `
     <span class="lineup-team-pitcher-label">${label}</span>
@@ -30111,17 +30421,67 @@ function renderScoreStateStrip(card, game) {
   card.querySelector('.score-mini-base.third')?.classList.toggle('on', !pregame && Boolean(game.bases?.third));
 }
 
+function scoreboardMiniInningText(game) {
+  const direct = cleanSummary(game?.inningShort || '');
+  if (direct && !/^(live|in progress)$/i.test(direct)) return direct;
+  const longText = cleanSummary(game?.inning || game?.status || '');
+  const match = longText.match(/\b(top|bot|bottom|mid|middle)\s*(\d+)/i);
+  if (match) {
+    const half = match[1].toLowerCase();
+    const n = match[2];
+    if (half === 'top') return `TOP ${n}`;
+    if (half === 'bot' || half === 'bottom') return `BOT ${n}`;
+    return `MID ${n}`;
+  }
+  return 'TOP 1';
+}
+
 function renderScorePlaySummary(card, game) {
   const inningEl = card.querySelector('.score-mini-inning');
   const lastPlayEl = card.querySelector('.score-mini-last-play');
-  if (inningEl && inningEl.textContent !== String(game.inningShort || '')) inningEl.textContent = game.inningShort;
+  const pregame = shouldPreferProbablePitcher(game);
+  const inningText = pregame ? 'PRE' : scoreboardMiniInningText(game);
+  if (inningEl && inningEl.textContent !== inningText) inningEl.textContent = inningText;
+  if (inningEl) {
+    if (pregame) {
+      const nativeTitle = String(inningEl.getAttribute('title') || '').trim();
+      const themedTitle = String(inningEl.dataset.themeTooltipTitle || '').trim();
+      if (/^Starts/i.test(nativeTitle)) inningEl.removeAttribute('title');
+      if (/^Starts/i.test(themedTitle)) delete inningEl.dataset.themeTooltipTitle;
+    } else {
+      inningEl.title = String(game.inning || game.inningShort || '');
+    }
+  }
   if (!lastPlayEl) return;
-  const realTicker = Array.isArray(game?.ticker) ? game.ticker.filter((item) => !isPlaceholderPlay(item?.text)) : [];
-  const displayPlay = firstRealPlayText(game?.lastPlay, realTicker[0]?.text) || defaultPlayText(game);
-  if (shouldPreferProbablePitcher(game)) {
-    renderSingleLineMarquee(lastPlayEl, defaultPlayText(game));
+
+  const realTicker = Array.isArray(game?.ticker)
+    ? game.ticker.filter((item) => !isPlaceholderPlay(item?.text))
+    : [];
+  const displayPlay = firstRealPlayText(realTicker[0]?.text, game?.lastPlay) || defaultPlayText(game);
+
+  if (pregame) {
+    const startsText = gameStartTimeText(game);
+    lastPlayEl.classList.add('score-mini-no-tooltip', 'score-mini-start-time');
+    lastPlayEl.classList.remove('overflow-marquee', 'is-multi');
+    lastPlayEl.removeAttribute('title');
+    delete lastPlayEl.dataset.themeTooltipTitle;
+    delete lastPlayEl.dataset.themeTooltipAriaSynced;
+    lastPlayEl.removeAttribute('aria-label');
+    lastPlayEl.dataset.pregameStartText = startsText;
+    if (lastPlayEl.dataset.renderMode !== 'start' || lastPlayEl.dataset.renderValue !== startsText) {
+      clearOverflowMarquee(lastPlayEl);
+      lastPlayEl.classList.add('score-mini-no-tooltip', 'score-mini-start-time');
+      lastPlayEl.textContent = startsText;
+      lastPlayEl.dataset.renderMode = 'start';
+      lastPlayEl.dataset.renderValue = startsText;
+      lastPlayEl.dataset.renderWidth = String(Math.round(lastPlayEl.clientWidth || 0));
+    }
     return;
   }
+
+  lastPlayEl.dataset.pregameStartText = '';
+  lastPlayEl.classList.remove('score-mini-no-tooltip', 'score-mini-start-time');
+  lastPlayEl.title = displayPlay;
 
   if (isFocusedGame(game.gamePk)) {
     const plays = (realTicker.length ? realTicker : [{ text: displayPlay, color: '#cddfff' }]).slice(0, 3);
@@ -30149,7 +30509,21 @@ function normalizeScoreboardWidth(width) {
 
 function syncScoreboardScale(scoreboard) {
   if (!scoreboard) return;
-  const width = scoreboard.getBoundingClientRect().width || scoreboard.clientWidth || scoreboardWidthPreference;
+
+  // Dashboard scoreboard cards briefly report unstable widths while the grid,
+  // logos, matchup text, and first pick highlight are hydrating. Writing that
+  // transient width into --sb-scale causes the visible card to pinch, then
+  // unpinch. Keep dashboard cards on a stable scale and let the CSS/media
+  // rules handle density instead.
+  if (document.body?.classList?.contains('dashboard-page')) {
+    scoreboard.style.setProperty('--sb-scale', '1');
+    scoreboard.dataset.stableDashboardScale = '1';
+    return;
+  }
+
+  const rectWidth = scoreboard.getBoundingClientRect().width;
+  const width = rectWidth || scoreboard.clientWidth || scoreboardWidthPreference;
+  if (!Number.isFinite(width) || width < SCOREBOARD_MIN_WIDTH) return;
   const isFocused = scoreboard.closest('.game-card')?.classList.contains('is-focused');
   const scale = clamp(width / DEFAULT_SCOREBOARD_WIDTH, 0.42, isFocused ? 1.08 : 1.85);
   scoreboard.style.setProperty('--sb-scale', scale.toFixed(3));
@@ -33409,7 +33783,7 @@ function renderLineupScoreboard(game) {
     const tossup = tossupScoreboardMarkedForGame(game);
     const locked = lockedTossupScoreboardMarkedForGame(game);
     inning.classList.toggle('is-tossup-locked', locked);
-    inning.setAttribute('title', pregame ? `Starts ${gameStartTimeText(game)} | ${locked ? 'Locked tossup. Click to clear.' : tossup ? 'Tossup marked. Click to lock.' : 'Mark this pregame as a tossup'}` : '');
+    inning.setAttribute('title', pregame ? (locked ? 'Locked tossup. Click to clear.' : tossup ? 'Tossup marked. Click to lock.' : 'Mark this pregame as a tossup') : '');
     inning.setAttribute('aria-pressed', locked ? 'mixed' : tossup ? 'true' : 'false');
     const homeScore = document.createElement('span');
     homeScore.className = 'lineup-state-score';
@@ -34874,7 +35248,7 @@ async function batterStarterStrengthSummaryForSplits(playerId, splits = [], game
   const seasonSplits = filteredRecentHistorySplits(splits, game);
   const recentSplits = playerStatCalendarWindowSplits(splits, selectedDate, 14)
     .filter((split) => String(split?.date || '') < String(calendarDateOnly(game?.officialDate || game?.gameDate || selectedDate, selectedDate) || selectedDate));
-  const cacheKey = `${playerId}:${selectedDate}:${String(game?.gamePk || 'none')}:starter-strength:v1:${seasonSplits.length}:${recentSplits.length}`;
+  const cacheKey = `${playerId}:${selectedDate}:${String(game?.gamePk || 'none')}:starter-strength:v2:${seasonSplits.length}:${recentSplits.length}`;
   if (batterStarterStrengthCache.has(cacheKey)) return batterStarterStrengthCache.get(cacheKey);
   const promise = (async () => {
     const [seasonItems, recentItems] = await Promise.all([
@@ -34928,16 +35302,22 @@ function batterStarterStrengthSummaryCell(summary = null) {
   };
 }
 
-function playerBattingComparisonRows(profile, recent = null, game = null, gamesSince = null, hrRoleSplits = null, starterSos = null) {
+function playerBattingComparisonRows(profile, recent = null, game = null, gamesSince = null, hrRoleSplits = null, starterSos = null, options = {}) {
   const batting = profile?.batting || {};
   const extraBaseHits = statNumber(batting.doubles) + statNumber(batting.triples) + statNumber(batting.hr);
   const handSplits = recent?.handSplits14 || null;
+  const recentLoading = Boolean(options?.recentLoading);
+  const loadingRecentCell = (label = 'Loading recent stats') => ({
+    html: `<span class="player-stat-mini-loading">${playerStatLoadingDotsHtml(label)}</span>`,
+    text: label,
+  });
   const recentValue = (key, rate = false, digits = 3, trim = true) => {
-    if (!recent) return '--';
+    if (!recent) return recentLoading ? loadingRecentCell(`Loading ${String(key || 'recent stat')}`) : '--';
     return rate ? playerStatRecentRate(recent[key], digits, trim) : statNumber(recent[key]);
   };
   const splitValue = (hand, key, rate = false) => {
     const split = handSplits?.[hand] || {};
+    if (!recent && recentLoading) return '...';
     if (rate) return split[key] || '---';
     return statNumber(split[key]);
   };
@@ -35205,33 +35585,83 @@ function playerPitchingComparisonRows(profile, recent = null, recentLabel = 'L3'
 function renderPlayerBattingSeasonBlock(profile, game = null, gamesSince = null) {
   if (!playerStatSeasonEl || !profile) return;
   const targetDate = playerStatTargetDate(game);
+  const cacheKey = `${profile.id || ''}:${targetDate}:batting-season-block:v4`;
   const token = `${profile.id || ''}:${targetDate}:hitting:${Date.now()}`;
   playerStatSeasonEl.dataset.calendarToken = token;
   const existingArchetypeSlot = preservePlayerSeasonArchetypeSlot();
-  playerStatSeasonEl.innerHTML = playerStatComparisonTableHtml('BATTING', ['Stat', 'Season', 'Last 14D'], playerBattingComparisonRows(profile, null, game, gamesSince, null, null)) + existingArchetypeSlot;
+  const cachedHtml = playerBattingSeasonBlockCache.get(cacheKey) || '';
+  if (cachedHtml) {
+    playerStatSeasonEl.innerHTML = cachedHtml + existingArchetypeSlot;
+  } else {
+    playerStatSeasonEl.innerHTML = playerStatComparisonTableHtml('BATTING', ['Stat', 'Season', 'Last 14D'], playerBattingComparisonRows(profile, null, game, gamesSince, null, null, { recentLoading: true })) + existingArchetypeSlot;
+  }
   if (!profile.id) return;
-  Promise.allSettled([
-    playerStatGameLogSplits(profile.id, 'hitting', game),
-    getLineupRecentBattingHandSplits(profile.id, game, 14),
-    getBatterHomeRunsByPitcherRole(profile.id, game),
-  ])
-    .then(async (results) => {
-      if (!playerStatSeasonEl || playerStatSeasonEl.dataset.calendarToken !== token) return;
-      const splits = results[0].status === 'fulfilled' ? results[0].value : [];
-      const handSplits14 = results[1].status === 'fulfilled' ? results[1].value : null;
-      const hrRoleSplits = results[2].status === 'fulfilled' ? results[2].value : null;
-      const recent = aggregatePlayerCardBattingSplits(playerStatCalendarWindowSplits(splits, targetDate, 14));
-      if (handSplits14) recent.handSplits14 = handSplits14;
-      const starterSos = await batterStarterStrengthSummaryForSplits(profile.id, splits, game).catch(() => null);
-      if (!playerStatSeasonEl || playerStatSeasonEl.dataset.calendarToken !== token) return;
-      const existingArchetypeSlot = preservePlayerSeasonArchetypeSlot();
-      playerStatSeasonEl.innerHTML = playerStatComparisonTableHtml('BATTING', ['Stat', 'Season', 'Last 14D'], playerBattingComparisonRows(profile, recent, game, gamesSince, hrRoleSplits, starterSos || undefined)) + existingArchetypeSlot;
-    })
-    .catch(() => {
-      if (!playerStatSeasonEl || playerStatSeasonEl.dataset.calendarToken !== token) return;
-      const existingArchetypeSlot = preservePlayerSeasonArchetypeSlot();
-      playerStatSeasonEl.innerHTML = playerStatComparisonTableHtml('BATTING', ['Stat', 'Season', 'Last 14D'], playerBattingComparisonRows(profile, null, game, gamesSince, null, null)) + existingArchetypeSlot;
-    });
+
+  const state = {
+    splits: null,
+    recent: null,
+    handSplits14: null,
+    hrRoleSplits: null,
+    starterSos: null,
+    starterSosDone: false,
+    coreLoaded: false,
+  };
+
+  const paint = ({ cacheFinal = false } = {}) => {
+    if (!playerStatSeasonEl || playerStatSeasonEl.dataset.calendarToken !== token) return false;
+    const existingSlot = preservePlayerSeasonArchetypeSlot();
+    const starterArg = state.starterSosDone ? (state.starterSos || { season: null, recent: null }) : null;
+    const rows = playerBattingComparisonRows(
+      profile,
+      state.coreLoaded ? state.recent : null,
+      game,
+      gamesSince,
+      state.hrRoleSplits,
+      starterArg,
+      state.coreLoaded ? {} : { recentLoading: true },
+    );
+    const html = playerStatComparisonTableHtml('BATTING', ['Stat', 'Season', 'Last 14D'], rows);
+    if (cacheFinal && state.coreLoaded && state.starterSosDone) playerBattingSeasonBlockCache.set(cacheKey, html);
+    playerStatSeasonEl.innerHTML = html + existingSlot;
+    if (typeof installThemedTooltips === 'function') installThemedTooltips(playerStatSeasonEl);
+    return true;
+  };
+
+  const splitsPromise = playerStatGameLogSplits(profile.id, 'hitting', game).catch(() => []);
+  const handSplitsPromise = getLineupRecentBattingHandSplits(profile.id, game, 14).catch(() => null);
+  const hrRolePromise = getBatterHomeRunsByPitcherRole(profile.id, game).catch(() => null);
+
+  // Priority path: the Last 14D column should not wait for HR role split, hand splits, or Starter SoS.
+  splitsPromise.then((splits) => {
+    state.splits = listify(splits);
+    state.recent = aggregatePlayerCardBattingSplits(playerStatCalendarWindowSplits(state.splits, targetDate, 14));
+    state.coreLoaded = true;
+    paint();
+
+    // Starter SoS is useful but slower because it opens recent game feeds. Hydrate it independently.
+    return withTimeoutValue(batterStarterStrengthSummaryForSplits(profile.id, state.splits, game), 6500, null)
+      .then((starterSos) => {
+        state.starterSos = starterSos || { season: null, recent: null };
+        state.starterSosDone = true;
+        paint({ cacheFinal: true });
+      });
+  }).catch(() => {
+    state.coreLoaded = true;
+    state.starterSosDone = true;
+    paint({ cacheFinal: true });
+  });
+
+  handSplitsPromise.then((handSplits14) => {
+    if (!handSplits14 || !state.recent) return;
+    state.handSplits14 = handSplits14;
+    state.recent.handSplits14 = handSplits14;
+    paint();
+  }).catch(() => {});
+
+  hrRolePromise.then((hrRoleSplits) => {
+    state.hrRoleSplits = hrRoleSplits;
+    paint({ cacheFinal: state.starterSosDone });
+  }).catch(() => {});
 }
 
 function renderPlayerPitchingSeasonBlock(profile, game = null) {
@@ -35243,11 +35673,12 @@ function renderPlayerPitchingSeasonBlock(profile, game = null) {
   playerStatSeasonEl.dataset.calendarToken = token;
   playerStatSeasonEl.innerHTML = playerStatComparisonTableHtml('PITCHING', ['Stat', 'Season', initial.recentLabel], initial.rows);
   if (!profile.id) return;
+
   Promise.allSettled([
     playerStatGameLogSplits(profile.id, 'pitching', game),
     getPitcherSeasonRankForProfile(profile, game),
   ])
-    .then(async (results) => {
+    .then((results) => {
       if (!playerStatSeasonEl || playerStatSeasonEl.dataset.calendarToken !== token) return;
       const splits = results[0].status === 'fulfilled' ? results[0].value : [];
       const rankInfo = results[1].status === 'fulfilled' ? results[1].value : null;
@@ -35261,16 +35692,24 @@ function renderPlayerPitchingSeasonBlock(profile, game = null) {
       }
       const recent = recentSplits.length ? aggregatePlayerCardPitchingSplits(recentSplits) : null;
       const seasonRoleSplits = historySplits.filter(roleForRecent ? isPitchingStartSplit : playerStatPitchingAppearanceSplit);
-      const [seasonSos, recentSos] = await Promise.all([
+
+      const paint = (sos = null, sosDone = false) => {
+        if (!playerStatSeasonEl || playerStatSeasonEl.dataset.calendarToken !== token) return false;
+        const comparison = playerPitchingComparisonRows(profile, recent, 'L3', rankInfo, sosDone ? (sos || { season: null, recent: null }) : null);
+        playerStatSeasonEl.innerHTML = playerStatComparisonTableHtml('PITCHING', ['Stat', 'Season', comparison.recentLabel], comparison.rows);
+        if (typeof installThemedTooltips === 'function') installThemedTooltips(playerStatSeasonEl);
+        if (rankInfo?.role && playerStatMetaEl && String(playerStatOverlayEl?.dataset?.playerId || '') === String(profile.id || '')) {
+          playerStatMetaEl.textContent = `${displayTeamAbbrev(profile.teamAbbrev)} #${profile.jersey} | ${pitcherDisplayRoleForCard(profile, game, rankInfo)}`;
+        }
+        return true;
+      };
+
+      // Paint rank/recent pitcher data immediately. Opponent SoS hydrates after because it opens game feeds.
+      paint(null, false);
+      return Promise.all([
         pitcherOpponentStrengthSummaryForSplits(seasonRoleSplits, game, profile).catch(() => null),
         pitcherOpponentStrengthSummaryForSplits(recentSplits, game, profile).catch(() => null),
-      ]);
-      if (!playerStatSeasonEl || playerStatSeasonEl.dataset.calendarToken !== token) return;
-      const comparison = playerPitchingComparisonRows(profile, recent, 'L3', rankInfo, { season: seasonSos, recent: recentSos });
-      playerStatSeasonEl.innerHTML = playerStatComparisonTableHtml('PITCHING', ['Stat', 'Season', comparison.recentLabel], comparison.rows);
-      if (rankInfo?.role && playerStatMetaEl && String(playerStatOverlayEl?.dataset?.playerId || '') === String(profile.id || '')) {
-        playerStatMetaEl.textContent = `${displayTeamAbbrev(profile.teamAbbrev)} #${profile.jersey} | ${pitcherDisplayRoleForCard(profile, game, rankInfo)}`;
-      }
+      ]).then(([seasonSos, recentSos]) => paint({ season: seasonSos, recent: recentSos }, true));
     })
     .catch(() => {
       if (!playerStatSeasonEl || playerStatSeasonEl.dataset.calendarToken !== token) return;
@@ -39543,11 +39982,20 @@ function pitcherProfileWithFastballMaxVelocity(pitcher = null, fastballMax = nul
   };
 }
 
+function refreshPitcherIdentityAsyncMarkers(rootEl = null) {
+  if (!rootEl) return;
+  try { hydratePitcherFireStreaks(rootEl); } catch (_) {}
+  try { hydratePitcherColdStreaks(rootEl); } catch (_) {}
+  try { hydratePitcherLastStartHrMarkers(rootEl); } catch (_) {}
+  try { hydratePitcherOpponentHandMarkers(rootEl); } catch (_) {}
+}
+
 function hydrateLineupPitcherVelocityArchetypeBadges(containerEl = null, pitcher = null, game = null) {
   const playerId = Number(pitcher?.id || pitcher?.person?.id || pitcher?.playerId);
   if (!containerEl || !Number.isFinite(playerId) || playerId <= 0) return;
   const token = `${playerId}:${seasonForDate(dateInput.value || formatDate(new Date()))}`;
   containerEl.dataset.pitcherVelocityArchToken = token;
+  refreshPitcherIdentityAsyncMarkers(containerEl);
   window.setTimeout(() => {
     getSavantPitcherFastballMaxVelocity(playerId, seasonForDate(dateInput.value || formatDate(new Date())))
       .then((fastballMax) => {
@@ -39556,7 +40004,33 @@ function hydrateLineupPitcherVelocityArchetypeBadges(containerEl = null, pitcher
         const enriched = pitcherProfileWithFastballMaxVelocity(pitcher, fastballMax);
         const nameEl = containerEl.querySelector?.('.pitcher-priority-name');
         if (!nameEl) return;
-        nameEl.innerHTML = `${lineupPitcherNameHtml(enriched, game)}${lineupPitcherArchetypeBadgeHtml(enriched)}`;
+        const currentRow = nameEl.querySelector?.('.pitcher-identity-row');
+        const nextHtml = lineupPitcherNameHtml(enriched, game);
+        const probe = document.createElement('span');
+        probe.innerHTML = nextHtml;
+        const nextRow = probe.querySelector?.('.pitcher-identity-row');
+        if (!nextRow) return;
+        const nextFingerprint = nextRow.dataset?.pitcherIdentityFingerprint || '';
+        if (currentRow) {
+          const currentFingerprint = currentRow.dataset?.pitcherIdentityFingerprint || '';
+          if (nextFingerprint && nextFingerprint !== currentFingerprint) {
+            const nextArch = nextRow.querySelector('.pitcher-identity-archetype');
+            const currentArch = currentRow.querySelector('.pitcher-identity-archetype');
+            if (nextArch && currentArch) {
+              currentArch.outerHTML = nextArch.outerHTML;
+            } else if (nextArch && !currentArch) {
+              const markerEl = currentRow.querySelector('.pitcher-identity-markers');
+              if (markerEl) markerEl.insertAdjacentHTML('beforebegin', nextArch.outerHTML);
+            } else if (!nextArch && currentArch) {
+              currentArch.remove();
+            }
+            currentRow.dataset.pitcherIdentityFingerprint = nextFingerprint;
+          }
+          refreshPitcherIdentityAsyncMarkers(currentRow);
+          return;
+        }
+        nameEl.innerHTML = nextHtml;
+        refreshPitcherIdentityAsyncMarkers(nameEl);
       })
       .catch(() => {});
   }, 0);
@@ -40902,7 +41376,7 @@ function initThemedTooltips() {
   let pendingHideTimer = 0;
   const SUPPRESS_TOOLTIP_SELECTOR = [
     '.pitcher-opponent-hand-table',
-    '.handed-splits-table',
+    '.handed-splits-table:not(.player-archetype-matchup-table)',
     '.pitcher-starts-graph-card',
     '.visible-pitch-card',
     '.visible-pitch-strip',
@@ -40910,6 +41384,7 @@ function initThemedTooltips() {
     '.pitch-last-start-use',
     '.player-batted-ball-profile-table',
     '.player-batted-ball-stacked-cell',
+    '.score-mini-no-tooltip',
   ].join(',');
   const SAME_TOOLTIP_GAP_PX = 7;
 

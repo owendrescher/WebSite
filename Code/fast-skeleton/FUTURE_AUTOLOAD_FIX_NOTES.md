@@ -80,3 +80,119 @@ v17 starter-memory / live-lineup correction:
 Validation:
 - node --check app.js
 - node --check live-dashboard-prototype.js
+
+
+Additional v18 player-card polish:
+- Restored themed/custom tooltips for batter-vs-pitcher archetype rows while keeping ordinary handedness/pitch/graph tooltips suppressed.
+- Tightened Last 5 Series and Last 5 Starts/Opponents card spacing after removing old rank/stat lines.
+- Added dot loading placeholders to initial batter Last 14D stat cells so the card does not show plain -- while async data is still loading.
+- Validation: node --check app.js; node --check live-dashboard-prototype.js.
+
+
+Additional v19 loading/archetype stability fix:
+- Batter Last 14D stat cells now repaint as soon as recent batting data loads instead of waiting behind Starter SoS hydration.
+- Added a small player-card batting season cache so already-loaded recent data does not fall back to bouncing dots during same-card repaints.
+- Batter-vs-pitcher archetype rows now keep their last stable card and never disappear during async pitch/archetype rehydration.
+- If archetype computation is still thin/loading, the row stays as a loading archetype row rather than removing the section.
+- Validation: node --check app.js; node --check live-dashboard-prototype.js.
+
+
+Additional v20 player-card archetype fix:
+- Player-card archetype matchup rows no longer stay stuck on `Archetype sample loading`; empty/time-out samples resolve to `No archetype sample`.
+- Added a timeout guard to the async archetype sample call so a slow live request cannot hold the row forever.
+- Restored compact pitcher markers/archetype badges beside the archetype label.
+- Swapped the right-card order so the archetype table renders before the pitch cards.
+- Validation: node --check app.js; node --check live-dashboard-prototype.js.
+
+
+v21 archetype sample + badge fix:
+- Batter-card archetype requests no longer turn a timeout into a permanent no-sample row; late live-site samples replace the loading row when they finish.
+- Expanded starter/archetype event hydration timeouts and made Flame Thrower filtering use event-derived velocity qualification when profile/eligibility hydration is late.
+- Busted the player-vs-archetype cache key so stale v20 no-sample rows do not survive.
+- Restored pitcher handedness and risk/archetype markers after the archetype label, with CSS that keeps those badges visible in the compact table.
+- Hydrates pitcher marker placeholders after every batter-card archetype repaint.
+
+
+v22 loading/SoS/archetype badge fix:
+- Flame Thrower archetype rows now reserve visible space for pitcher badges, including L/R and risk markers; only the text label ellipsizes.
+- Batter Last 14D stat cells now paint immediately after game-log splits resolve, without waiting for hand splits, HR role split, or Starter SoS.
+- Batter Starter SoS hydrates independently and repaints the same open card once available.
+- Pitcher Opp AVG/SLG SoS now hydrates independently after the recent/rank pitcher rows paint, then repaints the same open card once available.
+- Bumped batting season, starter SoS, and archetype matchup cache keys to avoid sticky stale live-site rows.
+- Validation: node --check app.js; node --check live-dashboard-prototype.js.
+
+
+V23 archetype badge hard fix:
+- Archetype row badge, pitcher handedness, and risk markers are now rendered before the long archetype label so Flame Thrower text cannot push them out.
+- Added a non-empty badge cluster for every archetype row; only the text label can ellipsize.
+- Removed fixed table behavior that was clipping F rows in the player-card archetype table.
+- Validation: node --check app.js; node --check live-dashboard-prototype.js.
+
+
+V27 pitcher identity cleanup:
+- Rolled back the word-label archetype display in lineup/pitching starter rows.
+- Archetype now renders as a single letter badge only.
+- Removed forced archetype placeholders for pitchers that do not qualify.
+- Separated async velocity/archetype refresh from marker spans so HR/L/R/fire/cold markers are not wiped after first hydration.
+- Added a marker rehydration helper after identity updates.
+- Added CSS guards so name text shrinks first while handedness, archetype letter, and markers stay visible.
+
+
+v29 scoreboard layout stability fix:
+- Dashboard scoreboard cards no longer write transient measured widths into `--sb-scale` during first render/hydration.
+- Locked dashboard scoreboard density to CSS/media rules so cards stop visually pinching when lineup/probable/HR marker data loads.
+- Team pick highlighting no longer changes logo box dimensions, so the first click should not collapse the team ID/win badge area.
+- Win/loss streak badges are kept in a reserved logo-stack row so W/L labels remain visible during loading and selection.
+
+v30 scoreboard spacing follow-up:
+- Kept the v29 stable no-pinch sizing, but reduced the fixed density so dashboard cards no longer overcrowd.
+- Disabled dashboard marquee animation inside compact scoreboard rows; pitcher text now clips from the right instead of sliding left and hiding the starter name.
+- Restored a fixed logo/team/meta/score column balance and reserved room for the center game-state strip.
+- Pick highlight styles no longer change logo dimensions, while W/L labels keep a fixed row below the logo.
+
+Validation:
+- node --check app.js
+- node --check live-dashboard-prototype.js
+
+## v31 scoreboard state strip spacing fix
+- Restored the score-state strip to span the full scoreboard-main width instead of reserving an extra score-column offset inside the wrong parent.
+- Kept v29/v30 no-pinch sizing for the team rows and score buttons.
+- Centered the base diamond, B/S/O boxes, inning, and play text inside the strip.
+- Prevented `PRE Starts...` from being squeezed into fragments by giving the context area its own flexible column.
+
+v32 scoreboard strip/marquee follow-up:
+- Kept the no-pinch scoreboard sizing from v29-v31.
+- Restored marquee scrolling for compact scoreboard pitcher text and last-play/play-by-play text.
+- Re-expanded the score-state strip to the full scoreboard body up to the score-button column, rather than letting it sit in a squeezed center lane.
+- Reduced B/S/O chip widths slightly so the play text has more usable horizontal room.
+- Syntax checks: node --check app.js, node --check live-dashboard-prototype.js.
+
+
+V34 scoreboard start-time/marquee fix:
+- Pregame state strip now renders Starts {time} as visible text, not only hover title.
+- Marquee measurement no longer locks in 0px/compact widths during first dashboard paint.
+- Pitcher and last-play marquee tracks force max-content measurement before overflow testing.
+- Score strip keeps no-pinch sizing while reserving visible room for PRE + start time.
+
+Validation:
+- node --check app.js
+- node --check live-dashboard-prototype.js
+
+v35 scoreboard start-time tooltip and strip background fix:
+- Pregame start time remains visible in the play text.
+- Removed start-time hover tooltip from the pregame play text.
+- Removed start-time text from lineup-state inning hover titles.
+- Added score-mini-no-tooltip suppression so themed tooltip code does not recreate a start-time tooltip.
+- Extended the B/S/O visual capsule through the PRE + start-time play-text area.
+- Kept previous no-pinch scoreboard sizing and marquee behavior.
+
+Validation:
+- node --check app.js
+- node --check live-dashboard-prototype.js
+
+
+v36 scoreboard start strip fix:
+- Pregame start time is rendered as fixed visible text instead of a marquee/tooltip target.
+- Removed the start-time hover path from the pregame play text.
+- Made the state-strip background a single full-width capsule through the count and play/start-time area.
+- Kept live play-by-play and pitcher-name marquee behavior.
