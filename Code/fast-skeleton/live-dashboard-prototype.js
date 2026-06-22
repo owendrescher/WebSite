@@ -12076,6 +12076,59 @@ function playByPlayDescription(play) {
   return description.toLowerCase().startsWith(label.toLowerCase()) ? description : `${label} - ${description}`;
 }
 
+
+function isScoreboardAtBatText(value) {
+  return /\bat bat\b/i.test(cleanPlayText(value || ''));
+}
+
+function isScoreboardTerminalPlay(play = null) {
+  if (!play) return false;
+  const label = cleanPlayText(eventLabel(play));
+  if (!label || isPlaceholderPlay(label) || isScoreboardAtBatText(label)) return false;
+  if (typeof isLiveLabTransientAdministrativeText === 'function' && isLiveLabTransientAdministrativeText(label)) return false;
+  const event = cleanPlayText(play?.result?.event || play?.result?.eventType || '');
+  const description = cleanPlayText(play?.result?.description || '');
+  if (/^play$/i.test(event) && !description) return false;
+  return true;
+}
+
+function scoreboardCompletedPlayText(game = null) {
+  const candidates = [];
+  if (game?.activePlay) candidates.push(game.activePlay);
+  if (Array.isArray(game?.allPlays)) candidates.push(...[...game.allPlays].reverse());
+  const seen = new Set();
+  for (const play of candidates) {
+    const key = [
+      play?.about?.atBatIndex ?? '',
+      play?.matchup?.batter?.id ?? '',
+      play?.result?.event || play?.result?.eventType || '',
+      play?.result?.description || '',
+    ].join('|');
+    if (seen.has(key)) continue;
+    seen.add(key);
+    if (isScoreboardTerminalPlay(play)) return cleanPlayText(eventLabel(play));
+  }
+  return '';
+}
+
+function firstScoreboardNonAtBatText(...values) {
+  for (const value of values) {
+    const text = cleanPlayText(value || '');
+    if (!text || isPlaceholderPlay(text) || isScoreboardAtBatText(text)) continue;
+    if (typeof isLiveLabTransientAdministrativeText === 'function' && isLiveLabTransientAdministrativeText(text)) continue;
+    return text;
+  }
+  return '';
+}
+
+function scoreboardPlayTextForGame(game = null, ticker = []) {
+  const completed = scoreboardCompletedPlayText(game);
+  if (completed) return completed;
+  const tickerTexts = Array.isArray(ticker) ? ticker.map((item) => item?.text) : [];
+  return firstScoreboardNonAtBatText(game?.lastPlay, ...tickerTexts, game?.currentEvent)
+    || firstRealPlayText(...tickerTexts, game?.lastPlay, game?.currentEvent);
+}
+
 function scoreFromPlayHistory(allPlays, side) {
   const keyName = side === 'away' ? 'awayScore' : 'homeScore';
   for (const play of [...(Array.isArray(allPlays) ? allPlays : [])].reverse()) {
@@ -18886,7 +18939,10 @@ function upsertProgressiveGameCard(game = null, selectedDate = '') {
   if (gamesEl.dataset.scoreboardDate && gamesEl.dataset.scoreboardDate !== targetDate) return;
   latestRenderedGamesDate = targetDate;
   gamesEl.dataset.scoreboardDate = targetDate;
-  const normalized = normalizeCompletedCard(game);
+  const currentCard = latestRenderedGames.find((existing) => String(existing?.gamePk || '') === String(game?.gamePk || ''))
+    || gamesEl.querySelector(`.game-card[data-game-pk='${game.gamePk}']`)?._game
+    || null;
+  const normalized = normalizeCompletedCard(chooseBestGameCard(currentCard, game));
   const incomingKey = gameCardInstanceKey(normalized, targetDate) || String(normalized.gamePk || '');
   const next = [];
   for (const existing of latestRenderedGames || []) {
@@ -30463,7 +30519,7 @@ function renderScorePlaySummary(card, game) {
   const realTicker = Array.isArray(game?.ticker)
     ? game.ticker.filter((item) => !isPlaceholderPlay(item?.text))
     : [];
-  const displayPlay = firstRealPlayText(realTicker[0]?.text, game?.lastPlay) || defaultPlayText(game);
+  const displayPlay = scoreboardPlayTextForGame(game, realTicker) || defaultPlayText(game);
 
   if (pregame) {
     const startsText = gameStartTimeText(game);
@@ -30490,7 +30546,7 @@ function renderScorePlaySummary(card, game) {
   lastPlayEl.title = displayPlay;
 
   if (isFocusedGame(game.gamePk)) {
-    const plays = (realTicker.length ? realTicker : [{ text: displayPlay, color: '#cddfff' }]).slice(0, 3);
+    const plays = [{ text: displayPlay, color: '#cddfff' }, ...realTicker.filter((item) => cleanPlayText(item?.text || '') !== displayPlay)].slice(0, 3);
     renderMultiLineSummary(lastPlayEl, plays);
     return;
   }
@@ -40598,11 +40654,39 @@ function scoreboardCardRenderFingerprint(game = {}) {
   ]);
 }
 
+
+function scoreboardLiveStateFingerprint(game = {}) {
+  const firstTickerText = listify(game?.ticker).slice(0, 2).map((item) => item?.text || item).join('|');
+  const awayPitcher = scoreboardPitcherForSide(game, 'away');
+  const homePitcher = scoreboardPitcherForSide(game, 'home');
+  const pitcherKey = (pitcher) => [
+    pitcher?.id || '',
+    pitcher?.fullName || pitcher?.name || '',
+    pitcherThrowHandValue(pitcher),
+    pitcherEra(pitcher),
+  ].join(':');
+  return JSON.stringify([
+    game?.gamePk || '',
+    game?.awayScore ?? '', game?.homeScore ?? '',
+    game?.awayHits ?? '', game?.homeHits ?? '',
+    game?.status || '', game?.inning || '', game?.inningShort || '',
+    game?.lastPlay || '', game?.currentEvent || '', firstTickerText,
+    game?.balls ?? '', game?.strikes ?? '', game?.outs ?? '',
+    Boolean(game?.bases?.first), Boolean(game?.bases?.second), Boolean(game?.bases?.third),
+    game?.activeBatterId || '', game?.battingSide || '',
+    pitcherKey(awayPitcher), pitcherKey(homePitcher),
+    lockedTossupScoreboardGamePks?.has?.(String(game?.gamePk || '')) ? 1 : 0,
+    tossupScoreboardGamePks?.has?.(String(game?.gamePk || '')) ? 1 : 0,
+  ]);
+}
+
 function upsertCard(game) {
   let card = gamesEl.querySelector(`.game-card[data-game-pk='${game.gamePk}']`);
   const nextRenderFingerprint = scoreboardCardRenderFingerprint(game);
+  const nextLiveStateFingerprint = scoreboardLiveStateFingerprint(game);
   if (card && card.dataset.scoreboardRenderFingerprint === nextRenderFingerprint) {
     card._game = chooseBestGameCard(card._game || game, game);
+    card.dataset.scoreboardLiveStateFingerprint = nextLiveStateFingerprint;
     return;
   }
   if (!card) {
@@ -40714,7 +40798,93 @@ function upsertCard(game) {
   }
 
   card.dataset.scoreboardRenderFingerprint = nextRenderFingerprint;
+  card.dataset.scoreboardLiveStateFingerprint = nextLiveStateFingerprint;
 
+  previousState.set(game.gamePk, {
+    awayRuns: storedAwayRuns,
+    homeRuns: storedHomeRuns,
+    awayHighWaterRuns,
+    homeHighWaterRuns,
+    lastScoringSignature,
+    balls: Number.isFinite(balls) ? balls : 0,
+    strikes: Number.isFinite(strikes) ? strikes : 0,
+    outs: Number.isFinite(outs) ? outs : 0,
+    inningShort: game.inningShort || '',
+    seenAt: Date.now(),
+  });
+}
+
+function updateScoreboardLiveCard(card, incomingGame) {
+  if (!card || !incomingGame?.gamePk) return;
+  const game = normalizeCompletedCard(chooseBestGameCard(card._game || incomingGame, incomingGame));
+  card._game = game;
+
+  const setTextIfChanged = (selector, value) => {
+    const el = card.querySelector(selector);
+    if (!el) return null;
+    const next = String(value ?? '');
+    if (el.textContent !== next) el.textContent = next;
+    return el;
+  };
+
+  const awayScoreEl = setTextIfChanged('.away-score', game.awayScore);
+  const homeScoreEl = setTextIfChanged('.home-score', game.homeScore);
+
+  const scoreboardEl = card.querySelector('.scoreboard');
+  const trackedHighlightsByGame = trackedBetHighlightMap(latestRenderedGames.length ? latestRenderedGames : [game]);
+  const activeHighlight = trackedHighlightsByGame.get(String(game.gamePk));
+  const isTrackedAtBat = Boolean(
+    !shouldPreferProbablePitcher(game)
+    && activeHighlight
+    && String(activeHighlight.playerId) === String(game.activeBatterId || '')
+  );
+  scoreboardEl?.classList.toggle('bet-watch', isTrackedAtBat);
+  if (scoreboardEl) {
+    scoreboardEl.style.setProperty('--bet-watch-color', isTrackedAtBat ? activeHighlight.teamColor : 'transparent');
+    scoreboardEl.style.setProperty('--bet-watch-rgb', isTrackedAtBat ? hexToRgb(activeHighlight.teamColor) : '102,217,255');
+  }
+
+  renderScoreboardMatchupLine(card.querySelector('.away-matchup'), game, 'away');
+  renderScoreboardMatchupLine(card.querySelector('.home-matchup'), game, 'home');
+  renderScoreStateStrip(card, game);
+  renderScorePlaySummary(card, game);
+  if (isFocusedGame(game.gamePk)) renderFocusedMatchupPanel(card, game);
+  syncCardGamePickState(card, game);
+
+  const prev = previousState.get(game.gamePk);
+  const awayRuns = Number(game.awayScore);
+  const homeRuns = Number(game.homeScore);
+  const balls = Number(game.balls);
+  const strikes = Number(game.strikes);
+  const outs = Number(game.outs);
+  const storedAwayRuns = Number.isFinite(awayRuns) ? (prev ? Math.max(Number(prev.awayRuns) || 0, awayRuns) : awayRuns) : (prev?.awayRuns || 0);
+  const storedHomeRuns = Number.isFinite(homeRuns) ? (prev ? Math.max(Number(prev.homeRuns) || 0, homeRuns) : homeRuns) : (prev?.homeRuns || 0);
+  const awayHighWaterRuns = Math.max(Number(prev?.awayHighWaterRuns) || 0, storedAwayRuns);
+  const homeHighWaterRuns = Math.max(Number(prev?.homeHighWaterRuns) || 0, storedHomeRuns);
+  let lastScoringSignature = prev?.lastScoringSignature || '';
+  if (prev) {
+    const awayScoringSignature = scoreRunAnimationSignature(game, 'away');
+    const homeScoringSignature = scoreRunAnimationSignature(game, 'home');
+    if (awayScoringSignature && awayScoringSignature !== prev.lastScoringSignature && canAnimateScoreIncrease(game, prev, awayRuns, prev.awayRuns, 'away')) {
+      lastScoringSignature = awayScoringSignature;
+      rememberScoreAnimation(game, 'away', awayRuns);
+      animateScoreChange(card, game.awayColor, game.currentEvent === 'Home Run');
+      flashHomePlate(card);
+      animateNumericChange(awayScoreEl || card.querySelector('.away-score'), game.awayColor);
+    } else if (homeScoringSignature && homeScoringSignature !== prev.lastScoringSignature && canAnimateScoreIncrease(game, prev, homeRuns, prev.homeRuns, 'home')) {
+      lastScoringSignature = homeScoringSignature;
+      rememberScoreAnimation(game, 'home', homeRuns);
+      animateScoreChange(card, game.homeColor, game.currentEvent === 'Home Run');
+      flashHomePlate(card);
+      animateNumericChange(homeScoreEl || card.querySelector('.home-score'), game.homeColor);
+    }
+    if (balls !== prev.balls) animateNumericChange(card.querySelector('.score-mini-balls strong'), '#5aa7ff');
+    if (strikes !== prev.strikes) animateNumericChange(card.querySelector('.score-mini-strikes strong'), '#ffd166');
+    if (outs !== prev.outs) animateNumericChange(card.querySelector('.score-mini-outs strong'), '#ff6b6b');
+    if (String(game.inningShort || '') !== String(prev.inningShort || '')) animateNumericChange(card.querySelector('.score-mini-inning'), '#f0da99');
+  }
+
+  card.dataset.scoreboardLiveStateFingerprint = scoreboardLiveStateFingerprint(game);
   previousState.set(game.gamePk, {
     awayRuns: storedAwayRuns,
     homeRuns: storedHomeRuns,
@@ -40977,14 +41147,21 @@ async function finalizeRenderedGames(cards, homeRuns = [], options = {}) {
   for (const game of dedupedCards) {
     const card = gamesEl.querySelector(`.game-card[data-game-pk='${game.gamePk}']`);
     const nextFingerprint = scoreboardCardRenderFingerprint(game);
+    const nextLiveFingerprint = scoreboardLiveStateFingerprint(game);
     const existing = card?._game || {};
-    const mustPaint = !card
-      || card.dataset.scoreboardRenderFingerprint !== nextFingerprint
-      || Boolean(existing.officialScheduleSeed && !game.officialScheduleSeed);
+    const wasSeed = Boolean(existing.officialScheduleSeed && !game.officialScheduleSeed);
+    const passiveLiveChanged = options.passive && card && card.dataset.scoreboardLiveStateFingerprint !== nextLiveFingerprint;
+    const fullChanged = !options.passive && card && card.dataset.scoreboardRenderFingerprint !== nextFingerprint;
+    const mustPaint = !card || wasSeed || passiveLiveChanged || fullChanged;
     if (mustPaint) {
-      upsertCard(game);
+      if (options.passive && card && passiveLiveChanged && !wasSeed) {
+        updateScoreboardLiveCard(card, game);
+      } else {
+        upsertCard(game);
+      }
     } else if (card) {
       card._game = chooseBestGameCard(card._game || game, game);
+      card.dataset.scoreboardLiveStateFingerprint = nextLiveFingerprint;
     }
   }
   syncGameCardDomOrder(dedupedCards);
@@ -41003,20 +41180,24 @@ async function finalizeRenderedGames(cards, homeRuns = [], options = {}) {
   if ((!options.passive && !scoreboardOverlayInteractionActive()) || shouldRefreshOpenLineup) {
     renderActiveLineupOverlay(dedupedCards).catch(() => {});
   }
-  prewarmLineupHrScoresForGames(dedupedCards);
-  hydratePregamePreviewCardsInBackground(dedupedCards, selectedDate);
-  renderBetList(dedupedCards);
-  renderPendingGamePicks(dedupedCards);
+  if (!options.passive) {
+    prewarmLineupHrScoresForGames(dedupedCards);
+    hydratePregamePreviewCardsInBackground(dedupedCards, selectedDate);
+    renderBetList(dedupedCards);
+    renderPendingGamePicks(dedupedCards);
+    renderPlayerTrackerList(dedupedCards);
+    syncHomeRunAudioAlerts(homeRuns);
+    updateHomeRunFeedIfChanged(homeRuns, {
+      date: selectedDate,
+      allowEmpty: latestHomeRunFeedDate !== selectedDate || !latestRenderedHomeRuns.length,
+    });
+  } else {
+    updateHomeRunFeedIfChanged(homeRuns, { date: selectedDate, allowEmpty: false });
+  }
   syncAllCardGamePickStates(dedupedCards);
   syncTossupScoreboardStates(dedupedCards);
-  renderPlayerTrackerList(dedupedCards);
   if (activeLineupGame) syncLineupGamePickState(activeLineupGame);
-  syncHomeRunAudioAlerts(homeRuns);
-  updateHomeRunFeedIfChanged(homeRuns, {
-    date: selectedDate,
-    allowEmpty: !options.passive && (latestHomeRunFeedDate !== selectedDate || !latestRenderedHomeRuns.length),
-  });
-  window.setTimeout(() => {
+  if (!options.passive) window.setTimeout(() => {
     prewarmRotowireLineupsForGames(dedupedCards);
     hydrateTeamLastSevenRecords(dedupedCards, selectedDate)
       .then((hydrated) => {
@@ -41083,6 +41264,7 @@ function resetDateScopedScoreboardState(date = '', options = {}) {
     root?.querySelectorAll?.([
       '[data-render-fingerprint]',
       '[data-scoreboard-render-fingerprint]',
+      '[data-scoreboard-live-state-fingerprint]',
       '[data-fire-hydrated-date]',
       '[data-cold-hydrated-date]',
       '[data-last-hr-hydrated-date]',
@@ -41090,6 +41272,7 @@ function resetDateScopedScoreboardState(date = '', options = {}) {
     ].join(',')).forEach((el) => {
       delete el.dataset.renderFingerprint;
       delete el.dataset.scoreboardRenderFingerprint;
+      delete el.dataset.scoreboardLiveStateFingerprint;
       delete el.dataset.fireHydratedDate;
       delete el.dataset.fireHydratedId;
       delete el.dataset.coldHydratedDate;
@@ -41194,6 +41377,7 @@ async function loadGames(options = {}) {
     const onProgressiveCard = (card) => {
       if (!isCurrentLoadGamesRequest(requestId)) return;
       if (!card || !card.gamePk) return;
+      if (effectivePassive && (card.officialScheduleSeed || card.fastScheduleShell)) return;
       const key = gameCardInstanceKey(card, selectedDate) || String(card.gamePk);
       const previous = progressiveCards.get(key);
       if (previous && previous.officialScheduleSeed && !card.officialScheduleSeed) {
@@ -41203,9 +41387,12 @@ async function loadGames(options = {}) {
       } else {
         progressiveCards.set(key, card.officialScheduleSeed && !previous.officialScheduleSeed ? previous : card);
       }
-      upsertProgressiveGameCard(progressiveCards.get(key), selectedDate);
+      if (!effectivePassive) upsertProgressiveGameCard(progressiveCards.get(key), selectedDate);
     };
-    let { cards, homeRuns } = await fetchGamesAndHomeRuns(selectedDate, { onCard: onProgressiveCard });
+    let { cards, homeRuns } = await fetchGamesAndHomeRuns(selectedDate, {
+      onCard: onProgressiveCard,
+      suppressScheduleSeeds: effectivePassive,
+    });
     if (!isCurrentLoadGamesRequest(requestId)) return;
     cards = dedupeGameCards(mergeCardsWithArchive(cards.map(normalizeCompletedCard), archived), selectedDate);
     const progressiveSeeds = Array.from(progressiveCards.values()).filter((game) => game?.officialScheduleSeed);

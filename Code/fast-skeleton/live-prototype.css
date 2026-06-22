@@ -5177,3 +5177,144 @@ body.dashboard-page .scoreboard-main > .score-state-strip .score-mini-inning.is-
   text-shadow: 0 1px 4px rgba(0, 0, 0, 0.9) !important;
   pointer-events: none !important;
 }
+/* v40: smoother live refresh and wider scoreboard play lane.
+   Live polling now updates text in place. These rules give play-by-play the
+   widest possible strip by compacting count chips before the context lane. */
+body.dashboard-page .scoreboard-main > .score-state-strip,
+body.dashboard-page[data-overlay-dock='top'] .scoreboard-main > .score-state-strip,
+body.dashboard-page[data-overlay-dock='bottom'] .scoreboard-main > .score-state-strip,
+body.dashboard-page .game-card.is-focused .scoreboard-main > .score-state-strip {
+  left: 5px !important;
+  right: 5px !important;
+  grid-template-columns: 15px 14px 14px 14px minmax(0, 1fr) !important;
+  gap: 1px !important;
+  padding: 4px 3px !important;
+}
+
+body.dashboard-page .scoreboard-main > .score-state-strip .score-mini-diamond {
+  width: 14px !important;
+  min-width: 14px !important;
+  height: 14px !important;
+}
+
+body.dashboard-page .scoreboard-main > .score-state-strip .score-mini-count {
+  min-width: 0 !important;
+  width: 14px !important;
+  max-width: 14px !important;
+  padding: 0 !important;
+  justify-content: center !important;
+  font-size: 0 !important;
+  letter-spacing: 0 !important;
+  overflow: hidden !important;
+}
+
+body.dashboard-page .scoreboard-main > .score-state-strip .score-mini-count strong {
+  display: inline-block !important;
+  font-size: 0.49rem !important;
+  line-height: 1 !important;
+  min-width: 0 !important;
+}
+
+body.dashboard-page .scoreboard-main > .score-state-strip .score-mini-context {
+  grid-template-columns: minmax(24px, auto) minmax(0, 1fr) !important;
+  gap: 3px !important;
+  padding: 0 2px !important;
+  min-width: 0 !important;
+}
+
+body.dashboard-page .scoreboard-main > .score-state-strip .score-mini-inning {
+  min-width: 24px !important;
+  max-width: 31px !important;
+  padding-inline: 2px !important;
+  font-size: 0.39rem !important;
+  letter-spacing: 0.025em !important;
+}
+
+body.dashboard-page .scoreboard-main > .score-state-strip .score-mini-last-play {
+  font-size: 0.46rem !important;
+  min-width: 0 !important;
+  width: 100% !important;
+}
+
+body.dashboard-page .scoreboard-main > .score-state-strip .score-mini-inning.is-tossup-locked {
+  padding-inline: 3px !important;
+}
+
+
+/* v41: restore readable B/S/O labels and proper base diamond while keeping the play lane wide.
+   v40 made the chips number-only and shrank the diamond too far. */
+body.dashboard-page .scoreboard-main > .score-state-strip,
+body.dashboard-page[data-overlay-dock='top'] .scoreboard-main > .score-state-strip,
+body.dashboard-page[data-overlay-dock='bottom'] .scoreboard-main > .score-state-strip,
+body.dashboard-page .game-card.is-focused .scoreboard-main > .score-state-strip {
+  left: 5px !important;
+  right: 5px !important;
+  grid-template-columns: 18px 22px 22px 22px minmax(0, 1fr) !important;
+  gap: 2px !important;
+  padding: 4px 3px !important;
+}
+
+body.dashboard-page .scoreboard-main > .score-state-strip .score-mini-diamond {
+  position: relative !important;
+  width: 18px !important;
+  min-width: 18px !important;
+  height: 18px !important;
+  justify-self: center !important;
+}
+
+body.dashboard-page .scoreboard-main > .score-state-strip .score-mini-base {
+  position: absolute !important;
+  width: 5px !important;
+  height: 5px !important;
+  transform: rotate(45deg) !important;
+}
+
+body.dashboard-page .scoreboard-main > .score-state-strip .score-mini-base.first { right: 1px !important; top: 7px !important; }
+body.dashboard-page .scoreboard-main > .score-state-strip .score-mini-base.second { left: 7px !important; top: 1px !important; }
+body.dashboard-page .scoreboard-main > .score-state-strip .score-mini-base.third { left: 1px !important; top: 7px !important; }
+
+body.dashboard-page .scoreboard-main > .score-state-strip .score-mini-count {
+  min-width: 22px !important;
+  width: 22px !important;
+  max-width: 22px !important;
+  height: 16px !important;
+  padding: 0 2px !important;
+  display: inline-flex !important;
+  align-items: center !important;
+  justify-content: center !important;
+  gap: 1px !important;
+  font-size: 0.39rem !important;
+  line-height: 1 !important;
+  letter-spacing: 0 !important;
+  overflow: hidden !important;
+  box-sizing: border-box !important;
+}
+
+body.dashboard-page .scoreboard-main > .score-state-strip .score-mini-count strong {
+  display: inline-block !important;
+  font-size: 0.48rem !important;
+  line-height: 1 !important;
+  min-width: 0 !important;
+  margin-left: 1px !important;
+}
+
+body.dashboard-page .scoreboard-main > .score-state-strip .score-mini-context {
+  grid-template-columns: minmax(23px, auto) minmax(0, 1fr) !important;
+  gap: 2px !important;
+  padding: 0 2px !important;
+  min-width: 0 !important;
+}
+
+body.dashboard-page .scoreboard-main > .score-state-strip .score-mini-inning {
+  min-width: 23px !important;
+  max-width: 31px !important;
+  padding-inline: 1px !important;
+  font-size: 0.39rem !important;
+  letter-spacing: 0.02em !important;
+}
+
+body.dashboard-page .scoreboard-main > .score-state-strip .score-mini-last-play {
+  font-size: 0.46rem !important;
+  min-width: 0 !important;
+  width: 100% !important;
+}
