@@ -525,22 +525,6 @@ body.dashboard-page .bet-form button {
   padding: 4px 7px;
 }
 
-body.dashboard-page .game-pick-draft {
-  gap: 4px;
-  padding: 6px 7px;
-  border-radius: 8px;
-}
-
-body.dashboard-page .game-pick-draft-list {
-  min-height: 24px;
-  gap: 4px;
-  line-height: 1.25;
-}
-
-body.dashboard-page .game-pick-draft-item {
-  padding: 4px 7px;
-}
-
 body.dashboard-page .leaders-card-grid,
 body.dashboard-page .hot-card-grid,
 body.dashboard-page .prediction-card-grid {
