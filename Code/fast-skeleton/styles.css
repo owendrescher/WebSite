@@ -14094,3 +14094,168 @@ body.dashboard-page .scoreboard-main > .score-state-strip .score-mini-last-play 
   min-width: 0 !important;
   width: 100% !important;
 }
+
+
+/* Over/under pregame selector: click once to mark, twice to lock, third to clear. */
+body.dashboard-page .scoreboard-main > .score-state-strip .score-mini-context.has-over-under {
+  grid-template-columns: auto minmax(23px, auto) minmax(0, 1fr) !important;
+  align-items: center !important;
+}
+
+.score-mini-over-under[hidden],
+.score-mini-ou-btn[hidden],
+.lineup-ou-btn[hidden] {
+  display: none !important;
+}
+
+.score-mini-over-under {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  gap: 1px;
+  min-width: 25px;
+  height: 16px;
+  overflow: visible;
+}
+
+.score-mini-ou-btn,
+.lineup-ou-btn {
+  appearance: none;
+  position: relative;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  border: 1px solid color-mix(in srgb, var(--line) 70%, transparent);
+  background: color-mix(in srgb, var(--badge-bg) 78%, transparent);
+  color: var(--muted);
+  cursor: pointer;
+  font-family: var(--font-ui);
+  font-weight: 950;
+  line-height: 1;
+  user-select: none;
+}
+
+.score-mini-ou-btn {
+  width: 12px;
+  min-width: 12px;
+  height: 14px;
+  padding: 0;
+  border-radius: 4px;
+  font-size: 0.5rem;
+}
+
+.lineup-ou-btn {
+  width: 28px;
+  min-width: 28px;
+  height: 28px;
+  padding: 0;
+  border-radius: 999px;
+  font-size: 0.92rem;
+}
+
+.score-mini-ou-btn:hover,
+.score-mini-ou-btn:focus-visible,
+.lineup-ou-btn:hover,
+.lineup-ou-btn:focus-visible {
+  border-color: rgba(255, 223, 100, 0.88);
+  color: var(--badge-text);
+  box-shadow: 0 0 12px rgba(255, 216, 77, 0.22);
+  outline: none;
+}
+
+.score-mini-ou-btn.is-selected,
+.lineup-ou-btn.is-selected {
+  border-color: rgba(255, 223, 100, 0.94);
+  background: rgba(101, 78, 12, 0.78);
+  color: #ffeb90;
+  text-shadow: 0 0 8px rgba(255, 220, 95, 0.58);
+  box-shadow: 0 0 0 1px rgba(0, 0, 0, 0.72), 0 0 12px rgba(255, 216, 77, 0.24);
+}
+
+.score-mini-ou-btn[data-over-under-side='over'].is-selected,
+.lineup-ou-btn[data-over-under-side='over'].is-selected {
+  border-color: rgba(100, 255, 155, 0.96);
+  background: rgba(21, 84, 42, 0.86);
+  color: #a8ffc2;
+  text-shadow: 0 0 9px rgba(84, 255, 137, 0.56);
+}
+
+.score-mini-ou-btn[data-over-under-side='under'].is-selected,
+.lineup-ou-btn[data-over-under-side='under'].is-selected {
+  border-color: rgba(115, 205, 255, 0.96);
+  background: rgba(18, 56, 91, 0.86);
+  color: #b8e7ff;
+  text-shadow: 0 0 9px rgba(91, 198, 255, 0.54);
+}
+
+.score-mini-ou-btn.is-locked,
+.lineup-ou-btn.is-locked {
+  border-color: rgba(220, 226, 238, 0.98) !important;
+  box-shadow: 0 0 0 2px rgba(10, 12, 16, 0.9), 0 0 16px rgba(210, 218, 232, 0.38) !important;
+  filter: saturate(0.72) contrast(1.08);
+}
+
+.score-mini-ou-btn.is-locked::after,
+.lineup-ou-btn.is-locked::after {
+  content: 'L';
+  position: absolute;
+  right: -0.35em;
+  top: -0.55em;
+  min-width: 0.82em;
+  height: 0.82em;
+  display: grid;
+  place-items: center;
+  border-radius: 999px;
+  border: 1px solid rgba(235, 240, 248, 0.92);
+  background: rgba(20, 23, 30, 0.96);
+  color: #f4f7ff;
+  font-size: 0.48rem;
+  line-height: 1;
+  text-shadow: none;
+  pointer-events: none;
+}
+
+.lineup-state-scoreboard .lineup-ou-under {
+  margin-left: 2px;
+}
+
+.lineup-state-scoreboard .lineup-ou-over {
+  margin-right: 2px;
+}
+
+body.dashboard-page .scoreboard.has-over-under-selection[data-over-under-selected-side='over'] .score-mini-over-under,
+body.dashboard-page .scoreboard.has-over-under-selection[data-over-under-selected-side='under'] .score-mini-over-under {
+  filter: saturate(1.08);
+}
+
+@media (max-width: 720px) {
+  .lineup-ou-btn {
+    width: 24px;
+    min-width: 24px;
+    height: 24px;
+    font-size: 0.78rem;
+  }
+
+  .score-mini-over-under {
+    min-width: 22px;
+  }
+
+  .score-mini-ou-btn {
+    width: 11px;
+    min-width: 11px;
+  }
+}
+
+
+/* v31: multi-letter pitcher archetype badges (RS/DB/SB) stay compact but readable. */
+.lineup-archetype-badge {
+  width: auto !important;
+  min-width: 1.15rem !important;
+  max-width: none !important;
+  padding-inline: 0.22rem !important;
+  white-space: nowrap !important;
+}
+.pitcher-identity-archetype .lineup-archetype-badge,
+.player-archetype-pitcher-badges .lineup-archetype-badge {
+  min-width: max-content !important;
+}

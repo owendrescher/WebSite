@@ -162,7 +162,7 @@ const LINEUP_STAT_WINDOW_KEY = 'lineup-stat-window:v1';
 const PLAYER_STAT_RECENT_WINDOW_KEY = 'player-stat-recent-window:v1';
 const PREDICTION_SNAPSHOT_STORAGE_KEY = 'prediction-snapshots:v1';
 const HITTING_PREDICTION_CACHE_STORAGE_KEY = 'hitting-predictions-cache:v1';
-const HITTING_PREDICTION_CACHE_VERSION = 10;
+const HITTING_PREDICTION_CACHE_VERSION = 11;
 const PREDICTION_SORT_KEY = 'prediction-sort:v1';
 const PREDICTION_FILTER_PRESETS_KEY = 'prediction-filter-presets:v1';
 const SCOREBOARD_WIDTH_KEY = 'scoreboard-width:v1';
@@ -8964,6 +8964,7 @@ function summarizeLastFiveBattingDetails(splits = [], game = null, gameLimit = 5
     },
     lastGame: {
       date: formatLeadersDateLabel(lastSplit?.date || selectedDate),
+      rawDate: calendarDateOnly(lastSplit?.date || selectedDate, selectedDate),
       opponent: lastOpponent,
       hits: statNumber(lastStat.hits),
       atBats: statNumber(lastStat.atBats),
@@ -14504,6 +14505,102 @@ function predictionRecentPowerScore(recent = {}, fallbackMetrics = {}) {
   ]);
 }
 
+function predictionBatterContactHeatFromRows(rows = []) {
+  const bbeRows = listify(rows).filter((row) => Number.isFinite(savantRate(row, ['launch_speed', 'Launch Speed', 'exit_velocity', 'EV'])));
+  if (!bbeRows.length) return null;
+  let maxEv = null;
+  let hardHit = 0;
+  let barrelLike = 0;
+  let homeRuns = 0;
+  for (const row of bbeRows) {
+    const ev = savantRate(row, ['launch_speed', 'Launch Speed', 'exit_velocity', 'EV']);
+    const la = savantRate(row, ['launch_angle', 'Launch Angle']);
+    const event = cleanSummary(csvValue(row, ['events', 'Events', 'event'])).toLowerCase();
+    if (Number.isFinite(ev)) maxEv = Math.max(Number(maxEv) || 0, ev);
+    if (Number.isFinite(ev) && ev >= 95) hardHit += 1;
+    if (Number.isFinite(ev) && ev >= 98 && Number.isFinite(la) && la >= 18 && la <= 38) barrelLike += 1;
+    if (event === 'home_run') homeRuns += 1;
+  }
+  const score = clamp(Math.round(
+    25
+    + predictionPoints(maxEv, 95, 112, 32, { fallbackPoints: 0 })
+    + Math.min(20, hardHit * 7)
+    + Math.min(22, barrelLike * 14)
+    + Math.min(18, homeRuns * 18)
+  ), 0, 100);
+  return {
+    score,
+    bbe: bbeRows.length,
+    maxEv,
+    hardHit,
+    barrelLike,
+    homeRuns,
+    detail: `${bbeRows.length} BBE, max EV ${Number.isFinite(maxEv) ? maxEv.toFixed(1) : '--'}, HH ${hardHit}, barrel-like ${barrelLike}${homeRuns ? `, HR ${homeRuns}` : ''}`,
+  };
+}
+
+function predictionStatcastRowDate(row = {}) {
+  return calendarDateOnly(csvValue(row, ['game_date', 'Game Date', 'date']), '');
+}
+
+async function getBatterRecentContactHeat(playerId, date = '') {
+  const id = Number(playerId);
+  const targetDate = calendarDateOnly(date || '', '');
+  if (!Number.isFinite(id) || id <= 0 || !targetDate) return null;
+  const nextDate = addDaysToDateValue(targetDate, 1) || targetDate;
+  const cacheKey = `${id}:batter-contact-heat:${targetDate}`;
+  if (savantPitchStrengthCache.has(cacheKey)) return savantPitchStrengthCache.get(cacheKey);
+  const promise = (async () => {
+    const rows = parseCsvRows(await getText(predictionRecentPowerUrl(id, targetDate, nextDate)));
+    return predictionBatterContactHeatFromRows(rows.filter((row) => predictionStatcastRowDate(row) === targetDate));
+  })().catch((error) => {
+    savantPitchStrengthCache.delete(cacheKey);
+    throw error;
+  });
+  savantPitchStrengthCache.set(cacheKey, promise);
+  return promise;
+}
+
+function predictionBatterHeatScore(details = null, recent = {}, recentContactHeat = null) {
+  const last = details?.lastGame || {};
+  const totals = details?.totals || {};
+  const lastHr = statNumber(last.hr ?? last.homeRuns);
+  const lastTb = statNumber(last.totalBases);
+  const lastHits = statNumber(last.hits);
+  const lastXbh = lastTb >= 2 || lastHr > 0;
+  const recentHr = statNumber(totals.homeRuns);
+  const recentXbh = statNumber(totals.xbh);
+  const recentGames = Math.max(1, statNumber(totals.games));
+  const statHeat = clamp(Math.round(
+    28
+    + (lastHr > 0 ? 26 : 0)
+    + (lastXbh ? 10 : 0)
+    + (lastTb >= 3 ? 8 : 0)
+    + (lastHits >= 2 ? 6 : 0)
+    + Math.min(16, Math.max(0, recentHr - lastHr) * 8)
+    + Math.min(14, Math.max(0, recentXbh - (lastXbh ? 1 : 0)) * 3)
+    + predictionPoints(recent.slg, 0.330, 0.700, 12, { fallbackPoints: 0 })
+    + predictionPoints(recent.hrRate ?? (recentHr / recentGames), 0.010, 0.080, 10, { fallbackPoints: 0 })
+  ), 0, 100);
+  const contactScore = Number(recentContactHeat?.score);
+  return Number.isFinite(contactScore)
+    ? predictionWeightedScore([{ score: statHeat, weight: 0.58 }, { score: contactScore, weight: 0.42 }])
+    : statHeat;
+}
+
+function predictionBatterHeatDetail(details = null, recentContactHeat = null) {
+  const last = details?.lastGame || {};
+  const pieces = [];
+  const lastHr = statNumber(last.hr ?? last.homeRuns);
+  const lastTb = statNumber(last.totalBases);
+  const lastHits = statNumber(last.hits);
+  if (lastHr > 0) pieces.push(`last game HR ${lastHr}`);
+  if (lastTb >= 2) pieces.push(`last game TB ${lastTb}`);
+  if (lastHits >= 2) pieces.push(`last game ${lastHits} hits`);
+  if (recentContactHeat?.detail) pieces.push(recentContactHeat.detail);
+  return pieces.join('; ') || 'no last-game heat spike';
+}
+
 function predictionPitcherDamageScore(weakness = {}, arsenalMatchup = null) {
   const arsenalPitcherDamage = arsenalMatchup?.families?.length
     ? Math.max(...arsenalMatchup.families.map((family) => predictionScore100(family?.pitcher?.slg, 0.330, 0.650, { fallbackPoints: 0 })))
@@ -14988,6 +15085,7 @@ function predictionHitterFullScoreParts(metrics = {}, seasonMetrics = {}, weakne
   const recentPowerScore = predictionRecentPowerScore(recent, metrics);
   const recentPowerContact = predictionContext.recentPowerContact || predictionRecentPowerNeutral();
   const recentContactQualityScore = clamp(Number(recentPowerContact.recentPowerSignal) || 50, 0, 100);
+  const batterHeatScore = predictionBatterHeatScore(predictionContext.details, recent, predictionContext.recentContactHeat || null);
   const pitchFamilyScore = hasArsenal ? arsenalHrScore : 35;
   const handDamageScore = predictionHandDamageScore(batterSplit, weakness, handStrong);
   const tb2Components = [
@@ -15003,14 +15101,14 @@ function predictionHitterFullScoreParts(metrics = {}, seasonMetrics = {}, weakne
   const environmentScore = weatherEffect.hrScore;
   const hrDueBonus = 0;
   const hrComponents = [
-    { key: 'true-power', label: 'hitter true power', score: truePowerScore, weight: 0.26 },
-    { key: 'pitcher-hr', label: 'pitcher HR vulnerability', score: pitcherDamageScore, weight: 0.20 },
-    { key: 'environment', label: 'park/weather', score: environmentScore, weight: 0.14 },
-    { key: 'pitch-family', label: hasArsenal ? 'pitch-family HR matchup' : 'fallback pitch-family', score: pitchFamilyScore, weight: 0.12 },
-    { key: 'recent-contact', label: 'recent batted-ball quality', score: recentContactQualityScore, weight: 0.10 },
-    { key: 'hand-split', label: 'handedness damage split', score: handDamageScore, weight: 0.08 },
-    { key: 'pa', label: 'lineup/PA expectation', score: paScore, weight: 0.05 },
-    { key: 'recent-power', label: 'recent actual power', score: recentPowerScore, weight: 0.05 },
+    { key: 'pitch-family', label: hasArsenal ? 'pitch-type HR matchup' : 'fallback pitch-type', score: pitchFamilyScore, weight: 0.353 },
+    { key: 'true-power', label: 'hitter power', score: truePowerScore, weight: 0.202 },
+    { key: 'recent-power', label: 'recent power', score: recentPowerScore, weight: 0.115 },
+    { key: 'pitcher-hr', label: 'pitcher vulnerability', score: pitcherDamageScore, weight: 0.128 },
+    { key: 'batter-heat', label: 'batter heat', score: batterHeatScore, weight: 0.068 },
+    { key: 'pa', label: 'opportunity', score: paScore, weight: 0.075 },
+    { key: 'recent-contact', label: 'recent contact quality', score: recentContactQualityScore, weight: 0.055 },
+    { key: 'hand-split', label: 'contact floor', score: handDamageScore, weight: 0.004 },
   ];
   let hrScore = clamp(predictionWeightedScore(hrComponents) + hrDueBonus - Math.round(predictionKRiskPenalty(kRiskForMath, 'hr') / 2), 0, 100);
   const rawHrScoreBeforeSplit = hrScore;
@@ -15117,6 +15215,7 @@ function predictionHitterFullScoreParts(metrics = {}, seasonMetrics = {}, weakne
     handDamageScore >= 60,
     recentContactQualityScore >= 65,
     recentPowerScore >= 65,
+    batterHeatScore >= 70,
   ].filter(Boolean).length;
   if (hrScore >= 90 && highHrConfirmations < 5) {
     hrScore = 89;
@@ -15206,7 +15305,7 @@ function predictionHitterFullScoreParts(metrics = {}, seasonMetrics = {}, weakne
     ...hitComponents.map((part) => predictionScorePart(`Hit ${part.label}`, Math.round(part.score * part.weight), `${Math.round(part.score)}/100 x ${Math.round(part.weight * 100)}%`)),
     predictionScorePart('TB2 Score', tb2Score, '25% hit probability, 25% season power, 15% pitcher damage, 15% weather, 10% pitch family, 5% recent power, 5% PA'),
     ...tb2Components.map((part) => predictionScorePart(`TB2 ${part.label}`, Math.round(part.score * part.weight), `${Math.round(part.score)}/100 x ${Math.round(part.weight * 100)}%`)),
-    predictionScorePart('HR Score', hrScore, '26% true power, 20% pitcher HR vulnerability, 14% environment, 12% pitch family, 10% recent batted-ball quality, 8% hand split, 5% PA, 5% recent actual power, minus partial K risk'),
+    predictionScorePart('HR Score', hrScore, '35.3% pitch-type matchup, 20.2% hitter power, 11.5% recent power, 12.8% pitcher vulnerability, 6.8% batter heat, 7.5% opportunity, 5.5% recent contact quality, 0.4% contact floor, minus partial K risk'),
     ...hrComponents.map((part) => predictionScorePart(`HR ${part.label}`, Math.round(part.score * part.weight), `${Math.round(part.score)}/100 x ${Math.round(part.weight * 100)}%`)),
   ];
   return {
@@ -15236,6 +15335,9 @@ function predictionHitterFullScoreParts(metrics = {}, seasonMetrics = {}, weakne
     sameHandPenalty: hrSplitAdjustment.sameHandPenalty,
     matchupSplitPa: hrSplitAdjustment.matchupSplitPa,
     recentPowerContact,
+    recentContactHeat: predictionContext.recentContactHeat || null,
+    batterHeatScore,
+    batterHeatDetail: predictionBatterHeatDetail(predictionContext.details, predictionContext.recentContactHeat || null),
     recentPowerAdjustment: Number.isFinite(recentPowerAdjustment) ? recentPowerAdjustment : 0,
     hrPickRank,
     contextScore,
@@ -15262,6 +15364,8 @@ function predictionHitterFullScoreParts(metrics = {}, seasonMetrics = {}, weakne
     pitchFamilyScore,
     recentPowerScore,
     recentContactQualityScore,
+    batterHeatScore,
+    batterHeatDetail: predictionBatterHeatDetail(predictionContext.details, predictionContext.recentContactHeat || null),
     handDamageScore,
     weatherEffect,
     hitDriver,
@@ -15308,6 +15412,7 @@ function predictionHittingContextFromEntry(entry = {}) {
     matchupBatterSplitMetrics: entry.matchupBatterSplitMetrics
       || predictionMatchupBatterSplitMetrics(splitMetrics, entry.weakness?.pitcherHand || ''),
     recentPowerContact: entry.recentPowerContact || null,
+    recentContactHeat: entry.recentContactHeat || null,
     lineupConfirmed: entry.lineupConfirmed,
     confirmedStarting: entry.confirmedStarting,
     battingOrder: entry.battingOrder,
@@ -15501,6 +15606,8 @@ async function buildHittingPredictionForEntry(game, side, entry, pitcher, pitche
     getSavantAirSprayProfile(playerId, seasonForDate(gameDate), gameDate).catch(() => null),
     getRecentBattedBallPower(playerId, recentPowerEndDate || gameDate, 14).catch(() => predictionRecentPowerNeutral()),
   ]);
+  const recentContactHeatDate = details?.lastGame?.rawDate || addDaysToDateValue(gameDate, -1) || recentPowerEndDate || gameDate;
+  const recentContactHeat = await withTimeoutValue(getBatterRecentContactHeat(playerId, recentContactHeatDate), 1400, null).catch(() => null);
   const batterSplit = pitcherHandCode === 'L' ? batterSplits?.vsLeft
     : pitcherHandCode === 'R' ? batterSplits?.vsRight
       : null;
@@ -15544,6 +15651,7 @@ async function buildHittingPredictionForEntry(game, side, entry, pitcher, pitche
     batterHandSplitMetrics,
     matchupBatterSplitMetrics,
     recentPowerContact,
+    recentContactHeat,
   };
   const scoreParts = predictionHitterFullScoreParts(metrics, seasonMetrics, weakness, duePayload, handStrong, teamHeat || {}, arsenalMatchup, batterSplit, predictionContext);
   const score = scoreParts.total;
@@ -15617,6 +15725,9 @@ async function buildHittingPredictionForEntry(game, side, entry, pitcher, pitche
     sameHandPenalty: scoreParts.sameHandPenalty,
     matchupSplitPa: scoreParts.matchupSplitPa,
     recentPowerContact,
+    recentContactHeat,
+    batterHeatScore: scoreParts.batterHeatScore,
+    batterHeatDetail: scoreParts.batterHeatDetail,
     recentPowerAdjustment: scoreParts.recentPowerAdjustment,
     arsenalMatchup,
     arsenalAvailable: Boolean(arsenalMatchup),
