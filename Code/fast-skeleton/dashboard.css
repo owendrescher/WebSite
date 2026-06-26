@@ -5004,3 +5004,17 @@ body.dashboard-page .scoreboard.has-over-under-selection[data-over-under-selecte
     min-width: 11px;
   }
 }
+
+
+/* Focus mode removed: keep all game cards visible and suppress the focused matchup panel. */
+.games.has-focused-game .game-card.is-condensed {
+  display: grid !important;
+}
+.focused-matchup-panel {
+  display: none !important;
+}
+.game-card.is-focused,
+.game-card.is-condensed {
+  order: initial !important;
+  grid-column: auto !important;
+}

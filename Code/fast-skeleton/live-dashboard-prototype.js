@@ -249,7 +249,7 @@ const LINEUP_STAT_WINDOW_KEY = 'lineup-stat-window:v1';
 const PLAYER_STAT_RECENT_WINDOW_KEY = 'player-stat-recent-window:v1';
 const PREDICTION_SNAPSHOT_STORAGE_KEY = 'prediction-snapshots:v1';
 const HITTING_PREDICTION_CACHE_STORAGE_KEY = 'hitting-predictions-cache:v1';
-const HITTING_PREDICTION_CACHE_VERSION = 11;
+const HITTING_PREDICTION_CACHE_VERSION = 24;
 const PREDICTION_SORT_KEY = 'prediction-sort:v1';
 const SCOREBOARD_WIDTH_KEY = 'scoreboard-width:v1';
 const GAME_ARCHIVE_PREFIX = 'games-archive:v1';
@@ -261,8 +261,11 @@ const PENDING_GAME_PICKS_STORAGE_KEY = 'pending-game-picks:v1';
 const TOSSUP_SCOREBOARD_STORAGE_KEY = 'tossup-scoreboards:v1';
 const LOCKED_TOSSUP_SCOREBOARD_STORAGE_KEY = 'locked-tossup-scoreboards:v1';
 const OVER_UNDER_SCOREBOARD_STORAGE_KEY = 'over-under-scoreboards:v1';
+const HOME_RUN_AUDIO_PLAYED_STORAGE_KEY = 'home-run-audio-played:v1';
+const HOME_RUN_AUDIO_WINDOW_MS = 60 * 1000;
 const MANUAL_STATE_BACKUP_KEY = 'manual-state-backup:v1';
 const MANUAL_STATE_MIRROR_KEY = 'manual-state-mirror:v1';
+const MANUAL_STATE_DURABLE_KEY = 'manual-state-durable:v1';
 const STORAGE_COMPACTED_KEY = 'storage-compacted:v2';
 const PITCHER_START_MEMORY_KEY = 'pitcher-start-memory:v3';
 const LEGACY_BET_PREFIX = 'bets:';
@@ -1377,7 +1380,7 @@ function initScoreboardColumnsControl() {
   scoreboardColumnsBtnEl.classList.add('help-btn');
   scoreboardColumnsBtnEl.addEventListener('click', () => {
     if (siteHelpDialogEl?.showModal) siteHelpDialogEl.showModal();
-    else window.alert('Controls: left-click a team to stage a winner pick. Ctrl/Cmd-click a game to focus it. Middle-click, Alt-click, or press L while hovering a game to open the lineup card. Use A/D to move the date.');
+    else window.alert('Controls: left-click a team to stage a winner pick. Middle-click, Alt-click, or press L while hovering a game to open the lineup card. Use A/D to move the date.');
   });
   siteHelpCloseBtnEl?.addEventListener('click', () => siteHelpDialogEl?.close());
   siteHelpDialogEl?.addEventListener('click', (e) => {
@@ -4539,11 +4542,20 @@ function rotowireTeamCode(teamAbbrev) {
 }
 
 function pitcherThrowHandValue(pitcher) {
-  return pitcher?.throws
-    || pitcher?.pitchHand?.code
+  // MLB's explicit pitchHand fields are authoritative. Generic `throws` / `hand`
+  // can be stale when a fallback/profile object has been merged, and that was
+  // causing team split chips to use vLHP/vLSP even when the displayed starter
+  // had hydrated correctly as a righty.
+  return pitcher?.pitchHand?.code
     || pitcher?.pitchHand?.description
     || pitcher?.person?.pitchHand?.code
     || pitcher?.person?.pitchHand?.description
+    || pitcher?.pitching?.throws
+    || pitcher?.stats?.pitching?.throws
+    || pitcher?.seasonStats?.pitching?.throws
+    || pitcher?.throws
+    || pitcher?.throwHand
+    || pitcher?.hand
     || '';
 }
 
@@ -7639,11 +7651,21 @@ function seasonStatHasGameActivity(stat = {}, group = '') {
   const normalizedGroup = String(group || '').toLowerCase();
   const games = statNumber(stat.gamesPlayed ?? stat.games ?? stat.gamesPitched ?? stat.appearances);
   if (normalizedGroup.includes('pitch')) {
-    return games > 0
-      || statNumber(stat.gamesStarted ?? stat.starts) > 0
-      || inningsToOuts(stat.inningsPitched ?? stat.ip) > 0
-      || statNumber(stat.battersFaced) > 0
-      || statNumber(stat.numberOfPitches ?? stat.pitchesThrown) > 0;
+    const outs = inningsToOuts(stat.inningsPitched ?? stat.ip);
+    const battersFaced = statNumber(stat.battersFaced);
+    const pitches = statNumber(stat.numberOfPitches ?? stat.pitchesThrown);
+    const countingStats = [
+      stat.hits,
+      stat.earnedRuns,
+      stat.runs,
+      stat.baseOnBalls ?? stat.walks,
+      stat.strikeOuts,
+      stat.homeRuns ?? stat.hrAllowed ?? stat.hr,
+    ].some((value) => statNumber(value) > 0);
+    // Scheduled/listed starters can appear in season payloads with gamesStarted/gamesPlayed
+    // but no recorded pitching work yet. Do not treat that shell as usable season activity,
+    // otherwise first-appearance/previous-season fallback never runs.
+    return outs > 0 || battersFaced > 0 || pitches > 0 || countingStats;
   }
   if (normalizedGroup.includes('hit') || normalizedGroup.includes('bat')) {
     return games > 0
@@ -7853,11 +7875,18 @@ async function getPlayerSeasonStatSplitWithFirstAppearanceFallback(playerId, gro
   const dateEligible = selectedDateIsPastAprilForFirstAppearanceFallback(context.selectedDate || dateInput.value || context.game?.officialDate || context.game?.gameDate || formatDate(new Date()));
   if (teamGames < FIRST_APPEARANCE_FALLBACK_MIN_TEAM_GAMES && !dateEligible) return current;
 
-  const previousSeason = Number(season) - 1;
-  if (Number.isFinite(previousSeason) && previousSeason > 1900) {
-    const previousMlb = await getPlayerPreviousMlbSeasonStatSplit(playerId, group, previousSeason).catch(() => ({}));
+  const numericSeason = Number(season);
+  const priorSeasons = Number.isFinite(numericSeason) && numericSeason > 1900
+    ? [1, 2, 3, 4, 5].map((offset) => numericSeason - offset).filter((year) => year > 1900)
+    : [];
+
+  // First-appearance/current-season shells are common for listed starters on future
+  // or pregame slates. Searching only the immediately previous season left players
+  // like Ben Brown stuck at IP 0.0 / ERA -- even though older MLB work existed.
+  for (const priorSeason of priorSeasons) {
+    const previousMlb = await getPlayerPreviousMlbSeasonStatSplit(playerId, group, priorSeason).catch(() => ({}));
     if (seasonStatHasGameActivity(previousMlb, group)) {
-      return tagSeasonStatSource(previousMlb, `${previousSeason} MLB`, 'previous-mlb', previousSeason);
+      return tagSeasonStatSource(previousMlb, `${priorSeason} MLB`, 'previous-mlb', priorSeason);
     }
   }
 
@@ -7866,10 +7895,10 @@ async function getPlayerSeasonStatSplitWithFirstAppearanceFallback(playerId, gro
     return tagSeasonStatSource(currentMinor, `${season} MiLB`, 'current-minors', season);
   }
 
-  if (Number.isFinite(previousSeason) && previousSeason > 1900) {
-    const previousMinor = await getPlayerMinorLeagueSeasonStatSplit(playerId, group, previousSeason).catch(() => ({}));
+  for (const priorSeason of priorSeasons) {
+    const previousMinor = await getPlayerMinorLeagueSeasonStatSplit(playerId, group, priorSeason).catch(() => ({}));
     if (seasonStatHasGameActivity(previousMinor, group)) {
-      return tagSeasonStatSource(previousMinor, `${previousSeason} MiLB`, 'previous-minors', previousSeason);
+      return tagSeasonStatSource(previousMinor, `${priorSeason} MiLB`, 'previous-minors', priorSeason);
     }
   }
 
@@ -9402,14 +9431,17 @@ async function getVisiblePitchBreakdown(playerId, playerType = 'batter', timeout
 function pitchStrengthMatchKey(value = '') {
   const key = normalizeLookupText(value).replace(/[^a-z0-9]+/g, '');
   if (!key) return '';
-  if (/^(ff|fa|fastball|4seam|4seamer|4seamfastball|fourseam|fourseamer|fourseamfastball)$/.test(key)) return 'fastball';
-  if (/^(si|sinker|twoseam|2seam|twoseamfastball|2seamfastball)$/.test(key)) return 'sinker';
-  if (/^(fc|cutter|cutfastball)$/.test(key)) return 'cutter';
+  // Canonicalize Savant/UI labels before exact-pitch comparisons. The short labels
+  // used in cards are often 4SFB/SIN/SWP/CB/CH, while CSV/page rows can use
+  // FF/SI/ST/CU/etc. Without this, exact-pitch archetypes miss true matches.
+  if (/^(ff|fa|fb|4fb|4sf|4sfb|4seam|4seamer|4seamfastball|fourseam|fourseamer|fourseamfastball)$/.test(key)) return 'fastball';
+  if (/^(si|sin|sinker|twoseam|2seam|twoseamfastball|2seamfastball)$/.test(key)) return 'sinker';
+  if (/^(fc|ct|cut|cutter|cutfastball)$/.test(key)) return 'cutter';
   if (/^(sl|slider)$/.test(key)) return 'slider';
-  if (/^(st|sweeper)$/.test(key)) return 'sweeper';
-  if (/^(cu|curve|curveball|kc|knucklecurve)$/.test(key)) return 'curveball';
-  if (/^(ch|change|changeup)$/.test(key)) return 'changeup';
-  if (/^(fs|split|splitter|splitfinger)$/.test(key)) return 'splitter';
+  if (/^(st|swp|sweep|sweeper)$/.test(key)) return 'sweeper';
+  if (/^(cu|cb|curve|curveball|kc|knucklecurve)$/.test(key)) return 'curveball';
+  if (/^(ch|chg|change|changeup)$/.test(key)) return 'changeup';
+  if (/^(fs|spl|split|splitter|splitfinger)$/.test(key)) return 'splitter';
   return key;
 }
 
@@ -9619,6 +9651,138 @@ function arsenalFamilyFlags(family) {
   return flags;
 }
 
+
+function arsenalRowRateValue(row = {}, keys = []) {
+  for (const key of keys) {
+    if (!Object.prototype.hasOwnProperty.call(row || {}, key)) continue;
+    const value = predictionRateValue(row?.[key]);
+    if (Number.isFinite(value)) return value;
+  }
+  return null;
+}
+
+function arsenalRowNumberValue(row = {}, keys = []) {
+  for (const key of keys) {
+    if (!Object.prototype.hasOwnProperty.call(row || {}, key)) continue;
+    const numeric = Number(String(row?.[key] ?? '').replace(/,/g, ''));
+    if (Number.isFinite(numeric)) return numeric;
+  }
+  return null;
+}
+
+function arsenalExactRowCategory(row = {}) {
+  return row?.category || row?.pitchName || row?.pitchType || row?.pitch_type || row?.pitch_name || row?.name || row?.type || '';
+}
+
+function arsenalExactDamageStack(batterRows = [], pitcherRows = []) {
+  const batterSlgKeys = ['hitterSlg', 'batterSlg', 'batterSLG', 'slg', 'SLG', 'slugging', 'xslg', 'xSLG'];
+  const pitcherSlgKeys = ['pitcherSlg', 'pitcherSLG', 'pitcherSlgAllowed', 'slgAllowedByPitcher', 'pitcherSlugging', 'pitcherSluggingAllowed', 'allowedSlugging', 'allowed_slg', 'slugging_allowed', 'pSlg', 'pSLG', 'slg', 'SLG', 'slugging', 'xslg', 'xSLG'];
+  const batterAvgKeys = ['hitterAvg', 'batterAvg', 'batterAVG', 'avg', 'AVG', 'average'];
+  const pitcherAvgKeys = ['pitcherAvg', 'pitcherBAA', 'pitcherAvgAllowed', 'avgAllowedByPitcher', 'baa', 'BAA', 'avg', 'AVG', 'average', 'batting_average_against'];
+  const hitterHitKeys = ['hitterHits', 'batterHits', 'H', 'h', 'hits', 'hit'];
+  const hitterAbKeys = ['hitterAb', 'hitterAB', 'batterAb', 'batterAB', 'AB', 'ab', 'abs', 'atBats', 'at_bats'];
+  const hitterHrKeys = ['hitterHr', 'hitterHR', 'batterHr', 'batterHR', 'HR', 'hr', 'homeRuns', 'home_runs', 'home_run', 'hrs'];
+  const pitcherHitKeys = ['pitcherHits', 'pitcherHitsAllowed', 'hitsAllowed', 'H', 'h', 'hits', 'hit'];
+  const pitcherAbKeys = ['pitcherAb', 'pitcherAB', 'abAllowed', 'AB', 'ab', 'abs', 'atBats', 'at_bats', 'battersFacedAB'];
+  const pitcherHrKeys = ['pitcherHr', 'pitcherHR', 'pitcherHrAllowed', 'hrAllowed', 'HR', 'hr', 'homeRuns', 'home_runs', 'home_run', 'hrs'];
+  const pitcherByKey = new Map();
+  for (const row of listify(pitcherRows)) {
+    const key = pitchStrengthMatchKey(arsenalExactRowCategory(row));
+    if (!key) continue;
+    const usage = visiblePitchUsagePercent(row, ['visibleUsagePct', 'pitcherUsagePct', 'pct', 'usage', 'usagePct', 'pitch_percent', 'pitchPercent']);
+    const pitcherSlg = arsenalRowRateValue(row, pitcherSlgKeys);
+    const pitcherAb = arsenalRowNumberValue(row, pitcherAbKeys);
+    const quality = (Number.isFinite(pitcherSlg) ? 1000 : 0) + (Number.isFinite(Number(pitcherAb)) ? Math.min(400, Number(pitcherAb)) : 0) + (Number.isFinite(Number(usage)) ? Number(usage) : 0);
+    const current = pitcherByKey.get(key);
+    if (!current || quality > Number(current.quality || 0)) {
+      pitcherByKey.set(key, { row, usagePct: usage, pitcherSlg, quality });
+    }
+  }
+  const hits = [];
+  const seen = new Set();
+  for (const batterRow of listify(batterRows)) {
+    const key = pitchStrengthMatchKey(arsenalExactRowCategory(batterRow));
+    if (!key || seen.has(key)) continue;
+    const pitcherMatch = pitcherByKey.get(key);
+    if (!pitcherMatch) continue;
+    const pitcherRow = pitcherMatch.row || {};
+    const hitterSlg = arsenalRowRateValue(batterRow, batterSlgKeys);
+    const pitcherSlg = Number.isFinite(pitcherMatch.pitcherSlg) ? pitcherMatch.pitcherSlg : arsenalRowRateValue(pitcherRow, pitcherSlgKeys);
+    const usage = Number(pitcherMatch.usagePct);
+    if (!Number.isFinite(hitterSlg) || !Number.isFinite(pitcherSlg)) continue;
+    if (Number.isFinite(usage) && usage > 0 && usage < 3) continue;
+    if (hitterSlg >= 0.500 && pitcherSlg >= 0.500) {
+      seen.add(key);
+      const rawCategory = arsenalExactRowCategory(batterRow) || arsenalExactRowCategory(pitcherRow) || key;
+      const category = typeof visiblePitchCategoryName === 'function' ? visiblePitchCategoryName(rawCategory) : cleanSummary(rawCategory);
+      const hitterHits = arsenalRowNumberValue(batterRow, hitterHitKeys);
+      const hitterAb = arsenalRowNumberValue(batterRow, hitterAbKeys);
+      const hitterHr = arsenalRowNumberValue(batterRow, hitterHrKeys);
+      const pitcherHits = arsenalRowNumberValue(pitcherRow, pitcherHitKeys);
+      const pitcherAb = arsenalRowNumberValue(pitcherRow, pitcherAbKeys);
+      const pitcherHr = arsenalRowNumberValue(pitcherRow, pitcherHrKeys);
+      hits.push({
+        key,
+        category,
+        hitterSlg,
+        pitcherSlg,
+        usagePct: Number.isFinite(usage) ? usage : null,
+        hitterAvg: arsenalRowRateValue(batterRow, batterAvgKeys),
+        pitcherAvg: arsenalRowRateValue(pitcherRow, pitcherAvgKeys),
+        hitterHits: Number.isFinite(hitterHits) ? hitterHits : null,
+        hitterAb: Number.isFinite(hitterAb) ? hitterAb : null,
+        hitterHr: Number.isFinite(hitterHr) ? hitterHr : null,
+        pitcherHits: Number.isFinite(pitcherHits) ? pitcherHits : null,
+        pitcherAb: Number.isFinite(pitcherAb) ? pitcherAb : null,
+        pitcherHr: Number.isFinite(pitcherHr) ? pitcherHr : null,
+      });
+    }
+  }
+  hits.sort((a, b) => ((Number(b.hitterSlg) + Number(b.pitcherSlg)) - (Number(a.hitterSlg) + Number(a.pitcherSlg))) || (Number(b.usagePct || 0) - Number(a.usagePct || 0)));
+  const qualifies = hits.length >= 2;
+  const avgExcess = hits.length
+    ? hits.reduce((sum, row) => sum + Math.max(0, row.hitterSlg - 0.500) + Math.max(0, row.pitcherSlg - 0.500), 0) / hits.length
+    : 0;
+  const hitterHits = hits.reduce((sum, row) => sum + (Number.isFinite(Number(row.hitterHits)) ? Number(row.hitterHits) : 0), 0);
+  const hitterAb = hits.reduce((sum, row) => sum + (Number.isFinite(Number(row.hitterAb)) ? Number(row.hitterAb) : 0), 0);
+  const hitterHr = hits.reduce((sum, row) => sum + (Number.isFinite(Number(row.hitterHr)) ? Number(row.hitterHr) : 0), 0);
+  const pitcherHits = hits.reduce((sum, row) => sum + (Number.isFinite(Number(row.pitcherHits)) ? Number(row.pitcherHits) : 0), 0);
+  const pitcherAb = hits.reduce((sum, row) => sum + (Number.isFinite(Number(row.pitcherAb)) ? Number(row.pitcherAb) : 0), 0);
+  const pitcherHr = hits.reduce((sum, row) => sum + (Number.isFinite(Number(row.pitcherHr)) ? Number(row.pitcherHr) : 0), 0);
+  const score = qualifies ? clamp(Math.round(70 + Math.min(16, (hits.length - 2) * 6) + Math.min(14, avgExcess * 70)), 0, 100) : 0;
+  return {
+    rows: hits,
+    count: hits.length,
+    qualifies,
+    score,
+    hitterHits: hitterAb > 0 ? hitterHits : null,
+    hitterAb: hitterAb > 0 ? hitterAb : null,
+    hitterHr: hitterHr > 0 ? hitterHr : 0,
+    pitcherHits: pitcherAb > 0 ? pitcherHits : null,
+    pitcherAb: pitcherAb > 0 ? pitcherAb : null,
+    pitcherHr: pitcherHr > 0 ? pitcherHr : 0,
+    detail: hits.length
+      ? hits.slice(0, 4).map((row) => `${row.category} H ${formatRateValue(row.hitterSlg, 3, true)} / P ${formatRateValue(row.pitcherSlg, 3, true)}${Number.isFinite(row.hitterAb) && row.hitterAb > 0 ? `, H-AB ${Math.round(Number(row.hitterHits || 0))}-${Math.round(Number(row.hitterAb))}` : ''}${Number.isFinite(row.usagePct) ? `, ${arsenalMetricText(row.usagePct, 1, false, '%')}` : ''}`).join('; ')
+      : 'No exact pitch types with both hitter and pitcher SLG .500+',
+  };
+}
+
+function arsenalImbalanceArchetypeFromDamageStack(stack = null) {
+  if (!stack?.qualifies) return null;
+  const score = clamp(Math.round(stack.score || 72), 0, 100);
+  return {
+    letter: 'I',
+    label: 'Arsenal Imbalance',
+    score,
+    confidence: score,
+    isPrimary: true,
+    isSecondary: true,
+    title: `Arsenal Imbalance: two or more exact pitches are .500+ SLG for both hitter and pitcher allowed. ${stack.detail}.`,
+    damageStack: stack,
+    contextualImbalance: true,
+  };
+}
+
 function buildArsenalMatchup(batterRows = [], pitcherRows = [], context = {}) {
   if (!Array.isArray(batterRows) || !Array.isArray(pitcherRows) || !batterRows.length || !pitcherRows.length) {
     return null;
@@ -9662,7 +9826,11 @@ function buildArsenalMatchup(batterRows = [], pitcherRows = [], context = {}) {
     families.reduce((sum, family) => sum + (family.kScore * family.weight), 0)
       + predictionPoints(context.weakness?.k9, 6.5, 11.5, 8, { fallbackPoints: 2 }),
   ), 0, 100);
-  const flags = [...new Set(families.flatMap(arsenalFamilyFlags))];
+  const damageStack = arsenalExactDamageStack(batterRows, pitcherRows);
+  const flags = [...new Set([
+    ...families.flatMap(arsenalFamilyFlags),
+    ...(damageStack.qualifies ? ['Arsenal Imbalance Damage Stack'] : []),
+  ])];
   const strongest = [...families].sort((a, b) => Math.abs(b.weightedEdge) - Math.abs(a.weightedEdge))[0] || families[0];
   const label = arsenalAdvantageLabel(overallScore);
   const hitterName = context.batterName || 'the hitter';
@@ -9677,7 +9845,8 @@ function buildArsenalMatchup(batterRows = [], pitcherRows = [], context = {}) {
     kRiskScore,
     families,
     flags,
-    explanation,
+    damageStack,
+    explanation: damageStack.qualifies ? `${explanation} Damage stack: ${damageStack.detail}.` : explanation,
   };
 }
 
@@ -9685,7 +9854,8 @@ function arsenalMatchupQualifies(matchup = null) {
   if (!matchup) return false;
   return matchup.overallScore >= 10
     || matchup.hrThreatScore >= 64
-    || matchup.flags.some((flag) => ['Fastball Punisher', 'Weakness-on-Weakness', 'Pitcher Cannot Attack Weakness'].includes(flag));
+    || Boolean(matchup.damageStack?.qualifies)
+    || matchup.flags.some((flag) => ['Fastball Punisher', 'Weakness-on-Weakness', 'Pitcher Cannot Attack Weakness', 'Arsenal Imbalance Damage Stack'].includes(flag));
 }
 
 function arsenalMatchupRows(matchup = null) {
@@ -9729,6 +9899,24 @@ function arsenalMatchupCardHtml(matchup = null) {
         `).join('')}
       </div>
       ${matchup.flags.length ? `<div class="arsenal-flags">${matchup.flags.map((flag) => `<span>${escapeHtml(flag)}</span>`).join('')}</div>` : ''}
+    </div>
+  `;
+}
+
+function predictionPitcherBagCardHtml(summary = null) {
+  if (!summary || !summary.count) return '';
+  return `
+    <div class="arsenal-matchup-card pitcher-bag-card">
+      <div class="arsenal-matchup-head">
+        <span>Pitch Bag</span>
+        <strong>${escapeHtml(summary.label)}</strong>
+        <b>${escapeHtml(summary.code)}</b>
+      </div>
+      <p class="arsenal-explanation">${escapeHtml(summary.description || summary.detail || '')}</p>
+      <div class="arsenal-score-grid">
+        <span><b>${Math.round(Math.max(summary.deepScore || 0, summary.shallowScore || summary.score || 0))}</b>Bag Score</span>
+        <span><b>${Math.round(summary.count || 0)}</b>Pitches</span>
+      </div>
     </div>
   `;
 }
@@ -9852,6 +10040,8 @@ function vulnerablePitcherExactCategories(pitcherRows = [], limit = 2) {
   return uniquePitchCategories(ranked.slice(0, limit).map((row) => row.category));
 }
 
+
+
 function archetypePitchCategories(arch = {}, pitcherRows = []) {
   const letter = String(arch?.letter || '').toUpperCase();
   if (letter === 'F') return ['Fastball'];
@@ -9873,8 +10063,9 @@ function archetypePitchCategories(arch = {}, pitcherRows = []) {
     return vulnerable.length ? vulnerable : [];
   }
   if (letter === 'I') {
-    const leanedOn = topPitcherExactCategories(pitcherRows, 2, 4);
-    return leanedOn.length ? leanedOn : [];
+    const stacked = uniquePitchCategories(listify(arch?.damageStack?.rows).map((row) => row?.category).filter(Boolean));
+    if (stacked.length) return stacked;
+    return [];
   }
   if (letter === 'R') {
     const repeated = topPitcherExactCategories(pitcherRows, 2, 12);
@@ -10605,11 +10796,32 @@ function archetypeHandedSplitSummary(handed = null, matchupHand = '') {
   };
 }
 
+
+
 function archetypeDisplaySummary(row = {}, handed = null, matchupHand = '') {
-  // Do not use a full handedness split as fake archetype history. If the pitch-family sample
-  // is thin, keep the row visible with -- values rather than implying hundreds of AB vs that archetype.
-  if (row?.summary) return row.summary;
-  return { h: null, ab: null, slg: null, hr: null, limited: true };
+  const summary = row.summary || {};
+  if (summary.loading) return { ...summary, loading: true };
+  const letter = String(row?.letter || '').toUpperCase();
+  if (letter === 'I' && row?.damageStack?.qualifies) {
+    const rows = listify(row.damageStack.rows);
+    const avgHitterSlg = rows.length ? rows.reduce((sum, item) => sum + Number(item.hitterSlg || 0), 0) / rows.length : null;
+    const stackH = Number(row.damageStack.hitterHits);
+    const stackAb = Number(row.damageStack.hitterAb);
+    const stackHr = Number(row.damageStack.hitterHr);
+    const fallbackHr = rows.reduce((sum, item) => sum + (Number.isFinite(Number(item.hitterHr)) ? Number(item.hitterHr) : 0), 0);
+    return {
+      ...summary,
+      h: Number.isFinite(stackH) && Number.isFinite(stackAb) && stackAb > 0 ? stackH : summary.h,
+      ab: Number.isFinite(stackAb) && stackAb > 0 ? stackAb : summary.ab,
+      slg: Number.isFinite(avgHitterSlg) ? avgHitterSlg : summary.slg,
+      hr: Number.isFinite(stackHr) && stackHr > 0 ? stackHr : (fallbackHr > 0 ? fallbackHr : summary.hr),
+      categories: uniquePitchCategories(rows.map((item) => item.category).filter(Boolean)),
+      limited: true,
+      starterOnly: true,
+      damageStack: row.damageStack,
+    };
+  }
+  return summary;
 }
 
 function pitcherArchetypeRowBadgesHtml(pitcher = null, row = null) {
@@ -10624,7 +10836,7 @@ function pitcherArchetypeRowBadgesHtml(pitcher = null, row = null) {
       .filter((arch) => arch?.letter)
       .filter((arch) => {
         const letter = String(arch?.letter || '').toUpperCase();
-        return letter === rowLetter || arch.isPrimary || (letter === 'K' && arch.isSecondary);
+        return letter === rowLetter || arch.isPrimary || (['K', 'RS', 'DB', 'SB'].includes(letter) && arch.isSecondary);
       })
       .sort((a, b) => {
         const al = String(a?.letter || '').toUpperCase();
@@ -10751,7 +10963,9 @@ function scoreBatterVsPitcherArchetype(arch = {}, batterRows = [], pitcherRows =
     };
   }
   if (letter === 'DB') {
-    const usageSummary = pitcherPitchBagSummary(pitcher);
+    const contextualRows = pitcherRowsForContextualArchetypes(pitcherRows);
+    const usageSummary = pitcherPitchBagSummary({ ...pitcher, pitchBreakdown: contextualRows, pitchMix: contextualRows, pitchRows: contextualRows });
+    if (!usageSummary.deep) return null;
     const score = clamp(Math.round(
       36
       + predictionPoints(arsenalMatchup?.overallScore, -10, 18, 28, { fallbackPoints: 10 })
@@ -10767,7 +10981,9 @@ function scoreBatterVsPitcherArchetype(arch = {}, batterRows = [], pitcherRows =
     };
   }
   if (letter === 'SB') {
-    const usageSummary = pitcherPitchBagSummary(pitcher);
+    const contextualRows = pitcherRowsForContextualArchetypes(pitcherRows);
+    const usageSummary = pitcherPitchBagSummary({ ...pitcher, pitchBreakdown: contextualRows, pitchMix: contextualRows, pitchRows: contextualRows });
+    if (!usageSummary.shallow) return null;
     const leanedOn = pitcherArchetypeMatchupFamily(batterRows, 'primary') || null;
     const score = clamp(Math.round(
       34
@@ -10794,16 +11010,18 @@ function scoreBatterVsPitcherArchetype(arch = {}, batterRows = [], pitcherRows =
     };
   }
   if (letter === 'I') {
-    const usageSummary = pitcherArsenalUsageSummaryFromRows(pitcherRows);
-    if (!usageSummary?.qualifies) return null;
-    const score = clamp(Math.round((Number(arsenalMatchup?.overallScore) || 0) + Math.max(52, usageSummary.score - 8)), 0, 100);
+    const contextualRows = pitcherRowsForContextualArchetypes(pitcherRows);
+    const damageStack = arch?.damageStack?.qualifies ? arch.damageStack : (arsenalMatchup?.damageStack || arsenalExactDamageStack(batterRows, contextualRows));
+    if (!damageStack?.qualifies || Number(damageStack.count) < 2) return null;
+    const score = clamp(Math.round((Number(arsenalMatchup?.overallScore) || 0) + Number(damageStack.score || 70)), 0, 100);
+    const reason = `Damage stack: ${damageStack.detail}`;
     return {
       letter,
       label: 'vs Arsenal Imbalance',
       score,
-      title: `Usage-based Arsenal Imbalance. ${usageSummary.description}. Matchup depends on whether the hitter attacks the pitch family the pitcher actually leans on. ${arsenalMatchup?.explanation || ''}`,
-      detail: `Usage lean: ${usageSummary.description}`,
-      usageSummary,
+      title: `Damage-stack Arsenal Imbalance. Requires 2+ exact pitch types where hitter SLG and pitcher SLG allowed are both .500+. ${reason}.`,
+      detail: reason,
+      damageStack,
     };
   }
   if (letter === 'R') {
@@ -10835,7 +11053,7 @@ async function getPlayerVsPitcherArchetypeMatchup(profile = null, pitcher = null
   const pitcherId = Number(pitcher?.id ?? pitcher?.person?.id);
   if (!Number.isFinite(batterId) || batterId <= 0 || !Number.isFinite(pitcherId) || pitcherId <= 0) return null;
   const targetDate = typeof playerStatTargetDate === 'function' ? playerStatTargetDate(game) : (dateInput.value || formatDate(new Date()));
-  const cacheKey = `${batterId}:${pitcherId}:${targetDate}:archetype-match-v7`;
+  const cacheKey = `${batterId}:${pitcherId}:${targetDate}:archetype-match-v12`;
   if (playerVsPitcherArchetypeCache.has(cacheKey)) return playerVsPitcherArchetypeCache.get(cacheKey);
   const promise = (async () => {
     const syncedPitcher = await syncedFirstAppearancePitcherProfileForGame(pitcher, game).catch(() => pitcher);
@@ -10913,11 +11131,17 @@ async function getPlayerVsPitcherArchetypeMatchup(profile = null, pitcher = null
         eventDerived: true,
       });
     }
-    const arsenal = buildArsenalMatchup(batterRows, pitcherRows, {
+    const contextualPitchRows = pitcherRowsForContextualArchetypes(pitcherRows);
+    const arsenal = buildArsenalMatchup(batterRows, contextualPitchRows, {
       batterName: profile?.fullName || profile?.name || 'hitter',
       pitcherName: matchupPitcher?.fullName || matchupPitcher?.name || 'pitcher',
     });
-    const usageSummary = pitcherArsenalUsageSummaryFromRows(pitcherRows);
+    const usageSummary = pitcherArsenalUsageSummaryFromRows(contextualPitchRows);
+    const hasCurrentPitchRows = pitcherHasCurrentPitchUsageRows(contextualPitchRows);
+    const currentBagSummary = pitcherPitchBagSummary({ pitchBreakdown: contextualPitchRows, pitchMix: contextualPitchRows, pitchRows: contextualPitchRows });
+    const contextualBagArchetype = pitchBagArchetypeFromSummary(currentBagSummary);
+    const contextualImbalanceArchetype = arsenalImbalanceArchetypeFromDamageStack(arsenal?.damageStack);
+    const bagArchetypeAllowed = (arch) => pitcherBagArchetypeIsAllowed(arch?.letter, currentBagSummary, hasCurrentPitchRows);
     const seasonProfileRow = activePitcherSeasonProfile?.row || null;
     const pitcherForArchetypes = {
       ...(seasonProfileRow || {}),
@@ -10930,34 +11154,43 @@ async function getPlayerVsPitcherArchetypeMatchup(profile = null, pitcher = null
       },
       fullName: matchupPitcher?.fullName || matchupPitcher?.name || seasonProfileRow?.fullName || seasonProfileRow?.name || pitcher?.fullName || pitcher?.name,
       name: matchupPitcher?.name || matchupPitcher?.fullName || seasonProfileRow?.name || seasonProfileRow?.fullName || pitcher?.name || pitcher?.fullName,
-      pitchBreakdown: pitcherRows.length ? pitcherRows : listify(seasonProfileRow?.pitchBreakdown || seasonProfileRow?.pitchMix || []),
-      pitchMix: pitcherRows.length ? pitcherRows : listify(seasonProfileRow?.pitchMix || seasonProfileRow?.pitchBreakdown || []),
+      pitchBreakdown: contextualPitchRows.length ? contextualPitchRows : listify(seasonProfileRow?.pitchBreakdown || seasonProfileRow?.pitchMix || []),
+      pitchMix: contextualPitchRows.length ? contextualPitchRows : listify(seasonProfileRow?.pitchMix || seasonProfileRow?.pitchBreakdown || []),
     };
     const directArchetypes = listify(lineupPitcherArchetypes(pitcherForArchetypes))
-      .filter((arch) => arch?.letter && (arch.isPrimary || arch.isSecondary || Number(arch.confidence) >= 52));
+      .filter((arch) => arch?.letter && (arch.isPrimary || arch.isSecondary || Number(arch.confidence) >= 52))
+      .filter(bagArchetypeAllowed);
     const seasonProfileArchetypes = listify(activePitcherSeasonProfile?.archetypes)
-      .filter((arch) => arch?.letter && (arch.isPrimary || arch.isSecondary || Number(arch.confidence) >= 52));
+      .filter((arch) => arch?.letter && (arch.isPrimary || arch.isSecondary || Number(arch.confidence) >= 52))
+      .filter(bagArchetypeAllowed);
     const archetypeByLetter = new Map();
-    [...seasonProfileArchetypes, ...directArchetypes].forEach((arch) => {
+    [...seasonProfileArchetypes, ...directArchetypes, contextualBagArchetype, contextualImbalanceArchetype].forEach((arch) => {
       const letter = String(arch?.letter || '').toUpperCase();
       if (!letter) return;
       const current = archetypeByLetter.get(letter);
-      if (!current || Number(arch.confidence || arch.score || 0) > Number(current.confidence || current.score || 0)) {
+      if (!current || Number(arch.confidence || arch.score || 0) > Number(current.confidence || current.score || 0) || arch.contextualBag || arch.contextualImbalance) {
         archetypeByLetter.set(letter, arch);
       }
     });
-    const archetypes = upsertUsageBasedArsenalImbalance([...archetypeByLetter.values()], usageSummary).slice(0, 5);
+    let archetypeCandidates = [...archetypeByLetter.values()].filter((arch) => String(arch?.letter || '').toUpperCase() !== 'I');
+    if (contextualImbalanceArchetype) {
+      archetypeCandidates.push(contextualImbalanceArchetype);
+      archetypeCandidates.sort((a, b) => Number(b.score || b.confidence || 0) - Number(a.score || a.confidence || 0));
+    }
+    const archetypes = archetypeCandidates
+      .filter(bagArchetypeAllowed)
+      .slice(0, 5);
     const matchups = archetypes
       .map((arch) => {
-        const scored = scoreBatterVsPitcherArchetype(arch, batterRows, pitcherRows, arsenal, pitcherForArchetypes);
+        const scored = scoreBatterVsPitcherArchetype(arch, batterRows, contextualPitchRows, arsenal, pitcherForArchetypes);
         if (!scored) return null;
         const archetypeStarterRows = filterStarterEventRowsForPitcherArchetype(starterOnlyEventRows, arch, starterPitcherProfiles, flamePitcherEligibility);
         const eventSummary = archetypeEventRowSummary(arch, archetypeStarterRows, matchupPitcher, profile);
-        let familyEventSummary = archetypePitchFamilyEventSummary(arch, archetypeStarterRows, pitcherRows, profile);
+        let familyEventSummary = archetypePitchFamilyEventSummary(arch, archetypeStarterRows, contextualPitchRows, profile);
         if (String(arch?.letter || '').toUpperCase() === 'K'
           && !archetypeSummaryHasUsableSample(eventSummary)
           && !archetypeSummaryHasUsableSample(familyEventSummary)) {
-          const starterSecondaryFallback = archetypePitchFamilyEventSummary(arch, starterOnlyEventRows, pitcherRows, profile);
+          const starterSecondaryFallback = archetypePitchFamilyEventSummary(arch, starterOnlyEventRows, contextualPitchRows, profile);
           if (archetypeSummaryHasUsableSample(starterSecondaryFallback)) {
             familyEventSummary = {
               ...starterSecondaryFallback,
@@ -10968,7 +11201,7 @@ async function getPlayerVsPitcherArchetypeMatchup(profile = null, pitcher = null
           }
         }
         const emptyStarterSummary = {
-          categories: archetypePitchCategories(arch, pitcherRows),
+          categories: archetypePitchCategories(arch, contextualPitchRows),
           h: null,
           ab: null,
           slg: null,
@@ -10983,6 +11216,15 @@ async function getPlayerVsPitcherArchetypeMatchup(profile = null, pitcher = null
           ? eventSummary
           : (archetypeSummaryHasUsableSample(familyEventSummary) ? familyEventSummary : emptyStarterSummary);
         summary.starterOnly = true;
+        if (String(arch?.letter || '').toUpperCase() === 'I' && scored?.damageStack?.qualifies) {
+          const currentPitcherName = cleanSummary(matchupPitcher?.fullName || matchupPitcher?.name || pitcherForArchetypes?.fullName || pitcherForArchetypes?.name || pitcher?.fullName || pitcher?.name || '');
+          if (currentPitcherName) {
+            summary.currentPitcherName = currentPitcherName;
+            summary.pitchers = dedupeTooltipPitcherNames([currentPitcherName, ...listify(summary.pitchers)], [profile?.fullName, profile?.name]);
+          }
+          summary.currentPitcherId = activePitcherId || pitcherId || null;
+          summary.currentPitcherDamageStack = true;
+        }
         if (!summary.pitchers?.length && familyEventSummary.pitchers?.length) summary.pitchers = familyEventSummary.pitchers;
         if (!summary.categories?.length && familyEventSummary.categories?.length) summary.categories = familyEventSummary.categories;
         return { ...scored, summary };
@@ -11003,11 +11245,51 @@ function archetypeStatlineHoverTitle(row = {}, pitcherName = '') {
   const summary = row.displaySummary || row.summary || {};
   const lines = [];
   const label = String(row.label || row.title || 'Pitcher archetype').replace(/^vs\s+/i, '');
-  const pitchers = dedupeTooltipPitcherNames(summary.pitchers);
+  const letter = String(row?.letter || '').toUpperCase();
+  const pitchers = dedupeTooltipPitcherNames(summary.pitchers, []);
   lines.push(`${label}${pitcherName ? ` vs ${pitcherName}` : ''}`);
   if (row.title) lines.push(String(row.title));
   const categories = uniquePitchCategories(listify(summary.categories).map(visiblePitchCategoryName).filter(Boolean));
   if (categories.length) lines.push(`Pitch families used: ${categories.join(', ')}`);
+
+  if (letter === 'I' && row?.damageStack?.qualifies) {
+    const currentPitcher = cleanSummary(summary.currentPitcherName || pitcherName || '');
+    if (currentPitcher) lines.push(`Current pitcher: ${currentPitcher}`);
+    const damageRows = listify(row.damageStack.rows);
+    if (damageRows.length) {
+      lines.push('Qualifying pitch damage:');
+      damageRows.slice(0, 6).forEach((item) => {
+        const parts = [
+          `${cleanSummary(item.category || 'Pitch')}`,
+          `H ${formatRateValue(item.hitterSlg, 3, true)}`,
+          `P ${formatRateValue(item.pitcherSlg, 3, true)}`,
+        ];
+        if (Number.isFinite(Number(item.hitterHits)) && Number.isFinite(Number(item.hitterAb)) && Number(item.hitterAb) > 0) {
+          parts.push(`H-AB ${Math.round(Number(item.hitterHits))}-${Math.round(Number(item.hitterAb))}`);
+        }
+        if (Number.isFinite(Number(item.usagePct))) parts.push(`${arsenalMetricText(item.usagePct, 1, false, '%')}`);
+        lines.push(`• ${parts.join(' | ')}`);
+      });
+    }
+    const statlines = listify(summary.pitcherStatlines)
+      .filter((line) => Number.isFinite(Number(line?.ab)) && Number(line.ab) > 0)
+      .sort((a, b) => Number(b.ab || 0) - Number(a.ab || 0) || String(a.pitcherName || '').localeCompare(String(b.pitcherName || '')));
+    if (statlines.length) {
+      lines.push('Historical starter sample:');
+      statlines.slice(0, 8).forEach((line) => {
+        const name = cleanSummary(line.pitcherName || (line.pitcherId ? `Pitcher ${line.pitcherId}` : 'Pitcher'));
+        lines.push(`• ${name}: ${formatArchetypeHab(line)} | ${formatArchetypeSlg(line)} SLG | HR ${formatArchetypeHr(line)}`);
+      });
+      if (statlines.length > 8) lines.push(`• +${statlines.length - 8} more pitcher statlines`);
+    } else if (pitchers.length > 1) {
+      lines.push('Historical starter names:');
+      pitchers.filter((name) => normalizedTooltipNameKey(name) !== normalizedTooltipNameKey(currentPitcher)).slice(0, 8).forEach((name) => lines.push(`• ${name}`));
+    }
+    lines.push('Sample scope: current pitcher exact-pitch damage stack; relief/closer historical rows excluded where available.');
+    if (summary.limited) lines.push('Sample note: limited archetype-specific sample.');
+    return lines.filter(Boolean).join('\n');
+  }
+
   lines.push(summary.starterOnly ? 'Starting pitchers in sample:' : 'Pitchers in sample:');
   const statlines = listify(summary.pitcherStatlines)
     .filter((line) => Number.isFinite(Number(line?.ab)) && Number(line.ab) > 0)
@@ -11097,9 +11379,17 @@ function playerVsPitcherArchetypeCardHtml(matchup = null, pitcher = null, loadin
   });
   const rows = [...byLetter.values()]
     .map((row) => ({ ...row, displaySummary: archetypeDisplaySummary(row, handed, matchupHand) }))
-    .filter((row) => row?.letter)
+    .filter((row) => {
+      const letter = String(row?.letter || '').toUpperCase();
+      if (!letter) return false;
+      if (letter === 'I') return Boolean(row?.damageStack?.qualifies) && Number(row?.damageStack?.count || 0) >= 2;
+      if (row.displaySummary?.loading || row.displaySummary?.noSample) return true;
+      // Do not render score-only archetype rows. If there is no H-AB, SLG, or HR sample,
+      // the table looks like an attribution error and the tooltip cannot explain the row.
+      return archetypeSummaryHasUsableSample(row.displaySummary || row.summary || {});
+    })
     .sort((a, b) => {
-      const order = { F: 0, K: 1, L: 2, I: 3, A: 3, R: 4 };
+      const order = { F: 0, K: 1, RS: 2, L: 3, I: 4, A: 4, DB: 5, SB: 5, R: 6 };
       const ao = order[String(a.letter || '').toUpperCase()] ?? 99;
       const bo = order[String(b.letter || '').toUpperCase()] ?? 99;
       return ao - bo || Number(b.score || 0) - Number(a.score || 0);
@@ -11779,7 +12069,7 @@ function visiblePlayerCardPitchStripHtml(rows = null, kind = 'pitcher', orderedC
   return `<div class="visible-pitch-strip${pitcherMode ? ' pitcher' : ' batter'}" data-pitch-count="${count}" style="--pitch-count:${count}">${cards}</div>`;
 }
 
-function pitcherOpponentHandHtml(splits = null, starts = null, graphLabel = 'Last 5 Starts', pitcherId = '', recentHand = null) {
+function pitcherOpponentHandHtml(splits = null, starts = null, graphLabel = 'Last 5 Starts', pitcherId = '', recentHand = null, profile = null) {
   const source = splits?.source || '';
   return `
     <div class="pitcher-card-extra-stack"${source ? ` title="${escapeHtml(source)}"` : ''}>
@@ -11877,11 +12167,6 @@ function hydrateVisiblePlayerCardPitchTables(profile, game, token) {
             null
           );
           const rows = mergePreviousStartPitchMix(rawRows, previousStartMix);
-          const panel = playerStatExtraEl?.querySelector?.('.pitcher-archetype-card');
-          if (panel && playerStatExtraEl?.dataset?.splitToken === token) {
-            const updatedPanel = pitcherArchetypePanelHtml(profile, rows);
-            if (updatedPanel) panel.outerHTML = updatedPanel;
-          }
           return visiblePlayerCardPitchStripHtml(rows, 'pitcher');
         }
 
@@ -13027,7 +13312,7 @@ function renderMultiLineSummary(el, items) {
 }
 
 function isFocusedGame(gamePk) {
-  return focusedGamePk !== null && String(focusedGamePk) === String(gamePk);
+  return false;
 }
 
 function animateNumericChange(el, color) {
@@ -13089,34 +13374,30 @@ function scoreRunAnimationSignature(game, side = '') {
 }
 
 function syncFocusedGameLayout() {
+  focusedGamePk = null;
+  priorityHydrationGamePk = '';
   if (!gamesEl) return;
-  const hasFocusedGame = focusedGamePk !== null;
-  gamesEl.classList.toggle('has-focused-game', hasFocusedGame);
+  gamesEl.classList.remove('has-focused-game');
   for (const card of gamesEl.querySelectorAll('.game-card')) {
-    const isFocused = hasFocusedGame && String(card.dataset.gamePk) === String(focusedGamePk);
-    card.classList.toggle('is-focused', isFocused);
-    card.classList.toggle('is-condensed', hasFocusedGame && !isFocused);
+    card.classList.remove('is-focused', 'is-condensed', 'is-priority-hydrating');
+    delete card.dataset.priorityHydrating;
+    card.dataset.focusedMatchupSide = '';
+    const panel = card.querySelector('.focused-matchup-panel');
+    if (panel) {
+      panel.hidden = true;
+      panel.dataset.renderToken = '';
+      panel.dataset.renderSignature = '';
+      panel.replaceChildren();
+    }
   }
   requestAnimationFrame(refreshAllScoreboardResponsiveLayout);
 }
 
 function setFocusedGame(gamePk) {
-  focusedGamePk = gamePk === null ? null : String(gamePk);
-  if (focusedGamePk && !focusedMatchupSideByGame.has(focusedGamePk)) {
-    focusedMatchupSideByGame.set(focusedGamePk, 'away');
-  }
+  focusedGamePk = null;
+  priorityHydrationGamePk = '';
+  focusedGameHydrationSeq += 1;
   syncFocusedGameLayout();
-  if (focusedGamePk) {
-    requestFocusedGameHydration(focusedGamePk);
-  } else {
-    priorityHydrationGamePk = '';
-    if (!loadGamesInFlight && typeof scoreboardHydrationIncomplete === 'function' && scoreboardHydrationIncomplete()) {
-      window.setTimeout(() => loadGames({ showLoading: false }), 150);
-    }
-  }
-  for (const card of gamesEl.querySelectorAll('.game-card')) {
-    if (card._game) upsertCard(card._game);
-  }
 }
 
 function focusedMatchupSide(gamePk) {
@@ -13144,8 +13425,7 @@ function syncFocusedMatchupSelection(card) {
 }
 
 function toggleFocusedGame(gamePk) {
-  if (!gamePk) return;
-  setFocusedGame(String(focusedGamePk) === String(gamePk) ? null : gamePk);
+  setFocusedGame(null);
 }
 
 function statusLine(game) {
@@ -15039,8 +15319,10 @@ function readPendingGamePickStore() {
   }
   const backupState = readManualStateBackup(date);
   const mirrorState = readManualStateMirror(date);
+  const durableState = readManualStateDurable(date);
   rememberCandidate(backupState.pendingGamePicks, backupState.updatedAt);
   rememberCandidate(mirrorState.pendingGamePicks, mirrorState.updatedAt);
+  rememberCandidate(durableState.pendingGamePicks, durableState.updatedAt);
   try {
     const sessionState = JSON.parse(sessionStorage.getItem(manualStateBackupKey(date)) || '{}');
     rememberCandidate(sessionState?.pendingGamePicks, sessionState?.updatedAt);
@@ -15089,6 +15371,64 @@ function readManualStateMirror(date = dateInput.value || formatDate(new Date()))
   }
 }
 
+function readManualStateDurable(date = dateInput.value || formatDate(new Date())) {
+  try {
+    const parsed = JSON.parse(localStorage.getItem(MANUAL_STATE_DURABLE_KEY) || '{}');
+    return parsed?.[date] && typeof parsed[date] === 'object' ? parsed[date] : {};
+  } catch {
+    return {};
+  }
+}
+
+function normalizeManualStatePatchField(key = '', value = []) {
+  if (key === 'pendingGamePicks') return normalizePendingGamePickEntries(value);
+  if (key === 'overUnderScoreboards') return normalizeOverUnderScoreboardEntries(value);
+  if (key === 'tossupScoreboards' || key === 'lockedTossupScoreboards') {
+    return listify(value).map((item) => String(item || '')).filter(Boolean);
+  }
+  return value;
+}
+
+function writeManualStateDurablePatch(patch = {}, date = dateInput.value || formatDate(new Date()), options = {}) {
+  try {
+    const targetDate = String(date || dateInput.value || formatDate(new Date()));
+    const store = JSON.parse(localStorage.getItem(MANUAL_STATE_DURABLE_KEY) || '{}') || {};
+    const current = store[targetDate] && typeof store[targetDate] === 'object' ? store[targetDate] : {};
+    const next = { ...current };
+    let changed = false;
+    for (const key of ['pendingGamePicks', 'tossupScoreboards', 'lockedTossupScoreboards', 'overUnderScoreboards']) {
+      if (!hasOwnManualStateField(patch, key)) continue;
+      const normalized = normalizeManualStatePatchField(key, patch[key]);
+      if (manualStateWeight(normalized) || options.allowEmpty) {
+        next[key] = normalized;
+        changed = true;
+      }
+    }
+    if (!changed) return;
+    store[targetDate] = { ...next, updatedAt: Date.now() };
+    localStorage.setItem(MANUAL_STATE_DURABLE_KEY, JSON.stringify(store));
+  } catch {}
+}
+
+function chooseManualStateFieldValue(date, field, normalizer = (value) => value) {
+  const candidates = [];
+  const remember = (source) => {
+    if (!hasOwnManualStateField(source, field)) return;
+    const value = normalizer(source[field]);
+    candidates.push({ value, updatedAt: Number(source?.updatedAt || 0), weight: manualStateWeight(value) });
+  };
+  remember(readManualStateMirror(date));
+  remember(readManualStateBackup(date));
+  remember(readManualStateDurable(date));
+  try {
+    const sessionState = JSON.parse(sessionStorage.getItem(manualStateBackupKey(date)) || '{}');
+    remember(sessionState);
+  } catch {}
+  if (!candidates.length) return null;
+  candidates.sort((a, b) => b.weight - a.weight || b.updatedAt - a.updatedAt);
+  return candidates[0].value;
+}
+
 function writeManualStateMirrorPatch(patch = {}, date = dateInput.value || formatDate(new Date())) {
   try {
     const parsed = JSON.parse(localStorage.getItem(MANUAL_STATE_MIRROR_KEY) || '{}');
@@ -15103,12 +15443,13 @@ function writeManualStateMirrorPatch(patch = {}, date = dateInput.value || forma
   } catch {}
 }
 
-function writeManualStateBackupPatch(patch = {}, date = dateInput.value || formatDate(new Date())) {
+function writeManualStateBackupPatch(patch = {}, date = dateInput.value || formatDate(new Date()), options = {}) {
   try {
     const current = readManualStateBackup(date);
     localStorage.setItem(manualStateBackupKey(date), JSON.stringify({ ...current, ...patch, updatedAt: Date.now() }));
   } catch {}
   writeManualStateMirrorPatch(patch, date);
+  writeManualStateDurablePatch(patch, date, options);
   try {
     const current = JSON.parse(sessionStorage.getItem(manualStateBackupKey(date)) || '{}');
     sessionStorage.setItem(manualStateBackupKey(date), JSON.stringify({ ...current, ...patch, updatedAt: Date.now() }));
@@ -15122,7 +15463,7 @@ function writePendingGamePickStore(picks, options = {}) {
     localStorage.setItem(dateKey, JSON.stringify(cleanPicks));
     localStorage.setItem(PENDING_GAME_PICKS_STORAGE_KEY, JSON.stringify(cleanPicks));
   } catch {}
-  if (options.backup !== false && (cleanPicks.length || options.allowEmpty)) writeManualStateBackupPatch({ pendingGamePicks: cleanPicks });
+  if (options.backup !== false && (cleanPicks.length || options.allowEmpty)) writeManualStateBackupPatch({ pendingGamePicks: cleanPicks }, undefined, { allowEmpty: options.allowEmpty });
 }
 
 function savePendingGamePicks(options = {}) {
@@ -15213,8 +15554,10 @@ function readOverUnderScoreboardStore(date = dateInput.value || formatDate(new D
   } catch {}
   const backupState = readManualStateBackup(date);
   const mirrorState = readManualStateMirror(date);
+  const durableState = readManualStateDurable(date);
   remember(backupState.overUnderScoreboards, backupState.updatedAt);
   remember(mirrorState.overUnderScoreboards, mirrorState.updatedAt);
+  remember(durableState.overUnderScoreboards, durableState.updatedAt);
   try {
     const sessionState = JSON.parse(sessionStorage.getItem(manualStateBackupKey(date)) || '{}');
     remember(sessionState?.overUnderScoreboards, sessionState?.updatedAt);
@@ -15231,11 +15574,15 @@ function saveOverUnderScoreboards(date = dateInput.value || formatDate(new Date(
   try {
     localStorage.setItem(overUnderScoreboardStorageKey(date), JSON.stringify(values));
   } catch {}
-  if (values.length || options.allowEmpty) writeManualStateBackupPatch({ overUnderScoreboards: values }, date);
+  if (values.length || options.allowEmpty) writeManualStateBackupPatch({ overUnderScoreboards: values }, date, { allowEmpty: options.allowEmpty });
 }
 
 function restoreOverUnderScoreboards(date = dateInput.value || formatDate(new Date())) {
   const stored = readOverUnderScoreboardStore(date);
+  if (!stored.length && overUnderScoreboardSelections.size) {
+    saveOverUnderScoreboards(date);
+    return;
+  }
   overUnderScoreboardSelections.clear();
   stored.forEach((entry) => {
     const side = normalizeOverUnderSide(entry.side);
@@ -15383,8 +15730,10 @@ function readLockedTossupScoreboardStore(date = dateInput.value || formatDate(ne
   } catch {}
   const backupState = readManualStateBackup(date);
   const mirrorState = readManualStateMirror(date);
+  const durableState = readManualStateDurable(date);
   remember(backupState.lockedTossupScoreboards, backupState.updatedAt);
   remember(mirrorState.lockedTossupScoreboards, mirrorState.updatedAt);
+  remember(durableState.lockedTossupScoreboards, durableState.updatedAt);
   const best = candidates.sort((a, b) => manualStateWeight(b.items) - manualStateWeight(a.items) || b.updatedAt - a.updatedAt)[0]?.items || [];
   if (best.length) {
     try { localStorage.setItem(lockedTossupScoreboardStorageKey(date), JSON.stringify(best)); } catch {}
@@ -15397,7 +15746,7 @@ function saveLockedTossupScoreboards(date = dateInput.value || formatDate(new Da
   try {
     localStorage.setItem(lockedTossupScoreboardStorageKey(date), JSON.stringify(values));
   } catch {}
-  if (values.length || options.allowEmpty) writeManualStateBackupPatch({ lockedTossupScoreboards: values }, date);
+  if (values.length || options.allowEmpty) writeManualStateBackupPatch({ lockedTossupScoreboards: values }, date, { allowEmpty: options.allowEmpty });
 }
 
 function lockedTossupScoreboardMarkedForGame(game) {
@@ -15409,24 +15758,27 @@ function tossupScoreboardStateForGame(game) {
 }
 
 function readTossupScoreboardStore(date = dateInput.value || formatDate(new Date())) {
+  const candidates = [];
+  const remember = (value, updatedAt = 0) => {
+    if (!Array.isArray(value)) return;
+    const items = value.map((gamePk) => String(gamePk)).filter(Boolean);
+    if (items.length) candidates.push({ items, updatedAt: Number(updatedAt) || 0 });
+  };
   try {
-    const parsed = JSON.parse(localStorage.getItem(tossupScoreboardStorageKey(date)) || '[]');
-    const values = Array.isArray(parsed) ? parsed.map((gamePk) => String(gamePk)).filter(Boolean) : [];
-    if (values.length) {
-      writeManualStateBackupPatch({ tossupScoreboards: values }, date);
-      return values;
-    }
-  } catch {
-    // Fall through to the protected same-day backup.
+    remember(JSON.parse(localStorage.getItem(tossupScoreboardStorageKey(date)) || '[]'));
+  } catch {}
+  const backupState = readManualStateBackup(date);
+  const mirrorState = readManualStateMirror(date);
+  const durableState = readManualStateDurable(date);
+  remember(backupState.tossupScoreboards, backupState.updatedAt);
+  remember(mirrorState.tossupScoreboards, mirrorState.updatedAt);
+  remember(durableState.tossupScoreboards, durableState.updatedAt);
+  const best = candidates.sort((a, b) => manualStateWeight(b.items) - manualStateWeight(a.items) || b.updatedAt - a.updatedAt)[0]?.items || [];
+  if (best.length) {
+    try { localStorage.setItem(tossupScoreboardStorageKey(date), JSON.stringify(best)); } catch {}
+    writeManualStateBackupPatch({ tossupScoreboards: best }, date);
   }
-  const backup = readManualStateBackup(date).tossupScoreboards;
-  if (Array.isArray(backup) && backup.length) {
-    try {
-      localStorage.setItem(tossupScoreboardStorageKey(date), JSON.stringify(backup));
-    } catch {}
-    return backup.map((gamePk) => String(gamePk)).filter(Boolean);
-  }
-  return [];
+  return best;
 }
 
 function saveTossupScoreboards(date = dateInput.value || formatDate(new Date()), options = {}) {
@@ -15434,7 +15786,7 @@ function saveTossupScoreboards(date = dateInput.value || formatDate(new Date()),
   try {
     localStorage.setItem(tossupScoreboardStorageKey(date), JSON.stringify(values));
   } catch {}
-  if (values.length || options.allowEmpty) writeManualStateBackupPatch({ tossupScoreboards: values }, date);
+  if (values.length || options.allowEmpty) writeManualStateBackupPatch({ tossupScoreboards: values }, date, { allowEmpty: options.allowEmpty });
 }
 
 function restoreTossupScoreboards(date = dateInput.value || formatDate(new Date())) {
@@ -15445,8 +15797,13 @@ function restoreTossupScoreboards(date = dateInput.value || formatDate(new Date(
   }
   tossupScoreboardGamePks.clear();
   stored.forEach((gamePk) => tossupScoreboardGamePks.add(String(gamePk)));
-  lockedTossupScoreboardGamePks.clear();
-  readLockedTossupScoreboardStore(date).forEach((gamePk) => lockedTossupScoreboardGamePks.add(String(gamePk)));
+  const lockedStored = readLockedTossupScoreboardStore(date);
+  if (!lockedStored.length && lockedTossupScoreboardGamePks.size) {
+    saveLockedTossupScoreboards(date);
+  } else {
+    lockedTossupScoreboardGamePks.clear();
+    lockedStored.forEach((gamePk) => lockedTossupScoreboardGamePks.add(String(gamePk)));
+  }
 }
 
 
@@ -15537,15 +15894,15 @@ function hasOwnManualStateField(source = {}, key = '') {
 
 function reconcileCrossDeviceManualState(date = dateInput.value || formatDate(new Date())) {
   const selectedDate = String(date || dateInput.value || formatDate(new Date()));
-  const mirror = readManualStateMirror(selectedDate);
-  const backup = readManualStateBackup(selectedDate);
-  const source = Number(mirror?.updatedAt || 0) >= Number(backup?.updatedAt || 0) ? mirror : backup;
-  if (!source || typeof source !== 'object') return false;
   const patch = {};
-  if (hasOwnManualStateField(source, 'pendingGamePicks')) patch.pendingGamePicks = normalizePendingGamePickEntries(source.pendingGamePicks);
-  if (hasOwnManualStateField(source, 'tossupScoreboards')) patch.tossupScoreboards = listify(source.tossupScoreboards).map((key) => String(key)).filter(Boolean);
-  if (hasOwnManualStateField(source, 'lockedTossupScoreboards')) patch.lockedTossupScoreboards = listify(source.lockedTossupScoreboards).map((key) => String(key)).filter(Boolean);
-  if (hasOwnManualStateField(source, 'overUnderScoreboards')) patch.overUnderScoreboards = normalizeOverUnderScoreboardEntries(source.overUnderScoreboards);
+  const pending = chooseManualStateFieldValue(selectedDate, 'pendingGamePicks', normalizePendingGamePickEntries);
+  const tossups = chooseManualStateFieldValue(selectedDate, 'tossupScoreboards', (value) => listify(value).map((key) => String(key)).filter(Boolean));
+  const locked = chooseManualStateFieldValue(selectedDate, 'lockedTossupScoreboards', (value) => listify(value).map((key) => String(key)).filter(Boolean));
+  const overUnder = chooseManualStateFieldValue(selectedDate, 'overUnderScoreboards', normalizeOverUnderScoreboardEntries);
+  if (pending !== null) patch.pendingGamePicks = pending;
+  if (tossups !== null) patch.tossupScoreboards = tossups;
+  if (locked !== null) patch.lockedTossupScoreboards = locked;
+  if (overUnder !== null) patch.overUnderScoreboards = overUnder;
   if (!Object.keys(patch).length) return false;
   const fingerprint = JSON.stringify({ date: selectedDate, ...patch });
   if (fingerprint === manualStateCrossDeviceFingerprint) return false;
@@ -15990,6 +16347,30 @@ function summarizeLastFiveBattingDetails(splits = [], game = null, gameLimit = 5
       walks: statNumber(lastStat.baseOnBalls ?? lastStat.walks),
       so: statNumber(lastStat.strikeOuts),
     },
+    heatGames: games.slice(0, 3).map((split) => {
+      const stat = split?.stat || {};
+      const opponent = displayTeamAbbrev(
+        split?.opponent?.abbreviation
+        || split?.opponent?.teamCode
+        || split?.opponent?.name
+        || split?.opponentTeam?.abbreviation
+        || split?.opponentTeam?.name
+        || '',
+      );
+      return {
+        date: formatLeadersDateLabel(split?.date || selectedDate),
+        rawDate: split?.date || selectedDate,
+        gamePk: Number(split?.game?.gamePk ?? split?.gamePk) || null,
+        opponent,
+        hits: statNumber(stat.hits),
+        atBats: statNumber(stat.atBats),
+        totalBases: statNumber(stat.totalBases) || totalBasesFromBatting(stat),
+        hr: statNumber(stat.homeRuns),
+        rbi: statNumber(stat.rbi),
+        walks: statNumber(stat.baseOnBalls ?? stat.walks),
+        so: statNumber(stat.strikeOuts),
+      };
+    }),
     totals: {
       games: totals.games,
       atBats: totals.atBats,
@@ -16165,9 +16546,138 @@ function playerLastGameFeatureHtml(last) {
   `;
 }
 
-function playerStatTodayWithLastGameHtml(todayLine, details = null, title = 'TODAY') {
-  return `${playerStatRowsHtml(title, [['Line', todayLine]])}${playerLastGameFeatureHtml(details?.feature || null)}`;
+
+
+
+function playerBatterHeatCompactDate(game = {}) {
+  const raw = cleanSummary(game.date || game.rawDate || '');
+  if (!raw) return '--';
+  const parts = raw.split('-');
+  if (parts.length === 3) {
+    const date = new Date(`${raw}T00:00:00`);
+    if (!Number.isNaN(date.getTime())) return date.toLocaleDateString('en-US', { month: 'short', day: 'numeric' });
+  }
+  return raw.replace(/^\d{4}-/, '').replace('-', '/');
 }
+
+function playerBatterHeatGameResultText(game = null) {
+  if (!game) return '--';
+  const hits = statNumber(game.hits);
+  const atBats = statNumber(game.atBats);
+  const tb = statNumber(game.totalBases);
+  const hr = statNumber(game.hr ?? game.homeRuns);
+  const parts = [`${hits}-${atBats}`, `${tb} TB`];
+  if (hr > 0) parts.push(`${hr} HR`);
+  return parts.join(', ');
+}
+
+
+function playerBatterHeatContactStat(contact = null, key = '', game = null) {
+  const src = contact || {};
+  const detail = cleanSummary(src.detail || src.contactDetail || '');
+  const fallbackBip = Math.max(0, statNumber(game?.atBats) - statNumber(game?.so ?? game?.strikeOuts));
+  const bbe = Number(src.bbe ?? src.bip ?? src.battedBalls ?? detail.match(/(\d+)\s*BBE/i)?.[1] ?? (fallbackBip || 0));
+  const hardHit = Number(src.hardHit ?? src.hh ?? src.hardContact ?? detail.match(/HH\s*(\d+)/i)?.[1] ?? detail.match(/hard[-\s]*hit(?:\s*balls?)?\s*(\d+)/i)?.[1] ?? 0);
+  const barrelLike = Number(src.barrelLike ?? src.barrels ?? src.barrel ?? detail.match(/barrel(?:-like)?\s*(\d+)/i)?.[1] ?? 0);
+  const gameLoaded = Boolean(game) || Boolean(contact);
+  if (key === 'bip') return Number.isFinite(bbe) && bbe > 0 ? String(Math.round(bbe)) : gameLoaded ? '0' : '--';
+  if (key === 'hard') return Number.isFinite(hardHit) && hardHit > 0 ? String(Math.round(hardHit)) : gameLoaded ? '0' : '--';
+  if (key === 'barrel') return Number.isFinite(barrelLike) && barrelLike > 0 ? String(Math.round(barrelLike)) : gameLoaded ? '0' : '--';
+  return '--';
+}
+
+function playerBatterHeatGameScoreValue(game = null, index = 0) {
+  if (!game) return null;
+  if (typeof batterHeatGameScore === 'function') return batterHeatGameScore(game, index);
+  const hits = statNumber(game.hits);
+  const atBats = statNumber(game.atBats);
+  const tb = statNumber(game.totalBases);
+  const hr = statNumber(game.hr ?? game.homeRuns);
+  return clamp(Math.round(18 + (hr > 0 ? 34 : 0) + Math.min(22, tb * 6) + Math.min(14, hits * 5) - Math.min(6, Math.max(0, atBats - hits) * 1.2)), 0, 100);
+}
+
+function playerBatterHeatGameNumbersHtml(games = []) {
+  const padded = [...listify(games).slice(0, 3), null, null, null].slice(0, 3);
+  return `
+    <div class="player-batter-heat-mini-row" aria-label="Last three game heat scores">
+      <span>Score</span>
+      ${padded.map((game, index) => {
+        const score = playerBatterHeatGameScoreValue(game, index);
+        const label = `G${index + 1}`;
+        const result = playerBatterHeatGameResultText(game);
+        const title = game ? `${label}: ${result}` : `${label}: no recent game loaded`;
+        return `<b title="${escapeHtml(title)}"><small>${escapeHtml(label)}</small>${Number.isFinite(score) ? Math.round(score) : '--'}</b>`;
+      }).join('')}
+    </div>
+  `;
+}
+
+function playerBatterHeatContactGridHtml(games = [], contacts = []) {
+  const gameRows = [...listify(games).slice(0, 3), null, null, null].slice(0, 3);
+  const contactRows = listify(contacts).slice(0, 3);
+  const contactFor = (index) => contactRows[index] || gameRows[index]?.contactHeat || null;
+  const cell = (index, key) => escapeHtml(playerBatterHeatContactStat(contactFor(index), key, gameRows[index]));
+  return `
+    <div class="player-batter-heat-contact-table" aria-label="Last three game contact quality">
+      <span></span><b>G1</b><b>G2</b><b>G3</b>
+      <strong>BIP</strong><em>${cell(0, 'bip')}</em><em>${cell(1, 'bip')}</em><em>${cell(2, 'bip')}</em>
+      <strong>Hard</strong><em>${cell(0, 'hard')}</em><em>${cell(1, 'hard')}</em><em>${cell(2, 'hard')}</em>
+      <strong>Brl</strong><em>${cell(0, 'barrel')}</em><em>${cell(1, 'barrel')}</em><em>${cell(2, 'barrel')}</em>
+    </div>
+  `;
+}
+
+function playerBatterHeatFeatureHtml(heat = null) {
+  if (!heat) return '';
+  const loading = Boolean(heat.loading);
+  const score = Number(heat.score);
+  const scoreText = Number.isFinite(score) ? `${Math.round(score)}/100` : loading ? '...' : '--';
+  const level = Number.isFinite(score) && score >= 75 ? 'is-hot' : Number.isFinite(score) && score >= 62 ? 'is-warm' : 'is-neutral';
+  const games = listify(heat.games || heat.heatGames).slice(0, 3);
+  const contacts = listify(heat.contactGames || heat.contactByGame).slice(0, 3);
+  const detail = cleanSummary(heat.detail || heat.contactDetail || '') || (loading ? 'checking recent box scores and contact data' : 'recent result/contact heat neutral');
+  return `
+    <div class="player-batter-heat ${level}${loading ? ' is-loading' : ''}" title="${escapeHtml(detail)}">
+      <div class="player-batter-heat-header"><strong>HEAT</strong><b>${escapeHtml(scoreText)}</b></div>
+      ${playerBatterHeatGameNumbersHtml(games)}
+      ${playerBatterHeatContactGridHtml(games, contacts)}
+    </div>
+  `;
+}
+
+
+function playerBatterHeatPayload(details = null, recentContactHeat = null, contactGames = []) {
+  if (!details) return null;
+  const games = batterHeatGameRows(details).slice(0, 3);
+  const contacts = listify(contactGames).length ? listify(contactGames).slice(0, 3) : (recentContactHeat ? [recentContactHeat] : []);
+  const aggregateContact = contacts.filter(Boolean).length
+    ? {
+        score: predictionWeightedScore(contacts.filter(Boolean).map((contact, index) => ({ score: Number(contact?.score) || 0, weight: [0.56, 0.29, 0.15][index] || 0.10 }))),
+        bbe: contacts.reduce((sum, contact) => sum + (Number(contact?.bbe) || 0), 0),
+        hardHit: contacts.reduce((sum, contact) => sum + (Number(contact?.hardHit) || 0), 0),
+        barrelLike: contacts.reduce((sum, contact) => sum + (Number(contact?.barrelLike) || 0), 0),
+      }
+    : recentContactHeat;
+  const score = predictionBatterHeatScore(details, details?.metrics || {}, aggregateContact || null);
+  const detail = predictionBatterHeatDetail(details, aggregateContact || null);
+  return {
+    score,
+    detail,
+    contact: aggregateContact || null,
+    recentContactHeat: aggregateContact || null,
+    contactGames: contacts,
+    contactByGame: contacts,
+    games,
+    heatGames: games.map((game, index) => ({ ...game, contactHeat: contacts[index] || null })),
+  };
+}
+
+function playerStatTodayWithLastGameHtml(todayLine, details = null, title = 'TODAY', options = {}) {
+  const heatHtml = playerBatterHeatFeatureHtml(options.batterHeat || null);
+  const lastGameHtml = heatHtml ? '' : playerLastGameFeatureHtml(details?.feature || null);
+  return `${playerStatRowsHtml(title, [['Line', todayLine]])}${lastGameHtml}${heatHtml}`;
+}
+
 
 function renderRecentBattingHistoryHtml(lines) {
   if (lines && typeof lines === 'object' && !Array.isArray(lines)) {
@@ -17538,7 +18048,9 @@ function lineupPitcherMarkerClusterHtml(pitcher = null, contextGame = null) {
 function lineupPitcherNameHtml(pitcher, contextGame = null) {
   const fullName = pitcher?.fullName || pitcher?.name || 'Unknown';
   const id = pitcher?.id || pitcher?.person?.id || pitcher?.playerId || '';
-  const hand = handednessHtml(pitcherThrowHandValue(pitcher)) || '<span class="handedness-tag is-muted" title="Throwing hand unavailable">?</span>';
+  const lookupProfile = id && contextGame?.playerLookup ? contextGame.playerLookup[String(id)] || null : null;
+  const mergedForHand = lookupProfile ? { ...(pitcher || {}), ...lookupProfile } : pitcher;
+  const hand = handednessHtml(pitcherThrowHandValue(mergedForHand));
   const archetypeText = lineupPitcherArchetypeTextHtml(pitcher);
   const markers = lineupPitcherMarkerClusterHtml(pitcher, contextGame);
   const fingerprint = [
@@ -20146,6 +20658,8 @@ async function fetchGamesAndHomeRuns(date, options = {}) {
 
           homeRuns.push({
             gamePk,
+            atBatIndex: play?.about?.atBatIndex ?? null,
+            playId: play?.playEvents?.find((event) => event?.playId)?.playId || '',
             homeAbbr: homeAbbrev,
             batterId,
             batter,
@@ -20384,14 +20898,14 @@ async function fetchGamesAndHomeRuns(date, options = {}) {
     saveAnalyticsDayIndex(date, buildDailyAnalyticsIndex(date, cards, matchupEvents));
   }
   if (homeRunsAborted()) return { cards, homeRuns: [] };
-  homeRuns.sort((a, b) => (Number(b.eventTimeMs) || 0) - (Number(a.eventTimeMs) || 0) || b.gamePk - a.gamePk || b.order - a.order);
+  const dedupedHomeRuns = mergeHomeRunFeedItems([], homeRuns);
   if (!options?.skipDaySideEffects) {
     try {
-      localStorage.setItem(`hrs:${date}`, JSON.stringify(homeRuns.slice(0, 120)));
+      localStorage.setItem(`hrs:${date}`, JSON.stringify(dedupedHomeRuns.slice(0, 120)));
       localStorage.setItem(hrLoadedStorageKey(date), '1');
     } catch {}
   }
-  return { cards, homeRuns };
+  return { cards, homeRuns: dedupedHomeRuns };
 }
 
 async function fetchMlbScheduleOnlyCards(date, cachedCards = new Map()) {
@@ -20659,13 +21173,135 @@ function clearHomeRunFeedForDate(date = '') {
   renderHomeRunFeed([], { forceClear: true });
 }
 
+function homeRunEventPart(value = '') {
+  return String(value ?? '').trim().replace(/\s+/g, ' ');
+}
+
+function homeRunPositiveInteger(value) {
+  const n = Number(value);
+  if (!Number.isFinite(n) || n < 0) return null;
+  return Math.round(n);
+}
+
 function homeRunEventKey(hr = {}) {
-  return [
-    hr.gamePk ?? '',
-    hr.batterId ?? hr.batter ?? '',
-    hr.eventTimeMs ?? hr.order ?? '',
-    hr.hrNo ?? '',
-  ].join(':');
+  const gamePk = homeRunEventPart(hr.gamePk ?? hr.gamePkString ?? hr.gameId ?? '');
+  const batter = homeRunEventPart(hr.batterId ?? hr.playerId ?? hr.batter ?? hr.batterName ?? '');
+  if (!gamePk || !batter) return '';
+
+  // Use the official at-bat index/order as the primary identity. The same HR can
+  // arrive first from progressive game hydration and later from a quiet/full-day
+  // refresh with a better event timestamp or HR number. Timestamp-based keys made
+  // that look like two separate HRs after a delay. The at-bat index is stable.
+  const order = homeRunPositiveInteger(hr.atBatIndex ?? hr.order ?? hr.playIndex ?? hr.about?.atBatIndex);
+  if (order !== null) return [gamePk, batter, `ab${order}`].join(':');
+
+  const playId = homeRunEventPart(hr.playId ?? hr.playGuid ?? hr.playEventId ?? hr.guid ?? '');
+  if (playId) return [gamePk, batter, `play${playId}`].join(':');
+
+  const hrNo = homeRunPositiveInteger(hr.hrNo ?? hr.homeRunNo ?? hr.number ?? hr.seasonHr ?? hr.seasonHomeRunNo);
+  if (hrNo !== null && hrNo > 0) return [gamePk, batter, `hr${hrNo}`].join(':');
+
+  const inning = homeRunEventPart(hr.inningText ?? hr.inning ?? '');
+  const pitcher = homeRunEventPart(hr.pitcherId ?? hr.pitcherName ?? '');
+  if (inning && pitcher) return [gamePk, batter, `inn${inning}`, `p${pitcher}`].join(':');
+
+  const eventMs = homeRunAudioEventMs(hr);
+  if (Number.isFinite(eventMs) && eventMs > 0) return [gamePk, batter, `t${Math.floor(eventMs / 60000)}`].join(':');
+
+  return [gamePk, batter, 'unknown'].join(':');
+}
+
+function homeRunAudioStorageKey() {
+  try {
+    return typeof storageKey === 'function' ? storageKey(HOME_RUN_AUDIO_PLAYED_STORAGE_KEY) : HOME_RUN_AUDIO_PLAYED_STORAGE_KEY;
+  } catch {
+    return HOME_RUN_AUDIO_PLAYED_STORAGE_KEY;
+  }
+}
+
+function loadPlayedHomeRunAudioKeys() {
+  try {
+    const raw = localStorage.getItem(homeRunAudioStorageKey());
+    const parsed = JSON.parse(raw || '[]');
+    if (Array.isArray(parsed)) return new Set(parsed.filter(Boolean).slice(-500));
+    if (parsed && typeof parsed === 'object') return new Set(Object.keys(parsed).filter(Boolean).slice(-500));
+  } catch {}
+  return new Set();
+}
+
+function savePlayedHomeRunAudioKeys(keys = new Set()) {
+  try {
+    const compact = [...keys].filter(Boolean).slice(-500);
+    localStorage.setItem(homeRunAudioStorageKey(), JSON.stringify(compact));
+  } catch {}
+}
+
+function rememberPlayedHomeRunAudioKey(key = '') {
+  if (!key) return;
+  const played = loadPlayedHomeRunAudioKeys();
+  played.add(key);
+  savePlayedHomeRunAudioKeys(played);
+}
+
+function homeRunAudioEventMs(hr = {}) {
+  const numericCandidates = [
+    hr.eventTimeMs,
+    hr.eventMs,
+    hr.timestampMs,
+    hr.playTimeMs,
+    hr.timeMs,
+  ];
+  for (const candidate of numericCandidates) {
+    const value = Number(candidate);
+    if (Number.isFinite(value) && value > 0) return value;
+  }
+  const stringCandidates = [
+    hr.eventTime,
+    hr.endTime,
+    hr.startTime,
+    hr.timestamp,
+    hr.dateTime,
+  ];
+  for (const candidate of stringCandidates) {
+    const value = Date.parse(candidate);
+    if (Number.isFinite(value) && value > 0) return value;
+  }
+  return null;
+}
+
+function homeRunAudioWithinWindow(hr = {}, now = Date.now()) {
+  const eventMs = homeRunAudioEventMs(hr);
+  if (!Number.isFinite(eventMs) || eventMs <= 0) return false;
+  return now >= eventMs - 10000 && now - eventMs <= HOME_RUN_AUDIO_WINDOW_MS;
+}
+
+function homeRunAudioAlreadyHandled(key = '') {
+  if (!key) return true;
+  return announcedHomeRunAudioKeys.has(key) || loadPlayedHomeRunAudioKeys().has(key);
+}
+
+function playHomeRunAudioForEvent(hr = {}, options = {}) {
+  const key = homeRunEventKey(hr);
+  if (homeRunAudioAlreadyHandled(key)) return false;
+  if (!homeRunAudioWithinWindow(hr)) return false;
+  announcedHomeRunAudioKeys.add(key);
+  rememberPlayedHomeRunAudioKey(key);
+  playHomeRunAudio({ source: options.source || 'home-run-feed' });
+  return true;
+}
+
+function isFinalLikeHomeRunAudioGame(game = null) {
+  const statusText = [
+    game?.status,
+    game?.statusCode,
+    game?.statusDetailedState,
+    game?.statusState,
+    game?.abstractGameState,
+    game?.detailedState,
+    game?.inningShort,
+    game?.inningState,
+  ].map((value) => String(value || '')).join(' ');
+  return /\b(final|game\s*over|completed)\b/i.test(statusText);
 }
 
 function ensureHomeRunAudio() {
@@ -20814,31 +21450,46 @@ function playHomeRunAudio(options = {}) {
 
 function resetHomeRunAudioAlerts() {
   homeRunAudioPrimed = false;
-  announcedHomeRunAudioKeys = new Set();
+  announcedHomeRunAudioKeys = loadPlayedHomeRunAudioKeys();
   announcedScoreboardHomeRunAudioKeys = new Set();
 }
 
 function syncHomeRunAudioAlerts(homeRuns = []) {
-  const keys = listify(homeRuns)
-    .map(homeRunEventKey)
-    .filter(Boolean);
+  const events = listify(homeRuns)
+    .map((hr) => ({ hr, key: homeRunEventKey(hr) }))
+    .filter((item) => item.key);
+  const played = loadPlayedHomeRunAudioKeys();
+
   if (!homeRunAudioPrimed) {
-    announcedHomeRunAudioKeys = new Set(keys);
+    announcedHomeRunAudioKeys = new Set([...played, ...events.map((item) => item.key)]);
     homeRunAudioPrimed = true;
     return;
   }
-  const newKeys = keys.filter((key) => !announcedHomeRunAudioKeys.has(key));
-  keys.forEach((key) => announcedHomeRunAudioKeys.add(key));
-  if (newKeys.length) playHomeRunAudio({ source: 'home-run-feed' });
+
+  const candidates = events.filter((item) => !announcedHomeRunAudioKeys.has(item.key) && !played.has(item.key));
+  events.forEach((item) => announcedHomeRunAudioKeys.add(item.key));
+  const playable = candidates.find((item) => homeRunAudioWithinWindow(item.hr));
+  if (!playable) return;
+
+  rememberPlayedHomeRunAudioKey(playable.key);
+  playHomeRunAudio({ source: 'home-run-feed' });
 }
 
 function maybePlayScoreboardHomeRunAudio(game = null, side = '', signature = '') {
+  if (isFinalLikeHomeRunAudioGame(game)) return;
   const text = `${game?.currentEvent || ''} ${game?.lastPlay || ''}`;
   if (!/home\s*run|homerun|\bhr\b/i.test(text)) return;
-  const key = [activeScoreboardDateKey(), game?.gamePk || '', side || '', signature || game?.currentEvent || game?.lastPlay || 'hr'].join(':');
-  if (announcedScoreboardHomeRunAudioKeys.has(key)) return;
-  announcedScoreboardHomeRunAudioKeys.add(key);
-  playHomeRunAudio({ source: 'scoreboard' });
+
+  const gamePk = String(game?.gamePk || '');
+  const matchingHomeRun = currentHomeRunFeedItems()
+    .find((hr) => String(hr?.gamePk || '') === gamePk && homeRunAudioWithinWindow(hr) && !homeRunAudioAlreadyHandled(homeRunEventKey(hr)));
+  if (!matchingHomeRun) return;
+
+  const key = homeRunEventKey(matchingHomeRun);
+  const scoreboardKey = [activeScoreboardDateKey(), gamePk, side || '', signature || key].join(':');
+  if (announcedScoreboardHomeRunAudioKeys.has(scoreboardKey)) return;
+  announcedScoreboardHomeRunAudioKeys.add(scoreboardKey);
+  playHomeRunAudioForEvent(matchingHomeRun, { source: 'scoreboard' });
 }
 
 function currentHomeRunFeedItems(homeRuns = []) {
@@ -20852,6 +21503,25 @@ function homeRunFeedHasVisibleItems() {
   return Boolean(hrListEl?.querySelector?.('.hr-item[data-hr-key]'));
 }
 
+function mergeHomeRunItemData(previous = {}, incoming = {}) {
+  const merged = { ...(previous || {}), ...(incoming || {}) };
+  const preserveKeys = [
+    'batter', 'resultLabel', 'hrNo', 'distance', 'hit', 'pitcherId', 'pitcherName',
+    'pitcherHand', 'pitcherHrAllowed', 'pitchDetailLine', 'eventTimeMs', 'eventTimeEt',
+    'inningText', 'rating', 'ratingBreakdown', 'teamAbbr', 'teamColor', 'teamLogo',
+    'homeAbbr', 'order', 'atBatIndex', 'playId',
+  ];
+  for (const key of preserveKeys) {
+    const nextValue = merged[key];
+    const prevValue = previous?.[key];
+    if ((nextValue === null || nextValue === undefined || nextValue === '')
+      && prevValue !== null && prevValue !== undefined && prevValue !== '') {
+      merged[key] = prevValue;
+    }
+  }
+  return merged;
+}
+
 function mergeHomeRunFeedItems(existing = [], incoming = []) {
   const map = new Map();
   const add = (hr, preferIncoming = false) => {
@@ -20859,7 +21529,11 @@ function mergeHomeRunFeedItems(existing = [], incoming = []) {
     const key = homeRunEventKey(hr);
     if (!key) return;
     const previous = map.get(key);
-    if (!previous || preferIncoming) map.set(key, previous ? { ...previous, ...hr } : hr);
+    if (!previous) {
+      map.set(key, hr);
+      return;
+    }
+    map.set(key, preferIncoming ? mergeHomeRunItemData(previous, hr) : mergeHomeRunItemData(hr, previous));
   };
   listify(existing).forEach((hr) => add(hr, false));
   listify(incoming).forEach((hr) => add(hr, true));
@@ -21004,7 +21678,7 @@ function renderHomeRunFeed(homeRuns, options = {}) {
   if (explicitEmptyInput && hasVisibleHrItems && !options.forceClear && !latestRenderedHomeRuns.length) return;
   if (hrSortToggleBtnEl) hrSortToggleBtnEl.textContent = currentHomeRunSortLabel();
   if (hrGradeToggleBtnEl) hrGradeToggleBtnEl.textContent = homeRunRatingDisplayMode === 'letter' ? 'letter' : 'number';
-  const list = options.forceClear ? [] : sortHomeRunFeedItems(currentHomeRunFeedItems(homeRuns));
+  const list = options.forceClear ? [] : mergeHomeRunFeedItems([], currentHomeRunFeedItems(homeRuns));
   const seen = new Set();
   const hadHrItems = Boolean(hrListEl.querySelector('.hr-item[data-hr-key]'));
   for (const hr of list) {
@@ -21061,6 +21735,7 @@ function renderHomeRunFeed(homeRuns, options = {}) {
       pitcherHand: hr.pitcherHand || '',
       pitchDetailLine: hr.pitchDetailLine || '',
       gamePk: hr.gamePk || null,
+      atBatIndex: hr.atBatIndex ?? hr.order ?? null,
       homeAbbr: hr.homeAbbr || '',
       teamAbbr: hr.teamAbbr || '',
       teamColor: hr.teamColor || '',
@@ -22976,6 +23651,31 @@ function predictionOpponentPitcherForHrScore(game, battingSide) {
     || null;
 }
 
+function lineupOpponentStarterForTeamSplit(game, battingSide) {
+  const pitcherSide = battingSide === 'home' ? 'away' : battingSide === 'away' ? 'home' : '';
+  if (!game || !pitcherSide) return null;
+  const summary = resolveLineupPitcherForDisplay(game, pitcherSide);
+  const probableStarter = predictionProbableStarterForSide(game, pitcherSide);
+  const probableRaw = game?.probablePitchers?.[pitcherSide] || game?.teams?.[pitcherSide]?.probablePitcher || previewProbableForSide(game, pitcherSide) || null;
+  const display = resolvePitchingSideForDisplay(game, pitcherSide);
+  const candidates = [
+    summary?.starter,
+    probableStarter,
+    probableRaw,
+    display?.current,
+    predictionStarterForSide(game, pitcherSide),
+    starterFromPitchingHistory(game, pitcherSide),
+  ].filter(Boolean);
+  for (const candidate of candidates) {
+    const id = Number(candidate?.id || candidate?.person?.id);
+    const profile = Number.isFinite(id) && id > 0 ? game?.playerLookup?.[String(id)] || null : null;
+    const merged = profile ? { ...candidate, ...profile, role: candidate?.role || profile?.role || 'starter' } : candidate;
+    const normalized = normalizePitcherDisplayEntry(merged, 'starter') || merged;
+    if (handednessCode(pitcherThrowHandValue(normalized))) return normalized;
+  }
+  return candidates[0] || null;
+}
+
 function predictionStarterForSide(game, side) {
   const probableStarter = predictionProbableStarterForSide(game, side);
   if (shouldPreferProbablePitcher(game) && probableStarter) return probableStarter;
@@ -23867,6 +24567,47 @@ function predictionBatterContactHeatFromRows(rows = []) {
   };
 }
 
+
+function predictionBatterContactHeatFromLivePlays(playerId, plays = [], targetDate = '') {
+  const id = Number(playerId);
+  if (!Number.isFinite(id) || id <= 0) return null;
+  const rows = [];
+  for (const play of listify(plays)) {
+    if (Number(play?.matchup?.batter?.id ?? play?.matchup?.batter?.person?.id) !== id) continue;
+    const playDate = calendarDateOnly(play?.about?.startTime || play?.about?.endTime || play?.playEndTime || '');
+    if (targetDate && playDate && playDate !== targetDate) continue;
+    for (const event of listify(play?.playEvents)) {
+      const hitData = event?.hitData || event?.details?.hitData || null;
+      const ev = Number(hitData?.launchSpeed ?? hitData?.exitVelocity ?? hitData?.launch_speed);
+      if (!Number.isFinite(ev)) continue;
+      rows.push({
+        launch_speed: ev,
+        launch_angle: Number(hitData?.launchAngle ?? hitData?.launch_angle),
+        events: cleanSummary(play?.result?.eventType || play?.result?.event || event?.details?.event || ''),
+        game_date: targetDate || playDate,
+      });
+    }
+  }
+  return predictionBatterContactHeatFromRows(rows);
+}
+
+async function getBatterRecentContactHeatFromGameFeed(playerId, gamePk = null, date = '') {
+  const id = Number(playerId);
+  const pk = Number(gamePk);
+  const targetDate = calendarDateOnly(date || '', '');
+  if (!Number.isFinite(id) || id <= 0 || !Number.isFinite(pk) || pk <= 0) return null;
+  const cacheKey = `${id}:batter-contact-heat-feed:${pk}:${targetDate || 'any'}`;
+  if (savantPitchStrengthCache.has(cacheKey)) return savantPitchStrengthCache.get(cacheKey);
+  const promise = getJson(`${MLB_API_BASE_LIVE}/game/${pk}/feed/live`)
+    .then((payload) => predictionBatterContactHeatFromLivePlays(id, payload?.liveData?.plays?.allPlays || [], targetDate))
+    .catch((error) => {
+      savantPitchStrengthCache.delete(cacheKey);
+      throw error;
+    });
+  savantPitchStrengthCache.set(cacheKey, promise);
+  return promise;
+}
+
 async function getBatterRecentContactHeat(playerId, date = '', game = null) {
   const id = Number(playerId);
   const targetDate = calendarDateOnly(date || '', '');
@@ -23885,41 +24626,102 @@ async function getBatterRecentContactHeat(playerId, date = '', game = null) {
   return promise;
 }
 
-function predictionBatterHeatScore(details = null, recent = {}, recentContactHeat = null) {
-  const last = details?.lastGame || {};
-  const totals = details?.totals || {};
-  const lastHr = statNumber(last.hr ?? last.homeRuns);
-  const lastTb = statNumber(last.totalBases);
-  const lastHits = statNumber(last.hits);
-  const lastXbh = lastTb >= 2 || lastHr > 0;
-  const recentHr = statNumber(totals.homeRuns);
-  const recentXbh = statNumber(totals.xbh);
-  const recentGames = Math.max(1, statNumber(totals.games));
-  const statHeat = clamp(Math.round(
-    28
-    + (lastHr > 0 ? 26 : 0)
-    + (lastXbh ? 10 : 0)
-    + (lastTb >= 3 ? 8 : 0)
-    + (lastHits >= 2 ? 6 : 0)
-    + Math.min(16, Math.max(0, recentHr - lastHr) * 8)
-    + Math.min(14, Math.max(0, recentXbh - (lastXbh ? 1 : 0)) * 3)
-    + predictionPoints(recent.slg, 0.330, 0.700, 12, { fallbackPoints: 0 })
-    + predictionPoints(recent.hrRate ?? (recentHr / recentGames), 0.010, 0.080, 10, { fallbackPoints: 0 })
+
+
+
+async function getBatterRecentContactHeatGames(playerId, games = [], game = null, timeoutMs = 1800) {
+  const rows = listify(games).slice(0, 3);
+  if (!rows.length) return [];
+  return Promise.all(rows.map(async (row) => {
+    const date = calendarDateOnly(row?.rawDate || row?.date || '');
+    const gamePk = Number(row?.gamePk || row?.game?.gamePk);
+    if (!date) return null;
+    const fromFeed = Number.isFinite(gamePk) && gamePk > 0
+      ? await withTimeoutValue(getBatterRecentContactHeatFromGameFeed(playerId, gamePk, date), Math.max(900, timeoutMs), null).catch(() => null)
+      : null;
+    if (fromFeed) return fromFeed;
+    return withTimeoutValue(getBatterRecentContactHeat(playerId, date, game), Math.max(1200, timeoutMs), null).catch(() => null);
+  }));
+}
+
+function batterHeatGameRows(details = null) {
+  const rows = listify(details?.heatGames).filter((game) => game && Number.isFinite(Number(game.atBats)));
+  if (rows.length) return rows.slice(0, 3);
+  const last = details?.lastGame || null;
+  return last ? [last] : [];
+}
+
+function batterHeatGameScore(game = {}, index = 0) {
+  const hits = statNumber(game.hits);
+  const atBats = statNumber(game.atBats);
+  const tb = statNumber(game.totalBases);
+  const hr = statNumber(game.hr ?? game.homeRuns);
+  const walks = statNumber(game.walks);
+  const rbi = statNumber(game.rbi);
+  const so = statNumber(game.so ?? game.strikeOuts);
+  const avg = atBats > 0 ? hits / atBats : null;
+  const slg = atBats > 0 ? tb / atBats : null;
+  const decayPenalty = index === 0 ? 0 : index === 1 ? 3 : 6;
+  return clamp(Math.round(
+    18
+    + (hr > 0 ? 34 : 0)
+    + (tb >= 4 ? 18 : tb >= 3 ? 12 : tb >= 2 ? 7 : 0)
+    + (hits >= 3 ? 12 : hits >= 2 ? 8 : hits >= 1 ? 3 : 0)
+    + Math.min(8, walks * 3)
+    + Math.min(7, rbi * 3)
+    + predictionPoints(avg, 0.220, 0.500, 8, { fallbackPoints: 0 })
+    + predictionPoints(slg, 0.350, 1.000, 12, { fallbackPoints: 0 })
+    - Math.min(6, so * 1.5)
+    - decayPenalty
   ), 0, 100);
+}
+
+function batterHeatWeightedStatScore(details = null, recent = {}) {
+  const games = batterHeatGameRows(details);
+  if (!games.length) {
+    return predictionWeightedScore([
+      { score: predictionScore100(recent.slg, 0.330, 0.700, { fallbackPoints: 35 }), weight: 0.62 },
+      { score: predictionScore100(recent.hrRate, 0.010, 0.080, { fallbackPoints: 28 }), weight: 0.38 },
+    ]);
+  }
+  const weights = [0.56, 0.29, 0.15];
+  const weighted = games.slice(0, 3).map((game, index) => ({ score: batterHeatGameScore(game, index), weight: weights[index] || 0.10 }));
+  return predictionWeightedScore(weighted);
+}
+
+function batterHeatGameLine(game = null) {
+  if (!game) return '--';
+  const opponent = cleanSummary(game.opponent) ? ` vs ${displayTeamAbbrev(game.opponent)}` : '';
+  const date = cleanSummary(game.date || game.rawDate || '');
+  return `${date}${opponent}: ${statNumber(game.hits)}-${statNumber(game.atBats)}, TB ${statNumber(game.totalBases)}, HR ${statNumber(game.hr ?? game.homeRuns)}`;
+}
+
+function batterHeatGameSummaryText(details = null) {
+  const games = batterHeatGameRows(details);
+  return games.length ? games.map(batterHeatGameLine).join(' | ') : '--';
+}
+
+function predictionBatterHeatScore(details = null, recent = {}, recentContactHeat = null) {
+  const statHeat = batterHeatWeightedStatScore(details, recent);
   const contactScore = Number(recentContactHeat?.score);
   return Number.isFinite(contactScore)
-    ? predictionWeightedScore([{ score: statHeat, weight: 0.58 }, { score: contactScore, weight: 0.42 }])
+    ? predictionWeightedScore([{ score: statHeat, weight: 0.66 }, { score: contactScore, weight: 0.34 }])
     : statHeat;
 }
 
 function predictionBatterHeatDetail(details = null, recentContactHeat = null) {
-  const last = details?.lastGame || {};
-  const chips = [];
-  if (statNumber(last.hr) > 0) chips.push('HR last game');
-  if (statNumber(last.totalBases) >= 3) chips.push(`${statNumber(last.totalBases)} TB last game`);
-  if (statNumber(last.hits) >= 2) chips.push(`${statNumber(last.hits)} H last game`);
-  if (recentContactHeat?.detail) chips.push(`loud contact: ${recentContactHeat.detail}`);
-  return chips.join('; ') || 'recent stat/contact heat neutral';
+  const games = batterHeatGameRows(details);
+  const pieces = [];
+  if (games.length) pieces.push(`L3: ${batterHeatGameSummaryText(details)}`);
+  const last = games[0] || details?.lastGame || {};
+  const lastHr = statNumber(last.hr ?? last.homeRuns);
+  const lastTb = statNumber(last.totalBases);
+  const lastHits = statNumber(last.hits);
+  if (lastHr > 0) pieces.push(`last game HR ${lastHr}`);
+  if (lastTb >= 2) pieces.push(`last game TB ${lastTb}`);
+  if (lastHits >= 2) pieces.push(`last game ${lastHits} hits`);
+  if (recentContactHeat?.detail) pieces.push(`loud contact: ${recentContactHeat.detail}`);
+  return pieces.join('; ') || 'recent result/contact heat neutral';
 }
 
 function predictionPitcherDamageScore(weakness = {}, arsenalMatchup = null) {
@@ -24907,6 +25709,7 @@ async function buildHittingPredictionForEntry(game, side, entry, pitcher, pitche
     weakness,
     handStrong,
   });
+  const pitcherBagSummary = pitcherPitchBagSummary({ pitchBreakdown: pitcherPitchRows, pitchMix: pitcherPitchRows });
   const lineupConfirmed = predictionLineupConfirmed(game, side);
   const confirmedStarting = predictionConfirmedStarting(game, side, playerId);
   const battingOrder = predictionBattingOrder(lockedEntry);
@@ -27712,6 +28515,10 @@ function renderPredictionPlayerCard(entry, mode = 'hitting') {
   const kRiskText = displayScores.kRiskScore === null || displayScores.kRiskScore === undefined
     ? 'Unavailable'
     : `${Math.round(displayScores.kRiskScore)}/100`;
+  const batterHeatForCard = !isPitcher ? Number(entry.batterHeatScore ?? displayScoreParts?.batterHeatScore) : null;
+  const batterHeatText = Number.isFinite(batterHeatForCard) ? `${Math.round(batterHeatForCard)}/100` : 'Unavailable';
+  const batterHeatDetailText = entry.batterHeatDetail || displayScoreParts?.batterHeatDetail || '--';
+  const pitcherBagForCard = !isPitcher ? (entry.pitcherBagSummary || null) : null;
   const cardWeatherEffect = entry.weatherEffect || displayScoreParts?.weatherEffect || {};
   const cardSprayProfile = entry.sprayProfile || cardWeatherEffect.sprayProfile || null;
   const windComponentSummary = [cardWeatherEffect.lfWindComponentMph, cardWeatherEffect.cfWindComponentMph, cardWeatherEffect.rfWindComponentMph]
@@ -27740,6 +28547,8 @@ function renderPredictionPlayerCard(entry, mode = 'hitting') {
         entry.duePayload?.hr ? 'HR due' : '',
         entry.duePayload?.xbh ? 'XBH due' : '',
         entry.handStrong ? 'Hand edge' : '',
+        Number.isFinite(batterHeatForCard) && batterHeatForCard >= 70 ? 'Batter heat' : '',
+        pitcherBagForCard?.code && pitcherBagForCard.code !== '--' ? pitcherBagForCard.code : '',
         entry.fallbackDriven ? 'fallback-driven' : '',
         ...(entry.arsenalMatchup?.flags || []).slice(0, 2),
         outcome ? `Result ${outcome.label}` : '',
@@ -27759,6 +28568,7 @@ function renderPredictionPlayerCard(entry, mode = 'hitting') {
         predictionMetricHtml('Hit', `${Math.round(displayScores.hitScore || 0)}/100`),
         predictionMetricHtml('TB2', `${Math.round(displayScores.tb2Score || 0)}/100`),
         predictionMetricHtml('HR', `${Math.round(displayScores.hrScore || 0)}/100`),
+        predictionMetricHtml('Batter Heat', batterHeatText),
         predictionMetricHtml('K Risk', kRiskText),
         predictionMetricHtml('Arsenal', entry.arsenalMatchup ? `${entry.arsenalMatchup.overallScore > 0 ? '+' : ''}${Math.round(entry.arsenalMatchup.overallScore)}` : 'Unavailable'),
       ].join('');
@@ -27793,6 +28603,8 @@ function renderPredictionPlayerCard(entry, mode = 'hitting') {
         ['Pitcher ERA/WHIP', `${predictionMetricValue(entry.weakness?.era, 2, false)} / ${predictionMetricValue(entry.weakness?.whip, 2, false)}`],
         ['Pitcher HR/9', predictionMetricValue(entry.weakness?.hr9, 1, false)],
         ['Pitcher HR Vulnerability', `${Math.round(entry.pitcherHrVulnerability ?? displayScoreParts?.pitcherHrVulnerability ?? 0)}/100`],
+        ['Batter Heat', `${batterHeatText} | ${batterHeatDetailText}`],
+        ['Pitcher Bag', pitcherBagForCard?.count ? `${pitcherBagForCard.code} ${pitcherBagForCard.label} | ${pitcherBagForCard.description || pitcherBagForCard.detail || ''}` : 'Unavailable'],
         ['Matchup Hand', entry.matchupBatterHand ? `${entry.matchupBatterHand} vs ${handednessCode(entry.weakness?.pitcherHand || '') || 'P'}` : 'Unavailable'],
         ['Hand Split', entry.weakness?.handSplit ? `${cleanSummary(entry.weakness.handSplit.avg) || '---'} AVG / ${cleanSummary(entry.weakness.handSplit.slg) || '---'} SLG` : 'Unavailable'],
         ['Lineup Status', entry.lineupConfirmed ? `Confirmed batting ${entry.battingOrder || '--'}` : 'Not confirmed'],
@@ -27825,6 +28637,7 @@ function renderPredictionPlayerCard(entry, mode = 'hitting') {
         </div>
       </div>
       <div class="hot-card-stats prediction-stat-grid">${statHtml}</div>
+      ${!isPitcher ? predictionPitcherBagCardHtml(entry.pitcherBagSummary) : ''}
       ${!isPitcher ? arsenalMatchupCardHtml(entry.arsenalMatchup) : ''}
       ${predictionSourceDetailsHtml(sourceRows)}
     </article>
@@ -29955,47 +30768,10 @@ function focusedMatchupSubtitle(game, side) {
 async function renderFocusedMatchupPanel(card, game) {
   const panel = card?.querySelector('.focused-matchup-panel');
   if (!panel) return;
-  if (!isFocusedGame(game?.gamePk)) {
-    panel.hidden = true;
-    panel.dataset.renderSignature = '';
-    panel.replaceChildren();
-    return;
-  }
-  panel.hidden = false;
-  const token = `${game?.gamePk || ''}:${Date.now()}`;
-  panel.dataset.renderToken = token;
-  try {
-    const activeSide = focusedMatchupSide(game?.gamePk);
-    const rows = await buildFocusedMatchupRows(game, activeSide);
-    if (panel.dataset.renderToken !== token) return;
-    if (!isFocusedGame(game?.gamePk)) {
-      panel.hidden = true;
-      panel.dataset.renderSignature = '';
-      panel.replaceChildren();
-      return;
-    }
-    const signature = JSON.stringify({
-      activeSide,
-      pitcher: resolveFocusedOpponentPitcher(game, activeSide)?.id || '',
-      rows: rows.map((row) => [row.playerId, row.sample, row.avgText, row.xbhText, row.hrText, row.kText]),
-    });
-    if (panel.dataset.renderSignature === signature && panel.children.length) return;
-    panel.dataset.renderSignature = signature;
-    panel.replaceChildren();
-    const teamTitle = activeSide === 'home' ? `${displayTeamAbbrev(game.home)} Hitters` : `${displayTeamAbbrev(game.away)} Hitters`;
-    const table = renderFocusedMatchupTable(teamTitle, focusedMatchupSubtitle(game, activeSide), rows);
-    table.classList.add('focused-matchup-table-wrap-single');
-    panel.appendChild(table);
-  } catch (error) {
-    if (panel.dataset.renderToken !== token) return;
-    if (!isFocusedGame(game?.gamePk)) {
-      panel.hidden = true;
-      panel.dataset.renderSignature = '';
-      panel.replaceChildren();
-      return;
-    }
-    panel.replaceChildren(createLeaderEmpty(`Could not load hitter matchups (${error.message}).`));
-  }
+  panel.hidden = true;
+  panel.dataset.renderToken = '';
+  panel.dataset.renderSignature = '';
+  panel.replaceChildren();
 }
 
 function renderHotFocusedGameCard(game) {
@@ -30846,9 +31622,23 @@ function renderLineupPitcherSummary(containerEl, color, staff, game = null) {
     ? `<span class="lineup-team-pitcher-current is-subbed-out">Starter ${escapeHtml(lastName(starter?.fullName || starter?.name || 'Pitcher'))} exited</span>`
     : '';
   const displayAsTbdFallback = Boolean(displayPitcher?.isTbdFallbackStarter || isUnconfirmedStarterFallbackProbable(displayPitcher));
-  const displayPitcherForRender = displayAsTbdFallback && !displayPitcher?.isTbdFallbackStarter
+  let displayPitcherForRender = displayAsTbdFallback && !displayPitcher?.isTbdFallbackStarter
     ? { ...displayPitcher, isTbdFallbackStarter: true, fallbackStarter: displayPitcher }
     : displayPitcher;
+  const renderPitcherId = Number(displayPitcherForRender?.id ?? displayPitcherForRender?.person?.id ?? displayPitcherForRender?.playerId);
+  const renderLookupProfile = Number.isFinite(renderPitcherId) && renderPitcherId > 0 && game?.playerLookup
+    ? game.playerLookup[String(renderPitcherId)] || null
+    : null;
+  if (renderLookupProfile) {
+    displayPitcherForRender = {
+      ...(displayPitcherForRender || {}),
+      ...renderLookupProfile,
+      id: renderPitcherId,
+      role: displayPitcherForRender?.role || renderLookupProfile?.role,
+      isTbdFallbackStarter: Boolean(displayPitcherForRender?.isTbdFallbackStarter),
+      fallbackStarter: displayPitcherForRender?.fallbackStarter || renderLookupProfile?.fallbackStarter,
+    };
+  }
   const label = displayPitcherForRender?.isTbdFallbackStarter ? 'Starter TBD' : displayPitcherForRender?.isPotentialStarter ? 'Potential Starter:' : showingCurrent ? 'Current Pitcher' : 'Starter';
   const renderDate = officialDateForGame(game) || dateInput?.value || formatDate(new Date());
   const pitcherTitle = displayPitcherForRender?.isTbdFallbackStarter
@@ -30870,6 +31660,7 @@ function renderLineupPitcherSummary(containerEl, color, staff, game = null) {
   if (containerEl.dataset.renderFingerprint === fingerprint) return;
   containerEl.dataset.renderFingerprint = fingerprint;
   containerEl.innerHTML = html;
+  hydrateLineupPitcherMetaIfNeeded(containerEl, displayPitcherForRender, game, fingerprint);
   hydrateLineupPitcherVelocityArchetypeBadges(containerEl, displayPitcherForRender, game);
 }
 
@@ -30912,6 +31703,73 @@ function pitcherSeasonMetaLine(pitcher, l3Leaders = null) {
     pitcherSeasonMetaMetricHtml('HR/9', formatRateValue(pitcherHrPerNine(pitcher), 2, false), l3Leaders?.hr9),
     pitcherSeasonMetaMetricHtml('K/9', formatRateValue(pitcherKPerNine(pitcher), 2, false), l3Leaders?.k9),
   ].join(' | ') + escapeHtml(memory);
+}
+
+
+function pitcherMetaLineLooksEmpty(pitcher = null) {
+  if (!pitcher) return true;
+  const outs = inningsToOuts(pitcherInningsPitched(pitcher));
+  const era = cleanSummary(pitcherEra(pitcher));
+  const whip = cleanSummary(pitcherWhip(pitcher));
+  const k9 = Number(pitcherKPerNine(pitcher));
+  return outs <= 0 || !era || /^-+$/.test(era) || !whip || /^-+$/.test(whip) || !Number.isFinite(k9) || k9 <= 0;
+}
+
+function hydrateLineupPitcherMetaIfNeeded(containerEl, pitcher = null, game = null, baseFingerprint = '') {
+  const id = Number(pitcher?.id ?? pitcher?.person?.id);
+  if (!containerEl || !Number.isFinite(id) || id <= 0) return;
+  const needsMeta = pitcherMetaLineLooksEmpty(pitcher);
+  const needsThrowHand = !handednessCode(pitcherThrowHandValue(pitcher));
+  if (!needsMeta && !needsThrowHand) return;
+  const role = cleanSummary(pitcher?.role || pitcherDisplayUsageRole(pitcher, pitcher?.role || ''));
+  const starterLike = /starter|sp|probable/i.test(role) || Number(pitcher?.gamesStarted) > 0 || pitcher?.isPotentialStarter || pitcher?.isTbdFallbackStarter;
+  // Missing throw hand is a display/data-quality issue for every pitcher, not just starters.
+  // Keep season-stat meta fallback restricted to starter-like arms, but hydrate L/R for current relievers too.
+  if (!needsThrowHand && !starterLike) return;
+  const token = `${String(game?.gamePk || 'game')}:${id}:${Date.now()}`;
+  containerEl.dataset.pitcherMetaHydrateToken = token;
+  window.setTimeout(() => {
+    fetchMlbPlayerProfile(id, game)
+      .then((fresh) => {
+        if (!fresh || containerEl.dataset.pitcherMetaHydrateToken !== token) return;
+        if (baseFingerprint && containerEl.dataset.renderFingerprint !== baseFingerprint) return;
+        const merged = { ...(pitcher || {}), ...(fresh || {}), id, role: pitcher?.role || fresh?.role || 'starter' };
+        const freshHandCode = handednessCode(pitcherThrowHandValue(merged));
+        let changed = false;
+
+        if (freshHandCode) {
+          const handEl = containerEl.querySelector?.('.pitcher-identity-hand');
+          const handHtml = handednessHtml(freshHandCode);
+          if (handEl && handHtml && handEl.innerHTML !== handHtml) {
+            handEl.innerHTML = handHtml;
+            changed = true;
+          }
+          const rowEl = containerEl.querySelector?.('.pitcher-identity-row');
+          if (rowEl) {
+            rowEl.dataset.pitcherIdentityFingerprint = [
+              id,
+              merged.fullName || merged.name || '',
+              freshHandCode,
+              listify(lineupPitcherArchetypes(merged)).map((arch) => `${arch.letter || ''}:${Math.round(Number(arch.confidence || 0))}:${arch.isPrimary ? 1 : 0}:${arch.isSecondary ? 1 : 0}`).join('|'),
+              merged?.usedYesterday ? 1 : 0,
+              merged?.isOpener ? 1 : 0,
+              merged?.isBulkFollower ? 1 : 0,
+            ].join('~');
+          }
+        }
+
+        if (needsMeta && starterLike && !pitcherMetaLineLooksEmpty(merged)) {
+          const metaEl = containerEl.querySelector?.('.pitcher-priority-meta');
+          if (metaEl) {
+            metaEl.innerHTML = pitcherSeasonMetaLine(merged);
+            changed = true;
+          }
+        }
+
+        if (changed && game) persistPlayerLookupForGame(game, { [String(id)]: merged });
+      })
+      .catch(() => {});
+  }, 0);
 }
 
 function lineupDisplayPitcherForComparison(staff = null) {
@@ -31049,7 +31907,7 @@ function normalizePitcherDisplayEntry(entry, role = 'current') {
       gf: pitcherGamesFinished(entry),
       saves: pitcherSaveCount(entry),
       so: pitcherStrikeoutCount(entry),
-      throws: entry.throws || entry.pitchHand?.code || entry.pitchHand?.description || '',
+      throws: pitcherThrowHandValue(entry),
       today: today && !/no game detail available/i.test(today) ? today : fallbackToday,
       isPotentialStarter: Boolean(entry.isPotentialStarter),
       lastPitchedDate: entry.lastPitchedDate || '',
@@ -31081,7 +31939,7 @@ function normalizePitcherDisplayEntry(entry, role = 'current') {
     gf: pitcherGamesFinished(entry),
     saves: pitcherSaveCount(entry),
     so: pitcherStrikeoutCount(entry),
-    throws: entry?.throws || entry?.pitching?.throws || entry?.person?.pitchHand?.code || entry?.pitchHand?.code || entry?.pitchHand?.description || '',
+    throws: pitcherThrowHandValue(entry),
     today: today && !/no game detail available/i.test(today) ? today : (role === 'starter' ? 'Not in yet' : pitcherTodaySummary(entry)),
     pitches: Number(entry?.pitches) || pitchCount(entry),
     isActive: Boolean(entry?.isActive),
@@ -31144,7 +32002,7 @@ function pitcherEntryNeedsProfile(entry) {
   if (!entry) return true;
   const era = cleanSummary(entry?.pitching?.era || entry?.stats?.pitching?.era || entry?.seasonStats?.pitching?.era || entry?.era);
   const whip = cleanSummary(entry?.pitching?.whip || entry?.stats?.pitching?.whip || entry?.seasonStats?.pitching?.whip || entry?.whip);
-  const throws = handednessCode(entry?.throws || entry?.pitching?.throws || entry?.person?.pitchHand?.code || entry?.pitchHand?.code || entry?.pitchHand?.description);
+  const throws = handednessCode(pitcherThrowHandValue(entry));
   return !era || era === '---' || !whip || whip === '---' || !hasPitcherHomeRunsAllowedData(entry) || !throws;
 }
 
@@ -35283,18 +36141,21 @@ async function fetchMlbPlayerProfile(playerId, game) {
       pitching: currentPitchingResult.status === 'fulfilled' ? currentPitchingResult.value : {},
       fielding: currentFieldingResult.status === 'fulfilled' ? currentFieldingResult.value : {},
     };
-    const hasCurrentSeasonActivity = seasonStatHasGameActivity(currentStats.hitting, 'hitting')
-      || seasonStatHasGameActivity(currentStats.pitching, 'pitching')
-      || seasonStatHasGameActivity(currentStats.fielding, 'fielding');
     const teamGames = teamGamesPlayedForPlayerFallback(playerId, game, fallbackProfile, person);
-    const firstAppearanceFallbackEligible = !hasCurrentSeasonActivity && (
-      teamGames >= FIRST_APPEARANCE_FALLBACK_MIN_TEAM_GAMES
-      || selectedDateIsPastAprilForFirstAppearanceFallback(dateInput.value || game?.officialDate || game?.gameDate || formatDate(new Date()))
-    );
-    const fallbackContext = { game, fallbackProfile, person, firstAppearanceFallbackEligible, selectedDate: dateInput.value || game?.officialDate || game?.gameDate || '' };
+    const dateEligible = selectedDateIsPastAprilForFirstAppearanceFallback(dateInput.value || game?.officialDate || game?.gameDate || formatDate(new Date()));
+    const baseFallbackEligible = teamGames >= FIRST_APPEARANCE_FALLBACK_MIN_TEAM_GAMES || dateEligible;
+    const fallbackContext = { game, fallbackProfile, person, selectedDate: dateInput.value || game?.officialDate || game?.gameDate || '' };
     const [hittingResult, pitchingResult] = await Promise.allSettled([
-      getPlayerSeasonStatSplitWithFirstAppearanceFallback(playerId, 'hitting', season, { ...fallbackContext, currentStat: currentStats.hitting }),
-      getPlayerSeasonStatSplitWithFirstAppearanceFallback(playerId, 'pitching', season, { ...fallbackContext, currentStat: currentStats.pitching }),
+      getPlayerSeasonStatSplitWithFirstAppearanceFallback(playerId, 'hitting', season, {
+        ...fallbackContext,
+        currentStat: currentStats.hitting,
+        firstAppearanceFallbackEligible: baseFallbackEligible && firstAppearanceFallbackEligibleForStat(currentStats.hitting, 'hitting'),
+      }),
+      getPlayerSeasonStatSplitWithFirstAppearanceFallback(playerId, 'pitching', season, {
+        ...fallbackContext,
+        currentStat: currentStats.pitching,
+        firstAppearanceFallbackEligible: baseFallbackEligible && firstAppearanceFallbackEligibleForStat(currentStats.pitching, 'pitching'),
+      }),
     ]);
 
     return buildMlbPlayerProfile(playerId, person, {
@@ -39222,7 +40083,7 @@ async function openPlayerStatOverlay(playerId, game, options = {}) {
     renderPlayerPitchingSeasonBlock(profile, game);
     renderPitcherOpponentHandSplits(profile, splitToken, game);
   } else {
-    playerStatTodayEl.innerHTML = playerStatTodayWithLastGameHtml(profile.todayBatting);
+    playerStatTodayEl.innerHTML = playerStatTodayWithLastGameHtml(profile.todayBatting, null, 'TODAY', { batterHeat: { loading: true } });
     renderPlayerBattingSeasonBlock(profile, game);
     renderPlayerHandedSplits(profile, game, splitToken);
     hydratePlayerStatNameBadges(profile, game, pitcherProfile);
@@ -39231,9 +40092,22 @@ async function openPlayerStatOverlay(playerId, game, options = {}) {
     const lastGameToken = `${profile.id}:${dateInput.value || formatDate(new Date())}:${pitcherProfile ? 'pitching' : 'hitting'}:${Date.now()}`;
     playerStatTodayEl.dataset.lastGameToken = lastGameToken;
     (pitcherProfile ? getPlayerRecentPitchingDetails(profile.id, game) : getPlayerRecentBattingDetails(profile.id, game, playerStatRecentGameWindow))
-      .then((details) => {
+      .then(async (details) => {
         if (!playerStatTodayEl || playerStatTodayEl.dataset.lastGameToken !== lastGameToken) return;
-        playerStatTodayEl.innerHTML = playerStatTodayWithLastGameHtml(pitcherProfile ? profile.todayPitching : profile.todayBatting, details);
+        if (pitcherProfile) {
+          playerStatTodayEl.innerHTML = playerStatTodayWithLastGameHtml(profile.todayPitching, details);
+          return;
+        }
+        const heatGames = batterHeatGameRows(details);
+        const heatDate = details?.lastGame?.rawDate || addDaysToDateValue(officialDateForGame(game) || dateInput.value || formatDate(new Date()), -1);
+        const contactGames = heatGames.length
+          ? await getBatterRecentContactHeatGames(profile.id, heatGames, game, 1800).catch(() => [])
+          : [];
+        const recentContactHeat = contactGames[0] || await withTimeoutValue(getBatterRecentContactHeat(profile.id, heatDate, game), 1800, null).catch(() => null);
+        if (!playerStatTodayEl || playerStatTodayEl.dataset.lastGameToken !== lastGameToken) return;
+        playerStatTodayEl.innerHTML = playerStatTodayWithLastGameHtml(profile.todayBatting, details, 'TODAY', {
+          batterHeat: playerBatterHeatPayload(details, recentContactHeat, contactGames),
+        });
       })
       .catch(() => {
         if (!playerStatTodayEl || playerStatTodayEl.dataset.lastGameToken !== lastGameToken) return;
@@ -40154,10 +41028,10 @@ async function syncLineupOverlay(game, options = {}) {
   syncLineupGamePickState(game);
   const shouldShowLineupHandStats = lineupGameIsPregame(game);
   const awayOpponentPitcher = shouldShowLineupHandStats
-    ? (predictionOpponentPitcherForHrScore(game, 'away') || predictionProbableStarterForSide(game, 'home') || homePitcherSummary?.starter || null)
+    ? (lineupOpponentStarterForTeamSplit(game, 'away') || predictionOpponentPitcherForHrScore(game, 'away') || predictionProbableStarterForSide(game, 'home') || homePitcherSummary?.starter || null)
     : (homePitcherSummary?.starter || homePitcherSummary?.current || null);
   const homeOpponentPitcher = shouldShowLineupHandStats
-    ? (predictionOpponentPitcherForHrScore(game, 'home') || predictionProbableStarterForSide(game, 'away') || awayPitcherSummary?.starter || null)
+    ? (lineupOpponentStarterForTeamSplit(game, 'home') || predictionOpponentPitcherForHrScore(game, 'home') || predictionProbableStarterForSide(game, 'away') || awayPitcherSummary?.starter || null)
     : (awayPitcherSummary?.starter || awayPitcherSummary?.current || null);
   const awayOpponentHand = pitcherThrowHandValue(awayOpponentPitcher);
   const homeOpponentHand = pitcherThrowHandValue(homeOpponentPitcher);
@@ -41029,29 +41903,66 @@ function pitcherMaxVelocityMph(pitcher = null) {
 
 
 function pitcherArsenalUsageEntriesFromRows(rows = []) {
+  const rawRows = listify(rows).filter(Boolean);
+  const pitchTotal = rawRows.reduce((sum, row) => {
+    const value = Number(row?.pitches ?? row?.pitchCount ?? row?.count ?? row?.totalPitches);
+    return sum + (Number.isFinite(value) && value > 0 ? value : 0);
+  }, 0);
   const totals = new Map();
-  for (const row of listify(rows)) {
-    const category = visiblePitchCategoryName(row?.category || row?.pitchName || row?.pitchType || row?.pitch_type || row?.pitch_name || '');
+
+  for (const row of rawRows) {
+    const category = visiblePitchCategoryName(row?.category || row?.pitchName || row?.pitchType || row?.pitch_type || row?.pitch_name || row?.name || row?.type || '');
     if (!category) continue;
-    const usage = visiblePitchUsagePercent(row, ['pitcherUsagePct', 'pct', 'usage', 'usagePct', 'pitch_percent']);
+
+    let usage = visiblePitchUsagePercent(row, ['visibleUsagePct', 'pitcherUsagePct', 'pct', 'usage', 'usagePct', 'pitch_percent', 'pitchPercent']);
+    const pitchCount = Number(row?.pitches ?? row?.pitchCount ?? row?.count ?? row?.totalPitches);
+    if ((!Number.isFinite(usage) || usage <= 0) && Number.isFinite(pitchCount) && pitchCount > 0 && pitchTotal > 0) {
+      usage = (pitchCount / pitchTotal) * 100;
+    }
     if (!Number.isFinite(usage) || usage <= 0) continue;
-    const key = pitchStrengthMatchKey(category) || category.toLowerCase();
-    const prior = totals.get(key) || { category, usage: 0 };
+
+    const groupLike = /\b(group|arsenal|fastball family|breaking family|offspeed family)\b/i.test(category);
+    const key = savantPitchCategoryKey(category) || pitchStrengthMatchKey(category) || category.toLowerCase();
+    const prior = totals.get(key) || { category, usage: 0, pitches: 0, isGroupLike: groupLike };
     prior.usage = Math.max(Number(prior.usage) || 0, usage);
+    prior.pitches = Math.max(Number(prior.pitches) || 0, Number.isFinite(pitchCount) ? pitchCount : 0);
+    prior.isGroupLike = Boolean(prior.isGroupLike || groupLike);
     totals.set(key, prior);
   }
+
   return [...totals.values()].sort((a, b) => b.usage - a.usage);
 }
 
 function pitcherArsenalUsageEntriesFromProfile(pitcher = null) {
   const rows = [];
-  const push = (category, usage) => {
+  const push = (category, usage, extra = {}) => {
     const cat = visiblePitchCategoryName(category);
     const pct = normalizedPitchUsagePercent({ usage }, ['usage']);
-    if (cat && Number.isFinite(pct) && pct > 0) rows.push({ category: cat, usage: pct });
+    if (cat && Number.isFinite(pct) && pct > 0) rows.push({ category: cat, usage: pct, ...extra });
   };
-  for (const row of listify(pitcher?.pitchMix || pitcher?.arsenal || pitcher?.pitchArsenal || pitcher?.pitchBreakdown || pitcher?.pitches)) {
-    push(row?.category || row?.pitchName || row?.pitchType || row?.name || row?.type, row?.usagePct ?? row?.usage ?? row?.pct ?? row?.pitch_percent);
+  const rowSources = [
+    pitcher?.pitchMix,
+    pitcher?.arsenal,
+    pitcher?.pitchArsenal,
+    pitcher?.pitchBreakdown,
+    pitcher?.pitches,
+    pitcher?.pitchRows,
+    pitcher?.pitcherPitchRows,
+    pitcher?.visiblePitchRows,
+    pitcher?.pitchUsage,
+    pitcher?.pitchUsageRows,
+    pitcher?.seasonPitchMix,
+    pitcher?.pitching?.pitchMix,
+    pitcher?.seasonStats?.pitching?.pitchMix,
+  ];
+  for (const sourceRows of rowSources) {
+    for (const row of listify(sourceRows)) {
+      rows.push({
+        ...row,
+        category: visiblePitchCategoryName(row?.category || row?.pitchName || row?.pitchType || row?.pitch_type || row?.pitch_name || row?.name || row?.type),
+        usage: row?.visibleUsagePct ?? row?.pitcherUsagePct ?? row?.usagePct ?? row?.usage ?? row?.pct ?? row?.pitch_percent ?? row?.pitchPercent,
+      });
+    }
   }
   const flattened = [
     ['Fastball', pitcher?.fastballUsagePct ?? pitcher?.fbUsagePct ?? pitcher?.fourSeamUsagePct ?? pitcher?.pitching?.fastballUsagePct ?? pitcher?.seasonStats?.pitching?.fastballUsagePct],
@@ -41062,6 +41973,7 @@ function pitcherArsenalUsageEntriesFromProfile(pitcher = null) {
     ['Curveball', pitcher?.curveballUsagePct ?? pitcher?.curveUsagePct ?? pitcher?.cuUsagePct ?? pitcher?.pitching?.curveballUsagePct ?? pitcher?.seasonStats?.pitching?.curveballUsagePct],
     ['Changeup', pitcher?.changeupUsagePct ?? pitcher?.chUsagePct ?? pitcher?.pitching?.changeupUsagePct ?? pitcher?.seasonStats?.pitching?.changeupUsagePct],
     ['Splitter', pitcher?.splitterUsagePct ?? pitcher?.splitUsagePct ?? pitcher?.fsUsagePct ?? pitcher?.pitching?.splitterUsagePct ?? pitcher?.seasonStats?.pitching?.splitterUsagePct],
+    ['Knuckle Curve', pitcher?.knuckleCurveUsagePct ?? pitcher?.kcUsagePct ?? pitcher?.pitching?.knuckleCurveUsagePct ?? pitcher?.seasonStats?.pitching?.knuckleCurveUsagePct],
   ];
   for (const [category, usage] of flattened) push(category, usage);
   return pitcherArsenalUsageEntriesFromRows(rows);
@@ -41104,29 +42016,117 @@ function pitcherArsenalUsageSummary(pitcher = null) {
 
 function pitcherMeaningfulPitchEntries(pitcher = null, minUsage = 3) {
   const entries = pitcherArsenalUsageEntriesFromProfile(pitcher);
-  return entries.filter((row) => Number(row.usage) >= minUsage);
+  const exactEntries = entries.filter((row) => !row.isGroupLike);
+  const base = exactEntries.length ? exactEntries : entries;
+  return base.filter((row) => Number(row.usage) >= minUsage);
 }
+
 
 function pitcherPitchBagSummary(pitcher = null) {
   const entries = pitcherMeaningfulPitchEntries(pitcher, 3);
   const count = entries.length;
   const topUsage = Number(entries[0]?.usage) || 0;
   const topTwoUsage = (Number(entries[0]?.usage) || 0) + (Number(entries[1]?.usage) || 0);
-  const deep = count >= 6;
-  const shallow = count > 0 && count <= 3;
+  const usageSum = entries.reduce((sum, row) => sum + (Number(row?.usage) || 0), 0);
+  const pitchCountSum = entries.reduce((sum, row) => sum + (Number(row?.pitches) || 0), 0);
+  // If the pitch rows only expose part of the arsenal, do not classify it as a
+  // Deep/Shallow bag. This avoids false SB tags from partial samples like
+  // "one pitch at 50%" before the full pitch mix has hydrated.
+  const usageReliable = count > 0 && (
+    usageSum >= 88
+    || (count >= 6 && usageSum >= 80)
+    || (count >= 4 && usageSum >= 82)
+    || (pitchCountSum >= 35 && usageSum >= 75)
+  );
+  const deep = usageReliable && count >= 6;
+  const shallow = usageReliable && count > 0 && count <= 3;
   const deepScore = deep ? clamp(Math.round(64 + ((count - 6) * 7) + Math.max(0, 58 - topUsage) * 0.35), 0, 100) : 0;
   const shallowScore = shallow ? clamp(Math.round(62 + ((3 - count) * 8) + Math.max(0, topUsage - 38) * 0.45 + Math.max(0, topTwoUsage - 65) * 0.25), 0, 100) : 0;
+  const label = deep ? 'Deep Bag' : shallow ? 'Shallow Bag' : (usageReliable && count ? 'Standard Bag' : 'Pitch Bag Unknown');
+  const code = deep ? 'DB' : shallow ? 'SB' : (usageReliable && count ? 'BAG' : '--');
+  const pitchList = entries.length ? entries.slice(0, 6).map((row) => `${row.category} ${arsenalMetricText(row.usage, 1, false, '%')}`).join(', ') : '';
+  const description = count
+    ? usageReliable
+      ? `${count} meaningful pitches at 3%+ usage${pitchList ? ` (${pitchList})` : ''}`
+      : `incomplete pitch-usage sample: ${count} visible pitch${count === 1 ? '' : 'es'} at 3%+ but usage only totals ${arsenalMetricText(usageSum, 1, false, '%')}${pitchList ? ` (${pitchList})` : ''}`
+    : 'pitch-usage sample unavailable';
   return {
     entries,
     count,
     topUsage,
     topTwoUsage,
+    usageSum,
+    pitchCountSum,
+    usageReliable,
     deep,
     shallow,
+    label,
+    code,
     deepScore,
     shallowScore,
-    description: count ? `${count} meaningful pitches at 3%+ usage${entries.length ? ` (${entries.slice(0, 6).map((row) => `${row.category} ${arsenalMetricText(row.usage, 1, false, '%')}`).join(', ')})` : ''}` : 'pitch-usage sample unavailable',
+    description,
   };
+}
+
+
+
+function pitcherBagArchetypeIsAllowed(letter = '', bagSummary = null, hasCurrentPitchRows = false) {
+  const code = String(letter || '').toUpperCase();
+  if (code !== 'DB' && code !== 'SB') return true;
+  // In batter-vs-pitcher contexts, never let stale season/full-profile bag labels override
+  // the handedness-specific pitch-mix rows. If those rows are not loaded, wait rather than guess.
+  if (!hasCurrentPitchRows || !bagSummary || !Number.isFinite(Number(bagSummary.count)) || Number(bagSummary.count) <= 0) return false;
+  return code === 'DB' ? Boolean(bagSummary.deep) : Boolean(bagSummary.shallow);
+}
+
+function pitcherHasCurrentPitchUsageRows(rows = []) {
+  return listify(rows).some((row) => {
+    const category = visiblePitchCategoryName(row?.category || row?.pitchName || row?.pitchType || row?.pitch_type || row?.pitch_name || row?.name || row?.type || '');
+    const usage = visiblePitchUsagePercent(row, ['visibleUsagePct', 'pitcherUsagePct', 'pct', 'usage', 'usagePct', 'pitch_percent', 'pitchPercent']);
+    return Boolean(category) && Number.isFinite(Number(usage)) && Number(usage) > 0;
+  });
+}
+
+function pitcherRowIsPreviousStartOnly(row = {}) {
+  const source = `${row?.source || ''} ${row?.sourceLabel || ''} ${row?.pitcherSourceLabel || ''}`;
+  return /last\s+start|MLB\s+last\s+start\s+pitch\s+feed/i.test(source);
+}
+
+function pitcherRowsForContextualArchetypes(rows = []) {
+  const allRows = listify(rows);
+  const currentRows = allRows.filter((row) => !pitcherRowIsPreviousStartOnly(row));
+  return currentRows.length ? currentRows : allRows;
+}
+
+function pitchBagArchetypeFromSummary(summary = null) {
+  if (!summary || !Number.isFinite(Number(summary.count)) || Number(summary.count) <= 0) return null;
+  if (summary.deep) {
+    const score = clamp(Math.round(summary.deepScore || summary.score || 68), 0, 100);
+    return {
+      letter: 'DB',
+      label: 'Deep Bag',
+      score,
+      confidence: score,
+      isPrimary: true,
+      isSecondary: true,
+      title: `Deep Bag: 6+ meaningful pitches at 3%+ usage in this context. ${summary.description}.`,
+      contextualBag: true,
+    };
+  }
+  if (summary.shallow) {
+    const score = clamp(Math.round(summary.shallowScore || summary.score || 68), 0, 100);
+    return {
+      letter: 'SB',
+      label: 'Shallow Bag',
+      score,
+      confidence: score,
+      isPrimary: true,
+      isSecondary: true,
+      title: `Shallow Bag: 3 or fewer meaningful pitches at 3%+ usage in this context. ${summary.description}.`,
+      contextualBag: true,
+    };
+  }
+  return null;
 }
 
 function pitcherBreakRowAmount(row = {}) {
@@ -41136,11 +42136,26 @@ function pitcherBreakRowAmount(row = {}) {
 }
 
 function pitcherBreakRowsFromProfile(pitcher = null) {
-  return listify(pitcher?.pitchMix || pitcher?.arsenal || pitcher?.pitchArsenal || pitcher?.pitchBreakdown || pitcher?.pitches)
+  const rowSources = [
+    pitcher?.pitchMix,
+    pitcher?.arsenal,
+    pitcher?.pitchArsenal,
+    pitcher?.pitchBreakdown,
+    pitcher?.pitches,
+    pitcher?.pitchRows,
+    pitcher?.pitcherPitchRows,
+    pitcher?.visiblePitchRows,
+    pitcher?.pitchUsage,
+    pitcher?.pitchUsageRows,
+    pitcher?.seasonPitchMix,
+    pitcher?.pitching?.pitchMix,
+    pitcher?.seasonStats?.pitching?.pitchMix,
+  ];
+  return rowSources.flatMap((sourceRows) => listify(sourceRows))
     .map((row) => ({
       ...row,
-      category: visiblePitchCategoryName(row?.category || row?.pitchName || row?.pitchType || row?.name || row?.type),
-      usage: normalizedPitchUsagePercent(row, ['pitcherUsagePct', 'pct', 'usage', 'usagePct', 'pitch_percent']),
+      category: visiblePitchCategoryName(row?.category || row?.pitchName || row?.pitchType || row?.pitch_type || row?.pitch_name || row?.name || row?.type),
+      usage: normalizedPitchUsagePercent(row, ['visibleUsagePct', 'pitcherUsagePct', 'pct', 'usage', 'usagePct', 'pitch_percent', 'pitchPercent']),
       breakAmount: pitcherBreakRowAmount(row),
       maxBreak: Number(row?.maxBreak ?? row?.topBreak ?? pitcherBreakRowAmount(row)),
     }))
@@ -41205,6 +42220,21 @@ function upsertUsageBasedArsenalImbalance(archetypes = [], usageSummary = null) 
   const base = listify(archetypes).filter((arch) => String(arch?.letter || '').toUpperCase() !== 'I');
   if (usageArch) base.push(usageArch);
   return base.sort((a, b) => Number(b.score || b.confidence || 0) - Number(a.score || a.confidence || 0));
+}
+
+
+function pitcherArchetypeTitleWithScore(item = {}) {
+  const label = cleanSummary(item?.label || item?.name || 'Pitcher archetype');
+  let title = cleanSummary(item?.title || label);
+  const lowerLabel = label.toLowerCase();
+  let lowerTitle = title.toLowerCase();
+  while (lowerTitle.startsWith(`${lowerLabel}: ${lowerLabel}:`)) {
+    title = `${label}: ${title.slice((`${label}: ${label}:`).length).trim()}`;
+    lowerTitle = title.toLowerCase();
+  }
+  if (!lowerTitle.startsWith(`${lowerLabel}:`)) title = `${label}: ${title}`;
+  const strengthText = `Strength ${Math.round(Number(item?.score) || 0)}/100.`;
+  return /\bStrength\s+\d+\/100\b/i.test(title) ? title : `${title} ${strengthText}`;
 }
 
 function lineupPitcherArchetypes(pitcher = null) {
@@ -41279,7 +42309,7 @@ function lineupPitcherArchetypes(pitcher = null) {
   const usageSummary = pitcherArsenalUsageSummary(pitcher);
   const bagSummary = pitcherPitchBagSummary(pitcher);
   const breakProfile = pitcherBreakProfile(pitcher);
-  const imbalance = usageSummary?.qualifies ? usageSummary.score : 0;
+  const imbalance = 0;
   const repeat = predictionWeightedScore([
     { score: isStarterish ? 64 : 42, weight: 0.34 },
     { score: Number.isFinite(k9) ? lineupMetricScore(k9, 5.8, 8.2, 50, true) : 50, weight: 0.32 },
@@ -41294,7 +42324,7 @@ function lineupPitcherArchetypes(pitcher = null) {
     { letter: 'DB', label: 'Deep Bag', score: bagSummary.deep ? bagSummary.deepScore : 0, title: `Deep Bag: 6+ meaningful pitches at 3%+ usage. ${bagSummary.description}.`, primaryFloor: 66, secondaryFloor: 66 },
     { letter: 'SB', label: 'Shallow Bag', score: bagSummary.shallow ? bagSummary.shallowScore : 0, title: `Shallow Bag: 3 or fewer meaningful pitches at 3%+ usage. ${bagSummary.description}.`, primaryFloor: 66, secondaryFloor: 66 },
     { letter: 'L', label: 'Mistake Leaker', score: leaker, title: `Mistake Leaker: attackable damage profile from HR/9 ${Number.isFinite(hr9) ? hr9.toFixed(2) : '--'}, WHIP ${Number.isFinite(whip) ? whip.toFixed(2) : '--'}, ERA ${Number.isFinite(era) ? era.toFixed(2) : '--'}.`, primaryFloor: 64 },
-    { letter: 'I', label: 'Arsenal Imbalance', score: imbalance, title: usageSummary ? `Arsenal Imbalance: usage-based pitch lean. ${usageSummary.description}.` : 'Arsenal Imbalance: requires a real pitch-usage lean; no usage sample loaded.', primaryFloor: 66, secondaryFloor: 58 },
+    { letter: 'I', label: 'Arsenal Imbalance', score: imbalance, title: 'Arsenal Imbalance is matchup-only and requires 2+ exact pitch types where hitter SLG and pitcher SLG allowed are both .500+.', primaryFloor: 101, secondaryFloor: 101 },
     { letter: 'R', label: 'Repeat Pattern', score: repeat, title: 'Repeat Pattern: starterish, lower-K or more sit-on-it profile.', primaryFloor: 66 },
   ].map((item) => ({
     ...item,
@@ -41311,7 +42341,7 @@ function lineupPitcherArchetypes(pitcher = null) {
       isPrimary: item.isPrimary || (item.letter === 'F' && hasEliteHeat),
       isTop: index === 0,
       relativeGap: Math.round(topScore - item.score),
-      title: `${item.label}: ${item.title} Strength ${Math.round(item.score)}/100.`,
+      title: pitcherArchetypeTitleWithScore(item),
     }));
 }
 
@@ -41328,9 +42358,10 @@ function pitcherArchetypeBadgeHtml(arch = null, extraClass = '') {
 }
 
 function lineupPitcherArchetypeBadgeHtml(pitcher = null) {
+  const secondaryLetters = new Set(['K', 'RS', 'DB', 'SB']);
   const visible = lineupPitcherArchetypes(pitcher)
-    .filter((arch) => arch.isPrimary || (String(arch?.letter || '').toUpperCase() === 'K' && arch.isSecondary))
-    .slice(0, 3);
+    .filter((arch) => arch.isPrimary || (secondaryLetters.has(String(arch?.letter || '').toUpperCase()) && arch.isSecondary))
+    .slice(0, 4);
   return visible.map((arch) => pitcherArchetypeBadgeHtml(arch, arch.isPrimary ? '' : 'is-secondary')).join('');
 }
 
@@ -41406,22 +42437,32 @@ function hydrateLineupPitcherVelocityArchetypeBadges(containerEl = null, pitcher
 
 function pitcherArchetypePanelHtml(pitcher = null, pitchRows = null) {
   const usageRows = listify(pitchRows);
-  const pitcherForArchetypes = usageRows.length ? { ...(pitcher || {}), pitchBreakdown: usageRows, pitchMix: usageRows } : pitcher;
+  const pitcherForArchetypes = usageRows.length ? { ...(pitcher || {}), pitchBreakdown: usageRows, pitchMix: usageRows, pitchRows: usageRows } : pitcher;
   const archetypes = lineupPitcherArchetypes(pitcherForArchetypes);
-  if (!archetypes.length) return '';
+  const bagSummary = pitcherPitchBagSummary(pitcherForArchetypes);
   const primary = archetypes.filter((arch) => arch.isPrimary);
   const secondary = archetypes.filter((arch) => !arch.isPrimary && arch.isSecondary);
   const shown = (primary.length ? primary : archetypes.slice(0, 1));
+  if (!archetypes.length && !bagSummary.count) return '';
   return `
     <div class="arsenal-matchup-card pitcher-archetype-card">
       <div class="arsenal-matchup-head">
         <span>Pitcher Types</span>
-        <strong>${shown.map((arch) => escapeHtml(arch.label)).join(' / ')}</strong>
-        <b>${Math.round(shown[0]?.confidence || 0)}</b>
+        <strong>${shown.length ? shown.map((arch) => escapeHtml(arch.label)).join(' / ') : escapeHtml(bagSummary.label)}</strong>
+        <b>${shown.length ? Math.round(shown[0]?.confidence || 0) : Math.round(Math.max(bagSummary.deepScore || 0, bagSummary.shallowScore || 0))}</b>
       </div>
-      <div class="arsenal-flags pitcher-archetype-flags">
-        ${shown.map((arch) => `<span title="${escapeHtml(arch.title)}">${pitcherArchetypeBadgeHtml(arch)} ${escapeHtml(arch.label)} ${Math.round(arch.confidence || 0)}</span>`).join('')}
-      </div>
+      ${bagSummary.count ? `
+        <div class="pitcher-bag-summary" title="${escapeHtml(bagSummary.description)}">
+          <span>${escapeHtml(bagSummary.code)}</span>
+          <strong>${escapeHtml(bagSummary.label)}</strong>
+          <em>${escapeHtml(bagSummary.count)} pitches</em>
+        </div>
+      ` : ''}
+      ${shown.length ? `
+        <div class="arsenal-flags pitcher-archetype-flags">
+          ${shown.map((arch) => `<span title="${escapeHtml(arch.title)}">${pitcherArchetypeBadgeHtml(arch)} ${escapeHtml(arch.label)} ${Math.round(arch.confidence || 0)}</span>`).join('')}
+        </div>
+      ` : ''}
       ${secondary.length ? `
         <details class="pitcher-secondary-archetypes">
           <summary>Secondary reads</summary>
@@ -41736,7 +42777,6 @@ function openLineupFromCard(card, e = null) {
   rememberScoreboardCard(card);
   const gamePk = String(card.dataset.gamePk || '');
   if (!gamePk) return false;
-  requestFocusedGameHydration(gamePk, { delayMs: 0 });
   const now = Date.now();
   if (gamePk === lineupShortcutHandledGamePk && now - lineupShortcutHandledAt < 350) {
     e?.preventDefault?.();
@@ -41878,7 +42918,6 @@ function bindCardInteractions(card, game) {
   });
 
   card.addEventListener('click', (e) => {
-    requestFocusedGameHydration(card.dataset.gamePk || (card._game || game)?.gamePk || '', { delayMs: 0 });
     if (Date.now() - lineupClickHandledAt < 250) {
       e.preventDefault();
       e.stopPropagation();
@@ -41886,11 +42925,6 @@ function bindCardInteractions(card, game) {
     }
     if (e.altKey) {
       toggleLineup(e);
-      return;
-    }
-    if (e.ctrlKey || e.metaKey) {
-      e.preventDefault();
-      toggleFocusedGame(card.dataset.gamePk);
       return;
     }
     if (shouldOpenSplitPeerFromScoreboardClick(card, e)) {
@@ -41904,16 +42938,7 @@ function bindCardInteractions(card, game) {
       e.preventDefault();
       const side = clickedAway ? 'away' : 'home';
       setPendingGamePick(liveGame, side);
-      if (isFocusedGame(card.dataset.gamePk)) {
-        setFocusedMatchupSide(card.dataset.gamePk, side);
-      }
       return;
-    }
-    if (isFocusedGame(card.dataset.gamePk)) {
-      return;
-    }
-    if (!e.target.closest('button, a, input, select, textarea, .away-row, .home-row, .away-score, .home-score')) {
-      setFocusedGame(card.dataset.gamePk);
     }
   });
 
