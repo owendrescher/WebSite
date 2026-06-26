@@ -24637,13 +24637,17 @@ function predictionBatterContactHeatFromLivePlays(playerId, plays = [], targetDa
   const id = Number(playerId);
   if (!Number.isFinite(id) || id <= 0) return null;
   const rows = [];
+  const seenPlateAppearances = new Set();
   for (const play of listify(plays)) {
     if (Number(play?.matchup?.batter?.id ?? play?.matchup?.batter?.person?.id) !== id) continue;
     const playDate = calendarDateOnly(play?.about?.startTime || play?.about?.endTime || play?.playEndTime || '');
     if (targetDate && playDate && playDate !== targetDate) continue;
+    const plateKey = cleanSummary(play?.about?.atBatIndex ?? play?.about?.plateAppearanceIndex ?? play?.about?.eventIdx ?? '');
+    const dedupeKey = plateKey ? `${targetDate || playDate || 'game'}:${plateKey}` : '';
+    if (dedupeKey && seenPlateAppearances.has(dedupeKey)) continue;
     const playEventName = cleanSummary(play?.result?.eventType || play?.result?.event || '').toLowerCase();
     const playIsHomeRun = playEventName === 'home_run' || playEventName === 'home run';
-    let pushedForPlay = false;
+    let selectedRow = null;
     for (const event of listify(play?.playEvents)) {
       const eventName = cleanSummary(event?.details?.eventType || event?.details?.event || play?.result?.eventType || play?.result?.event || '');
       const normalizedEventName = eventName.toLowerCase();
@@ -24651,21 +24655,24 @@ function predictionBatterContactHeatFromLivePlays(playerId, plays = [], targetDa
       const hitData = event?.hitData || event?.details?.hitData || null;
       const ev = Number(hitData?.launchSpeed ?? hitData?.exitVelocity ?? hitData?.launch_speed);
       if (!Number.isFinite(ev) && !isHomeRunEvent) continue;
-      rows.push({
+      selectedRow = {
         launch_speed: Number.isFinite(ev) ? ev : null,
         launch_angle: Number(hitData?.launchAngle ?? hitData?.launch_angle),
         events: isHomeRunEvent ? 'home_run' : eventName,
         game_date: targetDate || playDate,
-      });
-      pushedForPlay = true;
+      };
     }
-    if (!pushedForPlay && playIsHomeRun) {
-      rows.push({
+    if (!selectedRow && playIsHomeRun) {
+      selectedRow = {
         launch_speed: null,
         launch_angle: null,
         events: 'home_run',
         game_date: targetDate || playDate,
-      });
+      };
+    }
+    if (selectedRow) {
+      rows.push(selectedRow);
+      if (dedupeKey) seenPlateAppearances.add(dedupeKey);
     }
   }
   return predictionBatterContactHeatFromRows(rows);
@@ -24706,6 +24713,40 @@ async function getBatterRecentContactHeat(playerId, date = '', game = null) {
   return promise;
 }
 
+function batterHeatContactCapForGame(game = null) {
+  if (!game) return null;
+  const atBats = statNumber(game.atBats);
+  const strikeOuts = statNumber(game.so ?? game.strikeOuts);
+  const sacFlies = statNumber(game.sacFlies ?? game.sacrificeFlies);
+  const sacBunts = statNumber(game.sacBunts ?? game.sacrificeBunts);
+  const plateAppearances = batterHeatPlateAppearancesFromStat(game);
+  let maxBip = null;
+  if (atBats > 0 || sacFlies > 0 || sacBunts > 0) {
+    maxBip = Math.max(0, atBats - strikeOuts + sacFlies + sacBunts);
+  }
+  if (!Number.isFinite(maxBip) && plateAppearances > 0) maxBip = plateAppearances;
+  if (Number.isFinite(maxBip) && plateAppearances > 0) maxBip = Math.min(maxBip, plateAppearances);
+  return Number.isFinite(maxBip) ? Math.max(0, Math.floor(maxBip)) : null;
+}
+
+function clampBatterHeatContactToGame(contact = null, game = null) {
+  if (!contact || typeof contact !== 'object') return contact;
+  const cap = batterHeatContactCapForGame(game);
+  if (!Number.isFinite(cap)) return contact;
+  const hr = statNumber(game?.hr ?? game?.homeRuns ?? contact.homeRuns);
+  const floor = hr > 0 ? 1 : 0;
+  const bbe = Math.max(floor, Math.min(cap, statNumber(contact.bbe)));
+  const hardHit = Math.max(floor, Math.min(bbe, statNumber(contact.hardHit)));
+  const barrelLike = Math.max(floor, Math.min(hardHit, statNumber(contact.barrelLike)));
+  return {
+    ...contact,
+    bbe,
+    hardHit,
+    barrelLike,
+    contactCap: cap,
+    detail: cleanSummary(contact.detail || '').replace(/^\d+\s+BBE/i, `${bbe} BBE`),
+  };
+}
 
 
 
@@ -24719,8 +24760,9 @@ async function getBatterRecentContactHeatGames(playerId, games = [], game = null
     const fromFeed = Number.isFinite(gamePk) && gamePk > 0
       ? await withTimeoutValue(getBatterRecentContactHeatFromGameFeed(playerId, gamePk, date), Math.max(900, timeoutMs), null).catch(() => null)
       : null;
-    if (fromFeed) return fromFeed;
-    return withTimeoutValue(getBatterRecentContactHeat(playerId, date, game), Math.max(1200, timeoutMs), null).catch(() => null);
+    if (fromFeed) return clampBatterHeatContactToGame(fromFeed, row);
+    const fromSavant = await withTimeoutValue(getBatterRecentContactHeat(playerId, date, game), Math.max(1200, timeoutMs), null).catch(() => null);
+    return clampBatterHeatContactToGame(fromSavant, row);
   }));
 }
 
