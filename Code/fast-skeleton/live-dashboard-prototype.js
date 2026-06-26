@@ -276,7 +276,7 @@ const REQUEST_RETRY_COUNT = 2;
 const LINEUP_PAGE_FAST_TIMEOUT_MS = 1200;
 const LINEUP_READER_FAST_TIMEOUT_MS = 1500;
 const ROTOWIRE_LINEUP_FAST_TIMEOUT_MS = 4500;
-const ROTOWIRE_LINEUP_CACHE_TTL_MS = 2 * 60 * 1000;
+const ROTOWIRE_LINEUP_CACHE_TTL_MS = 60 * 1000;
 const ROTOWIRE_LINEUP_PREWARM_BUCKET_MS = ROTOWIRE_LINEUP_CACHE_TTL_MS;
 const LINEUP_FALLBACK_CACHE_TTL_MS = 2 * 60 * 1000;
 const ROTOWIRE_DYNAMIC_LINEUP_STORAGE_KEY = 'rotowire-dynamic-lineup-source:v1';
@@ -4872,6 +4872,54 @@ function seededRotowireDefaultBattingOrder(teamAbbrev, pitcherHand = 'RHP', date
   }));
 }
 
+function rotowireLineupPriority(lineup = []) {
+  if (!isUsableLineupCandidate(lineup)) return 0;
+  const sourceText = lineup.map((entry) => String(entry?.source || '')).join(' ');
+  if (/today|confirmed|starting/i.test(sourceText)) return 4;
+  if (/dynamic-source/i.test(sourceText)) return 3;
+  if (/default/i.test(sourceText)) return 2;
+  if (/seed/i.test(sourceText)) return 1;
+  return 2;
+}
+
+function bestRotowireLineupCandidate(candidates = []) {
+  let best = [];
+  let bestPriority = 0;
+  for (const lineup of candidates) {
+    const priority = rotowireLineupPriority(lineup);
+    if (!priority) continue;
+    if (priority > bestPriority || (priority === bestPriority && lineup.length > best.length)) {
+      best = lineup;
+      bestPriority = priority;
+    }
+  }
+  return best;
+}
+
+function rotowireLineupSourceUrls(rwTeam) {
+  const sourceUrl = `https://www.rotowire.com/baseball/batting-orders.php?team=${encodeURIComponent(rwTeam)}`;
+  const liveUrl = new URL(sourceUrl);
+  liveUrl.searchParams.set('_ot_live', String(Date.now()));
+  const liveSourceUrl = liveUrl.toString();
+  return [
+    `https://api.allorigins.win/raw?url=${encodeURIComponent(liveSourceUrl)}`,
+    `https://r.jina.ai/${liveSourceUrl}`,
+    liveSourceUrl,
+  ];
+}
+
+async function bestRotowireLineupFromUrls(urls = [], team = '', hand = 'RHP') {
+  const tasks = urls.filter(Boolean).map((url) => withTimeoutValue((async () => {
+    const text = await getText(url);
+    const todayLineup = parseRotowireTodayBattingOrder(text, team);
+    if (isUsableLineupCandidate(todayLineup)) return todayLineup;
+    return parseRotowireDefaultBattingOrder(text, hand);
+  })(), ROTOWIRE_LINEUP_FAST_TIMEOUT_MS, []));
+  if (!tasks.length) return [];
+  const settled = await Promise.allSettled(tasks);
+  return bestRotowireLineupCandidate(settled.map((result) => (result.status === 'fulfilled' ? result.value : [])));
+}
+
 
 function fetchRotowireProjectedBattingOrder(game, side, options = {}) {
   if (!game || !shouldPreferProbablePitcher(game)) return Promise.resolve([]);
@@ -4886,21 +4934,11 @@ function fetchRotowireProjectedBattingOrder(game, side, options = {}) {
   if (cached) return cached;
 
   const promise = (async () => {
-    const sourceUrl = `https://www.rotowire.com/baseball/batting-orders.php?team=${encodeURIComponent(rwTeam)}`;
-    const urls = [
-      `https://api.allorigins.win/raw?url=${encodeURIComponent(sourceUrl)}`,
-      `https://r.jina.ai/${sourceUrl}`,
-      sourceUrl,
-    ];
+    const urls = rotowireLineupSourceUrls(rwTeam);
     for (const hand of handOptions) {
-      const parsed = await firstUsableLineup(urls.map((url) => withTimeoutValue((async () => {
-        const text = await getText(url);
-        const todayLineup = parseRotowireTodayBattingOrder(text, team);
-        if (isUsableLineupCandidate(todayLineup)) return todayLineup;
-        return parseRotowireDefaultBattingOrder(text, hand);
-      })(), ROTOWIRE_LINEUP_FAST_TIMEOUT_MS, [])));
+      const parsed = await bestRotowireLineupFromUrls(urls, team, hand);
       if (isUsableLineupCandidate(parsed)) {
-        const sourceType = parsed.some((entry) => /rotowire-today/i.test(String(entry?.source || ''))) ? 'today' : 'default';
+        const sourceType = parsed.some((entry) => /rotowire-today|confirmed|starting/i.test(String(entry?.source || ''))) ? 'today' : 'default';
         rememberRotowireDynamicLineupSource(team, hand, date, parsed, sourceType);
         return enrichProjectedLineupEntriesForTeam(game, team, parsed);
       }

@@ -1,0 +1,392 @@
+{
+  "updated_file": "rotowire-default-lineups.js",
+  "old_sha256": "cfafbafccce84d4a31b3c566a9bd87b89b3f8772a1b962cf8999fe975e5ea985",
+  "new_sha256": "c6197260a6a2e51c116f7bdca67f866c831cac6a8ce1a972e15e3e3db73f3e68",
+  "team_count": 30,
+  "lineup_count": 60,
+  "batter_slots": 540,
+  "changed_team_hand_lineups": 59,
+  "spot_checks": {
+    "ARI_RHP": [
+      "Ketel Marte",
+      "Geraldo Perdomo",
+      "Corbin Carroll",
+      "Gabriel Moreno",
+      "Pavin Smith",
+      "Nolan Arenado",
+      "Lourdes Gurriel",
+      "Max Kepler",
+      "Tommy Troy"
+    ],
+    "BOS_RHP": [
+      "Mickey Gasper",
+      "Ceddanne Rafaela",
+      "Wilyer Abreu",
+      "Willson Contreras",
+      "Jarren Duran",
+      "Caleb Durbin",
+      "Masataka Yoshida",
+      "Anthony Seigler",
+      "Marcelo Mayer"
+    ],
+    "SD_RHP": [
+      "Fernando Tatis",
+      "Samad Taylor",
+      "Jackson Merrill",
+      "Manny Machado",
+      "Gavin Sheets",
+      "Xander Bogaerts",
+      "Will Wagner",
+      "Ty France",
+      "Freddy Fermin"
+    ],
+    "TOR_LHP": [
+      "George Springer",
+      "Vladimir Guerrero",
+      "Kazuma Okamoto",
+      "Alejandro Kirk",
+      "Daulton Varsho",
+      "Ernie Clement",
+      "Davis Schneider",
+      "Luis Urias",
+      "Myles Straw"
+    ],
+    "SF_RHP": [
+      "Luis Arraez",
+      "Bryce Eldridge",
+      "Casey Schmitt",
+      "Rafael Devers",
+      "Jung Hoo Lee",
+      "Willy Adames",
+      "Matt Chapman",
+      "Drew Gilbert",
+      "Daniel Susac"
+    ]
+  },
+  "changes_sample": [
+    {
+      "team": "ARI",
+      "hand": "RHP",
+      "before": [
+        "Ketel Marte",
+        "Corbin Carroll",
+        "Gabriel Moreno",
+        "Nolan Arenado",
+        "Pavin Smith",
+        "Geraldo Perdomo",
+        "Ryan Waldschmidt",
+        "LuJames Groover",
+        "Tommy Troy"
+      ],
+      "after": [
+        "Ketel Marte",
+        "Geraldo Perdomo",
+        "Corbin Carroll",
+        "Gabriel Moreno",
+        "Pavin Smith",
+        "Nolan Arenado",
+        "Lourdes Gurriel",
+        "Max Kepler",
+        "Tommy Troy"
+      ],
+      "changed_slots": 6
+    },
+    {
+      "team": "ARI",
+      "hand": "LHP",
+      "before": [
+        "Ketel Marte",
+        "Corbin Carroll",
+        "Gabriel Moreno",
+        "Nolan Arenado",
+        "Ryan Waldschmidt",
+        "Ildemaro Vargas",
+        "LuJames Groover",
+        "Geraldo Perdomo",
+        "Tommy Troy"
+      ],
+      "after": [
+        "Ketel Marte",
+        "Geraldo Perdomo",
+        "Corbin Carroll",
+        "Gabriel Moreno",
+        "Nolan Arenado",
+        "Tommy Troy",
+        "Lourdes Gurriel",
+        "Ildemaro Vargas",
+        "LuJames Groover"
+      ],
+      "changed_slots": 8
+    },
+    {
+      "team": "ATH",
+      "hand": "RHP",
+      "before": [
+        "Nick Kurtz",
+        "Carlos Cortes",
+        "Shea Langeliers",
+        "Brent Rooker",
+        "Tyler Soderstrom",
+        "Henry Bolte",
+        "Max Muncy",
+        "Jeff McNeil",
+        "Zack Gelof"
+      ],
+      "after": [
+        "Henry Bolte",
+        "Nick Kurtz",
+        "Shea Langeliers",
+        "Tyler Soderstrom",
+        "Jacob Wilson",
+        "Jonah Heim",
+        "Lawrence Butler",
+        "Max Muncy",
+        "Jeff McNeil"
+      ],
+      "changed_slots": 8
+    },
+    {
+      "team": "ATH",
+      "hand": "LHP",
+      "before": [
+        "Shea Langeliers",
+        "Nick Kurtz",
+        "Colby Thomas",
+        "Brent Rooker",
+        "Max Muncy",
+        "Tyler Soderstrom",
+        "Henry Bolte",
+        "Zack Gelof",
+        "Alika Williams"
+      ],
+      "after": [
+        "Henry Bolte",
+        "Nick Kurtz",
+        "Shea Langeliers",
+        "Jacob Wilson",
+        "Tyler Soderstrom",
+        "Joey Meneses",
+        "Colby Thomas",
+        "Alika Williams",
+        "Max Muncy"
+      ],
+      "changed_slots": 8
+    },
+    {
+      "team": "ATL",
+      "hand": "RHP",
+      "before": [
+        "Michael Harris",
+        "Ozzie Albies",
+        "Matt Olson",
+        "Dominic Smith",
+        "Mauricio Dubon",
+        "Austin Riley",
+        "Mike Yastrzemski",
+        "Jorge Mateo",
+        "Austin Wynns"
+      ],
+      "after": [
+        "Drake Baldwin",
+        "Michael Harris",
+        "Matt Olson",
+        "Ozzie Albies",
+        "Dominic Smith",
+        "Mauricio Dubon",
+        "Austin Riley",
+        "Mike Yastrzemski",
+        "Eli White"
+      ],
+      "changed_slots": 8
+    },
+    {
+      "team": "ATL",
+      "hand": "LHP",
+      "before": [
+        "Mauricio Dubon",
+        "Ozzie Albies",
+        "Matt Olson",
+        "Austin Riley",
+        "Eli White",
+        "Michael Harris",
+        "Jorge Mateo",
+        "Ha-Seong Kim",
+        "Sandy Leon"
+      ],
+      "after": [
+        "Mauricio Dubon",
+        "Drake Baldwin",
+        "Ozzie Albies",
+        "Matt Olson",
+        "Michael Harris",
+        "Austin Riley",
+        "Joey Bart",
+        "Eli White",
+        "Jorge Mateo"
+      ],
+      "changed_slots": 8
+    },
+    {
+      "team": "BAL",
+      "hand": "RHP",
+      "before": [
+        "Taylor Ward",
+        "Gunnar Henderson",
+        "Adley Rutschman",
+        "Pete Alonso",
+        "Samuel Basallo",
+        "Leody Taveras",
+        "Colton Cowser",
+        "Coby Mayo",
+        "Jackson Holliday"
+      ],
+      "after": [
+        "Taylor Ward",
+        "Gunnar Henderson",
+        "Pete Alonso",
+        "Samuel Basallo",
+        "Leody Taveras",
+        "Colton Cowser",
+        "Tyler O'Neill",
+        "Jackson Holliday",
+        "Blaze Alexander"
+      ],
+      "changed_slots": 7
+    },
+    {
+      "team": "BAL",
+      "hand": "LHP",
+      "before": [
+        "Taylor Ward",
+        "Gunnar Henderson",
+        "Adley Rutschman",
+        "Pete Alonso",
+        "Tyler O'Neill",
+        "Coby Mayo",
+        "Jeremiah Jackson",
+        "Blaze Alexander",
+        "Leody Taveras"
+      ],
+      "after": [
+        "Taylor Ward",
+        "Gunnar Henderson",
+        "Pete Alonso",
+        "Tyler O'Neill",
+        "Coby Mayo",
+        "Jeremiah Jackson",
+        "Blaze Alexander",
+        "Sam Huff",
+        "Leody Taveras"
+      ],
+      "changed_slots": 6
+    },
+    {
+      "team": "BOS",
+      "hand": "RHP",
+      "before": [
+        "Jarren Duran",
+        "Ceddanne Rafaela",
+        "Wilyer Abreu",
+        "Willson Contreras",
+        "Mickey Gasper",
+        "Masataka Yoshida",
+        "Caleb Durbin",
+        "Isiah Kiner-Falefa",
+        "Marcelo Mayer"
+      ],
+      "after": [
+        "Mickey Gasper",
+        "Ceddanne Rafaela",
+        "Wilyer Abreu",
+        "Willson Contreras",
+        "Jarren Duran",
+        "Caleb Durbin",
+        "Masataka Yoshida",
+        "Anthony Seigler",
+        "Marcelo Mayer"
+      ],
+      "changed_slots": 5
+    },
+    {
+      "team": "BOS",
+      "hand": "LHP",
+      "before": [
+        "Jarren Duran",
+        "Ceddanne Rafaela",
+        "Wilyer Abreu",
+        "Willson Contreras",
+        "Andruw Monasterio",
+        "Isiah Kiner-Falefa",
+        "Carlos Narvaez",
+        "Caleb Durbin",
+        "Marcelo Mayer"
+      ],
+      "after": [
+        "Nate Eaton",
+        "Ceddanne Rafaela",
+        "Wilyer Abreu",
+        "Willson Contreras",
+        "Jarren Duran",
+        "Caleb Durbin",
+        "Andruw Monasterio",
+        "Marcelo Mayer",
+        "Carlos Narvaez"
+      ],
+      "changed_slots": 6
+    },
+    {
+      "team": "CHC",
+      "hand": "RHP",
+      "before": [
+        "Pete Crow-Armstrong",
+        "Nico Hoerner",
+        "Michael Busch",
+        "Alex Bregman",
+        "Ian Happ",
+        "Seiya Suzuki",
+        "Moises Ballesteros",
+        "Carson Kelly",
+        "Dansby Swanson"
+      ],
+      "after": [
+        "Pete Crow-Armstrong",
+        "Alex Bregman",
+        "Michael Busch",
+        "Seiya Suzuki",
+        "Ian Happ",
+        "Matt Shaw",
+        "Nico Hoerner",
+        "Carson Kelly",
+        "Dansby Swanson"
+      ],
+      "changed_slots": 4
+    },
+    {
+      "team": "CHC",
+      "hand": "LHP",
+      "before": [
+        "Nico Hoerner",
+        "Pete Crow-Armstrong",
+        "Alex Bregman",
+        "Seiya Suzuki",
+        "Ian Happ",
+        "Carson Kelly",
+        "Michael Busch",
+        "Miguel Amaya",
+        "Dansby Swanson"
+      ],
+      "after": [
+        "Pete Crow-Armstrong",
+        "Matt Shaw",
+        "Seiya Suzuki",
+        "Alex Bregman",
+        "Michael Busch",
+        "Ian Happ",
+        "Nico Hoerner",
+        "Carson Kelly",
+        "Dansby Swanson"
+      ],
+      "changed_slots": 8
+    }
+  ]
+}
