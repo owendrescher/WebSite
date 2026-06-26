@@ -249,7 +249,7 @@ const LINEUP_STAT_WINDOW_KEY = 'lineup-stat-window:v1';
 const PLAYER_STAT_RECENT_WINDOW_KEY = 'player-stat-recent-window:v1';
 const PREDICTION_SNAPSHOT_STORAGE_KEY = 'prediction-snapshots:v1';
 const HITTING_PREDICTION_CACHE_STORAGE_KEY = 'hitting-predictions-cache:v1';
-const HITTING_PREDICTION_CACHE_VERSION = 24;
+const HITTING_PREDICTION_CACHE_VERSION = 25;
 const PREDICTION_SORT_KEY = 'prediction-sort:v1';
 const SCOREBOARD_WIDTH_KEY = 'scoreboard-width:v1';
 const GAME_ARCHIVE_PREFIX = 'games-archive:v1';
@@ -16347,7 +16347,7 @@ function summarizeLastFiveBattingDetails(splits = [], game = null, gameLimit = 5
       walks: statNumber(lastStat.baseOnBalls ?? lastStat.walks),
       so: statNumber(lastStat.strikeOuts),
     },
-    heatGames: games.slice(0, 3).map((split) => {
+    heatGames: eligibleGames.map((split) => {
       const stat = split?.stat || {};
       const opponent = displayTeamAbbrev(
         split?.opponent?.abbreviation
@@ -16364,13 +16364,18 @@ function summarizeLastFiveBattingDetails(splits = [], game = null, gameLimit = 5
         opponent,
         hits: statNumber(stat.hits),
         atBats: statNumber(stat.atBats),
+        plateAppearances: batterHeatPlateAppearancesFromStat(stat),
         totalBases: statNumber(stat.totalBases) || totalBasesFromBatting(stat),
         hr: statNumber(stat.homeRuns),
         rbi: statNumber(stat.rbi),
         walks: statNumber(stat.baseOnBalls ?? stat.walks),
         so: statNumber(stat.strikeOuts),
+        hitByPitch: statNumber(stat.hitByPitch),
+        sacFlies: statNumber(stat.sacFlies ?? stat.sacrificeFlies),
+        sacBunts: statNumber(stat.sacBunts ?? stat.sacrificeBunts),
+        catchersInterference: statNumber(stat.catchersInterference),
       };
-    }),
+    }).filter(batterHeatGameQualifies).slice(0, 3),
     totals: {
       games: totals.games,
       atBats: totals.atBats,
@@ -16571,18 +16576,48 @@ function playerBatterHeatGameResultText(game = null) {
   return parts.join(', ');
 }
 
+function batterHeatPlateAppearancesFromStat(stat = {}) {
+  const explicitPa = Number(stat.plateAppearances ?? stat.plateAppearance ?? stat.pa ?? stat.PA);
+  if (Number.isFinite(explicitPa) && explicitPa >= 0) return explicitPa;
+  return Math.max(0,
+    statNumber(stat.atBats)
+    + statNumber(stat.baseOnBalls ?? stat.walks)
+    + statNumber(stat.hitByPitch)
+    + statNumber(stat.sacFlies ?? stat.sacrificeFlies)
+    + statNumber(stat.sacBunts ?? stat.sacrificeBunts)
+    + statNumber(stat.catchersInterference)
+  );
+}
+
+function batterHeatGameQualifies(game = null) {
+  if (!game) return false;
+  const plateAppearances = batterHeatPlateAppearancesFromStat(game);
+  if (plateAppearances >= 3) return true;
+  const atBats = statNumber(game.atBats);
+  const hits = statNumber(game.hits);
+  const homeRuns = statNumber(game.hr ?? game.homeRuns);
+  return atBats === 1 && hits === 1 && homeRuns > 0;
+}
+
 
 function playerBatterHeatContactStat(contact = null, key = '', game = null) {
   const src = contact || {};
   const detail = cleanSummary(src.detail || src.contactDetail || '');
+  const gameHr = statNumber(game?.hr ?? game?.homeRuns);
+  const sourceHr = Number(src.homeRuns ?? src.hr ?? src.homeRun ?? detail.match(/(?:HR|home[-\s]*run[s]?)\s*(\d+)/i)?.[1] ?? 0);
+  const hasHomeRun = gameHr > 0 || (Number.isFinite(sourceHr) && sourceHr > 0);
   const fallbackBip = Math.max(0, statNumber(game?.atBats) - statNumber(game?.so ?? game?.strikeOuts));
-  const bbe = Number(src.bbe ?? src.bip ?? src.battedBalls ?? detail.match(/(\d+)\s*BBE/i)?.[1] ?? (fallbackBip || 0));
-  const hardHit = Number(src.hardHit ?? src.hh ?? src.hardContact ?? detail.match(/HH\s*(\d+)/i)?.[1] ?? detail.match(/hard[-\s]*hit(?:\s*balls?)?\s*(\d+)/i)?.[1] ?? 0);
-  const barrelLike = Number(src.barrelLike ?? src.barrels ?? src.barrel ?? detail.match(/barrel(?:-like)?\s*(\d+)/i)?.[1] ?? 0);
+  const bbeRaw = Number(src.bbe ?? src.bip ?? src.battedBalls ?? detail.match(/(\d+)\s*BBE/i)?.[1] ?? (fallbackBip || 0));
+  const hardRaw = Number(src.hardHit ?? src.hh ?? src.hardContact ?? detail.match(/HH\s*(\d+)/i)?.[1] ?? detail.match(/hard[-\s]*hit(?:\s*balls?)?\s*(\d+)/i)?.[1] ?? 0);
+  const barrelRaw = Number(src.barrelLike ?? src.barrels ?? src.barrel ?? detail.match(/barrel(?:-like)?\s*(\d+)/i)?.[1] ?? 0);
+  // Contact feeds can miss hitData for some historical HR plays. For the heat heuristic, a HR should never render as 0 hard contact / 0 barrel-like contact.
+  const bbe = Math.max(hasHomeRun ? 1 : 0, Number.isFinite(bbeRaw) ? bbeRaw : 0);
+  const hardHit = Math.max(hasHomeRun ? 1 : 0, Number.isFinite(hardRaw) ? hardRaw : 0);
+  const barrelLike = Math.max(hasHomeRun ? 1 : 0, Number.isFinite(barrelRaw) ? barrelRaw : 0);
   const gameLoaded = Boolean(game) || Boolean(contact);
-  if (key === 'bip') return Number.isFinite(bbe) && bbe > 0 ? String(Math.round(bbe)) : gameLoaded ? '0' : '--';
-  if (key === 'hard') return Number.isFinite(hardHit) && hardHit > 0 ? String(Math.round(hardHit)) : gameLoaded ? '0' : '--';
-  if (key === 'barrel') return Number.isFinite(barrelLike) && barrelLike > 0 ? String(Math.round(barrelLike)) : gameLoaded ? '0' : '--';
+  if (key === 'bip') return bbe > 0 ? String(Math.round(bbe)) : gameLoaded ? '0' : '--';
+  if (key === 'hard') return hardHit > 0 ? String(Math.round(hardHit)) : gameLoaded ? '0' : '--';
+  if (key === 'barrel') return barrelLike > 0 ? String(Math.round(barrelLike)) : gameLoaded ? '0' : '--';
   return '--';
 }
 
@@ -16646,13 +16681,35 @@ function playerBatterHeatFeatureHtml(heat = null) {
 }
 
 
+function playerBatterHeatContactWithGameFloor(contact = null, game = null) {
+  const gameHr = statNumber(game?.hr ?? game?.homeRuns);
+  const sourceHr = Number(contact?.homeRuns ?? contact?.hr ?? contact?.homeRun ?? 0);
+  if (!(gameHr > 0 || (Number.isFinite(sourceHr) && sourceHr > 0))) return contact;
+  const src = contact ? { ...contact } : {};
+  const bbe = Math.max(1, Number(src.bbe ?? src.bip ?? src.battedBalls) || 0);
+  const hardHit = Math.max(1, Number(src.hardHit ?? src.hh ?? src.hardContact) || 0);
+  const barrelLike = Math.max(1, Number(src.barrelLike ?? src.barrels ?? src.barrel) || 0);
+  const homeRuns = Math.max(gameHr, Number(src.homeRuns ?? src.hr ?? src.homeRun) || 0);
+  return {
+    ...src,
+    score: Math.max(Number(src.score) || 0, 78),
+    bbe,
+    bip: bbe,
+    hardHit,
+    barrelLike,
+    homeRuns,
+    detail: cleanSummary(src.detail || src.contactDetail) || `${bbe} BBE, HH ${hardHit}, barrel-like ${barrelLike}, HR ${homeRuns}`,
+  };
+}
+
 function playerBatterHeatPayload(details = null, recentContactHeat = null, contactGames = []) {
   if (!details) return null;
   const games = batterHeatGameRows(details).slice(0, 3);
-  const contacts = listify(contactGames).length ? listify(contactGames).slice(0, 3) : (recentContactHeat ? [recentContactHeat] : []);
+  const rawContacts = listify(contactGames).length ? listify(contactGames).slice(0, 3) : (recentContactHeat ? [recentContactHeat] : []);
+  const contacts = games.map((game, index) => playerBatterHeatContactWithGameFloor(rawContacts[index] || null, game));
   const aggregateContact = contacts.filter(Boolean).length
     ? {
-        score: predictionWeightedScore(contacts.filter(Boolean).map((contact, index) => ({ score: Number(contact?.score) || 0, weight: [0.56, 0.29, 0.15][index] || 0.10 }))),
+        score: predictionWeightedScore(contacts.filter(Boolean).map((contact, index) => ({ score: Number(contact?.score) || 0, weight: [0.40, 0.30, 0.30][index] || 0.10 }))),
         bbe: contacts.reduce((sum, contact) => sum + (Number(contact?.bbe) || 0), 0),
         hardHit: contacts.reduce((sum, contact) => sum + (Number(contact?.hardHit) || 0), 0),
         barrelLike: contacts.reduce((sum, contact) => sum + (Number(contact?.barrelLike) || 0), 0),
@@ -24534,7 +24591,12 @@ function predictionRecentPowerScore(recent = {}, fallbackMetrics = {}) {
 }
 
 function predictionBatterContactHeatFromRows(rows = []) {
-  const bbeRows = listify(rows).filter((row) => Number.isFinite(savantRate(row, ['launch_speed', 'Launch Speed', 'exit_velocity', 'EV'])));
+  const bbeRows = listify(rows).filter((row) => {
+    const event = cleanSummary(csvValue(row, ['events', 'Events', 'event'])).toLowerCase();
+    return Number.isFinite(savantRate(row, ['launch_speed', 'Launch Speed', 'exit_velocity', 'EV']))
+      || event === 'home_run'
+      || event === 'home run';
+  });
   if (!bbeRows.length) return null;
   let maxEv = null;
   let hardHit = 0;
@@ -24544,10 +24606,13 @@ function predictionBatterContactHeatFromRows(rows = []) {
     const ev = savantRate(row, ['launch_speed', 'Launch Speed', 'exit_velocity', 'EV']);
     const la = savantRate(row, ['launch_angle', 'Launch Angle', 'launch_angle_avg']);
     const event = cleanSummary(csvValue(row, ['events', 'Events', 'event'])).toLowerCase();
+    const isHomeRun = event === 'home_run' || event === 'home run';
     if (Number.isFinite(ev)) maxEv = Math.max(Number(maxEv) || 0, ev);
-    if (Number.isFinite(ev) && ev >= 95) hardHit += 1;
-    if (Number.isFinite(ev) && ev >= 98 && Number.isFinite(la) && la >= 18 && la <= 38) barrelLike += 1;
-    if (event === 'home_run') homeRuns += 1;
+    const isHard = isHomeRun || (Number.isFinite(ev) && ev >= 95);
+    const isBarrelLike = isHomeRun || (Number.isFinite(ev) && ev >= 98 && Number.isFinite(la) && la >= 18 && la <= 38);
+    if (isHard) hardHit += 1;
+    if (isBarrelLike) barrelLike += 1;
+    if (isHomeRun) homeRuns += 1;
   }
   const score = clamp(Math.round(
     25
@@ -24576,14 +24641,29 @@ function predictionBatterContactHeatFromLivePlays(playerId, plays = [], targetDa
     if (Number(play?.matchup?.batter?.id ?? play?.matchup?.batter?.person?.id) !== id) continue;
     const playDate = calendarDateOnly(play?.about?.startTime || play?.about?.endTime || play?.playEndTime || '');
     if (targetDate && playDate && playDate !== targetDate) continue;
+    const playEventName = cleanSummary(play?.result?.eventType || play?.result?.event || '').toLowerCase();
+    const playIsHomeRun = playEventName === 'home_run' || playEventName === 'home run';
+    let pushedForPlay = false;
     for (const event of listify(play?.playEvents)) {
+      const eventName = cleanSummary(event?.details?.eventType || event?.details?.event || play?.result?.eventType || play?.result?.event || '');
+      const normalizedEventName = eventName.toLowerCase();
+      const isHomeRunEvent = normalizedEventName === 'home_run' || normalizedEventName === 'home run' || playIsHomeRun;
       const hitData = event?.hitData || event?.details?.hitData || null;
       const ev = Number(hitData?.launchSpeed ?? hitData?.exitVelocity ?? hitData?.launch_speed);
-      if (!Number.isFinite(ev)) continue;
+      if (!Number.isFinite(ev) && !isHomeRunEvent) continue;
       rows.push({
-        launch_speed: ev,
+        launch_speed: Number.isFinite(ev) ? ev : null,
         launch_angle: Number(hitData?.launchAngle ?? hitData?.launch_angle),
-        events: cleanSummary(play?.result?.eventType || play?.result?.event || event?.details?.event || ''),
+        events: isHomeRunEvent ? 'home_run' : eventName,
+        game_date: targetDate || playDate,
+      });
+      pushedForPlay = true;
+    }
+    if (!pushedForPlay && playIsHomeRun) {
+      rows.push({
+        launch_speed: null,
+        launch_angle: null,
+        events: 'home_run',
         game_date: targetDate || playDate,
       });
     }
@@ -24645,10 +24725,12 @@ async function getBatterRecentContactHeatGames(playerId, games = [], game = null
 }
 
 function batterHeatGameRows(details = null) {
-  const rows = listify(details?.heatGames).filter((game) => game && Number.isFinite(Number(game.atBats)));
+  const rows = listify(details?.heatGames)
+    .filter((game) => game && Number.isFinite(Number(game.atBats)))
+    .filter(batterHeatGameQualifies);
   if (rows.length) return rows.slice(0, 3);
   const last = details?.lastGame || null;
-  return last ? [last] : [];
+  return batterHeatGameQualifies(last) ? [last] : [];
 }
 
 function batterHeatGameScore(game = {}, index = 0) {
@@ -24684,7 +24766,7 @@ function batterHeatWeightedStatScore(details = null, recent = {}) {
       { score: predictionScore100(recent.hrRate, 0.010, 0.080, { fallbackPoints: 28 }), weight: 0.38 },
     ]);
   }
-  const weights = [0.56, 0.29, 0.15];
+  const weights = [0.40, 0.30, 0.30];
   const weighted = games.slice(0, 3).map((game, index) => ({ score: batterHeatGameScore(game, index), weight: weights[index] || 0.10 }));
   return predictionWeightedScore(weighted);
 }
