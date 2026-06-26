@@ -276,6 +276,11 @@ const REQUEST_RETRY_COUNT = 2;
 const LINEUP_PAGE_FAST_TIMEOUT_MS = 1200;
 const LINEUP_READER_FAST_TIMEOUT_MS = 1500;
 const ROTOWIRE_LINEUP_FAST_TIMEOUT_MS = 4500;
+const ROTOWIRE_LINEUP_CACHE_TTL_MS = 2 * 60 * 1000;
+const ROTOWIRE_LINEUP_PREWARM_BUCKET_MS = ROTOWIRE_LINEUP_CACHE_TTL_MS;
+const LINEUP_FALLBACK_CACHE_TTL_MS = 2 * 60 * 1000;
+const ROTOWIRE_DYNAMIC_LINEUP_STORAGE_KEY = 'rotowire-dynamic-lineup-source:v1';
+const ROTOWIRE_DYNAMIC_LINEUP_MAX_AGE_DAYS = 10;
 const PANEL_GAP = 8;
 const PANEL_SNAP_THRESHOLD = 10;
 const OVERLAY_RAIL_MIN = 420;
@@ -4581,20 +4586,212 @@ function rotowirePitcherHandForLineup(game, side, options = {}) {
   return '';
 }
 
-function rotowireDefaultBatterLine(line) {
-  let text = cleanSummary(line)
+
+function getExpiringCachePromise(cache, key) {
+  const cached = cache?.get?.(key);
+  if (!cached) return null;
+  if (cached.promise && Number(cached.expiresAt) > Date.now()) return cached.promise;
+  cache.delete(key);
+  return null;
+}
+
+function setExpiringCachePromise(cache, key, promise, ttlMs) {
+  cache.set(key, {
+    promise,
+    expiresAt: Date.now() + Math.max(15000, Number(ttlMs) || 0),
+  });
+  return promise;
+}
+
+function invalidateRotowireLineupCachesForDate(date = '') {
+  const targetDate = date || dateInput?.value || formatDate(new Date());
+  for (const key of Array.from(rotowireBattingOrderCache.keys())) {
+    if (String(key).startsWith(`rotowire:${targetDate}:`)) rotowireBattingOrderCache.delete(key);
+  }
+  for (const key of Array.from(mlbStartingLineupPageCache.keys())) {
+    if (String(key).startsWith(`batters:${targetDate}:`)) mlbStartingLineupPageCache.delete(key);
+  }
+  for (const key of Array.from(rotowireLineupPrewarmKeys)) {
+    if (String(key).startsWith(`${targetDate}:`)) rotowireLineupPrewarmKeys.delete(key);
+  }
+}
+
+function normalizeRotowireSeedHand(hand = 'RHP') {
+  const value = String(hand || '').toUpperCase();
+  if (value === 'ACTUAL') return 'ACTUAL';
+  return value === 'LHP' ? 'LHP' : 'RHP';
+}
+
+function loadRotowireDynamicLineupSource() {
+  if (globalThis.ROTOWIRE_DYNAMIC_LINEUP_SOURCE_LOADED) {
+    return globalThis.ROTOWIRE_LIVE_LINEUP_SEEDS || {};
+  }
+  globalThis.ROTOWIRE_DYNAMIC_LINEUP_SOURCE_LOADED = true;
+  let stored = {};
+  try {
+    stored = JSON.parse(localStorage.getItem(ROTOWIRE_DYNAMIC_LINEUP_STORAGE_KEY) || '{}') || {};
+  } catch {
+    stored = {};
+  }
+  const today = formatDate(new Date());
+  const cutoff = addDaysToDateValue(today, -ROTOWIRE_DYNAMIC_LINEUP_MAX_AGE_DAYS);
+  for (const date of Object.keys(stored)) {
+    if (!/^\d{4}-\d{2}-\d{2}$/.test(date) || date < cutoff) delete stored[date];
+  }
+  globalThis.ROTOWIRE_LIVE_LINEUP_SEEDS = stored;
+  try {
+    localStorage.setItem(ROTOWIRE_DYNAMIC_LINEUP_STORAGE_KEY, JSON.stringify(stored));
+  } catch {}
+  return stored;
+}
+
+function saveRotowireDynamicLineupSource(source) {
+  globalThis.ROTOWIRE_LIVE_LINEUP_SEEDS = source || {};
+  try {
+    localStorage.setItem(ROTOWIRE_DYNAMIC_LINEUP_STORAGE_KEY, JSON.stringify(globalThis.ROTOWIRE_LIVE_LINEUP_SEEDS));
+  } catch {}
+}
+
+function rotowireDynamicLineupSeed(teamAbbrev, pitcherHand = 'RHP', date = '') {
+  const source = loadRotowireDynamicLineupSource();
+  const sourceDate = date || dateInput?.value || formatDate(new Date());
+  const team = rotowireTeamCode(teamAbbrev);
+  const targetHand = normalizeRotowireSeedHand(pitcherHand);
+  const byTeam = source?.[sourceDate]?.[team];
+  const seed = byTeam?.ACTUAL || byTeam?.[targetHand];
+  return Array.isArray(seed) ? seed.filter(Boolean).slice(0, 9) : [];
+}
+
+function rememberRotowireDynamicLineupSource(teamAbbrev, pitcherHand, date, lineup = [], sourceType = 'projected') {
+  if (!isUsableLineupCandidate(lineup)) return;
+  const names = lineup
+    .map((entry) => cleanSummary(entry?.fullName || entry?.name || ''))
+    .filter((name) => name && /^[A-Za-zÀ-ÿ'.-]+(?:\s+[A-Za-zÀ-ÿ'.-]+){1,5}$/.test(name))
+    .slice(0, 9);
+  if (names.length < 9) return;
+  const source = loadRotowireDynamicLineupSource();
+  const sourceDate = date || dateInput?.value || formatDate(new Date());
+  const team = rotowireTeamCode(teamAbbrev);
+  const targetHand = normalizeRotowireSeedHand(pitcherHand);
+  source[sourceDate] ||= {};
+  source[sourceDate][team] ||= {};
+  if (/today|actual|confirmed/i.test(String(sourceType || ''))) {
+    source[sourceDate][team].ACTUAL = names;
+  }
+  source[sourceDate][team][targetHand] = names;
+  saveRotowireDynamicLineupSource(source);
+}
+
+function rotowireLineupStopLine(line, mode = 'today') {
+  const text = cleanSummary(line).toLowerCase();
+  if (!text) return true;
+  if (/^(previous games?|download csv|game preview|tickets?|team stats|roster|injuries|news|schedule|transactions|depth chart)\b/i.test(text)) return true;
+  if (/^(default vs\.)/i.test(text)) return true;
+  if (mode !== 'today' && /^(today(?:'|’)?s lineup|todays lineup)/i.test(text)) return true;
+  return false;
+}
+
+function rotowireValidBatterName(text) {
+  const value = cleanSummary(text)
+    .replace(/\b(Jr|Sr)\b\.?$/i, '$1.')
+    .trim();
+  if (!value || /^(P|C|1B|2B|3B|SS|LF|CF|RF|DH|R|L|S|Bats?|Throws?|Lineup|Player|Pos|Position)$/i.test(value)) return false;
+  if (/^(default vs\.|previous games?|today(?:'|’)?s lineup|todays lineup|check our|loading stats|download csv|either the|daily lineups)/i.test(value)) return false;
+  return /^[A-Za-zÀ-ÿ'.-]+(?:\s+(?:[A-Za-zÀ-ÿ'.-]+|II|III|IV|V|Jr\.?|Sr\.?)){1,5}$/.test(value);
+}
+
+function rotowireBatterNameFromText(value) {
+  let text = cleanSummary(value)
     .replace(/\uE200cite[^\u2020]*\u2020([^\uE201]*)\uE201/g, '$1')
     .replace(/\[([^\]]*)]\([^)]*\)/g, '$1')
     .replace(/^【\d+†\s*/, '')
     .replace(/】/g, '')
-    .replace(/^\s*\d+\.\s*/, '')
+    .replace(/^\s*\d{1,2}\s*[.)-]\s*/, '')
     .replace(/\s+/g, ' ')
     .trim();
-  if (!text || /^TBD$/i.test(text)) return '';
-  if (/^(default vs\.|previous games|today's lineup|check our|loading stats|download csv|either the|daily lineups)/i.test(text)) return '';
-  text = text.replace(/\s+(P|C|1B|2B|3B|SS|LF|CF|RF|DH)$/i, '').trim();
-  return /^[A-Za-zÀ-ÿ'.-]+(?:\s+[A-Za-zÀ-ÿ'.-]+){1,4}$/.test(text) ? text : '';
+  if (!text || /^TBD$/i.test(text) || rotowireLineupStopLine(text, 'default')) return '';
+  text = text
+    .replace(/\s*\([LRS]\)\s*/ig, ' ')
+    .replace(/\b(confirmed|projected|expected|probable|available|batting|order)\b.*$/i, '')
+    .replace(/\s+-\s+.*$/, '')
+    .replace(/\s+/g, ' ')
+    .trim();
+  const direct = text.replace(/\s+(P|C|1B|2B|3B|SS|LF|CF|RF|DH|[LRS])$/i, '').trim();
+  if (rotowireValidBatterName(direct)) return direct;
+  const match = text.match(/^([A-ZÀ-Ý][A-Za-zÀ-ÿ'.-]+(?:\s+(?:[A-ZÀ-Ý][A-Za-zÀ-ÿ'.-]+|II|III|IV|V|Jr\.?|Sr\.?)){1,5})(?=\s+(?:P|C|1B|2B|3B|SS|LF|CF|RF|DH|[LRS]|\d|\$|vs\b|status\b|$)|$)/);
+  const candidate = cleanSummary(match?.[1] || '');
+  return rotowireValidBatterName(candidate) ? candidate : '';
 }
+
+function rotowireBatterNameFromCells(cells = []) {
+  for (const cell of cells) {
+    const name = rotowireBatterNameFromText(cell);
+    if (name) return name;
+  }
+  return '';
+}
+
+function parseRotowireTodayBattingOrder(rawText, teamAbbrev = '') {
+  const lines = probablePageLines(rawText);
+  const starts = [];
+  for (let i = 0; i < lines.length; i += 1) {
+    const line = cleanSummary(lines[i]);
+    const lower = line.toLowerCase();
+    if (/today(?:'|’)?s lineup|todays lineup|confirmed lineup|starting lineup/i.test(lower) && !/default vs\./i.test(lower)) {
+      starts.push(i);
+    }
+  }
+  if (!starts.length) return [];
+  for (const start of starts) {
+    const numbered = [];
+    for (let i = start + 1; i < Math.min(lines.length, start + 90); i += 1) {
+      const line = cleanSummary(lines[i]);
+      if (!line) continue;
+      if (/no lineup|not released|has not been announced|lineup is not available|not available|TBD/i.test(line)) break;
+      if (rotowireLineupStopLine(line, 'today')) break;
+      const cells = rotowireMarkdownCells(line);
+      if (cells.length) {
+        const cellName = rotowireBatterNameFromCells(cells);
+        if (cellName) numbered.push(`${numbered.length + 1}. ${cellName}`);
+      } else {
+        const entries = numberedLineupEntriesFromLine(line);
+        if (entries.length) {
+          for (const entry of entries) {
+            const name = rotowireBatterNameFromText(entry);
+            if (name) numbered.push(`${numbered.length + 1}. ${name}`);
+          }
+        } else {
+          const name = rotowireBatterNameFromText(line);
+          if (name) numbered.push(`${numbered.length + 1}. ${name}`);
+        }
+      }
+      const uniqueNames = new Set(numbered.map((entry) => normalizeNameKey(rotowireBatterNameFromText(entry))).filter(Boolean));
+      if (uniqueNames.size >= 9) break;
+    }
+    const deduped = [];
+    const seen = new Set();
+    for (const entry of numbered) {
+      const name = rotowireBatterNameFromText(entry);
+      const key = normalizeNameKey(name);
+      if (!name || seen.has(key)) continue;
+      seen.add(key);
+      deduped.push(`${deduped.length + 1}. ${name}`);
+      if (deduped.length >= 9) break;
+    }
+    const parsed = deduped
+      .slice(0, 9)
+      .map(parseStartingLineupBatterLine)
+      .filter(Boolean)
+      .map((entry, index) => ({ ...entry, slot: index + 1, source: 'rotowire-today-lineup' }));
+    if (isUsableLineupCandidate(parsed)) return parsed;
+  }
+  return [];
+}
+
+function rotowireDefaultBatterLine(line) {
+  return rotowireBatterNameFromText(line);
+}
+
 
 function rotowireMarkdownCells(line) {
   const text = cleanSummary(line);
@@ -4657,18 +4854,24 @@ function parseRotowireDefaultBattingOrder(rawText, pitcherHand = 'RHP') {
     .map((entry, index) => ({ ...entry, slot: index + 1, source: `rotowire-default-vs-${targetHand.toLowerCase()}` }));
 }
 
-function seededRotowireDefaultBattingOrder(teamAbbrev, pitcherHand = 'RHP') {
+function seededRotowireDefaultBattingOrder(teamAbbrev, pitcherHand = 'RHP', date = '') {
   const team = rotowireTeamCode(teamAbbrev);
-  const targetHand = String(pitcherHand || '').toUpperCase() === 'LHP' ? 'LHP' : 'RHP';
-  const seed = globalThis.ROTOWIRE_DEFAULT_LINEUP_SEEDS?.[team]?.[targetHand];
+  const targetHand = normalizeRotowireSeedHand(pitcherHand);
+  const sourceDate = date || dateInput?.value || formatDate(new Date());
+  const dynamicSeed = rotowireDynamicLineupSeed(team, targetHand, sourceDate);
+  const seed = dynamicSeed.length >= 9
+    ? dynamicSeed
+    : globalThis.ROTOWIRE_DEFAULT_LINEUP_SEEDS?.[team]?.[targetHand];
   if (!Array.isArray(seed) || seed.length < 9) return [];
+  const source = dynamicSeed.length >= 9 ? `rotowire-dynamic-source-vs-${targetHand.toLowerCase()}` : `rotowire-default-seed-vs-${targetHand.toLowerCase()}`;
   return seed.slice(0, 9).map((fullName, index) => ({
     fullName,
     name: lastName(fullName),
     slot: index + 1,
-    source: `rotowire-default-seed-vs-${targetHand.toLowerCase()}`,
+    source,
   }));
 }
+
 
 function fetchRotowireProjectedBattingOrder(game, side, options = {}) {
   if (!game || !shouldPreferProbablePitcher(game)) return Promise.resolve([]);
@@ -4679,7 +4882,8 @@ function fetchRotowireProjectedBattingOrder(game, side, options = {}) {
   const preferredHand = rotowirePitcherHandForLineup(game, side, options);
   const handOptions = preferredHand ? [preferredHand] : ['RHP', 'LHP'];
   const key = `rotowire:${date}:${rwTeam}:${preferredHand || 'any'}`;
-  if (rotowireBattingOrderCache.has(key)) return rotowireBattingOrderCache.get(key);
+  const cached = getExpiringCachePromise(rotowireBattingOrderCache, key);
+  if (cached) return cached;
 
   const promise = (async () => {
     const sourceUrl = `https://www.rotowire.com/baseball/batting-orders.php?team=${encodeURIComponent(rwTeam)}`;
@@ -4690,28 +4894,31 @@ function fetchRotowireProjectedBattingOrder(game, side, options = {}) {
     ];
     for (const hand of handOptions) {
       const parsed = await firstUsableLineup(urls.map((url) => withTimeoutValue((async () => {
-        const text = await fetchMlbProbablePageText(url);
+        const text = await getText(url);
+        const todayLineup = parseRotowireTodayBattingOrder(text, team);
+        if (isUsableLineupCandidate(todayLineup)) return todayLineup;
         return parseRotowireDefaultBattingOrder(text, hand);
       })(), ROTOWIRE_LINEUP_FAST_TIMEOUT_MS, [])));
       if (isUsableLineupCandidate(parsed)) {
+        const sourceType = parsed.some((entry) => /rotowire-today/i.test(String(entry?.source || ''))) ? 'today' : 'default';
+        rememberRotowireDynamicLineupSource(team, hand, date, parsed, sourceType);
         return enrichProjectedLineupEntriesForTeam(game, team, parsed);
       }
     }
     for (const hand of handOptions) {
-      const seeded = seededRotowireDefaultBattingOrder(team, hand);
+      const seeded = seededRotowireDefaultBattingOrder(team, hand, date);
       if (isUsableLineupCandidate(seeded)) return enrichProjectedLineupEntriesForTeam(game, team, seeded);
     }
     return [];
   })().catch(() => {
     rotowireBattingOrderCache.delete(key);
     for (const hand of handOptions) {
-      const seeded = seededRotowireDefaultBattingOrder(team, hand);
+      const seeded = seededRotowireDefaultBattingOrder(team, hand, date);
       if (isUsableLineupCandidate(seeded)) return enrichProjectedLineupEntriesForTeam(game, team, seeded);
     }
     return [];
   });
-  rotowireBattingOrderCache.set(key, promise);
-  return promise;
+  return setExpiringCachePromise(rotowireBattingOrderCache, key, promise, ROTOWIRE_LINEUP_CACHE_TTL_MS);
 }
 
 function prewarmRotowireLineupsForGames(games = []) {
@@ -4723,7 +4930,8 @@ function prewarmRotowireLineupsForGames(games = []) {
       const hands = [...new Set([preferredHand, 'RHP', 'LHP'].filter(Boolean))];
       for (const opponentHand of hands) {
         const team = canonicalTeamAbbrev(side === 'away' ? game.away : game.home);
-        const key = `${officialDateForGame(game)}:${game.gamePk || ''}:${team}:${side}:${opponentHand}`;
+        const prewarmBucket = Math.floor(Date.now() / ROTOWIRE_LINEUP_PREWARM_BUCKET_MS);
+        const key = `${officialDateForGame(game)}:${game.gamePk || ''}:${team}:${side}:${opponentHand}:${prewarmBucket}`;
         if (rotowireLineupPrewarmKeys.has(key)) continue;
         rotowireLineupPrewarmKeys.add(key);
         tasks.push(() => fetchRotowireProjectedBattingOrder(game, side, { opponentHand }).catch(() => []));
@@ -4927,7 +5135,8 @@ async function fetchMlbStartingLineupFallback(game, side, options = {}) {
   const date = officialDateForGame(game);
   const handForCache = rotowirePitcherHandForLineup(game, side, options) || 'no-hand';
   const key = `batters:${date}:${team}:${game?.gamePk || ''}:${handForCache}`;
-  if (mlbStartingLineupPageCache.has(key)) return mlbStartingLineupPageCache.get(key);
+  const cached = getExpiringCachePromise(mlbStartingLineupPageCache, key);
+  if (cached) return cached;
 
   const promise = (async () => {
     const hasOpponentHand = opponentPitcherHandKnownForLineup(game, side, options);
@@ -4956,8 +5165,7 @@ async function fetchMlbStartingLineupFallback(game, side, options = {}) {
     return [];
   });
 
-  mlbStartingLineupPageCache.set(key, promise);
-  return promise;
+  return setExpiringCachePromise(mlbStartingLineupPageCache, key, promise, LINEUP_FALLBACK_CACHE_TTL_MS);
 }
 
 
@@ -43995,6 +44203,7 @@ function refreshForSelectedDate(options = {}) {
   try {
     localStorage.setItem('dashboard-date:v1', dateInput.value);
   } catch {}
+  if (options.force) invalidateRotowireLineupCachesForDate(dateInput.value);
   if (playerTrackerListEl) playerTrackerListEl.dataset.renderFingerprint = '';
   resetDateScopedScoreboardState(dateInput.value, { clearHrFeed: true, closeLineup: true });
   clearDraftBetSlip();
