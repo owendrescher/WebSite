@@ -5018,3 +5018,78 @@ body.dashboard-page .scoreboard.has-over-under-selection[data-over-under-selecte
   order: initial !important;
   grid-column: auto !important;
 }
+
+.stats-profiler-panel {
+  position: fixed;
+  right: 12px;
+  bottom: 12px;
+  z-index: 99999;
+  width: min(460px, calc(100vw - 24px));
+  max-height: min(70vh, 620px);
+  overflow: auto;
+  border: 1px solid rgba(125, 208, 255, 0.55);
+  border-radius: 8px;
+  background: rgba(5, 14, 24, 0.96);
+  color: #eaf6ff;
+  box-shadow: 0 12px 36px rgba(0, 0, 0, 0.45);
+  font: 11px/1.35 ui-monospace, SFMono-Regular, Menlo, Consolas, monospace;
+}
+
+.stats-profiler-head {
+  position: sticky;
+  top: 0;
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  padding: 8px;
+  background: rgba(10, 31, 50, 0.98);
+  border-bottom: 1px solid rgba(125, 208, 255, 0.28);
+}
+
+.stats-profiler-head strong {
+  margin-right: auto;
+  letter-spacing: 0.04em;
+}
+
+.stats-profiler-head button {
+  border: 1px solid rgba(125, 208, 255, 0.5);
+  border-radius: 6px;
+  background: rgba(125, 208, 255, 0.1);
+  color: #eaf6ff;
+  padding: 3px 7px;
+  font: inherit;
+  cursor: pointer;
+}
+
+.stats-profiler-body {
+  display: grid;
+  gap: 8px;
+  padding: 8px;
+}
+
+.stats-profiler-kpis {
+  display: flex;
+  gap: 8px;
+  flex-wrap: wrap;
+}
+
+.stats-profiler-kpis span,
+.stats-profiler-block {
+  border: 1px solid rgba(125, 208, 255, 0.18);
+  border-radius: 6px;
+  background: rgba(255, 255, 255, 0.04);
+  padding: 6px;
+}
+
+.stats-profiler-block {
+  display: grid;
+  gap: 3px;
+}
+
+.stats-profiler-block b {
+  color: #7dd0ff;
+}
+
+.stats-profiler-block span {
+  overflow-wrap: anywhere;
+}
