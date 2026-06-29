@@ -2358,7 +2358,16 @@ function handleLineupPregameOverUnderToggle(e) {
   if (!gamePk || !activeLineupGame || !shouldPreferProbablePitcher(activeLineupGame)) return false;
   e.preventDefault();
   e.stopPropagation();
-  toggleOverUnderScoreboardMarked(gamePk, btn.dataset.overUnderSide);
+  const side = normalizeOverUnderSide(btn.dataset.overUnderSide);
+  const changed = toggleOverUnderScoreboardMarked(gamePk, side);
+  // Optimistically resync the visible lineup header immediately. A passive scoreboard
+  // render can run right after the click, and without this the state is saved but the
+  // modal button sometimes keeps the neutral styling until the next full sync.
+  if (changed) {
+    const game = gameForManualStateKey(gamePk) || activeLineupGame;
+    syncOverUnderControlsForGame(lineupOverlayEl, game, shouldPreferProbablePitcher(game));
+    requestAnimationFrame(() => syncOverUnderControlsForGame(lineupOverlayEl, game, shouldPreferProbablePitcher(game)));
+  }
   return true;
 }
 
@@ -4825,23 +4834,32 @@ function pitcherThrowHandValue(pitcher) {
 }
 
 function rotowirePitcherHandForLineup(game, side, options = {}) {
-  const pitcherSide = side === 'home' ? 'away' : side === 'away' ? 'home' : '';
-  const summary = pitcherSide ? resolveLineupPitcherForDisplay(game, pitcherSide) : null;
-  const candidates = [
-    options.opponentHand,
-    summary?.current,
-    summary?.starter,
-    pitcherSide ? game?.probablePitchers?.[pitcherSide] : null,
-    pitcherSide ? game?.teams?.[pitcherSide]?.probablePitcher : null,
-    pitcherSide ? previewProbableForSide(game, pitcherSide) : null,
-    pitcherSide ? game?.pitching?.[pitcherSide]?.current : null,
-    matchupPitcherHandForLineup(game, side),
-    pitcherSide ? scoreboardPitcherForSide(game, pitcherSide) : null,
-  ];
-  for (const candidate of candidates) {
+  const handFromCandidate = (candidate) => {
     const hand = handednessCode(typeof candidate === 'string' ? candidate : pitcherThrowHandValue(candidate));
     if (hand === 'L') return 'LHP';
     if (hand === 'R') return 'RHP';
+    return '';
+  };
+  const direct = handFromCandidate(options.opponentHand);
+  if (direct) return direct;
+  const pitcherSide = side === 'home' ? 'away' : side === 'away' ? 'home' : '';
+  const candidateGetters = [
+    () => pitcherSide ? resolveLineupPitcherForDisplay(game, pitcherSide)?.current : null,
+    () => pitcherSide ? resolveLineupPitcherForDisplay(game, pitcherSide)?.starter : null,
+    () => pitcherSide ? game?.probablePitchers?.[pitcherSide] : null,
+    () => pitcherSide ? game?.teams?.[pitcherSide]?.probablePitcher : null,
+    () => pitcherSide ? previewProbableForSide(game, pitcherSide) : null,
+    () => pitcherSide ? game?.pitching?.[pitcherSide]?.current : null,
+    () => matchupPitcherHandForLineup(game, side),
+    () => pitcherSide ? scoreboardPitcherForSide(game, pitcherSide) : null,
+  ];
+  for (const getCandidate of candidateGetters) {
+    let candidate = null;
+    try {
+      candidate = getCandidate();
+    } catch {}
+    const resolved = handFromCandidate(candidate);
+    if (resolved) return resolved;
   }
   return '';
 }
@@ -4920,6 +4938,17 @@ function rotowireDynamicLineupSeed(teamAbbrev, pitcherHand = 'RHP', date = '') {
   const byTeam = source?.[sourceDate]?.[team];
   const seed = byTeam?.ACTUAL || byTeam?.[targetHand];
   return Array.isArray(seed) ? seed.filter(Boolean).slice(0, 9) : [];
+}
+
+function rotowireDynamicLineupForTeam(teamAbbrev, pitcherHand = 'RHP', date = '') {
+  const team = rotowireTeamCode(teamAbbrev);
+  const targetHand = normalizeRotowireSeedHand(pitcherHand);
+  return rotowireDynamicLineupSeed(team, targetHand, date).map((fullName, index) => ({
+    fullName,
+    name: lastName(fullName),
+    slot: index + 1,
+    source: `rotowire-dynamic-source-vs-${targetHand.toLowerCase()}`,
+  }));
 }
 
 function rememberRotowireDynamicLineupSource(teamAbbrev, pitcherHand, date, lineup = [], sourceType = 'projected') {
@@ -5119,16 +5148,24 @@ function seededRotowireDefaultBattingOrder(teamAbbrev, pitcherHand = 'RHP', date
   const targetHand = normalizeRotowireSeedHand(pitcherHand);
   const sourceDate = date || dateInput?.value || formatDate(new Date());
   const dynamicSeed = rotowireDynamicLineupSeed(team, targetHand, sourceDate);
-  const seed = dynamicSeed.length >= 9
-    ? dynamicSeed
-    : globalThis.ROTOWIRE_DEFAULT_LINEUP_SEEDS?.[team]?.[targetHand];
+  if (dynamicSeed.length >= 9) {
+    const dynamicLineup = dynamicSeed.slice(0, 9).map((fullName, index) => ({
+      fullName,
+      name: lastName(fullName),
+      slot: index + 1,
+      source: `rotowire-dynamic-source-vs-${targetHand.toLowerCase()}`,
+    }));
+    // A previously cached bad scrape can be an alphabetical active-roster list.
+    // Treat that as unusable and fall through to the static RotoWire seed.
+    if (isUsableLineupCandidate(dynamicLineup)) return dynamicLineup;
+  }
+  const seed = globalThis.ROTOWIRE_DEFAULT_LINEUP_SEEDS?.[team]?.[targetHand];
   if (!Array.isArray(seed) || seed.length < 9) return [];
-  const source = dynamicSeed.length >= 9 ? `rotowire-dynamic-source-vs-${targetHand.toLowerCase()}` : `rotowire-default-seed-vs-${targetHand.toLowerCase()}`;
   return seed.slice(0, 9).map((fullName, index) => ({
     fullName,
     name: lastName(fullName),
     slot: index + 1,
-    source,
+    source: `rotowire-default-seed-vs-${targetHand.toLowerCase()}`,
   }));
 }
 
@@ -5186,13 +5223,38 @@ function instantRotowireProjectedBattingOrder(game, side, options = {}) {
   const date = officialDateForGame(game);
   const preferredHand = rotowirePitcherHandForLineup(game, side, options);
   const handOptions = preferredHand ? [preferredHand] : ['RHP', 'LHP'];
+  const normalizeInstant = (lineup = []) => normalizeLineupCollectionForSide(game, side, lineup)
+    .map((entry, index) => ({ ...entry, slot: index + 1, teamAbbrev: team }));
   for (const hand of handOptions) {
     const dynamic = rotowireDynamicLineupForTeam(team, hand, date);
-    if (isUsableLineupCandidate(dynamic)) return enrichProjectedLineupEntriesForTeam(game, team, dynamic);
+    if (isUsableLineupCandidate(dynamic)) return normalizeInstant(dynamic);
   }
   for (const hand of handOptions) {
     const seeded = seededRotowireDefaultBattingOrder(team, hand, date);
-    if (isUsableLineupCandidate(seeded)) return enrichProjectedLineupEntriesForTeam(game, team, seeded);
+    if (isUsableLineupCandidate(seeded)) return normalizeInstant(seeded);
+  }
+  return [];
+}
+
+
+function staticRotowireSeedLineupForGameSide(game, side, options = {}) {
+  if (!game || !['away', 'home'].includes(side)) return [];
+  const team = canonicalTeamAbbrev(side === 'away' ? game.away : game.home);
+  const date = officialDateForGame(game);
+  const preferredHand = rotowirePitcherHandForLineup(game, side, options) || normalizeRotowireSeedHand(options.opponentHand || 'RHP');
+  const handOptions = preferredHand ? [preferredHand] : ['RHP', 'LHP'];
+  const normalizeSeed = (lineup = []) => normalizeLineupCollectionForSide(game, side, lineup)
+    .map((entry, index) => ({ ...entry, slot: index + 1, teamAbbrev: team, source: entry?.source || 'rotowire-default-seed-emergency' }));
+  for (const hand of handOptions) {
+    const seeded = seededRotowireDefaultBattingOrder(team, hand, date);
+    const normalized = normalizeSeed(seeded);
+    if (isUsableLineupCandidate(normalized)) return normalized;
+  }
+  for (const hand of ['RHP', 'LHP']) {
+    if (handOptions.includes(hand)) continue;
+    const seeded = seededRotowireDefaultBattingOrder(team, hand, date);
+    const normalized = normalizeSeed(seeded);
+    if (isUsableLineupCandidate(normalized)) return normalized;
   }
   return [];
 }
@@ -5642,10 +5704,13 @@ async function fetchMlbStartingLineupFallback(game, side, options = {}) {
     rotowirePromise.catch(() => []);
 
     const previousLineup = await fetchPreviousCompletedLineupFromStatsApi(game, side).catch(() => []);
-    return isUsableLineupCandidate(previousLineup) ? previousLineup : [];
+    if (isUsableLineupCandidate(previousLineup)) return previousLineup;
+    const emergencySeed = staticRotowireSeedLineupForGameSide(game, side, options);
+    return isUsableLineupCandidate(emergencySeed) ? emergencySeed : [];
   })().catch(() => {
     mlbStartingLineupPageCache.delete(key);
-    return [];
+    const emergencySeed = staticRotowireSeedLineupForGameSide(game, side, options);
+    return isUsableLineupCandidate(emergencySeed) ? emergencySeed : [];
   });
 
   return setExpiringCachePromise(mlbStartingLineupPageCache, key, promise, LINEUP_FALLBACK_CACHE_TTL_MS);
@@ -41743,10 +41808,19 @@ function lineupDisplayName(entry) {
   return cleanSummary(entry?.fullName || entry?.name || entry?.person?.fullName || '');
 }
 
-function lineupLooksAlphabetical(lineup = []) {
-  const names = (Array.isArray(lineup) ? lineup : [])
-    .map(lineupDisplayName)
-    .filter(Boolean);
+function lineupSourceLooksRosterFallback(source = '') {
+  return /(?:active-roster|roster-lineup|lookup-lineup-completion|lineup-completion|bench-lineup-completion|fallback|completion|roster)/i.test(String(source || ''));
+}
+
+function lineupSourcesAreMostlyRosterFallback(lineup = []) {
+  const entries = (Array.isArray(lineup) ? lineup : []).filter(Boolean);
+  if (!entries.length) return false;
+  const fallbackCount = entries.filter((entry) => lineupSourceLooksRosterFallback(entry?.source)).length;
+  return fallbackCount >= Math.max(5, Math.ceil(entries.length * 0.55));
+}
+
+function lineupSequenceLooksAlphabetical(values = []) {
+  const names = values.map(cleanSummary).filter(Boolean);
   if (names.length < 5) return false;
   const sorted = [...names].sort((a, b) => a.localeCompare(b));
   let samePositions = 0;
@@ -41756,8 +41830,36 @@ function lineupLooksAlphabetical(lineup = []) {
   return samePositions >= Math.max(5, names.length - 1);
 }
 
+function lineupLooksAlphabetical(lineup = []) {
+  const entries = Array.isArray(lineup) ? lineup : [];
+  const fullNames = entries.map(lineupDisplayName).filter(Boolean);
+  const lastNames = entries
+    .map((entry) => lastName(lineupDisplayName(entry) || ''))
+    .filter(Boolean);
+  return lineupSequenceLooksAlphabetical(fullNames) || lineupSequenceLooksAlphabetical(lastNames);
+}
+
+function lineupLooksLikeRosterAlphabeticalFallback(lineup = []) {
+  if (!Array.isArray(lineup) || lineup.length < 9) return false;
+  return lineupLooksAlphabetical(lineup) && lineupSourcesAreMostlyRosterFallback(lineup);
+}
+
+function lineupHasTrustedOrderSource(lineup = []) {
+  const entries = Array.isArray(lineup) ? lineup : [];
+  if (!entries.length) return false;
+  const trustedCount = entries.filter((entry) => /(?:rotowire-today|rotowire-default|confirmed|starting-lineup|mlb-starting-lineups-page|mlb-boxscore|mlb-live|actual-lineup)/i.test(String(entry?.source || ''))).length;
+  return trustedCount >= Math.max(5, Math.ceil(entries.length * 0.55));
+}
+
 function isUsableLineupCandidate(lineup = []) {
-  return Array.isArray(lineup) && lineup.length >= 9 && !lineupLooksAlphabetical(lineup);
+  if (!Array.isArray(lineup) || lineup.length < 9) return false;
+  if (lineupLooksLikeRosterAlphabeticalFallback(lineup)) return false;
+  // Alphabetical-looking active roster lists are fake batting orders and should be blocked.
+  // Static/daily RotoWire seeds and confirmed MLB lineups are trusted ordered sources, though:
+  // a real ordered fallback can coincidentally look alphabetical by last name and should not
+  // disappear as "RotoWire lineup unavailable."
+  if (lineupLooksAlphabetical(lineup) && !lineupHasTrustedOrderSource(lineup)) return false;
+  return true;
 }
 
 function firstUsableLineup(promises = []) {
@@ -41792,10 +41894,11 @@ function hasTrustedLineupOrder(game, side) {
   if (!Array.isArray(lineup) || !lineup.length) return false;
   const normalized = normalizeLineupCollectionForSide(game, side, lineup);
   if (lineupHitterCount(normalized) < 9) return false;
-  if (shouldPreferProbablePitcher(game) && lineupLooksAlphabetical(lineup)) return false;
+  if (shouldPreferProbablePitcher(game) && lineupLooksAlphabetical(normalized) && !lineupHasTrustedOrderSource(normalized)) return false;
   if (shouldPreferProbablePitcher(game)) {
     const sources = normalized.map((entry) => String(entry?.source || '').toLowerCase()).filter(Boolean);
-    if (sources.length && sources.every((source) => /previous|fallback|completion|active-roster/.test(source))) return false;
+    if (sources.length && sources.every((source) => /previous|fallback|completion|active-roster|roster/.test(source))) return false;
+    if (lineupLooksLikeRosterAlphabeticalFallback(normalized)) return false;
   }
   return true;
 }
@@ -41965,15 +42068,25 @@ async function completeLineupToNine(game, side, lineup = []) {
     .forEach((profile) => addEntry(fallbackLineupEntryFromProfile(profile, completed.length + 1), 'lookup-lineup-completion'));
   if (completed.length >= 9) return renumberLineup(completed);
 
+  // Do not synthesize a full batting order from the active roster. MLB roster endpoints
+  // are effectively roster lists, not batting orders; when they are used as the main
+  // source they create alphabetical-looking fake lineups. Only use them to patch a
+  // nearly complete, already ordered lineup.
+  if (shouldPreferProbablePitcher(game) && completed.length < 7) return renumberLineup(completed);
+
   const activeRoster = await fetchTeamActiveRoster(team, game).catch(() => []);
   const activeCandidates = listify(activeRoster)
     .filter((player) => Number.isFinite(Number(player?.id)) && Number(player.id) > 0)
     .filter((player) => String(player?.position || '').toUpperCase() !== 'P')
     .map((player) => ({ ...(game?.playerLookup?.[String(player.id)] || {}), ...player, teamAbbrev: team }))
     .sort((a, b) => fallbackLineupCandidateScore(b, b) - fallbackLineupCandidateScore(a, a) || String(a?.fullName || a?.name || '').localeCompare(String(b?.fullName || b?.name || '')));
-  activeCandidates.forEach((profile) => addEntry(fallbackLineupEntryFromProfile(profile, completed.length + 1), 'active-roster-lineup-completion'));
+  activeCandidates.forEach((profile) => {
+    if (completed.length >= 9) return;
+    addEntry(fallbackLineupEntryFromProfile(profile, completed.length + 1), 'active-roster-lineup-completion');
+  });
 
-  return renumberLineup(completed);
+  const finalLineup = renumberLineup(completed);
+  return lineupLooksLikeRosterAlphabeticalFallback(finalLineup) ? renumberLineup(lineup) : finalLineup;
 }
 
 function injuryTimeText(entry, rosterType) {
@@ -42501,8 +42614,14 @@ async function syncLineupOverlay(game, options = {}) {
   if (!homeHasConfirmedLineup) {
     homeDisplayLineup = normalizeLineupCollectionForSide(game, 'home', remoteHomeLineup) || [];
   }
-  if (!awayDisplayLineup.length) awayDisplayLineup = fallbackTeamLineupFromLookup(game, 'away');
-  if (!homeDisplayLineup.length) homeDisplayLineup = fallbackTeamLineupFromLookup(game, 'home');
+  if (!awayDisplayLineup.length || (!awayHasConfirmedLineup && !isUsableLineupCandidate(awayDisplayLineup))) {
+    awayDisplayLineup = staticRotowireSeedLineupForGameSide(game, 'away', { opponentHand: awayOpponentHand })
+      || fallbackTeamLineupFromLookup(game, 'away');
+  }
+  if (!homeDisplayLineup.length || (!homeHasConfirmedLineup && !isUsableLineupCandidate(homeDisplayLineup))) {
+    homeDisplayLineup = staticRotowireSeedLineupForGameSide(game, 'home', { opponentHand: homeOpponentHand })
+      || fallbackTeamLineupFromLookup(game, 'home');
+  }
   [awayDisplayLineup, homeDisplayLineup] = await Promise.all([
     completeLineupToNine(game, 'away', awayDisplayLineup),
     completeLineupToNine(game, 'home', homeDisplayLineup),
@@ -42513,6 +42632,12 @@ async function syncLineupOverlay(game, options = {}) {
     !homeHasConfirmedLineup ? enrichFallbackLineupDisplay(game, 'home', homeDisplayLineup) : Promise.resolve(homeDisplayLineup),
   ]);
   if (!stillRenderingLineup()) return;
+  if (!awayHasConfirmedLineup && !isUsableLineupCandidate(awayDisplayLineup)) {
+    awayDisplayLineup = staticRotowireSeedLineupForGameSide(game, 'away', { opponentHand: awayOpponentHand });
+  }
+  if (!homeHasConfirmedLineup && !isUsableLineupCandidate(homeDisplayLineup)) {
+    homeDisplayLineup = staticRotowireSeedLineupForGameSide(game, 'home', { opponentHand: homeOpponentHand });
+  }
   const awayLineupReady = isUsableLineupCandidate(awayDisplayLineup);
   const homeLineupReady = isUsableLineupCandidate(homeDisplayLineup);
   setLineupListLoadingFallback(awayLineupListEl, false, awayFallbackMode);

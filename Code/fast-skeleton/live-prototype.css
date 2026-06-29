@@ -6376,3 +6376,31 @@ body.dashboard-page .player-batter-heat-contact-table em {
   order: initial !important;
   grid-column: auto !important;
 }
+
+/* Keep lineup-modal over/under button state visually obvious after modal refreshes. */
+body.dashboard-page .lineup-state-scoreboard .lineup-ou-btn.is-selected {
+  border-color: rgba(255, 223, 100, 0.98) !important;
+  background: rgba(101, 78, 12, 0.84) !important;
+  color: #ffeb90 !important;
+  text-shadow: 0 0 8px rgba(255, 220, 95, 0.62) !important;
+  box-shadow: 0 0 0 1px rgba(0, 0, 0, 0.76), 0 0 13px rgba(255, 216, 77, 0.28) !important;
+}
+
+body.dashboard-page .lineup-state-scoreboard .lineup-ou-btn[data-over-under-side='over'].is-selected {
+  border-color: rgba(100, 255, 155, 0.98) !important;
+  background: rgba(21, 84, 42, 0.9) !important;
+  color: #a8ffc2 !important;
+  text-shadow: 0 0 9px rgba(84, 255, 137, 0.6) !important;
+}
+
+body.dashboard-page .lineup-state-scoreboard .lineup-ou-btn[data-over-under-side='under'].is-selected {
+  border-color: rgba(115, 205, 255, 0.98) !important;
+  background: rgba(18, 56, 91, 0.9) !important;
+  color: #b8e7ff !important;
+  text-shadow: 0 0 9px rgba(91, 198, 255, 0.58) !important;
+}
+
+body.dashboard-page .lineup-state-scoreboard .lineup-ou-btn.is-locked {
+  border-color: rgba(236, 241, 250, 0.98) !important;
+  box-shadow: 0 0 0 2px rgba(10, 12, 16, 0.94), 0 0 16px rgba(210, 218, 232, 0.42) !important;
+}
