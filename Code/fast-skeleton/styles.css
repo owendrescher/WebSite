@@ -5176,15 +5176,15 @@ body[data-overlay-dock='bottom'] .lineup-modal {
   grid-template-columns: minmax(0, 1fr) auto auto;
   align-items: center;
   gap: 10px;
-  padding: 10px 12px;
+  padding: 7px 12px;
   border-bottom: 1px solid var(--line);
   background: color-mix(in srgb, var(--panel-head) 72%, transparent);
 }
 
 .lineup-modal-title-wrap {
   display: grid;
-  grid-template-columns: minmax(0, auto) auto;
-  gap: 2px;
+  grid-template-columns: minmax(0, auto) auto minmax(240px, 520px);
+  gap: 3px 8px;
   align-items: center;
   justify-content: start;
 }
@@ -5192,6 +5192,138 @@ body[data-overlay-dock='bottom'] .lineup-modal {
 .lineup-modal-title-wrap strong { grid-column: 1 / -1; font-size: 1.29rem; letter-spacing: 0.08em; }
 
 .lineup-modal-matchup { min-width: 0; font-size: 1.02rem; color: var(--muted); letter-spacing: 0.04em; }
+
+.lineup-series-strip {
+  display: inline-grid;
+  grid-template-columns: minmax(0, 1fr);
+  align-items: center;
+  justify-self: center;
+  justify-content: center;
+  min-width: 0;
+  width: min(520px, 42vw);
+  height: 60px;
+  padding: 0 6px;
+  border: 1px solid color-mix(in srgb, var(--accent) 28%, transparent);
+  border-radius: 8px;
+  background:
+    linear-gradient(180deg, rgba(255,255,255,0.08), transparent 62%),
+    color-mix(in srgb, var(--panel-item) 76%, transparent);
+  color: var(--text);
+  font: 900 0.74rem/1 var(--font-ui);
+  letter-spacing: 0.02em;
+  white-space: nowrap;
+  overflow: hidden;
+  box-sizing: border-box;
+}
+
+.lineup-series-label,
+.lineup-series-empty {
+  min-width: 0;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+
+.lineup-series-label {
+  display: none;
+  color: var(--muted);
+  text-transform: uppercase;
+  font-size: 0.55rem;
+  letter-spacing: 0.08em;
+}
+
+.lineup-series-games {
+  display: inline-flex;
+  align-items: stretch;
+  justify-content: center;
+  gap: 6px;
+  min-width: 0;
+  max-width: 100%;
+  height: 100%;
+  overflow: hidden;
+}
+
+.lineup-series-game {
+  display: inline-grid;
+  grid-template-rows: 22px 12px 13px 13px;
+  justify-items: center;
+  align-items: stretch;
+  gap: 0;
+  flex: 0 0 auto;
+  min-width: 98px;
+  max-width: 108px;
+  height: 100%;
+  padding: 0 5px;
+  border: 1px solid color-mix(in srgb, var(--series-winner) 72%, white 8%);
+  border-radius: 8px;
+  background:
+    linear-gradient(180deg, color-mix(in srgb, var(--series-winner) 32%, black 68%), rgba(0,0,0,0.24)),
+    color-mix(in srgb, var(--series-winner) 20%, var(--panel-item) 80%);
+  box-shadow: inset 0 1px 0 rgba(255,255,255,0.12);
+}
+
+.lineup-series-game.is-live {
+  box-shadow: 0 0 0 1px color-mix(in srgb, var(--series-winner) 70%, white 12%), 0 0 10px color-mix(in srgb, var(--series-winner) 42%, transparent);
+}
+
+.lineup-series-winner-logo {
+  width: 21px;
+  height: 21px;
+  border-radius: 4px;
+  object-fit: contain;
+  background: rgba(255,255,255,0.88);
+}
+
+.lineup-series-score {
+  min-width: 0;
+  overflow: hidden;
+  text-overflow: clip;
+  color: #fff;
+  font-size: 0.68rem;
+  font-variant-numeric: tabular-nums;
+}
+
+.lineup-series-pitcher {
+  display: inline-grid;
+  grid-template-columns: 11px minmax(0, 1fr);
+  align-items: center;
+  gap: 2px;
+  width: 100%;
+  min-width: 0;
+  height: 13px;
+  padding: 0 3px 0 1px;
+  border: 1px solid color-mix(in srgb, var(--series-pitcher) 65%, white 10%);
+  border-radius: 999px;
+  background:
+    linear-gradient(180deg, color-mix(in srgb, var(--series-pitcher) 34%, white 6%), color-mix(in srgb, var(--series-pitcher) 18%, black 72%));
+  color: #fff;
+  box-sizing: border-box;
+}
+
+.lineup-series-pitcher span {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  width: 11px;
+  height: 11px;
+  border-radius: 999px;
+  background: rgba(0,0,0,0.35);
+  font-size: 0.42rem;
+  line-height: 1;
+}
+
+.lineup-series-pitcher b {
+  min-width: 0;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  color: #fff;
+  font-size: 0.5rem;
+  line-height: 1;
+}
+
+.lineup-series-empty {
+  color: var(--muted);
+  font-size: 0.58rem;
+}
 
 .lineup-close-btn {
   border: 1px solid color-mix(in srgb, var(--accent) 55%, transparent);
@@ -9768,11 +9900,12 @@ body[data-theme="paper-scorebook"] .team {
 
 .lineup-modal-header {
   gap: 7px;
-  padding: 8px 10px;
+  padding: 4px 10px;
 }
 
 .lineup-modal-title-wrap {
   gap: 1px;
+  grid-template-columns: minmax(0, auto) auto minmax(150px, 1fr);
 }
 
 .lineup-modal-title-wrap strong {
@@ -9781,6 +9914,39 @@ body[data-theme="paper-scorebook"] .team {
 
 .lineup-modal-matchup {
   font-size: 0.78rem;
+}
+
+.lineup-series-strip {
+  max-width: 100%;
+  width: min(360px, 100%);
+  height: 56px;
+  padding: 0 4px;
+  font-size: 0.58rem;
+}
+
+.lineup-series-label {
+  display: none;
+}
+
+.lineup-series-game {
+  min-width: 86px;
+  max-width: 94px;
+  height: 100%;
+  grid-template-rows: 20px 11px 12px 13px;
+  padding: 0 4px;
+}
+
+.lineup-series-winner-logo {
+  width: 20px;
+  height: 20px;
+}
+
+.lineup-series-pitcher {
+  height: 12px;
+}
+
+.lineup-series-pitcher b {
+  font-size: 0.46rem;
 }
 
 .lineup-close-btn {

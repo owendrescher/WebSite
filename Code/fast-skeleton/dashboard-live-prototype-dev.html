@@ -17,12 +17,11 @@
     <meta name="twitter:description" content="Live MLB scoreboard, lineups, pitcher trends, hot players, and betting stat tools." />
     <link rel="icon" type="image/png" href="baseball.png" />
     <link rel="apple-touch-icon" href="baseball.png" />
-    <link rel="stylesheet" href="styles.css" />
-    <link rel="stylesheet" href="dashboard.css" />
+    <link rel="stylesheet" href="styles.css?v=20260630seriesSync2" />
+    <link rel="stylesheet" href="dashboard.css?v=20260630seriesSync2" />
     <link rel="stylesheet" href="live-prototype.css" />
   </head>
-  <body class="dashboard-page">
-    <a class="owentools-home-link" href="../index.html" aria-label="Back to owentools" title="Back to owentools">ot</a>
+  <body class="dashboard-page" data-dashboard-page="scoreboard">
 
     <dialog id="gamePickDialog" class="bet-dialog">
       <form id="gamePickDialogForm" class="bet-dialog-form">
@@ -80,6 +79,7 @@
     <div class="dashboard-shell">
       <main class="dashboard-main">
         <section class="overlay dashboard-scoreboard" id="overlay">
+          <a class="owentools-home-link" href="../index.html" aria-label="Back to owentools" title="Back to owentools">ot</a>
           <header class="topbar">
             <div class="topbar-left">
               <h1>MLB GAME CENTER</h1>
@@ -171,9 +171,9 @@
               <button type="button" class="lineup-nav-btn lineup-nav-next" data-lineup-nav="1" aria-label="Next game">&rsaquo;</button>
               <header class="lineup-modal-header">
                 <div class="lineup-modal-title-wrap">
-                  <strong>LINEUP CARD</strong>
                   <span id="lineupModalMatchup" class="lineup-modal-matchup"></span>
                   <button type="button" class="lineup-recent-toggle" data-lineup-stat-window title="Toggle lineup stat window">L7</button>
+                  <span id="lineupSeriesStrip" class="lineup-series-strip" aria-live="polite"></span>
                 </div>
                 <div class="lineup-view-toggle" role="tablist" aria-label="Lineup card view">
                   <button type="button" class="lineup-view-btn active" data-lineup-view="lineups" aria-selected="true">Lineups</button>
@@ -565,16 +565,22 @@
         toolId: "baseball-dashboard",
         label: "Baseball dashboard",
         include: [
-          "manual-state-mirror:v1"
+          "manual-state-mirror:v1",
+          "manual-state-durable:v1",
+          "player-tracker-backup:v1",
+          "pending-game-picks:v1",
+          "tossup-scoreboards:v1",
+          "locked-tossup-scoreboards:v1",
+          "over-under-scoreboards:v1"
         ]
       };
     </script>
     <script src="../shared/owentools-sync.js?v=20260610manual2"></script>
     <script src="rotowire-default-lineups.js?v=20260629lineupseedverified2"></script>
     <script>
-      window.MLB_DASHBOARD_BUILD_ID="20260629-lineup-seed-fallback-dev2";
+      window.MLB_DASHBOARD_BUILD_ID="20260630-series-sync-dev2";
       window.MLB_STATS_PROFILER_FORCE=true;
     </script>
-    <script src="live-dashboard-prototype.js?v=20260629lineupseedverified2"></script>
+    <script src="live-dashboard-prototype.js?v=20260630seriesSync2"></script>
   </body>
 </html>
