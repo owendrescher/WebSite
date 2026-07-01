@@ -236,6 +236,7 @@ const lockedTossupScoreboardGamePks = new Set();
 const overUnderScoreboardSelections = new Map();
 let draftBetLegs = [];
 let pendingGamePickSelections = new Map();
+let manualStateInMemoryDate = '';
 let cachedArchiveCardsBeforeDateKey = '';
 let cachedArchiveCardsBeforeDateValue = [];
 const PANEL_LAYOUT_KEY = 'panel-layout:v2';
@@ -1189,6 +1190,7 @@ if (lineupEmbedMode) {
   dateInput.value = parseFlexibleDateInput(lineupEmbedDate) || dateInput.value || formatDate(new Date());
   document.body.classList.add('lineup-embed-page');
 }
+manualStateInMemoryDate = dateInput.value || formatDate(new Date());
 
 function storageKey(prefix) {
   return `${prefix}:${dateInput.value || formatDate(new Date())}`;
@@ -16869,9 +16871,9 @@ function getPendingGamePickEntries(games = latestRenderedGames) {
     .filter(Boolean);
 }
 
-function readPendingGamePickStore() {
-  const dateKey = `${PENDING_GAME_PICKS_STORAGE_KEY}:${dateInput.value || formatDate(new Date())}`;
-  const date = dateInput.value || formatDate(new Date());
+function readPendingGamePickStore(date = dateInput.value || formatDate(new Date())) {
+  const selectedDate = String(date || dateInput.value || formatDate(new Date()));
+  const dateKey = `${PENDING_GAME_PICKS_STORAGE_KEY}:${selectedDate}`;
   const candidates = [];
   const rememberCandidate = (value, updatedAt = 0) => {
     const normalized = normalizePendingGamePickEntries(value);
@@ -16894,18 +16896,19 @@ function readPendingGamePickStore() {
   } catch {
     // Fall through to the protected same-day backup.
   }
-  const backupState = readManualStateBackup(date);
-  const mirrorState = readManualStateMirror(date);
-  const durableState = readManualStateDurable(date);
+  const backupState = readManualStateBackup(selectedDate);
+  const mirrorState = readManualStateMirror(selectedDate);
+  const durableState = readManualStateDurable(selectedDate);
   rememberCandidate(backupState.pendingGamePicks, backupState.updatedAt);
   rememberCandidate(mirrorState.pendingGamePicks, mirrorState.updatedAt);
   rememberCandidate(durableState.pendingGamePicks, durableState.updatedAt);
   try {
-    const sessionState = JSON.parse(sessionStorage.getItem(manualStateBackupKey(date)) || '{}');
+    const sessionState = JSON.parse(sessionStorage.getItem(manualStateBackupKey(selectedDate)) || '{}');
     rememberCandidate(sessionState?.pendingGamePicks, sessionState?.updatedAt);
   } catch {}
   const best = candidates
-    .sort((a, b) => manualStateWeight(b.items) - manualStateWeight(a.items) || b.updatedAt - a.updatedAt)[0]?.items || [];
+    .map((candidate) => manualStateCandidate(candidate.items, candidate.updatedAt, 'pending-store'))
+    .sort(compareManualStateCandidates)[0]?.value || [];
   if (best.length) {
     writePendingGamePickStore(best, { backup: false });
     return best;
@@ -16924,6 +16927,56 @@ function manualStateWeight(value) {
   if (Array.isArray(value)) return value.reduce((sum, item) => sum + 2 + manualStateWeight(item), value.length);
   if (typeof value === 'object') return Object.values(value).reduce((sum, item) => sum + manualStateWeight(item), Object.keys(value).length);
   return String(value).trim() ? 1 : 0;
+}
+
+function manualStatePayloadSize(value) {
+  try {
+    return JSON.stringify(value ?? null).length;
+  } catch {
+    return String(value ?? '').length;
+  }
+}
+
+function compareManualStateCandidates(a = {}, b = {}) {
+  return (Number(b.weight) || 0) - (Number(a.weight) || 0)
+    || (Number(b.size) || 0) - (Number(a.size) || 0)
+    || (Number(b.updatedAt) || 0) - (Number(a.updatedAt) || 0);
+}
+
+function manualStateCandidate(value, updatedAt = 0, source = '') {
+  return {
+    value,
+    updatedAt: Number(updatedAt) || 0,
+    source,
+    weight: manualStateWeight(value),
+    size: manualStatePayloadSize(value),
+  };
+}
+
+function activeManualStateDateMatches(date = dateInput.value || formatDate(new Date())) {
+  const selectedDate = String(date || dateInput.value || formatDate(new Date()));
+  return String(manualStateInMemoryDate || dateInput.value || '') === selectedDate;
+}
+
+function activeManualStateFieldValue(date, field, normalizer = (value) => value) {
+  if (!activeManualStateDateMatches(date)) return null;
+  if (field === 'pendingGamePicks') return normalizePendingGamePickEntries([...pendingGamePickSelections.entries()]);
+  if (field === 'tossupScoreboards') return normalizer([...tossupScoreboardGamePks]);
+  if (field === 'lockedTossupScoreboards') return normalizer([...lockedTossupScoreboardGamePks]);
+  if (field === 'overUnderScoreboards') return normalizer(serializeOverUnderScoreboards());
+  if (field === 'trackedPlayers') {
+    const key = typeof trackedPlayersStorageKey === 'function' ? trackedPlayersStorageKey(date) : '';
+    if (key && trackedPlayersMemoryByDate?.has?.(key)) return normalizer(trackedPlayersMemoryByDate.get(key) || []);
+  }
+  return null;
+}
+
+function shouldWriteManualStateField(currentValue, nextValue, options = {}) {
+  const nextWeight = manualStateWeight(nextValue);
+  if (nextWeight > 0) return true;
+  if (!options.allowEmpty) return false;
+  if (options.forceEmpty) return true;
+  return manualStateWeight(currentValue) === 0;
 }
 
 function manualStateBackupKey(date = dateInput.value || formatDate(new Date())) {
@@ -16977,7 +17030,7 @@ function writeManualStateDurablePatch(patch = {}, date = dateInput.value || form
     for (const key of ['trackedPlayers', 'pendingGamePicks', 'tossupScoreboards', 'lockedTossupScoreboards', 'overUnderScoreboards']) {
       if (!hasOwnManualStateField(patch, key)) continue;
       const normalized = normalizeManualStatePatchField(key, patch[key]);
-      if (manualStateWeight(normalized) || options.allowEmpty) {
+      if (shouldWriteManualStateField(current[key], normalized, options)) {
         next[key] = normalized;
         changed = true;
       }
@@ -16993,8 +17046,10 @@ function chooseManualStateFieldValue(date, field, normalizer = (value) => value)
   const remember = (source) => {
     if (!hasOwnManualStateField(source, field)) return;
     const value = normalizer(source[field]);
-    candidates.push({ value, updatedAt: Number(source?.updatedAt || 0), weight: manualStateWeight(value) });
+    candidates.push(manualStateCandidate(value, source?.updatedAt, 'stored'));
   };
+  const activeValue = activeManualStateFieldValue(date, field, normalizer);
+  if (activeValue !== null) candidates.push(manualStateCandidate(activeValue, Date.now(), 'active'));
   remember(readManualStateMirror(date));
   remember(readManualStateBackup(date));
   remember(readManualStateDurable(date));
@@ -17003,20 +17058,29 @@ function chooseManualStateFieldValue(date, field, normalizer = (value) => value)
     remember(sessionState);
   } catch {}
   if (!candidates.length) return null;
-  candidates.sort((a, b) => b.weight - a.weight || b.updatedAt - a.updatedAt);
+  candidates.sort(compareManualStateCandidates);
   return candidates[0].value;
 }
 
-function writeManualStateMirrorPatch(patch = {}, date = dateInput.value || formatDate(new Date())) {
+function writeManualStateMirrorPatch(patch = {}, date = dateInput.value || formatDate(new Date()), options = {}) {
   try {
-    const parsed = JSON.parse(localStorage.getItem(MANUAL_STATE_MIRROR_KEY) || '{}');
+    const targetDate = String(date || dateInput.value || formatDate(new Date()));
+    const parsed = JSON.parse(localStorage.getItem(MANUAL_STATE_MIRROR_KEY) || '{}') || {};
+    const current = parsed?.[targetDate] && typeof parsed[targetDate] === 'object' ? parsed[targetDate] : {};
+    const next = { ...current };
+    let changed = false;
+    for (const key of ['trackedPlayers', 'pendingGamePicks', 'tossupScoreboards', 'lockedTossupScoreboards', 'overUnderScoreboards']) {
+      if (!hasOwnManualStateField(patch, key)) continue;
+      const normalized = normalizeManualStatePatchField(key, patch[key]);
+      if (shouldWriteManualStateField(current[key], normalized, options)) {
+        next[key] = normalized;
+        changed = true;
+      }
+    }
+    if (!changed) return;
     localStorage.setItem(MANUAL_STATE_MIRROR_KEY, JSON.stringify({
-      ...(parsed || {}),
-      [date]: {
-        ...(parsed?.[date] || {}),
-        ...patch,
-        updatedAt: Date.now(),
-      },
+      ...parsed,
+      [targetDate]: { ...next, updatedAt: Date.now() },
     }));
   } catch {}
 }
@@ -17024,24 +17088,48 @@ function writeManualStateMirrorPatch(patch = {}, date = dateInput.value || forma
 function writeManualStateBackupPatch(patch = {}, date = dateInput.value || formatDate(new Date()), options = {}) {
   try {
     const current = readManualStateBackup(date);
-    localStorage.setItem(manualStateBackupKey(date), JSON.stringify({ ...current, ...patch, updatedAt: Date.now() }));
+    const next = { ...current };
+    let changed = false;
+    for (const key of ['trackedPlayers', 'pendingGamePicks', 'tossupScoreboards', 'lockedTossupScoreboards', 'overUnderScoreboards']) {
+      if (!hasOwnManualStateField(patch, key)) continue;
+      const normalized = normalizeManualStatePatchField(key, patch[key]);
+      if (shouldWriteManualStateField(current[key], normalized, options)) {
+        next[key] = normalized;
+        changed = true;
+      }
+    }
+    if (changed) localStorage.setItem(manualStateBackupKey(date), JSON.stringify({ ...next, updatedAt: Date.now() }));
   } catch {}
-  writeManualStateMirrorPatch(patch, date);
+  writeManualStateMirrorPatch(patch, date, options);
   writeManualStateDurablePatch(patch, date, options);
   try {
     const current = JSON.parse(sessionStorage.getItem(manualStateBackupKey(date)) || '{}');
-    sessionStorage.setItem(manualStateBackupKey(date), JSON.stringify({ ...current, ...patch, updatedAt: Date.now() }));
+    const next = { ...current };
+    let changed = false;
+    for (const key of ['trackedPlayers', 'pendingGamePicks', 'tossupScoreboards', 'lockedTossupScoreboards', 'overUnderScoreboards']) {
+      if (!hasOwnManualStateField(patch, key)) continue;
+      const normalized = normalizeManualStatePatchField(key, patch[key]);
+      if (shouldWriteManualStateField(current[key], normalized, options)) {
+        next[key] = normalized;
+        changed = true;
+      }
+    }
+    if (changed) sessionStorage.setItem(manualStateBackupKey(date), JSON.stringify({ ...next, updatedAt: Date.now() }));
   } catch {}
 }
 
 function writePendingGamePickStore(picks, options = {}) {
   const cleanPicks = normalizePendingGamePickEntries(picks);
-  const dateKey = `${PENDING_GAME_PICKS_STORAGE_KEY}:${dateInput.value || formatDate(new Date())}`;
+  const selectedDate = String(options.date || dateInput.value || formatDate(new Date()));
+  const dateKey = `${PENDING_GAME_PICKS_STORAGE_KEY}:${selectedDate}`;
   try {
     localStorage.setItem(dateKey, JSON.stringify(cleanPicks));
     localStorage.setItem(PENDING_GAME_PICKS_STORAGE_KEY, JSON.stringify(cleanPicks));
   } catch {}
-  if (options.backup !== false && (cleanPicks.length || options.allowEmpty)) writeManualStateBackupPatch({ pendingGamePicks: cleanPicks }, undefined, { allowEmpty: options.allowEmpty });
+  manualStateInMemoryDate = selectedDate;
+  if (options.backup !== false && (cleanPicks.length || options.allowEmpty)) {
+    writeManualStateBackupPatch({ pendingGamePicks: cleanPicks }, selectedDate, { allowEmpty: options.allowEmpty, forceEmpty: options.forceEmpty });
+  }
 }
 
 function savePendingGamePicks(options = {}) {
@@ -17049,10 +17137,11 @@ function savePendingGamePicks(options = {}) {
   writePendingGamePickStore(picks, options);
 }
 
-function restorePendingGamePicks() {
-  const picks = readPendingGamePickStore();
+function restorePendingGamePicks(date = dateInput.value || formatDate(new Date())) {
+  const selectedDate = String(date || dateInput.value || formatDate(new Date()));
+  const picks = readPendingGamePickStore(selectedDate);
   if (!picks.length && pendingGamePickSelections.size) {
-    savePendingGamePicks({ backup: false });
+    if (activeManualStateDateMatches(selectedDate)) savePendingGamePicks({ backup: false, date: selectedDate });
     return;
   }
   const restored = new Map(
@@ -17060,11 +17149,14 @@ function restorePendingGamePicks() {
       .map(([key, side]) => [String(key), normalizeGamePickSide(side)])
       .filter(([key, side]) => key && side),
   );
-  for (const [key, side] of pendingGamePickSelections.entries()) {
-    const normalizedSide = normalizeGamePickSide(side);
-    if (key && normalizedSide) restored.set(String(key), normalizedSide);
+  if (activeManualStateDateMatches(selectedDate)) {
+    for (const [key, side] of pendingGamePickSelections.entries()) {
+      const normalizedSide = normalizeGamePickSide(side);
+      if (key && normalizedSide) restored.set(String(key), normalizedSide);
+    }
   }
   pendingGamePickSelections = restored;
+  manualStateInMemoryDate = selectedDate;
 }
 
 function pendingGamePickSideForGame(game) {
@@ -17140,7 +17232,9 @@ function readOverUnderScoreboardStore(date = dateInput.value || formatDate(new D
     const sessionState = JSON.parse(sessionStorage.getItem(manualStateBackupKey(date)) || '{}');
     remember(sessionState?.overUnderScoreboards, sessionState?.updatedAt);
   } catch {}
-  const best = candidates.sort((a, b) => manualStateWeight(b.items) - manualStateWeight(a.items) || b.updatedAt - a.updatedAt)[0]?.items || [];
+  const best = candidates
+    .map((candidate) => manualStateCandidate(candidate.items, candidate.updatedAt, 'over-under-store'))
+    .sort(compareManualStateCandidates)[0]?.value || [];
   if (best.length) {
     try { localStorage.setItem(overUnderScoreboardStorageKey(date), JSON.stringify(best)); } catch {}
   }
@@ -17148,17 +17242,20 @@ function readOverUnderScoreboardStore(date = dateInput.value || formatDate(new D
 }
 
 function saveOverUnderScoreboards(date = dateInput.value || formatDate(new Date()), options = {}) {
+  const selectedDate = String(date || dateInput.value || formatDate(new Date()));
   const values = serializeOverUnderScoreboards();
   try {
-    localStorage.setItem(overUnderScoreboardStorageKey(date), JSON.stringify(values));
+    localStorage.setItem(overUnderScoreboardStorageKey(selectedDate), JSON.stringify(values));
   } catch {}
-  if (values.length || options.allowEmpty) writeManualStateBackupPatch({ overUnderScoreboards: values }, date, { allowEmpty: options.allowEmpty });
+  manualStateInMemoryDate = selectedDate;
+  if (values.length || options.allowEmpty) writeManualStateBackupPatch({ overUnderScoreboards: values }, selectedDate, { allowEmpty: options.allowEmpty, forceEmpty: options.forceEmpty });
 }
 
 function restoreOverUnderScoreboards(date = dateInput.value || formatDate(new Date())) {
-  const stored = readOverUnderScoreboardStore(date);
+  const selectedDate = String(date || dateInput.value || formatDate(new Date()));
+  const stored = readOverUnderScoreboardStore(selectedDate);
   if (!stored.length && overUnderScoreboardSelections.size) {
-    saveOverUnderScoreboards(date);
+    if (activeManualStateDateMatches(selectedDate)) saveOverUnderScoreboards(selectedDate);
     return;
   }
   overUnderScoreboardSelections.clear();
@@ -17166,6 +17263,7 @@ function restoreOverUnderScoreboards(date = dateInput.value || formatDate(new Da
     const side = normalizeOverUnderSide(entry.side);
     if (entry.key && side) overUnderScoreboardSelections.set(String(entry.key), { side, locked: Boolean(entry.locked) });
   });
+  manualStateInMemoryDate = selectedDate;
 }
 
 function overUnderScoreboardEntryForGame(game) {
@@ -17261,7 +17359,7 @@ function setOverUnderScoreboardState(gamePk, side = '', state = 'default') {
   if (normalizedSide && normalizedState !== 'default') {
     overUnderScoreboardSelections.set(key, { side: normalizedSide, locked: normalizedState === 'lock' });
   }
-  saveOverUnderScoreboards(undefined, { allowEmpty: true });
+  saveOverUnderScoreboards(undefined, { allowEmpty: true, forceEmpty: !overUnderScoreboardSelections.size });
   const liveGame = game || gameForManualStateKey(key) || activeLineupGame || null;
   const card = cardForGamePk(liveGame?.gamePk || gamePk);
   if (card && liveGame) syncOverUnderControlsForGame(card, liveGame, shouldPreferProbablePitcher(liveGame));
@@ -17312,7 +17410,9 @@ function readLockedTossupScoreboardStore(date = dateInput.value || formatDate(ne
   remember(backupState.lockedTossupScoreboards, backupState.updatedAt);
   remember(mirrorState.lockedTossupScoreboards, mirrorState.updatedAt);
   remember(durableState.lockedTossupScoreboards, durableState.updatedAt);
-  const best = candidates.sort((a, b) => manualStateWeight(b.items) - manualStateWeight(a.items) || b.updatedAt - a.updatedAt)[0]?.items || [];
+  const best = candidates
+    .map((candidate) => manualStateCandidate(candidate.items, candidate.updatedAt, 'locked-tossup-store'))
+    .sort(compareManualStateCandidates)[0]?.value || [];
   if (best.length) {
     try { localStorage.setItem(lockedTossupScoreboardStorageKey(date), JSON.stringify(best)); } catch {}
   }
@@ -17320,11 +17420,13 @@ function readLockedTossupScoreboardStore(date = dateInput.value || formatDate(ne
 }
 
 function saveLockedTossupScoreboards(date = dateInput.value || formatDate(new Date()), options = {}) {
+  const selectedDate = String(date || dateInput.value || formatDate(new Date()));
   const values = [...lockedTossupScoreboardGamePks];
   try {
-    localStorage.setItem(lockedTossupScoreboardStorageKey(date), JSON.stringify(values));
+    localStorage.setItem(lockedTossupScoreboardStorageKey(selectedDate), JSON.stringify(values));
   } catch {}
-  if (values.length || options.allowEmpty) writeManualStateBackupPatch({ lockedTossupScoreboards: values }, date, { allowEmpty: options.allowEmpty });
+  manualStateInMemoryDate = selectedDate;
+  if (values.length || options.allowEmpty) writeManualStateBackupPatch({ lockedTossupScoreboards: values }, selectedDate, { allowEmpty: options.allowEmpty, forceEmpty: options.forceEmpty });
 }
 
 function lockedTossupScoreboardMarkedForGame(game) {
@@ -17351,7 +17453,9 @@ function readTossupScoreboardStore(date = dateInput.value || formatDate(new Date
   remember(backupState.tossupScoreboards, backupState.updatedAt);
   remember(mirrorState.tossupScoreboards, mirrorState.updatedAt);
   remember(durableState.tossupScoreboards, durableState.updatedAt);
-  const best = candidates.sort((a, b) => manualStateWeight(b.items) - manualStateWeight(a.items) || b.updatedAt - a.updatedAt)[0]?.items || [];
+  const best = candidates
+    .map((candidate) => manualStateCandidate(candidate.items, candidate.updatedAt, 'tossup-store'))
+    .sort(compareManualStateCandidates)[0]?.value || [];
   if (best.length) {
     try { localStorage.setItem(tossupScoreboardStorageKey(date), JSON.stringify(best)); } catch {}
     writeManualStateBackupPatch({ tossupScoreboards: best }, date);
@@ -17360,28 +17464,33 @@ function readTossupScoreboardStore(date = dateInput.value || formatDate(new Date
 }
 
 function saveTossupScoreboards(date = dateInput.value || formatDate(new Date()), options = {}) {
+  const selectedDate = String(date || dateInput.value || formatDate(new Date()));
   const values = [...tossupScoreboardGamePks];
   try {
-    localStorage.setItem(tossupScoreboardStorageKey(date), JSON.stringify(values));
+    localStorage.setItem(tossupScoreboardStorageKey(selectedDate), JSON.stringify(values));
   } catch {}
-  if (values.length || options.allowEmpty) writeManualStateBackupPatch({ tossupScoreboards: values }, date, { allowEmpty: options.allowEmpty });
+  manualStateInMemoryDate = selectedDate;
+  if (values.length || options.allowEmpty) writeManualStateBackupPatch({ tossupScoreboards: values }, selectedDate, { allowEmpty: options.allowEmpty, forceEmpty: options.forceEmpty });
 }
 
 function restoreTossupScoreboards(date = dateInput.value || formatDate(new Date())) {
-  const stored = readTossupScoreboardStore(date);
+  const selectedDate = String(date || dateInput.value || formatDate(new Date()));
+  const stored = readTossupScoreboardStore(selectedDate);
   if (!stored.length && tossupScoreboardGamePks.size) {
-    saveTossupScoreboards(date);
+    if (activeManualStateDateMatches(selectedDate)) saveTossupScoreboards(selectedDate);
     return;
   }
   tossupScoreboardGamePks.clear();
   stored.forEach((gamePk) => tossupScoreboardGamePks.add(String(gamePk)));
-  const lockedStored = readLockedTossupScoreboardStore(date);
+  const lockedStored = readLockedTossupScoreboardStore(selectedDate);
   if (!lockedStored.length && lockedTossupScoreboardGamePks.size) {
-    saveLockedTossupScoreboards(date);
+    if (activeManualStateDateMatches(selectedDate)) saveLockedTossupScoreboards(selectedDate);
+    else lockedTossupScoreboardGamePks.clear();
   } else {
     lockedTossupScoreboardGamePks.clear();
     lockedStored.forEach((gamePk) => lockedTossupScoreboardGamePks.add(String(gamePk)));
   }
+  manualStateInMemoryDate = selectedDate;
 }
 
 
@@ -17510,6 +17619,8 @@ function reconcileCrossDeviceManualState(date = dateInput.value || formatDate(ne
     overUnderScoreboardSelections.clear();
     normalizeOverUnderScoreboardEntries(patch.overUnderScoreboards).forEach((entry) => overUnderScoreboardSelections.set(String(entry.key), { side: entry.side, locked: Boolean(entry.locked) }));
   }
+  manualStateInMemoryDate = selectedDate;
+  writeManualStateBackupPatch(patch, selectedDate);
   normalizeManualGameStateForGames(latestRenderedGames, selectedDate);
   renderPlayerTrackerList(latestRenderedGames);
   renderPendingGamePicks(latestRenderedGames);
@@ -17545,7 +17656,7 @@ function clearCompletedPendingGamePicks(games = latestRenderedGames) {
 
 function clearPendingGamePicks({ render = true } = {}) {
   pendingGamePickSelections = new Map();
-  savePendingGamePicks({ allowEmpty: true });
+  savePendingGamePicks({ allowEmpty: true, forceEmpty: true });
   if (render) renderPendingGamePicks(latestRenderedGames);
 }
 
@@ -17563,7 +17674,7 @@ function setPendingGamePick(game, side) {
   } else {
     for (const alias of aliases) pendingGamePickSelections.set(alias, normalizedSide);
   }
-  savePendingGamePicks({ allowEmpty: true });
+  savePendingGamePicks({ allowEmpty: true, forceEmpty: !pendingGamePickSelections.size });
   renderPendingGamePicks(latestRenderedGames);
 }
 
@@ -20879,7 +20990,8 @@ function getTrackedPlayers(date = dateInput.value || formatDate(new Date())) {
     } catch {}
     const durableBackup = candidates
       .filter((items) => items.length)
-      .sort((a, b) => manualStateWeight(b) - manualStateWeight(a))[0] || [];
+      .map((items) => manualStateCandidate(items, 0, 'tracked-backup'))
+      .sort(compareManualStateCandidates)[0]?.value || [];
     if (durableBackup.length) {
       trackedPlayersMemoryByDate.set(key, durableBackup);
       try {
@@ -20904,7 +21016,8 @@ function getTrackedPlayers(date = dateInput.value || formatDate(new Date())) {
         { items: normalizeTrackedPlayerEntries(durableState.trackedPlayers || []), updatedAt: Number(durableState.updatedAt) || 0 },
       ]
         .filter((candidate) => candidate.items.length)
-        .sort((a, b) => manualStateWeight(b.items) - manualStateWeight(a.items) || b.updatedAt - a.updatedAt)[0]?.items || filtered;
+        .map((candidate) => manualStateCandidate(candidate.items, candidate.updatedAt, 'tracked-store'))
+        .sort(compareManualStateCandidates)[0]?.value || filtered;
       trackedPlayersMemoryByDate.set(key, best);
       if (best !== filtered) {
         try { localStorage.setItem(key, JSON.stringify(best)); } catch {}
@@ -20919,19 +21032,21 @@ function getTrackedPlayers(date = dateInput.value || formatDate(new Date())) {
 }
 
 function saveTrackedPlayers(players = [], date = dateInput.value || formatDate(new Date()), options = {}) {
-  const key = trackedPlayersStorageKey(date);
+  const selectedDate = String(date || dateInput.value || formatDate(new Date()));
+  const key = trackedPlayersStorageKey(selectedDate);
   let deduped = normalizeTrackedPlayerEntries(players);
   if (!deduped.length && !options.allowEmpty) {
-    const backup = normalizeTrackedPlayerEntries(readManualStateBackup(date).trackedPlayers || []);
+    const backup = normalizeTrackedPlayerEntries(readManualStateBackup(selectedDate).trackedPlayers || []);
     if (backup.length) deduped = backup;
   }
   trackedPlayersMemoryByDate.set(key, deduped);
   try {
     localStorage.setItem(key, JSON.stringify(deduped));
   } catch {}
+  manualStateInMemoryDate = selectedDate;
   if (deduped.length || options.allowEmpty) {
-    writeManualStateBackupPatch({ trackedPlayers: deduped }, date);
-    writeTrackedPlayersBackup(deduped, date);
+    writeManualStateBackupPatch({ trackedPlayers: deduped }, selectedDate, { allowEmpty: options.allowEmpty, forceEmpty: options.forceEmpty });
+    if (deduped.length || options.forceEmpty) writeTrackedPlayersBackup(deduped, selectedDate);
   }
   if (playerTrackerListEl) playerTrackerListEl.dataset.renderFingerprint = '';
 }
@@ -21667,7 +21782,7 @@ function initBetInput() {
 
   clearBetsBtn.addEventListener('click', () => {
     if (betPanelMode === 'players') {
-      saveTrackedPlayers([], undefined, { allowEmpty: true });
+      saveTrackedPlayers([], undefined, { allowEmpty: true, forceEmpty: true });
       renderPlayerTrackerList(latestRenderedGames);
       return;
     }
@@ -21715,7 +21830,7 @@ function initBetInput() {
       const removeTrackedBtn = e.target.closest('[data-tracked-player-id]');
       if (removeTrackedBtn) {
         const playerId = String(removeTrackedBtn.dataset.trackedPlayerId || '');
-        saveTrackedPlayers(getTrackedPlayers().filter((entry) => String(entry.playerId) !== playerId), undefined, { allowEmpty: true });
+        saveTrackedPlayers(getTrackedPlayers().filter((entry) => String(entry.playerId) !== playerId), undefined, { allowEmpty: true, forceEmpty: true });
         renderPlayerTrackerList(latestRenderedGames);
         return;
       }
@@ -21747,7 +21862,7 @@ function initBetInput() {
     const removeTrackedBtn = e.target.closest('[data-tracked-player-id]');
     if (removeTrackedBtn) {
       const playerId = String(removeTrackedBtn.dataset.trackedPlayerId || '');
-      saveTrackedPlayers(getTrackedPlayers().filter((entry) => String(entry.playerId) !== playerId), undefined, { allowEmpty: true });
+      saveTrackedPlayers(getTrackedPlayers().filter((entry) => String(entry.playerId) !== playerId), undefined, { allowEmpty: true, forceEmpty: true });
       renderPlayerTrackerList(latestRenderedGames);
       return;
     }
@@ -38628,8 +38743,8 @@ function setTossupScoreboardState(gamePk, state = 'default') {
   });
   if (normalized === 'tossup' || normalized === 'lock') tossupScoreboardGamePks.add(key);
   if (normalized === 'lock') lockedTossupScoreboardGamePks.add(key);
-  saveTossupScoreboards(undefined, { allowEmpty: true });
-  saveLockedTossupScoreboards(undefined, { allowEmpty: true });
+  saveTossupScoreboards(undefined, { allowEmpty: true, forceEmpty: !tossupScoreboardGamePks.size });
+  saveLockedTossupScoreboards(undefined, { allowEmpty: true, forceEmpty: !lockedTossupScoreboardGamePks.size });
   const card = cardForGamePk(game?.gamePk || gamePk);
   const tossup = game ? tossupScoreboardMarkedForGame(game) : tossupScoreboardGamePks.has(key);
   const locked = game ? lockedTossupScoreboardMarkedForGame(game) : lockedTossupScoreboardGamePks.has(key);
@@ -45493,7 +45608,7 @@ async function finalizeRenderedGames(cards, homeRuns = [], options = {}) {
   let dedupedCards = mergeRetainedScoreboardCardsForDate(dateSafeCards, selectedDate);
   const hasFastScheduleShell = dedupedCards.some((game) => game?.fastScheduleShell);
   latestRenderedGames = dedupedCards;
-  restorePendingGamePicks();
+  restorePendingGamePicks(selectedDate);
   restoreTossupScoreboards(selectedDate);
   restoreOverUnderScoreboards(selectedDate);
   normalizeManualGameStateForGames(dedupedCards, selectedDate);
@@ -45714,7 +45829,12 @@ async function loadGames(options = {}) {
   const dateChanged = Boolean(currentDomDate && currentDomDate !== selectedDate);
   const effectivePassive = options.passive === true && !dateChanged;
   if (dateChanged) {
+    persistManualStateSnapshot(manualStateInMemoryDate || currentDomDate);
+    reconcileCrossDeviceManualState(manualStateInMemoryDate || currentDomDate);
     resetDateScopedScoreboardState(selectedDate, { clearHrFeed: true, closeLineup: true });
+    restorePendingGamePicks(selectedDate);
+    restoreTossupScoreboards(selectedDate);
+    restoreOverUnderScoreboards(selectedDate);
     clearScoreboardForDate(selectedDate);
     initialGamesLoadingShown = false;
   }
@@ -45856,6 +45976,7 @@ function isCompleteDateInputText(value) {
 }
 
 function refreshForSelectedDate(options = {}) {
+  const previousManualDate = String(manualStateInMemoryDate || lastHandledDateValue || dateInput.value || formatDate(new Date()));
   const normalized = parseFlexibleDateInput(dateInput.value);
   if (!normalized) {
     if (options.fallbackToToday === false) return false;
@@ -45864,6 +45985,10 @@ function refreshForSelectedDate(options = {}) {
     dateInput.value = normalized;
   }
   if (lastHandledDateValue === dateInput.value && !options.force) return false;
+  if (previousManualDate && previousManualDate !== dateInput.value) {
+    persistManualStateSnapshot(previousManualDate);
+    reconcileCrossDeviceManualState(previousManualDate);
+  }
   lastHandledDateValue = dateInput.value;
   try {
     localStorage.setItem('dashboard-date:v1', dateInput.value);
@@ -45871,6 +45996,9 @@ function refreshForSelectedDate(options = {}) {
   if (options.force) invalidateRotowireLineupCachesForDate(dateInput.value);
   if (playerTrackerListEl) playerTrackerListEl.dataset.renderFingerprint = '';
   resetDateScopedScoreboardState(dateInput.value, { clearHrFeed: true, closeLineup: true });
+  restorePendingGamePicks(dateInput.value);
+  restoreTossupScoreboards(dateInput.value);
+  restoreOverUnderScoreboards(dateInput.value);
   clearDraftBetSlip();
   closeGamePickDialog();
   renderBetList();
