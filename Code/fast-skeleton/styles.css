@@ -5325,6 +5325,72 @@ body[data-overlay-dock='bottom'] .lineup-modal {
   font-size: 0.58rem;
 }
 
+.lineup-series-fallback {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) auto minmax(0, 1fr);
+  align-items: center;
+  gap: 6px;
+  width: 100%;
+  min-width: 0;
+  height: 100%;
+}
+
+.lineup-series-fallback-card.is-away {
+  justify-self: start;
+}
+
+.lineup-series-fallback-card.is-home {
+  justify-self: end;
+}
+
+.lineup-series-fallback-card.is-empty {
+  opacity: 0.82;
+}
+
+.lineup-series-season-record {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  min-width: 72px;
+  max-width: 112px;
+  height: 28px;
+  padding: 0 7px;
+  border: 1px solid color-mix(in srgb, var(--series-record) 68%, white 8%);
+  border-radius: 999px;
+  background:
+    linear-gradient(180deg, color-mix(in srgb, var(--series-record) 28%, black 60%), rgba(0,0,0,0.18));
+  color: #fff;
+  font-size: 0.56rem;
+  line-height: 1.05;
+  text-align: center;
+  white-space: normal;
+}
+
+.theme-tooltip-score-inning {
+  display: block;
+  margin: 0 0 5px;
+}
+
+.theme-tooltip-score-inning:last-child {
+  margin-bottom: 0;
+}
+
+.theme-tooltip-score-inning > b {
+  color: var(--muted);
+  font-weight: 950;
+  margin-right: 5px;
+}
+
+.theme-tooltip-score-play {
+  color: var(--score-play-color, var(--accent));
+  font-weight: 750;
+}
+
+.theme-tooltip-score-separator {
+  color: var(--muted);
+  opacity: 0.82;
+}
+
 .lineup-close-btn {
   border: 1px solid color-mix(in srgb, var(--accent) 55%, transparent);
   background: color-mix(in srgb, var(--badge-bg) 78%, transparent);

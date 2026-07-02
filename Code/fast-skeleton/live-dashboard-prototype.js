@@ -421,6 +421,8 @@ const liveLabFeedCache = new Map();
 const liveLabStableGameByPk = new Map();
 const teamStandingRecordCache = new Map();
 const teamSeriesResultsCache = new Map();
+const teamLastGameBeforeDateCache = new Map();
+const teamSeasonHeadToHeadCache = new Map();
 const lineupRecentBattingCache = new Map();
 const pitcherSeasonRankCache = new Map();
 const liveGameFeedRequestCache = new Map();
@@ -4573,17 +4575,121 @@ function normalizeSeriesScheduleGame(game = {}, referenceGame = null) {
         ? (referenceGame?.homeColor || getTeamColor(home))
         : '#8aa0c4',
     winnerLogo: winnerSide === 'away'
-      ? (sameTeamAbbrev(away, referenceGame?.away) ? referenceGame?.awayLogo : getLogoPath(away))
+      ? (sameTeamAbbrev(away, referenceGame?.away) ? (referenceGame?.awayLogo || getLogoPath(away)) : getLogoPath(away))
       : winnerSide === 'home'
-        ? (sameTeamAbbrev(home, referenceGame?.home) ? referenceGame?.homeLogo : getLogoPath(home))
+        ? (sameTeamAbbrev(home, referenceGame?.home) ? (referenceGame?.homeLogo || getLogoPath(home)) : getLogoPath(home))
         : 'placeholder.png',
   };
 }
 
 function currentSeriesResultIsDisplayable(item = {}, referenceGame = null) {
   if (!item?.hasScore) return false;
+  if (item.officialDate && item.officialDate >= officialDateForGame(referenceGame)) return false;
   if (item.final || item.live) return true;
   return String(item.gamePk || '') === String(referenceGame?.gamePk || '') && !shouldPreferProbablePitcher(referenceGame);
+}
+
+function seriesRecordText(wins = 0, losses = 0, leader = '') {
+  const w = Number(wins) || 0;
+  const l = Number(losses) || 0;
+  if (!w && !l) return '0-0 Season';
+  if (w === l) return `${w}-${l} Season`;
+  return `${Math.max(w, l)}-${Math.min(w, l)} ${displayTeamAbbrev(leader)}`;
+}
+
+async function getTeamLastGameBeforeDate(teamAbbrev = '', targetDate = '') {
+  const team = canonicalTeamAbbrev(teamAbbrev);
+  const teamId = TEAM_IDS[team];
+  const date = calendarDateOnly(targetDate || dateInput.value || formatDate(new Date()));
+  if (!team || !teamId || !date) return null;
+  const cacheKey = `${team}:${date}:last-before`;
+  if (teamLastGameBeforeDateCache.has(cacheKey)) return teamLastGameBeforeDateCache.get(cacheKey);
+  const promise = (async () => {
+    const endDate = addDaysToDateValue(date, -1);
+    const url = new URL(`${MLB_API_BASE}/schedule`);
+    url.searchParams.set('sportId', '1');
+    url.searchParams.set('teamId', String(teamId));
+    url.searchParams.set('startDate', addDaysToDateValue(date, -14));
+    url.searchParams.set('endDate', endDate);
+    url.searchParams.set('gameTypes', 'R,F,D,L,W,C');
+    const response = await getJson(url.toString());
+    const games = listify(response?.dates)
+      .flatMap((day) => listify(day?.games))
+      .map((scheduleGame) => normalizeSeriesScheduleGame(scheduleGame, { away: team, home: team, officialDate: date }))
+      .filter((item) => item.hasScore && item.officialDate < date && (sameTeamAbbrev(item.away, team) || sameTeamAbbrev(item.home, team)))
+      .sort((a, b) => String(b.officialDate).localeCompare(String(a.officialDate)) || Number(b.gameNumber) - Number(a.gameNumber));
+    return games[0] || null;
+  })().catch((error) => {
+    teamLastGameBeforeDateCache.delete(cacheKey);
+    throw error;
+  });
+  teamLastGameBeforeDateCache.set(cacheKey, promise);
+  return promise;
+}
+
+async function getSeasonHeadToHeadRecord(awayAbbrev = '', homeAbbrev = '', targetDate = '') {
+  const away = canonicalTeamAbbrev(awayAbbrev);
+  const home = canonicalTeamAbbrev(homeAbbrev);
+  const awayId = TEAM_IDS[away];
+  const homeId = TEAM_IDS[home];
+  const date = calendarDateOnly(targetDate || dateInput.value || formatDate(new Date()));
+  if (!away || !home || !awayId || !homeId || !date) return null;
+  const cacheKey = `${away}:${home}:${seasonForDate(date)}:${date}:h2h`;
+  if (teamSeasonHeadToHeadCache.has(cacheKey)) return teamSeasonHeadToHeadCache.get(cacheKey);
+  const promise = (async () => {
+    const url = new URL(`${MLB_API_BASE}/schedule`);
+    url.searchParams.set('sportId', '1');
+    url.searchParams.set('teamId', String(awayId));
+    url.searchParams.set('opponentId', String(homeId));
+    url.searchParams.set('startDate', `${seasonForDate(date)}-01-01`);
+    url.searchParams.set('endDate', addDaysToDateValue(date, -1));
+    url.searchParams.set('gameTypes', 'R,F,D,L,W,C');
+    const response = await getJson(url.toString());
+    const games = listify(response?.dates)
+      .flatMap((day) => listify(day?.games))
+      .map((scheduleGame) => normalizeSeriesScheduleGame(scheduleGame, { away, home, officialDate: date }))
+      .filter((item) => item.hasScore && item.officialDate < date)
+      .filter((item) => (
+        (sameTeamAbbrev(item.away, away) && sameTeamAbbrev(item.home, home))
+        || (sameTeamAbbrev(item.away, home) && sameTeamAbbrev(item.home, away))
+      ));
+    const wins = { away: 0, home: 0 };
+    games.forEach((item) => {
+      if (!item.winnerTeam) return;
+      if (sameTeamAbbrev(item.winnerTeam, away)) wins.away += 1;
+      if (sameTeamAbbrev(item.winnerTeam, home)) wins.home += 1;
+    });
+    const leader = wins.away > wins.home ? away : wins.home > wins.away ? home : '';
+    return {
+      away,
+      home,
+      awayWins: wins.away,
+      homeWins: wins.home,
+      text: seriesRecordText(wins.away, wins.home, leader),
+    };
+  })().catch((error) => {
+    teamSeasonHeadToHeadCache.delete(cacheKey);
+    throw error;
+  });
+  teamSeasonHeadToHeadCache.set(cacheKey, promise);
+  return promise;
+}
+
+async function getSeriesFallbackContext(game = null) {
+  const away = canonicalTeamAbbrev(game?.away || '');
+  const home = canonicalTeamAbbrev(game?.home || '');
+  const targetDate = officialDateForGame(game);
+  if (!away || !home || !targetDate) return null;
+  const [awayLastRaw, h2h, homeLastRaw] = await Promise.all([
+    getTeamLastGameBeforeDate(away, targetDate).catch(() => null),
+    getSeasonHeadToHeadRecord(away, home, targetDate).catch(() => null),
+    getTeamLastGameBeforeDate(home, targetDate).catch(() => null),
+  ]);
+  const [awayLast, homeLast] = await Promise.all([
+    hydrateSeriesGameStarters(awayLastRaw).catch(() => awayLastRaw),
+    hydrateSeriesGameStarters(homeLastRaw).catch(() => homeLastRaw),
+  ]);
+  return { away, home, awayLast, homeLast, h2h };
 }
 
 function seriesStarterPitcherStatline(player = null) {
@@ -4625,10 +4731,14 @@ function seriesStarterPitcherFromBoxscore(boxscore = null, side = '') {
 
 async function hydrateSeriesGameStarters(item = null) {
   if (!item?.gamePk) return item;
-  const boxscore = await getGameBoxscore(item.gamePk).catch(() => null);
+  const [boxscore, live] = await Promise.all([
+    getGameBoxscore(item.gamePk).catch(() => null),
+    getLiveGameFeed(item.gamePk).catch(() => null),
+  ]);
   if (!boxscore) return item;
   return {
     ...item,
+    allPlays: listify(live?.liveData?.plays?.allPlays),
     starters: {
       away: seriesStarterPitcherFromBoxscore(boxscore, 'away'),
       home: seriesStarterPitcherFromBoxscore(boxscore, 'home'),
@@ -4681,6 +4791,7 @@ async function getTeamSeriesResults(game = null) {
     const segment = games.slice(startIndex, currentIndex + 1);
     const displayed = segment.filter((item) => currentSeriesResultIsDisplayable(item, game));
     const hydratedDisplayed = await mapWithConcurrency(displayed, 3, hydrateSeriesGameStarters);
+    const fallback = hydratedDisplayed.length ? null : await getSeriesFallbackContext(game).catch(() => null);
     const wins = { away: 0, home: 0 };
     for (const item of hydratedDisplayed) {
       if (item.winnerSide === 'away') wins.away += 1;
@@ -4692,6 +4803,7 @@ async function getTeamSeriesResults(game = null) {
       awayWins: wins.away,
       homeWins: wins.home,
       games: hydratedDisplayed,
+      fallback,
     };
   })().catch((error) => {
     teamSeriesResultsCache.delete(cacheKey);
@@ -4714,18 +4826,51 @@ function seriesStarterRowHtml(item = {}, side = '') {
   `;
 }
 
-function seriesResultSliverHtml(item = {}) {
+function seriesResultSliverHtml(item = {}, extraClass = '') {
   if (!item?.hasScore) return '';
   const winnerColor = item.winnerColor || getTeamColor(item.winnerTeam) || '#7bd0ff';
   const awayScore = item.awayScore ?? '-';
   const homeScore = item.homeScore ?? '-';
   const title = `${displayTeamAbbrev(item.away)} ${awayScore}, ${displayTeamAbbrev(item.home)} ${homeScore}${item.live ? ' (live)' : ''}`;
+  const scoringHtml = scoreboardScoringSummaryHtml(item);
+  const scoreTooltipAttrs = scoringHtml
+    ? ` data-theme-tooltip-title="Scoring summary" data-theme-tooltip-html="${escapeHtml(scoringHtml)}" aria-label="Scoring summary"`
+    : '';
+  const classes = ['lineup-series-game', item.live ? 'is-live' : '', extraClass].filter(Boolean).join(' ');
   return `
-    <span class="lineup-series-game${item.live ? ' is-live' : ''}" style="--series-winner:${escapeHtml(winnerColor)}" title="${escapeHtml(title)}">
+    <span class="${escapeHtml(classes)}" style="--series-winner:${escapeHtml(winnerColor)}" aria-label="${escapeHtml(title)}">
       <img class="lineup-series-winner-logo" src="${escapeHtml(item.winnerLogo || 'placeholder.png')}" alt="${escapeHtml(displayTeamAbbrev(item.winnerTeam || 'Winner'))} logo" />
-      <b class="lineup-series-score">${escapeHtml(String(awayScore))}-${escapeHtml(String(homeScore))}</b>
+      <b class="lineup-series-score"${scoreTooltipAttrs}>${escapeHtml(String(awayScore))}-${escapeHtml(String(homeScore))}</b>
       ${seriesStarterRowHtml(item, 'away')}
       ${seriesStarterRowHtml(item, 'home')}
+    </span>
+  `;
+}
+
+function seriesFallbackGameHtml(item = null, team = '', side = 'away') {
+  if (item?.hasScore) return seriesResultSliverHtml(item, `lineup-series-fallback-card is-${side}`);
+  const color = getTeamColor(team) || '#7bd0ff';
+  return `
+    <span class="lineup-series-game lineup-series-fallback-card is-${escapeHtml(side)} is-empty" style="--series-winner:${escapeHtml(color)}" aria-label="${escapeHtml(`${displayTeamAbbrev(team)} has no prior game before today`)}">
+      <img class="lineup-series-winner-logo" src="${escapeHtml(getLogoPath(team))}" alt="${escapeHtml(displayTeamAbbrev(team))} logo" />
+      <b class="lineup-series-score">--</b>
+      <span class="lineup-series-pitcher" style="--series-pitcher:${escapeHtml(color)}"><span>${side === 'home' ? 'H' : 'A'}</span><b>No prior</b></span>
+      <span class="lineup-series-pitcher" style="--series-pitcher:${escapeHtml(color)}"><span>${side === 'home' ? 'H' : 'A'}</span><b>SP</b></span>
+    </span>
+  `;
+}
+
+function seriesFallbackHtml(fallback = null) {
+  if (!fallback) return '<span class="lineup-series-empty">No prior result</span>';
+  const h2h = fallback.h2h || {};
+  const leader = h2h.awayWins > h2h.homeWins ? fallback.away : h2h.homeWins > h2h.awayWins ? fallback.home : '';
+  const recordColor = leader ? getTeamColor(leader) : '#8aa0c4';
+  const recordText = h2h.text || '0-0 Season';
+  return `
+    <span class="lineup-series-fallback">
+      ${seriesFallbackGameHtml(fallback.awayLast, fallback.away, 'away')}
+      <span class="lineup-series-season-record" style="--series-record:${escapeHtml(recordColor)}" title="${escapeHtml(`${displayTeamAbbrev(fallback.away)} vs ${displayTeamAbbrev(fallback.home)} before today`)}">${escapeHtml(recordText)}</span>
+      ${seriesFallbackGameHtml(fallback.homeLast, fallback.home, 'home')}
     </span>
   `;
 }
@@ -4734,7 +4879,7 @@ function lineupSeriesStripHtml(series = null) {
   const games = listify(series?.games);
   const gamesHtml = games.length
     ? games.map(seriesResultSliverHtml).join('')
-    : '<span class="lineup-series-empty">No prior result</span>';
+    : seriesFallbackHtml(series?.fallback || null);
   return `
     <span class="lineup-series-games">${gamesHtml}</span>
   `;
@@ -14950,6 +15095,87 @@ function scoreRunAnimationSignature(game, side = '') {
     Number(game?.homeScore),
     cleanPlayText(eventText).toLowerCase().slice(0, 180),
   ].join('|');
+}
+
+function scoreboardScoringSummaryRows(game = null) {
+  const rows = [];
+  const seen = new Set();
+  for (const play of listify(game?.allPlays)) {
+    if (!play?.about || !play?.result) continue;
+    const runs = liveLabReplayRunTotal(play);
+    if (!runs) continue;
+    const side = liveLabReplayBattingSide(play);
+    if (side !== 'away' && side !== 'home') continue;
+    const description = scoreboardScoringPlayLabel(play, runs);
+    const inning = Number(play?.about?.inning);
+    const key = `${play?.about?.atBatIndex ?? rows.length}:${side}:${description}`;
+    if (seen.has(key)) continue;
+    seen.add(key);
+    rows.push({
+      inning: Number.isFinite(inning) && inning > 0 ? inning : 0,
+      side,
+      text: cleanPlayText(description),
+      color: side === 'home' ? (game?.homeColor || getTeamColor(game?.home)) : (game?.awayColor || getTeamColor(game?.away)),
+    });
+  }
+  return rows;
+}
+
+function scoreboardScoringPlayAbbreviation(play = null) {
+  const event = cleanPlayText(play?.result?.event || play?.result?.eventType || '');
+  const description = cleanPlayText(play?.result?.description || '');
+  const text = `${event} ${description}`;
+  if (/grand slam|home run|homers?\b/i.test(text)) return 'HR';
+  if (/\btriples?\b|triple/i.test(text)) return '3B';
+  if (/\bdoubles?\b|double/i.test(text)) return '2B';
+  if (/\bsingles?\b|single/i.test(text)) return '1B';
+  if (/sacrifice fly|\bsac fly\b/i.test(text)) return 'SF';
+  if (/sacrifice bunt|\bsac bunt\b/i.test(text)) return 'SAC';
+  if (/grounded into double play|double play/i.test(text)) return 'GIDP';
+  if (/fielder'?s choice/i.test(text)) return 'FC';
+  if (/walk|base on balls/i.test(text)) return 'BB';
+  if (/hit by pitch/i.test(text)) return 'HBP';
+  if (/wild pitch/i.test(text)) return 'WP';
+  if (/passed ball/i.test(text)) return 'PB';
+  if (/balk/i.test(text)) return 'BK';
+  if (/stolen base|steals?\b/i.test(text)) return 'SB';
+  if (/error|fielding error|throwing error/i.test(text)) return 'E';
+  if (/groundout|grounds? out/i.test(text)) return 'GO';
+  if (/flyout|flies? out|lineout|pop out|pops? out/i.test(text)) return 'OUT';
+  if (/strikeout|strikes? out/i.test(text)) return 'K';
+  return 'PLAY';
+}
+
+function scoreboardScoringPlayLabel(play = null, runs = 0) {
+  const batterName = cleanPlayText(play?.matchup?.batter?.fullName || play?.matchup?.batter?.name || 'Player');
+  const name = lastName(batterName) || batterName || 'Player';
+  const abbr = scoreboardScoringPlayAbbreviation(play);
+  const runCount = Math.max(1, Number(runs) || 1);
+  return `${name} ${abbr} ${runCount}R scored`;
+}
+
+function scoreboardScoringSummaryHtml(game = null) {
+  const rows = scoreboardScoringSummaryRows(game);
+  if (!rows.length) return '';
+  const groups = new Map();
+  rows.forEach((row) => {
+    const key = row.inning || 0;
+    if (!groups.has(key)) groups.set(key, []);
+    groups.get(key).push(row);
+  });
+  return Array.from(groups.entries())
+    .sort(([a], [b]) => Number(a) - Number(b))
+    .map(([inning, items]) => {
+      const label = inning ? ordinalNumber(inning) : 'Inning';
+      const plays = items.map((item, index) => {
+        const separator = index
+          ? `<span class="theme-tooltip-score-separator">${items[index - 1]?.side === item.side ? ', ' : ' | '}</span>`
+          : '';
+        return `${separator}<span class="theme-tooltip-score-play" style="--score-play-color:${escapeHtml(item.color || '#7bd0ff')}">${escapeHtml(item.text)}</span>`;
+      }).join('');
+      return `<div class="theme-tooltip-score-inning"><b>${escapeHtml(label)}</b> ${plays}</div>`;
+    })
+    .join('');
 }
 
 function syncFocusedGameLayout() {
@@ -46127,7 +46353,8 @@ function initThemedTooltips() {
     }
   }
 
-  function formatTooltipHtml(rawTitle = '') {
+  function formatTooltipHtml(rawTitle = '', el = null) {
+    if (el?.dataset?.themeTooltipHtml) return String(el.dataset.themeTooltipHtml || '');
     let html = escapeHtml(String(rawTitle || '').trim()).replace(/\r\n?/g, '\n');
     html = html.replace(tooltipNumberRegex, (match, prefix, value) => `${prefix}<strong class="theme-tooltip-number">${value}</strong>`);
     if (tooltipTeamRegex) {
@@ -46141,7 +46368,7 @@ function initThemedTooltips() {
 
   const titleTarget = (target) => {
     if (!target?.closest || suppressesThemeTooltip(target)) return null;
-    const themed = target.closest('[data-theme-tooltip-title]');
+    const themed = target.closest('[data-theme-tooltip-title], [data-theme-tooltip-html]');
     if (themed && !suppressesThemeTooltip(themed)) return themed;
     const native = target.closest('[title]');
     if (native) {
@@ -46151,7 +46378,7 @@ function initThemedTooltips() {
     return null;
   };
 
-  const readableTitle = (el) => String(el?.dataset?.themeTooltipTitle || '').trim();
+  const readableTitle = (el) => String(el?.dataset?.themeTooltipHtml || el?.dataset?.themeTooltipTitle || '').trim();
 
   function rectGapDistance(a, b) {
     if (!a || !b || !a.getBoundingClientRect || !b.getBoundingClientRect) return Infinity;
@@ -46214,7 +46441,7 @@ function initThemedTooltips() {
     if (activeEl && activeEl !== el) hideTooltip(activeEl);
     activeEl = el;
     lastPointerEvent = event;
-    tooltipEl.innerHTML = formatTooltipHtml(title);
+    tooltipEl.innerHTML = formatTooltipHtml(title, el);
     tooltipEl.hidden = false;
     tooltipEl.classList.add('is-visible');
     positionTooltip(event);
