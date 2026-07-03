@@ -3346,6 +3346,22 @@ body.dashboard-page .player-batted-ball-profile-table .player-batted-ball-stacke
     inset 0 1px 0 rgba(255, 255, 255, .08);
 }
 
+.player-heatmap-metric-row.hitter-pitch-row.velo-bucket-pitch-row {
+  border-color: color-mix(in srgb, var(--accent) 34%, var(--line) 48%);
+}
+
+.player-heatmap-metric-row.hitter-pitch-row.velo-bucket-pitch-row.is-active-velo-bucket {
+  border-color: color-mix(in srgb, var(--accent) 68%, rgba(255, 255, 255, 0.38));
+  box-shadow:
+    0 0 0 1px color-mix(in srgb, var(--accent) 34%, transparent),
+    inset 0 1px 0 rgba(255, 255, 255, .08);
+}
+
+.batter-velo-bucket-table tr.is-active-velo-bucket {
+  outline: 1px solid color-mix(in srgb, var(--accent) 58%, rgba(255, 255, 255, 0.32));
+  outline-offset: -1px;
+}
+
 
 .pitcher-archetype-card,
 .player-archetype-matchup-card {
@@ -6403,4 +6419,259 @@ body.dashboard-page .lineup-state-scoreboard .lineup-ou-btn[data-over-under-side
 body.dashboard-page .lineup-state-scoreboard .lineup-ou-btn.is-locked {
   border-color: rgba(236, 241, 250, 0.98) !important;
   box-shadow: 0 0 0 2px rgba(10, 12, 16, 0.94), 0 0 16px rgba(210, 218, 232, 0.42) !important;
+}
+
+/* High-velocity fastball marker and batter-card split. */
+body.dashboard-page .pitcher-high-velo-placeholder,
+body.dashboard-page .pitcher-high-velo-placeholder[hidden],
+body.dashboard-page .pitcher-high-velo-badge[hidden] {
+  display: none !important;
+}
+
+body.dashboard-page .pitcher-high-velo-badge {
+  display: inline-grid !important;
+  place-items: center !important;
+  min-width: 1.55rem !important;
+  height: 1.08rem !important;
+  padding: 0 0.25rem !important;
+  border: 1px solid rgba(255, 213, 95, 0.88) !important;
+  border-radius: 999px !important;
+  background:
+    linear-gradient(180deg, rgba(255, 229, 122, 0.24), rgba(255, 115, 45, 0.16)),
+    rgba(52, 28, 6, 0.86) !important;
+  color: #ffe58a !important;
+  font: 950 0.56rem/1 var(--font-ui, sans-serif) !important;
+  letter-spacing: 0.02em !important;
+  text-shadow: 0 0 8px rgba(255, 180, 64, 0.58) !important;
+  white-space: nowrap !important;
+}
+
+body.dashboard-page .player-high-velo-matchup {
+  display: grid;
+  gap: 6px;
+  margin: 0 0 7px;
+  padding: 7px;
+  border: 1px solid rgba(255, 213, 95, 0.58);
+  border-radius: 8px;
+  background:
+    linear-gradient(90deg, rgba(255, 196, 70, 0.16), transparent 72%),
+    rgba(255, 255, 255, 0.04);
+  box-shadow: inset 0 0 0 1px rgba(255, 255, 255, 0.035);
+}
+
+body.dashboard-page .player-high-velo-matchup-top {
+  display: grid;
+  grid-template-columns: auto minmax(0, max-content) minmax(0, 1fr);
+  align-items: center;
+  gap: 7px;
+  min-width: 0;
+}
+
+body.dashboard-page .player-high-velo-matchup-top span {
+  display: inline-grid;
+  place-items: center;
+  min-width: 32px;
+  height: 22px;
+  padding: 0 6px;
+  border-radius: 999px;
+  background: rgba(255, 204, 77, 0.18);
+  color: #ffe58a;
+  font: 950 0.66rem/1 var(--font-ui, sans-serif);
+}
+
+body.dashboard-page .player-high-velo-matchup-top strong,
+body.dashboard-page .player-high-velo-matchup-top em {
+  min-width: 0;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+body.dashboard-page .player-high-velo-matchup-top strong {
+  color: var(--text);
+  font: 950 0.64rem/1 var(--font-ui, sans-serif);
+  letter-spacing: 0.06em;
+  text-transform: uppercase;
+}
+
+body.dashboard-page .player-high-velo-matchup-top em {
+  color: var(--muted);
+  font: 850 0.58rem/1 var(--font-ui, sans-serif);
+  font-style: normal;
+  text-align: right;
+}
+
+body.dashboard-page .player-high-velo-matchup-grid {
+  display: grid;
+  grid-template-columns: repeat(7, minmax(0, 1fr));
+  gap: 3px;
+}
+
+body.dashboard-page .player-high-velo-matchup-grid b {
+  min-width: 0;
+  overflow: hidden;
+  padding: 4px 3px;
+  border-radius: 5px;
+  background: rgba(0, 0, 0, 0.16);
+  color: var(--text);
+  font: 900 0.54rem/1 var(--font-ui, sans-serif);
+  text-align: center;
+  text-overflow: clip;
+  white-space: nowrap;
+}
+
+/* Average fastball-family velocity buckets. */
+body.dashboard-page .pitcher-velo-placeholder,
+body.dashboard-page .pitcher-velo-placeholder[hidden],
+body.dashboard-page .pitcher-velo-badge[hidden] {
+  display: none !important;
+}
+
+body.dashboard-page .pitcher-velo-badge {
+  display: inline-grid !important;
+  place-items: center !important;
+  min-width: 2.15rem !important;
+  height: 1.12rem !important;
+  padding: 0 0.34rem !important;
+  border: 1px solid color-mix(in srgb, var(--velo-team-color, var(--accent)) 72%, rgba(255,255,255,0.45)) !important;
+  border-radius: 999px !important;
+  background:
+    linear-gradient(180deg, color-mix(in srgb, var(--velo-team-color, var(--accent)) 28%, transparent), rgba(0,0,0,0.2)),
+    rgba(5, 12, 22, 0.78) !important;
+  color: color-mix(in srgb, #ffffff 88%, var(--velo-team-color, var(--accent)) 12%) !important;
+  font: 950 0.56rem/1 var(--font-ui, sans-serif) !important;
+  letter-spacing: 0.02em !important;
+  text-shadow: 0 0 8px color-mix(in srgb, var(--velo-team-color, var(--accent)) 48%, transparent) !important;
+  white-space: nowrap !important;
+}
+
+body.dashboard-page .pitcher-velo-badge.is-high {
+  border-color: rgba(255, 213, 95, 0.95) !important;
+  background:
+    linear-gradient(180deg, rgba(255, 232, 122, 0.36), rgba(255, 95, 38, 0.24)),
+    color-mix(in srgb, var(--velo-team-color, var(--accent)) 30%, rgba(45, 16, 4, 0.88)) !important;
+  color: #ffe58a !important;
+  box-shadow:
+    0 0 12px rgba(255, 107, 45, 0.46),
+    inset 0 0 8px rgba(255, 226, 102, 0.18) !important;
+}
+
+body.dashboard-page .pitcher-velo-badge.is-low {
+  border-color: rgba(135, 208, 255, 0.85) !important;
+  background:
+    linear-gradient(180deg, rgba(132, 213, 255, 0.24), rgba(50, 101, 167, 0.2)),
+    color-mix(in srgb, var(--velo-team-color, var(--accent)) 18%, rgba(5, 20, 45, 0.86)) !important;
+  color: #c4ecff !important;
+  text-shadow: 0 0 8px rgba(114, 202, 255, 0.48) !important;
+}
+
+body.dashboard-page .player-velo-bucket-matchup {
+  display: grid;
+  gap: 6px;
+  margin: 0 0 7px;
+  padding: 7px;
+  border: 1px solid color-mix(in srgb, var(--accent) 42%, var(--line) 44%);
+  border-radius: 8px;
+  background:
+    linear-gradient(90deg, color-mix(in srgb, var(--accent) 14%, transparent), transparent 72%),
+    rgba(255, 255, 255, 0.04);
+}
+
+body.dashboard-page .player-velo-bucket-matchup.is-high {
+  border-color: rgba(255, 213, 95, 0.62);
+  box-shadow: inset 0 0 0 1px rgba(255, 119, 42, 0.12);
+}
+
+body.dashboard-page .player-velo-bucket-matchup.is-low {
+  border-color: rgba(135, 208, 255, 0.58);
+}
+
+body.dashboard-page .player-velo-bucket-matchup-top {
+  display: grid;
+  grid-template-columns: auto minmax(0, max-content) minmax(0, 1fr);
+  align-items: center;
+  gap: 7px;
+  min-width: 0;
+}
+
+body.dashboard-page .player-velo-bucket-matchup-top span {
+  display: inline-grid;
+  place-items: center;
+  min-width: 42px;
+  height: 22px;
+  padding: 0 6px;
+  border-radius: 999px;
+  background: color-mix(in srgb, var(--accent) 20%, transparent);
+  color: var(--text);
+  font: 950 0.62rem/1 var(--font-ui, sans-serif);
+}
+
+body.dashboard-page .player-velo-bucket-matchup-top strong,
+body.dashboard-page .player-velo-bucket-matchup-top em {
+  min-width: 0;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+body.dashboard-page .player-velo-bucket-matchup-top strong {
+  color: var(--text);
+  font: 950 0.64rem/1 var(--font-ui, sans-serif);
+  letter-spacing: 0.06em;
+  text-transform: uppercase;
+}
+
+body.dashboard-page .player-velo-bucket-matchup-top em {
+  color: var(--muted);
+  font: 850 0.58rem/1 var(--font-ui, sans-serif);
+  font-style: normal;
+  text-align: right;
+}
+
+body.dashboard-page .player-velo-bucket-matchup-grid {
+  display: grid;
+  grid-template-columns: repeat(7, minmax(0, 1fr));
+  gap: 3px;
+}
+
+body.dashboard-page .player-velo-bucket-summary-grid {
+  display: grid;
+  grid-template-columns: repeat(3, minmax(0, 1fr));
+  gap: 3px;
+}
+
+body.dashboard-page .player-velo-bucket-summary-grid b {
+  min-width: 0;
+  overflow: hidden;
+  padding: 4px 4px;
+  border-radius: 5px;
+  background: rgba(0, 0, 0, 0.18);
+  color: var(--text);
+  font: 900 0.52rem/1 var(--font-ui, sans-serif);
+  text-align: center;
+  text-overflow: clip;
+  white-space: nowrap;
+}
+
+body.dashboard-page .player-velo-bucket-matchup-grid b {
+  min-width: 0;
+  overflow: hidden;
+  padding: 4px 3px;
+  border-radius: 5px;
+  background: rgba(0, 0, 0, 0.16);
+  color: var(--text);
+  font: 900 0.54rem/1 var(--font-ui, sans-serif);
+  text-align: center;
+  text-overflow: clip;
+  white-space: nowrap;
+}
+
+body.dashboard-page .player-velo-bucket-matchup-grid b.is-active {
+  outline: 1px solid color-mix(in srgb, var(--accent) 62%, rgba(255, 255, 255, 0.32));
+  background: color-mix(in srgb, var(--accent) 22%, rgba(0, 0, 0, 0.2));
+}
+
+body.dashboard-page .player-velo-bucket-summary-grid b.is-active {
+  outline: 1px solid color-mix(in srgb, var(--accent) 62%, rgba(255, 255, 255, 0.32));
+  background: color-mix(in srgb, var(--accent) 22%, rgba(0, 0, 0, 0.2));
 }

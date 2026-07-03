@@ -34,8 +34,19 @@
 
   const META_KEY = `owentools-sync-meta:${pageConfig.toolId}`;
   const AUTH_STORAGE_KEY = "owentools-auth-session";
+  const EMAIL_STORAGE_KEY = "owentools-sync-email";
   const POSITION_KEY = "owentools-sync-position";
   const HARD_DENY_PATTERNS = [
+    "games:",
+    "games-archive:",
+    "analytics-day:",
+    "hrs:",
+    "pending-game-picks:v1:",
+    "tossup-scoreboards:v1:",
+    "locked-tossup-scoreboards:v1:",
+    "over-under-scoreboards:v1:"
+  ];
+  const LOCAL_CLEANUP_DENY_PATTERNS = [
     "games:",
     "games-archive:",
     "analytics-day:",
@@ -73,7 +84,7 @@
       const keys = [];
       for (let index = 0; index < window.localStorage.length; index += 1) {
         const key = window.localStorage.key(index);
-        if (isHardDeniedKey(key)) keys.push(key);
+        if (matchesAny(String(key || ""), LOCAL_CLEANUP_DENY_PATTERNS)) keys.push(key);
       }
       keys.forEach((key) => originalRemoveItem.call(window.localStorage, key));
       if (keys.length) console.info("owentools sync removed local cache keys", keys);
@@ -225,6 +236,20 @@
     return message;
   }
 
+  function dispatchSyncStateChanged(detail = {}) {
+    try {
+      window.dispatchEvent(new CustomEvent("owentools:sync-state-changed", {
+        detail: {
+          toolId: pageConfig.toolId,
+          label: pageConfig.label,
+          ...detail
+        }
+      }));
+    } catch {
+      // CustomEvent can be unavailable in very old embedded browsers.
+    }
+  }
+
   function queueUpload(key, value) {
     if (suppressUpload || !shouldSyncKey(key)) return;
     markLocalUpdated(key);
@@ -298,6 +323,7 @@
     }
 
     let changed = false;
+    const changedKeys = [];
     const rows = data || [];
     const deniedCloudKeys = rows
       .map((row) => row.state_key)
@@ -328,9 +354,10 @@
       if (localValue !== value) {
         writeLocalValue(key, value);
         changed = true;
+        changedKeys.push(key);
       }
     });
-    return { ok: true, changed };
+    return { ok: true, changed, changedKeys };
   }
 
   async function uploadLocalState() {
@@ -353,11 +380,7 @@
       if (!uploaded) return;
       setState("signed-in");
       setStatus(session?.user?.email || "Synced");
-
-      if (download.changed && !sessionStorage.getItem(`owentools-sync-reloaded:${pageConfig.toolId}`)) {
-        sessionStorage.setItem(`owentools-sync-reloaded:${pageConfig.toolId}`, "1");
-        window.location.reload();
-      }
+      if (download.changed) dispatchSyncStateChanged({ changedKeys: download.changedKeys || [], source: "reconcile" });
     } catch (error) {
       syncReady = Boolean(session);
       setErrorStatus(error);
@@ -412,8 +435,8 @@
         <p class="owentools-sync__title">owentools sync</p>
         <p class="owentools-sync__copy"></p>
         <form class="owentools-sync__form">
-          <input class="owentools-sync__email" type="email" autocomplete="email" placeholder="email@example.com" />
-          <input class="owentools-sync__password" type="password" autocomplete="current-password" placeholder="Password" />
+          <input class="owentools-sync__email" type="email" name="email" autocomplete="username" placeholder="email@example.com" />
+          <input class="owentools-sync__password" type="password" name="password" autocomplete="current-password" placeholder="Password" />
           <div class="owentools-sync__actions">
             <button class="owentools-sync__signin" type="submit">Sign in</button>
             <button class="owentools-sync__signup" type="button">Create account</button>
@@ -466,6 +489,11 @@
     const reset = root.querySelector(".owentools-sync__reset");
     manualSyncButton = root.querySelector(".owentools-sync__manual");
     const signOut = root.querySelector(".owentools-sync__signout");
+    try {
+      email.value = window.localStorage.getItem(EMAIL_STORAGE_KEY) || "";
+    } catch {
+      // ignore
+    }
 
     button.addEventListener("click", (event) => {
       if (event?.shiftKey) {
@@ -513,12 +541,17 @@
         return;
       }
       if (!email.value) return;
+      try {
+        window.localStorage.setItem(EMAIL_STORAGE_KEY, email.value.trim());
+      } catch {
+        // ignore
+      }
       setStatus("Signing in...");
       let result;
       try {
         result = await withTimeout(
           client.auth.signInWithPassword({
-            email: email.value,
+            email: email.value.trim(),
             password: password.value
           }),
           "Sign in"
@@ -546,12 +579,17 @@
 
     signUp.addEventListener("click", async () => {
       if (!client || !email.value || !password.value) return;
+      try {
+        window.localStorage.setItem(EMAIL_STORAGE_KEY, email.value.trim());
+      } catch {
+        // ignore
+      }
       setStatus("Creating...");
       let result;
       try {
         result = await withTimeout(
           client.auth.signUp({
-            email: email.value,
+            email: email.value.trim(),
             password: password.value
           }),
           "Create account"
@@ -623,7 +661,7 @@
       if (!uploaded) return;
       setState("signed-in");
       setStatus("Synced");
-      if (download.changed) window.location.reload();
+      if (download.changed) dispatchSyncStateChanged({ changedKeys: download.changedKeys || [], source: "manual" });
     });
 
     root.__refresh = () => {
@@ -637,6 +675,11 @@
         return;
       }
       if (session) {
+        try {
+          if (session.user?.email) window.localStorage.setItem(EMAIL_STORAGE_KEY, session.user.email);
+        } catch {
+          // ignore
+        }
         copy.textContent = `${pageConfig.label} is syncing through ${session.user.email || "your account"}.`;
         form.hidden = true;
         manualSyncButton.hidden = pageConfig.loginOnly;
@@ -698,6 +741,7 @@
         persistSession: true,
         autoRefreshToken: true,
         detectSessionInUrl: true,
+        storage: window.localStorage,
         storageKey: AUTH_STORAGE_KEY
       }
     });
