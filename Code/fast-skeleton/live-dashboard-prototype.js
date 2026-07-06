@@ -45907,6 +45907,9 @@ function renderLineupList(listEl, lineup, color, teamCode = '', hotPlayerIds = n
         ${emojiHtml}
         ${lineupDashboardStatsHtml(entry, recentStatsMap)}
       `;
+    const mobileRecentStatsHtml = hasSubstitutionChain
+      ? ''
+      : lineupDashboardStatsHtml(entry, recentStatsMap).replace('class="lineup-dashboard-stats"', 'class="lineup-dashboard-stats lineup-row-recent-stats"');
 
     const li = document.createElement('li');
     li.className = rowClasses.join(' ');
@@ -45924,6 +45927,7 @@ function renderLineupList(listEl, lineup, color, teamCode = '', hotPlayerIds = n
       </span>
       <span class="lineup-pos">${escapeHtml(entry.position || '')}</span>
       ${lineupRowEndHrScoreHtml(hrScorePayload, { loading: hrScoreLoading, isTopPick: hrScoreIsTopPick, isSecondPick: hrScoreIsSecondPick, teamColor: color || hrScorePayload?.teamColor })}
+      ${mobileRecentStatsHtml}
       <span class="lineup-today">${hasSubstitutionChain ? '' : escapeHtml(subToday)}</span>
     `;
     const markerImg = li.querySelector('.lineup-indicator');

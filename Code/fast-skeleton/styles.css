@@ -6752,7 +6752,8 @@ body[data-overlay-dock='bottom'] .score {
   overflow-wrap: anywhere;
   text-overflow: clip;
 }
-.lineup-dashboard-stats { display: none; }
+.lineup-dashboard-stats,
+.lineup-row-recent-stats { display: none; }
 .lineup-sub-split {
   display: grid;
   grid-template-columns: repeat(var(--sub-count, 2), minmax(0, 1fr));
@@ -15777,11 +15778,11 @@ body.dashboard-page .pitcher-high-velo-badge {
   }
 
   body.dashboard-page .lineup-list li {
-    grid-template-columns: 18px minmax(0, 1fr) 28px !important;
+    grid-template-columns: 18px minmax(0, 1fr) auto !important;
     grid-template-areas:
-      "slot name avg"
-      "slot today today"
-      "slot pos pos" !important;
+      "slot name edge"
+      "slot stats pos"
+      "slot today today" !important;
     gap: 2px 5px !important;
   }
 
@@ -15796,12 +15797,16 @@ body.dashboard-page .pitcher-high-velo-badge {
     white-space: nowrap !important;
   }
 
+  body.dashboard-page .lineup-name > .lineup-dashboard-stats {
+    display: none !important;
+  }
+
   body.dashboard-page .lineup-name-text {
     flex: 0 1 auto !important;
     min-width: 0 !important;
-    max-width: min(34vw, 10.5ch) !important;
-    overflow: hidden !important;
-    text-overflow: ellipsis !important;
+    max-width: none !important;
+    overflow: visible !important;
+    text-overflow: clip !important;
     white-space: nowrap !important;
     overflow-wrap: normal !important;
   }
@@ -15838,12 +15843,42 @@ body.dashboard-page .pitcher-high-velo-badge {
   }
 
   body.dashboard-page .lineup-pos {
-    text-align: left !important;
+    grid-area: pos !important;
+    justify-self: end !important;
+    align-self: start !important;
+    text-align: right !important;
     font-size: 0.68rem !important;
   }
 
   body.dashboard-page .lineup-row-edge-score {
+    grid-area: edge !important;
+    justify-self: end !important;
     align-self: center !important;
+  }
+
+  body.dashboard-page .lineup-row-recent-stats {
+    grid-area: stats !important;
+    display: block !important;
+    justify-self: start !important;
+    align-self: start !important;
+    min-width: 0 !important;
+    max-width: 100% !important;
+    overflow: hidden !important;
+    color: var(--muted) !important;
+    font-size: 0.72rem !important;
+    font-weight: 850 !important;
+    line-height: 1.12 !important;
+    text-align: left !important;
+    text-overflow: ellipsis !important;
+    white-space: nowrap !important;
+    font-variant-numeric: tabular-nums !important;
+  }
+
+  body.dashboard-page .lineup-today {
+    grid-area: today !important;
+    justify-self: start !important;
+    align-self: start !important;
+    text-align: left !important;
   }
 }
 

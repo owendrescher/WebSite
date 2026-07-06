@@ -5064,15 +5064,19 @@ body.dashboard-page .player-extra-archetype-slot .player-archetype-name-only {
   font-weight: 950;
 }
 
+body.dashboard-page .lineup-list > li > .lineup-row-recent-stats {
+  display: none !important;
+}
+
 @media (max-width: 820px), (max-height: 520px) and (orientation: landscape) {
   body.dashboard-page .lineup-list li {
     grid-template-columns: 18px minmax(0, 1fr) auto;
     grid-template-areas:
-      "slot name name"
-      "slot pos edge"
-      "slot today today";
+      "slot name edge"
+      "slot stats pos"
+      "slot today today" !important;
     align-items: start;
-    row-gap: 2px;
+    gap: 1px 6px;
   }
 
   body.dashboard-page .lineup-list li.lineup-row-substitution {
@@ -5094,34 +5098,47 @@ body.dashboard-page .player-extra-archetype-slot .player-archetype-name-only {
   }
 
   body.dashboard-page .lineup-list > li > .lineup-name > .lineup-name-text {
-    flex: 1 0 100%;
+    flex: 0 1 auto;
     min-width: 0;
-    max-width: 100%;
-    white-space: normal;
+    max-width: none;
+    white-space: nowrap;
     overflow: visible;
-    overflow-wrap: anywhere;
+    overflow-wrap: normal;
     text-overflow: clip;
     line-height: 1.08;
   }
 
   body.dashboard-page .lineup-list > li > .lineup-name > :not(.lineup-name-text):not(.lineup-dashboard-stats) {
-    flex: 0 1 auto;
+    flex: 0 0 auto;
     min-width: 0;
   }
 
   body.dashboard-page .lineup-list > li > .lineup-name > .lineup-dashboard-stats {
-    flex: 1 1 100%;
+    display: none !important;
+  }
+
+  body.dashboard-page .lineup-list > li > .lineup-row-recent-stats {
+    grid-area: stats !important;
+    display: block !important;
+    justify-self: start !important;
+    align-self: start !important;
     min-width: 0;
     max-width: 100%;
     overflow: hidden;
+    color: var(--muted);
+    font-size: 0.72rem;
+    font-weight: 850;
+    line-height: 1.12;
+    text-align: left !important;
     text-overflow: ellipsis;
     white-space: nowrap;
-    order: 3;
+    font-variant-numeric: tabular-nums;
   }
 
   body.dashboard-page .lineup-row-edge-score {
-    grid-area: edge;
-    justify-self: end;
+    grid-area: edge !important;
+    justify-self: end !important;
+    align-self: center !important;
     min-width: 0;
     max-width: 54px;
     overflow: hidden;
@@ -5138,20 +5155,25 @@ body.dashboard-page .player-extra-archetype-slot .player-archetype-name-only {
   }
 
   body.dashboard-page .lineup-pos {
-    grid-area: pos;
+    grid-area: pos !important;
     display: block;
-    justify-self: start;
+    justify-self: end !important;
+    align-self: start !important;
     min-width: 0;
     max-width: 100%;
     overflow: hidden;
     text-overflow: ellipsis;
+    text-align: right !important;
     white-space: nowrap;
   }
 
   body.dashboard-page .lineup-today {
-    grid-area: today;
+    grid-area: today !important;
+    justify-self: start !important;
+    align-self: start !important;
     min-width: 0;
     overflow: hidden;
+    text-align: left !important;
     text-overflow: ellipsis;
   }
 }
