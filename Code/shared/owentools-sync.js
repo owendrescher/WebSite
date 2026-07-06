@@ -202,7 +202,7 @@
         return sum + 2 + String(key).length * 0.05 + structuredWeight(item);
       }, Object.keys(value).length);
     }
-    if (typeof value === "string") return value.trim() ? Math.min(10000, value.trim().length) : 0;
+    if (typeof value === "string") return value.trim() ? 1 : 0;
     if (typeof value === "number") return Number.isFinite(value) ? 1 : 0;
     if (typeof value === "boolean") return value ? 1 : 0;
     return 0;

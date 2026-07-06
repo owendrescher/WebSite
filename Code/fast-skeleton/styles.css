@@ -15617,6 +15617,236 @@ body.dashboard-page .pitcher-high-velo-badge {
   white-space: nowrap !important;
 }
 
+@media (hover: none), (pointer: coarse), (max-width: 760px) {
+  body.dashboard-page .lineup-modal-header {
+    position: relative !important;
+    display: grid !important;
+    grid-template-columns: minmax(0, 1fr) auto auto auto !important;
+    grid-template-areas:
+      "matchup tabs recent close"
+      "series series series series" !important;
+    align-items: center !important;
+    gap: 6px !important;
+    padding: 7px 8px !important;
+  }
+
+  body.dashboard-page .lineup-modal-title-wrap {
+    display: contents !important;
+  }
+
+  body.dashboard-page .lineup-modal-matchup {
+    grid-area: matchup !important;
+    min-width: 0 !important;
+    font-size: 0.74rem !important;
+    line-height: 1.08 !important;
+    white-space: normal !important;
+  }
+
+  body.dashboard-page .lineup-series-strip {
+    grid-area: series !important;
+    justify-self: stretch !important;
+    width: 100% !important;
+    max-width: none !important;
+    height: 44px !important;
+    padding: 0 3px !important;
+  }
+
+  body.dashboard-page .lineup-series-games {
+    justify-content: flex-start !important;
+    gap: 4px !important;
+    overflow-x: auto !important;
+    scrollbar-width: none !important;
+  }
+
+  body.dashboard-page .lineup-series-games::-webkit-scrollbar {
+    display: none !important;
+  }
+
+  body.dashboard-page .lineup-series-game {
+    min-width: 68px !important;
+    max-width: 74px !important;
+    grid-template-rows: 16px 9px 9px 9px !important;
+    padding: 0 3px !important;
+    border-radius: 6px !important;
+  }
+
+  body.dashboard-page .lineup-series-winner-logo {
+    width: 16px !important;
+    height: 16px !important;
+  }
+
+  body.dashboard-page .lineup-series-score {
+    font-size: 0.52rem !important;
+  }
+
+  body.dashboard-page .lineup-series-pitcher {
+    grid-template-columns: 9px minmax(0, 1fr) !important;
+    height: 9px !important;
+    padding: 0 2px 0 0 !important;
+  }
+
+  body.dashboard-page .lineup-series-pitcher span {
+    width: 9px !important;
+    height: 9px !important;
+    font-size: 0.34rem !important;
+  }
+
+  body.dashboard-page .lineup-series-pitcher b {
+    font-size: 0.38rem !important;
+  }
+
+  body.dashboard-page .lineup-view-toggle {
+    grid-area: tabs !important;
+    display: inline-flex !important;
+    flex-wrap: nowrap !important;
+    justify-content: flex-end !important;
+    gap: 4px !important;
+    min-width: 0 !important;
+  }
+
+  body.dashboard-page .lineup-view-btn {
+    min-width: 0 !important;
+    padding: 4px 7px !important;
+    border-radius: 999px !important;
+    font-size: 0.62rem !important;
+    line-height: 1 !important;
+    letter-spacing: 0 !important;
+  }
+
+  body.dashboard-page .lineup-recent-toggle {
+    grid-area: recent !important;
+    min-width: 32px !important;
+    padding: 4px 6px !important;
+    border-radius: 8px !important;
+    font-size: 0.62rem !important;
+    line-height: 1 !important;
+  }
+
+  body.dashboard-page .lineup-close-btn {
+    grid-area: close !important;
+    width: 34px !important;
+    height: 34px !important;
+    font-size: 1.1rem !important;
+  }
+
+  body.dashboard-page .lineup-split-btn {
+    display: none !important;
+  }
+
+  body.dashboard-page .lineup-team-hand-chip {
+    flex: 0 0 auto !important;
+    max-width: none !important;
+    min-width: max-content !important;
+    padding-inline: 5px !important;
+    overflow: visible !important;
+    text-overflow: clip !important;
+    font-size: 0.53rem !important;
+  }
+
+  body.dashboard-page .lineup-team-pitcher-main {
+    display: grid !important;
+    grid-template-columns: minmax(0, 1fr) !important;
+    gap: 3px !important;
+  }
+
+  body.dashboard-page .lineup-team-pitcher-name {
+    max-width: 100% !important;
+    overflow: visible !important;
+  }
+
+  body.dashboard-page .lineup-team-pitcher-name .pitcher-identity-row {
+    max-width: 100% !important;
+    min-width: 0 !important;
+    font-size: 0.82rem !important;
+  }
+
+  body.dashboard-page .lineup-team-pitcher-name .pitcher-identity-name {
+    flex: 0 1 auto !important;
+    min-width: 0 !important;
+    max-width: none !important;
+    overflow: visible !important;
+    text-overflow: clip !important;
+  }
+
+  body.dashboard-page .lineup-team-pitcher-main .pitcher-priority-meta {
+    max-width: 100% !important;
+    text-align: left !important;
+    font-size: 0.68rem !important;
+    overflow: hidden !important;
+    text-overflow: ellipsis !important;
+  }
+
+  body.dashboard-page .lineup-list li {
+    grid-template-columns: 18px minmax(0, 1fr) 28px !important;
+    grid-template-areas:
+      "slot name avg"
+      "slot today today"
+      "slot pos pos" !important;
+    gap: 2px 5px !important;
+  }
+
+  body.dashboard-page .lineup-name {
+    display: inline-flex !important;
+    align-items: center !important;
+    flex-wrap: nowrap !important;
+    gap: 4px !important;
+    min-width: 0 !important;
+    max-width: 100% !important;
+    overflow: hidden !important;
+    white-space: nowrap !important;
+  }
+
+  body.dashboard-page .lineup-name-text {
+    flex: 0 1 auto !important;
+    min-width: 0 !important;
+    max-width: min(34vw, 10.5ch) !important;
+    overflow: hidden !important;
+    text-overflow: ellipsis !important;
+    white-space: nowrap !important;
+    overflow-wrap: normal !important;
+  }
+
+  body.dashboard-page .lineup-name .handedness-tag,
+  body.dashboard-page .lineup-name .lineup-last-hr-badge,
+  body.dashboard-page .lineup-name .lineup-due-badge,
+  body.dashboard-page .lineup-name .lineup-hit-streak,
+  body.dashboard-page .lineup-name .lineup-elite-matchup-badge,
+  body.dashboard-page .lineup-name .lineup-split-flag,
+  body.dashboard-page .lineup-name .lineup-avg-burst,
+  body.dashboard-page .lineup-name .lineup-power-burst,
+  body.dashboard-page .lineup-name .lineup-slug-burst,
+  body.dashboard-page .lineup-name .lineup-indicator {
+    flex: 0 0 auto !important;
+    min-width: max-content !important;
+    max-width: none !important;
+    overflow: visible !important;
+  }
+
+  body.dashboard-page .lineup-name .lineup-due-badge,
+  body.dashboard-page .lineup-name .lineup-hit-streak,
+  body.dashboard-page .lineup-name .lineup-last-hr-badge {
+    height: 15px !important;
+    min-width: 17px !important;
+    padding-inline: 3px !important;
+    font-size: 0.52rem !important;
+  }
+
+  body.dashboard-page .lineup-name .lineup-elite-matchup-badge {
+    min-width: 15px !important;
+    height: 15px !important;
+    font-size: 0.58rem !important;
+  }
+
+  body.dashboard-page .lineup-pos {
+    text-align: left !important;
+    font-size: 0.68rem !important;
+  }
+
+  body.dashboard-page .lineup-row-edge-score {
+    align-self: center !important;
+  }
+}
+
 body.dashboard-page .player-high-velo-matchup {
   display: grid;
   gap: 6px;

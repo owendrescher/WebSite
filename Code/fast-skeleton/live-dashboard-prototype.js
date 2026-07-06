@@ -17425,8 +17425,8 @@ function manualStatePayloadSize(value) {
 
 function compareManualStateCandidates(a = {}, b = {}) {
   return (Number(b.weight) || 0) - (Number(a.weight) || 0)
-    || (Number(b.size) || 0) - (Number(a.size) || 0)
-    || (Number(b.updatedAt) || 0) - (Number(a.updatedAt) || 0);
+    || (Number(b.updatedAt) || 0) - (Number(a.updatedAt) || 0)
+    || (Number(b.size) || 0) - (Number(a.size) || 0);
 }
 
 function manualStateCandidate(value, updatedAt = 0, source = '') {
