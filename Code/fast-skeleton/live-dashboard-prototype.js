@@ -2027,6 +2027,7 @@ function compactStoredGamesIfNeeded(list) {
 }
 
 function compactExistingStorage() {
+  compactDatedPlayerTrackerStorage();
   try {
     if (localStorage.getItem(STORAGE_COMPACTED_KEY) === '1') return;
   } catch {}
@@ -2047,6 +2048,43 @@ function compactExistingStorage() {
     try {
       localStorage.setItem(STORAGE_COMPACTED_KEY, '1');
     } catch {}
+  } catch {}
+}
+
+function compactDatedPlayerTrackerStorage() {
+  const prefix = `${PLAYER_TRACKER_STORAGE_KEY}:`;
+  try {
+    const keys = [];
+    for (let i = 0; i < localStorage.length; i += 1) {
+      const key = localStorage.key(i);
+      if (key && key.startsWith(prefix)) keys.push(key);
+    }
+    if (!keys.length) return;
+    let backup = {};
+    try {
+      backup = JSON.parse(localStorage.getItem(PLAYER_TRACKER_BACKUP_STORAGE_KEY) || '{}') || {};
+    } catch {
+      backup = {};
+    }
+    let backupChanged = false;
+    for (const key of keys) {
+      const date = key.slice(prefix.length);
+      if (/^\d{4}-\d{2}-\d{2}$/.test(date) && !backup[date]?.length) {
+        try {
+          backup[date] = normalizeTrackedPlayerEntries(JSON.parse(localStorage.getItem(key) || '[]'));
+          backupChanged = true;
+        } catch {}
+      }
+    }
+    let backupSaved = !backupChanged;
+    try {
+      localStorage.setItem(PLAYER_TRACKER_BACKUP_STORAGE_KEY, JSON.stringify(backup));
+      backupSaved = true;
+    } catch {}
+    if (!backupSaved) return;
+    keys.forEach((key) => {
+      try { localStorage.removeItem(key); } catch {}
+    });
   } catch {}
 }
 
@@ -21085,6 +21123,11 @@ function initPlayerBetContextMenu() {
   document.addEventListener('contextmenu', (e) => {
     if (isTextEntryTarget(e.target)) return;
     e.preventDefault();
+    if (isTooltipLongPressTarget(e.target)) {
+      activeBetContextMenuPlayer = null;
+      document.getElementById('playerBetMenu')?.remove();
+      return;
+    }
     const player = betContextTargetPlayer(e.target);
     if (!player) {
       activeBetContextMenuPlayer = null;
@@ -21106,6 +21149,11 @@ function initPlayerBetContextMenu() {
       document.getElementById('playerBetMenu')?.remove();
     }
   });
+}
+
+function isTooltipLongPressTarget(target) {
+  if (!(target instanceof Element)) return false;
+  return Boolean(target.closest('[data-theme-tooltip-title], [data-theme-tooltip-html], [title], .has-split-tooltip'));
 }
 
 function parseTrackedBet(desc) {

@@ -14727,6 +14727,29 @@ body.dashboard-page .scoreboard-main > .score-state-strip .score-mini-last-play 
   width: 100% !important;
 }
 
+@media (hover: none), (pointer: coarse), (max-width: 760px) {
+  body.dashboard-page .overlay,
+  body.dashboard-page .overlay *,
+  body.dashboard-page .lineup-overlay,
+  body.dashboard-page .lineup-overlay *,
+  body.dashboard-page .player-stat-overlay,
+  body.dashboard-page .player-stat-overlay *,
+  body.dashboard-page .global-player-search-overlay,
+  body.dashboard-page .global-player-search-overlay * {
+    -webkit-touch-callout: none;
+    -webkit-user-select: none;
+    user-select: none;
+  }
+
+  body.dashboard-page input,
+  body.dashboard-page textarea,
+  body.dashboard-page select,
+  body.dashboard-page [contenteditable='true'] {
+    -webkit-touch-callout: default;
+    -webkit-user-select: text;
+    user-select: text;
+  }
+}
 
 /* Over/under pregame selector: click once to mark, twice to lock, third to clear. */
 body.dashboard-page .scoreboard-main > .score-state-strip .score-mini-context.has-over-under {

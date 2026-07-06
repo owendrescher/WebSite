@@ -41,6 +41,7 @@
     "games-archive:",
     "analytics-day:",
     "hrs:",
+    "player-tracker:v1:",
     "pending-game-picks:v1:",
     "tossup-scoreboards:v1:",
     "locked-tossup-scoreboards:v1:",
@@ -50,12 +51,14 @@
     "games:",
     "games-archive:",
     "analytics-day:",
-    "hrs:"
+    "hrs:",
+    "player-tracker:v1:"
   ];
 
   const originalSetItem = Storage.prototype.setItem;
   const originalRemoveItem = Storage.prototype.removeItem;
   const authSessionMemory = new Map();
+  const restoredValueMemory = new Map();
 
   function matchesAny(key, patterns) {
     if (!patterns || !patterns.length) return false;
@@ -215,17 +218,31 @@
 
   function readLocalValue(key) {
     try {
-      return window.localStorage.getItem(key);
+      const localValue = window.localStorage.getItem(key);
+      if (localValue != null) return localValue;
     } catch {
-      return null;
+      // fall through
     }
+    try {
+      const sessionValue = window.sessionStorage.getItem(key);
+      if (sessionValue != null) return sessionValue;
+    } catch {
+      // fall through
+    }
+    return restoredValueMemory.has(key) ? restoredValueMemory.get(key) : null;
   }
 
   function writeLocalValue(key, value) {
     suppressUpload = true;
     try {
-      if (value == null) originalRemoveItem.call(window.localStorage, key);
-      else originalSetItem.call(window.localStorage, key, value);
+      if (value == null) {
+        restoredValueMemory.delete(key);
+        originalRemoveItem.call(window.localStorage, key);
+        try { originalRemoveItem.call(window.sessionStorage, key); } catch {}
+      } else {
+        restoredValueMemory.set(key, String(value));
+        originalSetItem.call(window.localStorage, key, value);
+      }
     } catch (error) {
       if (error?.name === "QuotaExceededError") {
         cleanupLocalDeniedKeys();
@@ -234,7 +251,16 @@
           else originalSetItem.call(window.localStorage, key, value);
           return;
         } catch (retryError) {
-          setErrorStatus(retryError, `Could not restore ${key}`);
+          if (value != null) {
+            try {
+              originalSetItem.call(window.sessionStorage, key, value);
+            } catch {
+              // in-memory restored value remains available for sync comparisons in this tab
+            }
+            console.warn("owentools sync restored value outside localStorage after quota failure", key, retryError);
+            return;
+          }
+          console.warn("owentools sync could not remove local value after quota cleanup", key, retryError);
           return;
         }
       }
