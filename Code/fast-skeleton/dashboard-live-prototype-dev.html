@@ -103,7 +103,7 @@
                 <button type="button" data-page-nav="scoreboard" aria-selected="true">Scoreboard</button>
                 <button type="button" data-page-nav="leaders" aria-selected="false">Leaders</button>
                 <button type="button" data-page-nav="teamStats" aria-selected="false">Team Stats</button>
-                <button type="button" data-page-nav="hrLeaderboard" aria-selected="false">HR Candidates</button>
+                <button type="button" data-page-nav="hrLeaderboard" aria-selected="false">Playoff Picture</button>
               </div>
               <label class="theme-label">
                 <span>Style</span>
@@ -114,7 +114,7 @@
               <button type="button" data-page-nav="scoreboard" aria-selected="true">Scoreboard</button>
               <button type="button" data-page-nav="leaders" aria-selected="false">League Leaders</button>
               <button type="button" data-page-nav="teamStats" aria-selected="false">Team Stats</button>
-              <button type="button" data-page-nav="hrLeaderboard" aria-selected="false">HR Candidates</button>
+              <button type="button" data-page-nav="hrLeaderboard" aria-selected="false">Playoff Picture</button>
             </nav>
             <div id="leadersToolbar" class="leaders-toolbar" hidden>
               <label class="leaders-filter">
@@ -141,6 +141,13 @@
                   <option value="DH">DH</option>
                 </select>
               </label>
+              <label class="leaders-filter leaders-min-pa-filter">
+                <span>Min PA/IP</span>
+                <select id="leadersQualifierSelect">
+                  <option value="qualified">Qualified</option>
+                  <option value="all">All</option>
+                </select>
+              </label>
               <button id="leadersOpponentsBtn" class="toolbar-btn leaders-opponents-btn" type="button">Show Today's Opponents</button>
               <div id="leadersContext" class="leaders-context">Season leaders across MLB</div>
             </div>
@@ -159,8 +166,8 @@
           <section id="predictionsPage" class="leaders-page predictions-page" hidden>
             <div class="leaders-empty">Loading predictions...</div>
           </section>
-          <section id="hrLeaderboardPage" class="leaders-page hr-leaderboard-page" hidden>
-            <div class="leaders-empty">Loading home run leaderboard...</div>
+          <section id="hrLeaderboardPage" class="leaders-page hr-leaderboard-page playoff-picture-page" hidden>
+            <div class="leaders-empty">Loading playoff picture...</div>
           </section>
           <button id="overlayResizeHandle" class="overlay-resize-handle dashboard-hidden" type="button" aria-label="Resize scoreboard area"></button>
 

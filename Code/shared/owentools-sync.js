@@ -55,6 +55,7 @@
 
   const originalSetItem = Storage.prototype.setItem;
   const originalRemoveItem = Storage.prototype.removeItem;
+  const authSessionMemory = new Map();
 
   function matchesAny(key, patterns) {
     if (!patterns || !patterns.length) return false;
@@ -91,6 +92,59 @@
     } catch (error) {
       console.warn("owentools sync local cache cleanup failed", error);
     }
+  }
+
+  function createSafeAuthStorage() {
+    return {
+      getItem(key) {
+        try {
+          const localValue = window.localStorage.getItem(key);
+          if (localValue != null) return localValue;
+        } catch {
+          // fall through
+        }
+        try {
+          const sessionValue = window.sessionStorage.getItem(key);
+          if (sessionValue != null) return sessionValue;
+        } catch {
+          // fall through
+        }
+        return authSessionMemory.get(key) || null;
+      },
+      setItem(key, value) {
+        authSessionMemory.set(key, String(value));
+        try {
+          originalSetItem.call(window.localStorage, key, value);
+          return;
+        } catch {
+          cleanupLocalDeniedKeys();
+        }
+        try {
+          originalSetItem.call(window.localStorage, key, value);
+          return;
+        } catch {
+          // fall through to session storage
+        }
+        try {
+          window.sessionStorage.setItem(key, value);
+        } catch {
+          // in-memory value remains available for this tab
+        }
+      },
+      removeItem(key) {
+        authSessionMemory.delete(key);
+        try {
+          originalRemoveItem.call(window.localStorage, key);
+        } catch {
+          // ignore
+        }
+        try {
+          window.sessionStorage.removeItem(key);
+        } catch {
+          // ignore
+        }
+      }
+    };
   }
 
   function readMeta() {
@@ -741,7 +795,7 @@
         persistSession: true,
         autoRefreshToken: true,
         detectSessionInUrl: true,
-        storage: window.localStorage,
+        storage: createSafeAuthStorage(),
         storageKey: AUTH_STORAGE_KEY
       }
     });
