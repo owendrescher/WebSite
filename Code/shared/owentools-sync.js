@@ -41,7 +41,6 @@
     "games-archive:",
     "analytics-day:",
     "hrs:",
-    "player-tracker:v1:",
     "pending-game-picks:v1:",
     "tossup-scoreboards:v1:",
     "locked-tossup-scoreboards:v1:",
@@ -51,8 +50,7 @@
     "games:",
     "games-archive:",
     "analytics-day:",
-    "hrs:",
-    "player-tracker:v1:"
+    "hrs:"
   ];
 
   const originalSetItem = Storage.prototype.setItem;
@@ -208,7 +206,10 @@
     return 0;
   }
 
-  function shouldUseCloudValue(localValue, cloudValue, localTime, cloudTime) {
+  function shouldUseCloudValue(localValue, cloudValue, localTime, cloudTime, key = "") {
+    if (String(key || "").startsWith("player-tracker:v1:")) {
+      return cloudTime > localTime;
+    }
     const localWeight = dataWeight(localValue);
     const cloudWeight = dataWeight(cloudValue);
     if (cloudWeight > localWeight) return true;
@@ -427,7 +428,7 @@
       const localValue = readLocalValue(key);
       const cloudTime = Date.parse(row.updated_at || "") || 0;
       const localTime = localUpdatedAt(key);
-      if (!shouldUseCloudValue(localValue, value, localTime, cloudTime)) {
+      if (!shouldUseCloudValue(localValue, value, localTime, cloudTime, key)) {
         pendingUploads.set(key, localValue);
         return;
       }

@@ -17,9 +17,9 @@
     <meta name="twitter:description" content="Live MLB scoreboard, lineups, pitcher trends, hot players, and betting stat tools." />
     <link rel="icon" type="image/png" href="baseball.png" />
     <link rel="apple-touch-icon" href="baseball.png" />
-    <link rel="stylesheet" href="styles.css?v=20260706mobileLineup2" />
+    <link rel="stylesheet" href="styles.css?v=20260707teamCard4" />
     <link rel="stylesheet" href="dashboard.css?v=20260703veloBuckets6" />
-    <link rel="stylesheet" href="live-prototype.css?v=20260706mobileLineup2" />
+    <link rel="stylesheet" href="live-prototype.css?v=20260707teamCard4" />
   </head>
   <body class="dashboard-page" data-dashboard-page="scoreboard">
 
@@ -380,6 +380,24 @@
             </article>
           </section>
 
+          <section id="teamDetailOverlay" class="lineup-overlay team-detail-overlay" hidden>
+            <div id="teamDetailBackdrop" class="lineup-backdrop"></div>
+            <article class="lineup-modal team-detail-modal">
+              <button type="button" class="lineup-nav-btn lineup-nav-prev team-detail-nav-prev" data-team-detail-nav="-1" aria-label="Previous team">&lsaquo;</button>
+              <button type="button" class="lineup-nav-btn lineup-nav-next team-detail-nav-next" data-team-detail-nav="1" aria-label="Next team">&rsaquo;</button>
+              <header class="lineup-modal-header team-detail-header">
+                <div class="lineup-modal-title-wrap team-detail-title-wrap">
+                  <span id="teamDetailTitle" class="lineup-modal-matchup team-detail-title"></span>
+                  <span id="teamDetailRecord" class="team-detail-record"></span>
+                </div>
+                <button id="teamDetailCloseBtn" class="lineup-close-btn" type="button" aria-label="Close team card">x</button>
+              </header>
+              <div id="teamDetailBody" class="lineup-modal-body team-detail-body">
+                <div class="leaders-empty">Loading team...</div>
+              </div>
+            </article>
+          </section>
+
           <section id="lineupSplitPeer" class="lineup-split-peer" hidden aria-label="Secondary lineup card">
             <button id="lineupSplitPeerCloseBtn" class="lineup-split-peer-close" type="button" aria-label="Close secondary lineup">x</button>
             <iframe id="lineupSplitPeerFrame" class="lineup-split-peer-frame" title="Secondary lineup card"></iframe>
@@ -575,6 +593,7 @@
           "manual-state-mirror:v1",
           "manual-state-durable:v1",
           "manual-state-backup:v1",
+          "player-tracker:v1:",
           "player-tracker-backup:v1",
           "pending-game-picks:v1",
           "tossup-scoreboards:v1",
@@ -585,12 +604,12 @@
         ]
       };
     </script>
-    <script src="../shared/owentools-sync.js?v=20260706pickSync1"></script>
+    <script src="../shared/owentools-sync.js?v=20260707trackerSync1"></script>
     <script src="rotowire-default-lineups.js?v=20260629lineupseedverified2"></script>
     <script>
-      window.MLB_DASHBOARD_BUILD_ID="20260706-pick-sync1-dev";
+      window.MLB_DASHBOARD_BUILD_ID="20260707-team-card4-dev";
       window.MLB_STATS_PROFILER_FORCE=true;
     </script>
-    <script src="live-dashboard-prototype.js?v=20260706mobileLineup2"></script>
+    <script src="live-dashboard-prototype.js?v=20260707teamCard4"></script>
   </body>
 </html>

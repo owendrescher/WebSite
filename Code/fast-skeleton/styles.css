@@ -3449,7 +3449,7 @@ body[data-overlay-dock='bottom'] .matchup-team-grid {
 .player-stat-overlay {
   position: absolute;
   inset: 14px 10px;
-  z-index: 40;
+  z-index: 90;
   display: grid;
   place-items: center;
   box-sizing: border-box;
@@ -16110,4 +16110,443 @@ body.dashboard-page .player-velo-bucket-matchup-grid b.is-active {
 body.dashboard-page .player-velo-bucket-summary-grid b.is-active {
   outline: 1px solid color-mix(in srgb, var(--accent) 62%, rgba(255, 255, 255, 0.32));
   background: color-mix(in srgb, var(--accent) 22%, rgba(0, 0, 0, 0.2));
+}
+
+/* Team detail overlay opened from playoff picture and team stats. */
+.team-stats-team[data-team-detail-team],
+.playoff-team-cell[data-team-detail-team],
+.playoff-bracket-team[data-team-detail-team],
+.away-lineup-team[data-team-detail-team],
+.home-lineup-team[data-team-detail-team],
+.lineup-state-away-code[data-team-detail-team],
+.lineup-state-home-code[data-team-detail-team] {
+  cursor: pointer;
+}
+
+.team-stats-team[data-team-detail-team]:hover span,
+.team-stats-team[data-team-detail-team]:focus-visible span,
+.playoff-team-cell[data-team-detail-team]:hover strong,
+.playoff-team-cell[data-team-detail-team]:focus-visible strong,
+.playoff-bracket-team[data-team-detail-team]:hover strong,
+.playoff-bracket-team[data-team-detail-team]:focus-visible strong,
+.away-lineup-team[data-team-detail-team]:hover,
+.away-lineup-team[data-team-detail-team]:focus-visible,
+.home-lineup-team[data-team-detail-team]:hover,
+.home-lineup-team[data-team-detail-team]:focus-visible,
+.lineup-state-away-code[data-team-detail-team]:hover,
+.lineup-state-away-code[data-team-detail-team]:focus-visible,
+.lineup-state-home-code[data-team-detail-team]:hover,
+.lineup-state-home-code[data-team-detail-team]:focus-visible {
+  text-decoration: underline;
+  text-underline-offset: 2px;
+}
+
+.team-detail-overlay {
+  z-index: 72;
+  touch-action: pan-y;
+}
+
+.team-detail-modal {
+  width: min(1180px, calc(100% - 18px));
+  touch-action: pan-y;
+}
+
+.team-detail-header {
+  grid-template-columns: minmax(0, 1fr) auto;
+}
+
+.team-detail-title-wrap {
+  grid-template-columns: minmax(0, 1fr);
+}
+
+.team-detail-title {
+  display: inline-flex;
+  align-items: center;
+  gap: 8px;
+  color: var(--text);
+  font-family: var(--font-display);
+  font-size: 1.15rem;
+  font-weight: 950;
+  letter-spacing: 0.07em;
+  text-transform: uppercase;
+}
+
+.team-detail-title-logo {
+  width: 34px;
+  height: 34px;
+  object-fit: contain;
+  border-radius: 8px;
+  background: rgba(255,255,255,0.9);
+}
+
+.team-detail-record {
+  color: var(--muted);
+  font-size: 0.72rem;
+  font-weight: 800;
+  letter-spacing: 0.04em;
+  text-transform: uppercase;
+}
+
+.team-detail-body {
+  min-height: 0;
+  overflow: auto !important;
+  -webkit-overflow-scrolling: touch;
+  overscroll-behavior: contain;
+  touch-action: pan-y;
+}
+
+.team-detail-card {
+  position: relative;
+  display: grid;
+  gap: 12px;
+  min-height: max-content;
+  padding: 12px;
+  overflow: hidden;
+}
+
+.team-detail-card::before {
+  content: '';
+  position: absolute;
+  inset: 80px 10px 12px;
+  background-image: var(--team-logo-bg);
+  background-repeat: no-repeat;
+  background-position: center;
+  background-size: min(42vw, 330px) auto;
+  opacity: 0.12;
+  pointer-events: none;
+}
+
+.team-detail-card > * {
+  position: relative;
+  z-index: 1;
+}
+
+.team-detail-hero {
+  display: grid;
+  grid-template-columns: minmax(250px, 0.9fr) minmax(300px, 1fr) minmax(270px, max-content);
+  align-items: start;
+  gap: 12px;
+  min-width: 0;
+  padding: 10px 12px;
+  border: 1px solid color-mix(in srgb, var(--team-color, var(--accent)) 45%, transparent);
+  border-radius: 10px;
+  background:
+    linear-gradient(90deg, color-mix(in srgb, var(--team-color, var(--accent)) 22%, transparent), transparent 72%),
+    color-mix(in srgb, var(--panel-item) 72%, transparent);
+}
+
+.team-detail-identity {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  min-width: 0;
+}
+
+.team-detail-hero-main {
+  min-width: 0;
+}
+
+.team-detail-hero img {
+  width: 58px;
+  height: 58px;
+  object-fit: contain;
+  border-radius: 12px;
+  background: rgba(255,255,255,0.9);
+}
+
+.team-detail-hero strong {
+  display: block;
+  color: var(--text);
+  font-family: var(--font-display);
+  font-size: 1.35rem;
+  font-weight: 950;
+  letter-spacing: 0.08em;
+  text-transform: uppercase;
+}
+
+.team-detail-hero span {
+  color: var(--muted);
+  font-size: 0.8rem;
+  font-weight: 800;
+  text-transform: uppercase;
+}
+
+.team-detail-hero-stats {
+  display: grid;
+  grid-template-columns: repeat(2, minmax(112px, 1fr));
+  gap: 7px;
+  align-items: stretch;
+  justify-self: end;
+  width: min(390px, 100%);
+}
+
+.team-detail-record-chip {
+  display: grid;
+  grid-template-columns: auto 1fr;
+  gap: 1px 6px;
+  min-width: 0;
+  padding: 7px 9px;
+  border: 1px solid color-mix(in srgb, var(--team-color, var(--accent)) 34%, var(--line));
+  border-radius: 8px;
+  background:
+    linear-gradient(135deg, color-mix(in srgb, var(--team-color, var(--accent)) 20%, transparent), transparent 65%),
+    rgba(0,0,0,0.2);
+  box-shadow: inset 0 1px 0 rgba(255,255,255,0.07);
+}
+
+.team-detail-record-chip b {
+  color: color-mix(in srgb, var(--team-color, var(--accent)) 45%, white 55%);
+  font-family: var(--font-display);
+  font-size: 0.62rem;
+  letter-spacing: 0.12em;
+  text-transform: uppercase;
+}
+
+.team-detail-record-chip strong {
+  min-width: 0;
+  color: var(--text);
+  font-family: var(--font-display);
+  font-size: 0.72rem;
+  font-weight: 950;
+  text-align: right;
+  white-space: nowrap;
+}
+
+.team-detail-record-chip small {
+  grid-column: 1 / -1;
+  display: block;
+  color: var(--muted);
+  font-size: 0.62rem;
+  line-height: 1.15;
+}
+
+.team-detail-section,
+.team-detail-lineup-panel {
+  border: 1px solid color-mix(in srgb, var(--team-color, var(--accent)) 36%, var(--line));
+  border-radius: 10px;
+  background:
+    linear-gradient(180deg, rgba(255,255,255,0.06), transparent 55%),
+    color-mix(in srgb, var(--panel-item) 70%, transparent);
+  box-shadow: inset 0 1px 0 rgba(255,255,255,0.06);
+}
+
+.team-detail-section {
+  padding: 10px;
+}
+
+.team-detail-section h3,
+.team-detail-lineup-panel h3 {
+  margin: 0 0 8px;
+  color: color-mix(in srgb, var(--team-color, var(--accent)) 48%, white 52%);
+  font-family: var(--font-display);
+  font-size: 0.88rem;
+  font-weight: 950;
+  letter-spacing: 0.1em;
+  text-transform: uppercase;
+}
+
+.team-detail-pitcher-list {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(230px, 1fr));
+  gap: 6px;
+  margin: 0;
+  padding: 0;
+  list-style: none;
+}
+
+.team-detail-hero-rotation {
+  min-width: 0;
+  justify-self: stretch;
+}
+
+.team-detail-hero-rotation h3 {
+  margin: 0 0 5px;
+  color: color-mix(in srgb, var(--team-color, var(--accent)) 48%, white 52%);
+  font-family: var(--font-display);
+  font-size: 0.78rem;
+  font-weight: 950;
+  letter-spacing: 0.1em;
+  text-transform: uppercase;
+}
+
+.team-detail-starter-list {
+  grid-template-columns: minmax(0, 1fr);
+  gap: 4px;
+}
+
+.team-detail-starter-list .bullpen-item {
+  padding-block: 4px;
+}
+
+.team-detail-pitcher-list .bullpen-item,
+.team-detail-lineup-list li[data-player-id] {
+  cursor: pointer;
+}
+
+.team-detail-pitcher-list .bullpen-item.is-bullpen-day {
+  cursor: default;
+  border-style: dashed;
+  opacity: 0.9;
+}
+
+.team-detail-pitcher-list .bullpen-main {
+  min-width: 0;
+}
+
+.team-detail-pitcher-list .pitcher-priority-name,
+.team-detail-pitcher-list .pitcher-identity-name,
+.team-detail-pitcher-list .bullpen-name {
+  max-width: none !important;
+  overflow: visible !important;
+  text-overflow: clip !important;
+  white-space: normal;
+}
+
+.team-detail-pitcher-list .pitcher-priority-meta,
+.team-detail-pitcher-list .bullpen-meta,
+.team-detail-pitcher-list .bullpen-today {
+  overflow-wrap: anywhere;
+}
+
+.team-detail-pitcher-list .pitcher-priority-meta {
+  font-size: 0.74rem;
+  opacity: 0.86;
+}
+
+.team-detail-pitcher-list .bullpen-item.lineup-row-hot,
+.team-detail-pitcher-list .bullpen-item.lineup-row-cold {
+  position: relative;
+  overflow: hidden;
+}
+
+.team-detail-pitcher-list .bullpen-item.lineup-row-hot {
+  border-color: color-mix(in srgb, #ff8a45 54%, var(--line));
+  background:
+    radial-gradient(circle at 0 50%, rgba(255,138,69,0.2), transparent 38%),
+    rgba(255,138,69,0.08);
+}
+
+.team-detail-pitcher-list .bullpen-item.lineup-row-cold {
+  border-color: color-mix(in srgb, #64c8ff 50%, var(--line));
+  background:
+    radial-gradient(circle at 0 50%, rgba(100,200,255,0.2), transparent 38%),
+    rgba(100,200,255,0.08);
+}
+
+.team-detail-card .lineup-hot-emoji,
+.team-detail-card .lineup-cold-emoji,
+.team-detail-card .pitcher-used-yesterday,
+.team-detail-card .pitcher-fire-streak,
+.team-detail-card .pitcher-cold-streak,
+.team-detail-card .pitcher-last-start-hr,
+.team-detail-card .pitcher-hr-risk,
+.team-detail-card .pitcher-whip-risk {
+  display: none !important;
+}
+
+.team-detail-pitcher-list .bullpen-item:hover .pitcher-identity-name,
+.team-detail-pitcher-list .bullpen-item:focus-visible .pitcher-identity-name,
+.team-detail-lineup-list li[data-player-id]:hover .lineup-name-text,
+.team-detail-lineup-list li[data-player-id]:focus-visible .lineup-name-text {
+  text-decoration: underline;
+  text-underline-offset: 2px;
+}
+
+.team-detail-lineup-grid {
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: 12px;
+}
+
+.team-detail-lineup-panel {
+  position: relative;
+  min-height: 0;
+  padding: 10px;
+}
+
+.team-detail-watermark {
+  position: absolute;
+  inset: 50% auto auto 50%;
+  transform: translate(-50%, -50%);
+  color: color-mix(in srgb, var(--team-color, var(--accent)) 34%, white 16%);
+  font-family: var(--font-display);
+  font-size: clamp(4rem, 15vw, 8rem);
+  font-weight: 950;
+  letter-spacing: 0.02em;
+  opacity: 0.12;
+  pointer-events: none;
+}
+
+.team-detail-lineup-list li {
+  grid-template-columns: 20px minmax(0, 1fr) 34px;
+  grid-template-areas:
+    "slot name pos"
+    "slot today today";
+  gap: 2px 7px;
+  padding: 5px 0;
+}
+
+.team-detail-lineup-list .lineup-name {
+  align-items: center;
+  white-space: nowrap;
+}
+
+.team-detail-lineup-list .lineup-name-text {
+  max-width: 15ch;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.team-detail-lineup-list .lineup-today {
+  font-size: 0.72rem;
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+
+@media (max-width: 760px) {
+  .team-detail-modal {
+    width: 100%;
+    height: 100%;
+    max-height: 100%;
+    margin: 0;
+  }
+
+  .team-detail-card {
+    padding: 8px;
+    gap: 8px;
+  }
+
+  .team-detail-hero img {
+    width: 44px;
+    height: 44px;
+  }
+
+  .team-detail-hero {
+    grid-template-columns: minmax(0, 1fr);
+  }
+
+  .team-detail-hero strong {
+    font-size: 1rem;
+  }
+
+  .team-detail-hero-stats {
+    width: 100%;
+    justify-self: stretch;
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+  }
+
+  .team-detail-record-chip strong {
+    white-space: normal;
+  }
+
+  .team-detail-lineup-grid {
+    grid-template-columns: minmax(0, 1fr);
+    gap: 8px;
+  }
+
+  .team-detail-pitcher-list {
+    grid-template-columns: minmax(0, 1fr);
+  }
 }
