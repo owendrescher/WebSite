@@ -2091,9 +2091,6 @@ function compactDatedPlayerTrackerStorage() {
       backupSaved = true;
     } catch {}
     if (!backupSaved) return;
-    keys.forEach((key) => {
-      try { localStorage.removeItem(key); } catch {}
-    });
   } catch {}
 }
 
@@ -5458,6 +5455,9 @@ function saveRotowireDynamicLineupSource(source) {
   try {
     localStorage.setItem(ROTOWIRE_DYNAMIC_LINEUP_STORAGE_KEY, JSON.stringify(globalThis.ROTOWIRE_LIVE_LINEUP_SEEDS));
   } catch {}
+  window.setTimeout(() => {
+    window.OwenToolsSync?.flushUploads?.();
+  }, 80);
 }
 
 function rotowireDynamicLineupSeed(teamAbbrev, pitcherHand = 'RHP', date = '') {
@@ -5793,7 +5793,26 @@ function refreshRotowireProjectedBattingOrderInBackground(game, side, options = 
   if (!game || !shouldPreferProbablePitcher(game)) return;
   const key = `rotowire-refresh:${officialDateForGame(game)}:${game?.gamePk || ''}:${side}:${rotowirePitcherHandForLineup(game, side, options) || 'any'}`;
   if (lineupPrewarmTaskKeys.has(key)) return;
-  enqueueLineupPrewarmTask(key, options.priority === 'focus' ? 'focus' : 'idle', () => fetchRotowireProjectedBattingOrder(game, side, options).catch(() => []));
+  enqueueLineupPrewarmTask(key, options.priority === 'focus' ? 'focus' : 'idle', async () => {
+    const lineup = await fetchRotowireProjectedBattingOrder(game, side, options).catch(() => []);
+    if (!isUsableLineupCandidate(lineup)) return [];
+    const normalized = normalizeLineupCollectionForSide(game, side, lineup)
+      .map((entry, index) => ({ ...entry, slot: index + 1 }));
+    if (!isUsableLineupCandidate(normalized)) return lineup;
+    const previousSignature = lineupIdSignature(game?.previewLineupFallback?.[side] || []);
+    const nextSignature = lineupIdSignature(normalized);
+    game.previewLineupFallback = { ...(game.previewLineupFallback || {}), [side]: normalized };
+    const date = officialDateForGame(game);
+    const team = canonicalTeamAbbrev(side === 'away' ? game.away : game.home);
+    const handForCache = rotowirePitcherHandForLineup(game, side, options) || 'no-hand';
+    mlbStartingLineupPageCache.delete(`batters:${date}:${team}:${game?.gamePk || ''}:${handForCache}`);
+    if (nextSignature && nextSignature !== previousSignature && activeLineupGame && String(activeLineupGame.gamePk || '') === String(game.gamePk || '')) {
+      activeLineupGame.previewLineupFallback = { ...(activeLineupGame.previewLineupFallback || {}), [side]: normalized };
+      nonLiveLineupRenderSignature = '';
+      syncLineupOverlay(activeLineupGame, { forceOpen: true }).catch(() => {});
+    }
+    return normalized;
+  });
 }
 
 function fetchRotowireProjectedBattingOrder(game, side, options = {}) {
@@ -18181,13 +18200,26 @@ function initOwenToolsSoftSyncRefresh() {
       manualStateBackupKey(selectedDate),
     ]);
     const allChanged = keys.size === 0;
-    if (allChanged || [...manualKeys].some((key) => keys.has(key))) {
-      reconcileCrossDeviceManualState(selectedDate);
+    if (allChanged || keys.has(ROTOWIRE_DYNAMIC_LINEUP_STORAGE_KEY)) {
+      globalThis.ROTOWIRE_DYNAMIC_LINEUP_SOURCE_LOADED = false;
+      invalidateRotowireLineupCachesForDate(selectedDate);
+      nonLiveLineupRenderSignature = '';
+      if (activeLineupGame) {
+        syncLineupOverlay(activeLineupGame, { forceOpen: true }).catch(() => {});
+      }
     }
-    if (allChanged || keys.has(trackedPlayersStorageKey(selectedDate)) || keys.has(PLAYER_TRACKER_STORAGE_KEY) || keys.has(PLAYER_TRACKER_BACKUP_STORAGE_KEY)) {
+    const manualChanged = allChanged || [...manualKeys].some((key) => keys.has(key));
+    if (manualChanged) {
+      manualStateInMemoryDate = '';
+      manualStateCrossDeviceFingerprint = '';
+    }
+    if (allChanged || keys.has(trackedPlayersStorageKey(selectedDate)) || keys.has(PLAYER_TRACKER_STORAGE_KEY) || keys.has(PLAYER_TRACKER_BACKUP_STORAGE_KEY) || keys.has(MANUAL_STATE_MIRROR_KEY) || keys.has(MANUAL_STATE_DURABLE_KEY) || keys.has(manualStateBackupKey(selectedDate))) {
       trackedPlayersMemoryByDate.delete(trackedPlayersStorageKey(selectedDate));
       if (playerTrackerListEl) playerTrackerListEl.dataset.renderFingerprint = '';
       renderPlayerTrackerList(latestRenderedGames);
+    }
+    if (manualChanged) {
+      reconcileCrossDeviceManualState(selectedDate);
     }
     if (allChanged || [...lineupWindowKeys].some((key) => keys.has(key))) {
       const nextWindow = savedLineupStatWindow();
@@ -21616,6 +21648,9 @@ function saveTrackedPlayers(players = [], date = dateInput.value || formatDate(n
     if (deduped.length || options.forceEmpty) writeTrackedPlayersBackup(deduped, selectedDate);
   }
   if (playerTrackerListEl) playerTrackerListEl.dataset.renderFingerprint = '';
+  window.setTimeout(() => {
+    window.OwenToolsSync?.flushUploads?.();
+  }, 80);
 }
 
 function persistManualStateSnapshot(date = dateInput.value || formatDate(new Date())) {
@@ -26064,7 +26099,7 @@ function teamDetailIsStarterCandidate(arm = {}) {
 }
 
 function splitTeamDetailPitchingStaff(arms = []) {
-  const normalized = listify(arms).filter((arm) => Number.isFinite(Number(arm?.id)) && Number(arm.id) > 0);
+  const normalized = listify(arms).filter((arm) => Number.isFinite(Number(arm?.id)) && Number(arm.id) > 0 && isHealthyPitcherCandidate(arm));
   const starterPool = normalized
     .filter(teamDetailIsStarterCandidate)
     .sort((a, b) => teamDetailPitcherSortValue(b) - teamDetailPitcherSortValue(a) || String(a?.name || '').localeCompare(String(b?.name || '')));
@@ -26207,7 +26242,7 @@ function renderTeamDetailShell(data = {}) {
 async function fetchTeamDetailData(teamAbbrev = '') {
   const team = canonicalTeamAbbrev(teamAbbrev);
   const selectedDate = dateInput?.value || formatDate(new Date());
-  const cacheKey = `${team}:${selectedDate}:v4`;
+  const cacheKey = `${team}:${selectedDate}:v5`;
   if (teamDetailCache.has(cacheKey)) return teamDetailCache.get(cacheKey);
   const promise = (async () => {
     const gameContext = teamDetailGameContext(team);
@@ -26236,11 +26271,19 @@ async function fetchTeamDetailData(teamAbbrev = '') {
       },
     );
     hitters = await hydrateTeamDetailBatterTrends(team, hitters, selectedDate).catch(() => hitters);
+    const activePitcherIds = new Set(listify(roster)
+      .filter((player) => String(player?.position || '').toUpperCase() === 'P')
+      .map((player) => String(player?.id || ''))
+      .filter(Boolean));
     const staffProfiles = markPitchersUsedYesterday(
       listify(pitcherProfiles).map((profile) => {
         const normalized = normalizePitcherDisplayEntry({ ...profile, teamAbbrev: team }, profile?.role || 'bullpen');
         return normalized ? { ...profile, ...normalized, teamAbbrev: team } : null;
-      }).filter(Boolean),
+      }).filter((profile) => (
+        profile
+        && isHealthyPitcherCandidate(profile)
+        && (!activePitcherIds.size || activePitcherIds.has(String(profile.id || '')))
+      )),
       pitcherUsedYesterdayIdsForTeam(gameContext, team),
     );
     const groups = splitTeamDetailPitchingStaff(staffProfiles);
@@ -26353,13 +26396,18 @@ function closeTeamDetailOverlay() {
   if (teamDetailBodyEl) teamDetailBodyEl.innerHTML = '<div class="leaders-empty">Loading team...</div>';
 }
 
-function openTeamDetailOverlay(teamAbbrev = '') {
+function openTeamDetailOverlay(teamAbbrev = '', options = {}) {
   const team = canonicalTeamAbbrev(teamAbbrev);
   if (!team || !teamDetailOverlayEl || !teamDetailBodyEl) return;
   const color = getTeamColor(team);
   const logo = getLogoPath(team);
   teamDetailOverlayEl.hidden = false;
   teamDetailOverlayEl.dataset.teamDetailTeam = team;
+  if (options.order?.length) {
+    teamDetailOverlayEl.dataset.teamDetailOrder = options.order.map(canonicalTeamAbbrev).filter(Boolean).join(',');
+  } else if (!options.preserveOrder) {
+    delete teamDetailOverlayEl.dataset.teamDetailOrder;
+  }
   teamDetailOverlayEl.style.setProperty('--team-color', color || '#66d9ff');
   if (teamDetailTitleEl) teamDetailTitleEl.innerHTML = `<img class="team-detail-title-logo" src="${escapeHtml(logo || 'placeholder.png')}" alt="" /> ${escapeHtml(displayTeamAbbrev(team) || team)} Team Card`;
   if (teamDetailRecordEl) teamDetailRecordEl.textContent = 'Loading roster, splits, and staff...';
@@ -26408,6 +26456,11 @@ function teamDetailPlayerGameContext(teamAbbrev = '') {
 }
 
 function currentTeamDetailOrder() {
+  const storedOrder = String(teamDetailOverlayEl?.dataset?.teamDetailOrder || '')
+    .split(',')
+    .map(canonicalTeamAbbrev)
+    .filter(Boolean);
+  if (storedOrder.length >= 2) return [...new Set(storedOrder)];
   const source = teamStatsPageEl?.querySelector('.team-stats-shell')
     ? teamStatsPageEl
     : (hrLeaderboardPageEl?.querySelector('.playoff-picture-shell') ? hrLeaderboardPageEl : document);
@@ -26424,12 +26477,25 @@ function navigateOpenTeamDetail(delta = 1) {
   if (!current || order.length < 2) return;
   const index = Math.max(0, order.indexOf(current));
   const next = order[(index + delta + order.length) % order.length];
-  if (next && next !== current) openTeamDetailOverlay(next);
+  if (next && next !== current) openTeamDetailOverlay(next, { preserveOrder: true });
+}
+
+function teamDetailOrderFromLineupContext() {
+  if (!activeLineupGame) return [];
+  return [activeLineupGame.away, activeLineupGame.home].map(canonicalTeamAbbrev).filter(Boolean);
 }
 
 function initTeamDetailOverlay() {
   teamDetailCloseBtnEl?.addEventListener('click', closeTeamDetailOverlay);
   teamDetailBackdropEl?.addEventListener('click', closeTeamDetailOverlay);
+  document.addEventListener('keydown', (event) => {
+    if (!teamDetailOverlayEl || teamDetailOverlayEl.hidden) return;
+    if (event.key !== 'ArrowLeft' && event.key !== 'ArrowRight') return;
+    if (event.altKey || event.ctrlKey || event.metaKey || isTextEntryTarget(event.target)) return;
+    event.preventDefault();
+    event.stopImmediatePropagation();
+    navigateOpenTeamDetail(event.key === 'ArrowRight' ? 1 : -1);
+  }, true);
   teamDetailOverlayEl?.addEventListener('wheel', (event) => {
     if (!teamDetailBodyEl || teamDetailOverlayEl.hidden) return;
     if (Math.abs(event.deltaY) < Math.abs(event.deltaX)) return;
@@ -26461,7 +26527,8 @@ function initTeamDetailOverlay() {
     if (!team) return;
     event.preventDefault();
     event.stopPropagation();
-    openTeamDetailOverlay(team);
+    const order = target.closest('#lineupOverlay') ? teamDetailOrderFromLineupContext() : [];
+    openTeamDetailOverlay(team, { order });
   });
   document.addEventListener('keydown', (event) => {
     if (event.key === 'Escape' && teamDetailOverlayEl && !teamDetailOverlayEl.hidden) {
@@ -26470,6 +26537,7 @@ function initTeamDetailOverlay() {
     }
     if (teamDetailOverlayEl && !teamDetailOverlayEl.hidden && (event.key === 'ArrowLeft' || event.key === 'ArrowRight')) {
       event.preventDefault();
+      event.stopImmediatePropagation();
       navigateOpenTeamDetail(event.key === 'ArrowRight' ? 1 : -1);
       return;
     }
@@ -26496,7 +26564,8 @@ function initTeamDetailOverlay() {
     const target = event.target instanceof Element ? event.target.closest('[data-team-detail-team]') : null;
     if (!target) return;
     event.preventDefault();
-    openTeamDetailOverlay(target.dataset.teamDetailTeam || '');
+    const order = target.closest('#lineupOverlay') ? teamDetailOrderFromLineupContext() : [];
+    openTeamDetailOverlay(target.dataset.teamDetailTeam || '', { order });
   });
 }
 

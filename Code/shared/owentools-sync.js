@@ -26,6 +26,10 @@
   let suppressUpload = false;
   let pendingUploads = new Map();
   let flushTimer = 0;
+  let pullTimer = 0;
+  let pullInFlight = false;
+  let lastPullAt = 0;
+  let realtimeChannel = null;
   let statusEl = null;
   let menuEl = null;
   let copyEl = null;
@@ -208,6 +212,8 @@
 
   function shouldUseCloudValue(localValue, cloudValue, localTime, cloudTime, key = "") {
     if (String(key || "").startsWith("player-tracker:v1:")) {
+      if (localValue == null && cloudValue != null) return true;
+      if (dataWeight(localValue) === 0 && dataWeight(cloudValue) > 0) return true;
       return cloudTime > localTime;
     }
     const localWeight = dataWeight(localValue);
@@ -447,6 +453,97 @@
     return flushUploads();
   }
 
+  async function pullCloudState(reason = "auto") {
+    if (!client || !session || pageConfig.loginOnly || pullInFlight) return false;
+    pullInFlight = true;
+    try {
+      if (pendingUploads.size) await flushUploads();
+      const download = await loadCloudState();
+      if (!download.ok) return false;
+      lastPullAt = Date.now();
+      if (download.changed) dispatchSyncStateChanged({ changedKeys: download.changedKeys || [], source: reason });
+      if (session) {
+        setState("signed-in");
+        setStatus("Synced");
+      }
+      return Boolean(download.changed);
+    } finally {
+      pullInFlight = false;
+    }
+  }
+
+  function scheduleCloudPull(delay = 0, reason = "auto") {
+    if (!client || !session || pageConfig.loginOnly) return;
+    window.clearTimeout(pullTimer);
+    pullTimer = window.setTimeout(() => {
+      void pullCloudState(reason);
+    }, Math.max(0, Number(delay) || 0));
+  }
+
+  function startAutoPullLoop() {
+    if (!configured) return;
+    const interval = Math.max(2500, Number(pageConfig.pullIntervalMs) || 5000);
+    window.setInterval(() => {
+      if (document.visibilityState === "hidden") return;
+      if (!session || !syncReady) return;
+      if (Date.now() - lastPullAt < interval - 250) return;
+      scheduleCloudPull(0, "poll");
+    }, interval);
+    window.addEventListener("focus", () => scheduleCloudPull(80, "focus"));
+    document.addEventListener("visibilitychange", () => {
+      if (document.visibilityState === "visible") scheduleCloudPull(80, "visible");
+    });
+    window.addEventListener("storage", (event) => {
+      if (event.key === META_KEY || shouldSyncKey(event.key || "")) scheduleCloudPull(80, "storage");
+    });
+  }
+
+  function stopRealtimeSubscription() {
+    if (!client || !realtimeChannel) {
+      realtimeChannel = null;
+      return;
+    }
+    try {
+      client.removeChannel(realtimeChannel);
+    } catch {
+      // Polling remains the fallback if realtime cleanup is unavailable.
+    }
+    realtimeChannel = null;
+  }
+
+  function startRealtimeSubscription() {
+    if (!client || !session || pageConfig.loginOnly || realtimeChannel || typeof client.channel !== "function") return;
+    try {
+      const userId = session.user?.id;
+      if (!userId) return;
+      realtimeChannel = client
+        .channel(`owentools-sync:${pageConfig.toolId}:${userId}`)
+        .on(
+          "postgres_changes",
+          {
+            event: "*",
+            schema: "public",
+            table: "tool_state",
+            filter: `user_id=eq.${userId}`
+          },
+          (payload) => {
+            const row = payload?.new || payload?.old || {};
+            if (row.tool_id !== pageConfig.toolId) return;
+            if (row.state_key && !shouldSyncKey(row.state_key)) return;
+            scheduleCloudPull(40, "realtime");
+          }
+        )
+        .subscribe((status) => {
+          if (status === "CHANNEL_ERROR" || status === "TIMED_OUT" || status === "CLOSED") {
+            stopRealtimeSubscription();
+          }
+        });
+    } catch (error) {
+      realtimeChannel = null;
+      console.warn("owentools sync realtime subscription failed", error);
+    }
+  }
+
   async function reconcileAfterSignIn() {
     try {
       setState("working");
@@ -462,6 +559,7 @@
       setState("signed-in");
       setStatus(session?.user?.email || "Synced");
       if (download.changed) dispatchSyncStateChanged({ changedKeys: download.changedKeys || [], source: "reconcile" });
+      scheduleCloudPull(1200, "post-reconcile");
     } catch (error) {
       syncReady = Boolean(session);
       setErrorStatus(error);
@@ -829,14 +927,22 @@
     const result = await withTimeout(client.auth.getSession(), "Session restore");
     session = result.data.session;
     refreshWidget();
-    if (session) await reconcileAfterSignIn();
+    if (session) {
+      await reconcileAfterSignIn();
+      startRealtimeSubscription();
+    }
+    startAutoPullLoop();
 
     client.auth.onAuthStateChange(async (_event, nextSession) => {
+      stopRealtimeSubscription();
       session = nextSession;
       recoveryMode = _event === "PASSWORD_RECOVERY";
       syncReady = false;
       refreshWidget();
-      if (session) await reconcileAfterSignIn();
+      if (session) {
+        await reconcileAfterSignIn();
+        startRealtimeSubscription();
+      }
       else {
         setState("signed-out");
         setStatus("Sign in");
@@ -847,6 +953,7 @@
   window.OwenToolsSync = {
     uploadLocalState,
     loadCloudState,
+    pullCloudState,
     flushUploads,
     getSession: () => session
   };
