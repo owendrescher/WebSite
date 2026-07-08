@@ -1,33 +1,187 @@
-{
-  "generatedAt": "2026-06-29T14:01:46.167Z",
-  "note": "BOS static RotoWire fallback updated from current RotoWire search result; batter series SOS label removed while preserving base handedness and series loaders.",
-  "bos": {
-    "RHP": [
-      "Masataka Yoshida",
-      "Ceddanne Rafaela",
-      "Wilyer Abreu",
-      "Willson Contreras",
-      "Jarren Duran",
-      "Caleb Durbin",
-      "Carlos Narvaez",
-      "Anthony Seigler",
-      "Tsung-Che Cheng"
-    ],
-    "LHP": [
-      "Nate Eaton",
-      "Ceddanne Rafaela",
-      "Wilyer Abreu",
-      "Willson Contreras",
-      "Jarren Duran",
-      "Caleb Durbin",
-      "Andruw Monasterio",
-      "Anthony Seigler",
-      "Carlos Narvaez"
-    ],
-    "source": "RotoWire Boston Red Sox batting orders search result, crawled yesterday/today in this session"
-  },
-  "preservedLoaders": {
-    "getLineupRecentBattingHandSplits": "unchanged from uploaded clean base except surrounding render race fix",
-    "getBatterSeriesHistoryDetails": "algorithm unchanged from uploaded clean base; asOfLabel changed from Daily SOS to empty string"
-  }
+﻿{
+    "generatedAt":  "2026-07-08T12:42:20.9274975Z",
+    "note":  "Static RotoWire fallback refreshed from RotoWire batting-order table endpoint. Each hand uses the latest actual lineup against that opposing pitcher hand; previous seed preserved only if a hand could not be resolved.",
+    "sourcePattern":  "https://www.rotowire.com/baseball/tables/batting-order-data.php?team={TEAM}",
+    "teams":  {
+                  "ARI":  {
+                              "url":  "https://www.rotowire.com/baseball/tables/batting-order-data.php?team=ARI",
+                              "rows":  162,
+                              "rhp":  "latest actual lineup vs RHP",
+                              "lhp":  "latest actual lineup vs LHP"
+                          },
+                  "ATH":  {
+                              "url":  "https://www.rotowire.com/baseball/tables/batting-order-data.php?team=ATH",
+                              "rows":  162,
+                              "rhp":  "latest actual lineup vs RHP",
+                              "lhp":  "latest actual lineup vs LHP"
+                          },
+                  "ATL":  {
+                              "url":  "https://www.rotowire.com/baseball/tables/batting-order-data.php?team=ATL",
+                              "rows":  161,
+                              "rhp":  "latest actual lineup vs RHP",
+                              "lhp":  "latest actual lineup vs LHP"
+                          },
+                  "BAL":  {
+                              "url":  "https://www.rotowire.com/baseball/tables/batting-order-data.php?team=BAL",
+                              "rows":  159,
+                              "rhp":  "latest actual lineup vs RHP",
+                              "lhp":  "latest actual lineup vs LHP"
+                          },
+                  "BOS":  {
+                              "url":  "https://www.rotowire.com/baseball/tables/batting-order-data.php?team=BOS",
+                              "rows":  160,
+                              "rhp":  "latest actual lineup vs RHP",
+                              "lhp":  "latest actual lineup vs LHP"
+                          },
+                  "CHC":  {
+                              "url":  "https://www.rotowire.com/baseball/tables/batting-order-data.php?team=CHC",
+                              "rows":  159,
+                              "rhp":  "latest actual lineup vs RHP",
+                              "lhp":  "latest actual lineup vs LHP"
+                          },
+                  "CIN":  {
+                              "url":  "https://www.rotowire.com/baseball/tables/batting-order-data.php?team=CIN",
+                              "rows":  160,
+                              "rhp":  "latest actual lineup vs RHP",
+                              "lhp":  "latest actual lineup vs LHP"
+                          },
+                  "CLE":  {
+                              "url":  "https://www.rotowire.com/baseball/tables/batting-order-data.php?team=CLE",
+                              "rows":  160,
+                              "rhp":  "latest actual lineup vs RHP",
+                              "lhp":  "latest actual lineup vs LHP"
+                          },
+                  "COL":  {
+                              "url":  "https://www.rotowire.com/baseball/tables/batting-order-data.php?team=COL",
+                              "rows":  160,
+                              "rhp":  "latest actual lineup vs RHP",
+                              "lhp":  "latest actual lineup vs LHP"
+                          },
+                  "CWS":  {
+                              "url":  "https://www.rotowire.com/baseball/tables/batting-order-data.php?team=CWS",
+                              "rows":  161,
+                              "rhp":  "latest actual lineup vs RHP",
+                              "lhp":  "latest actual lineup vs LHP"
+                          },
+                  "DET":  {
+                              "url":  "https://www.rotowire.com/baseball/tables/batting-order-data.php?team=DET",
+                              "rows":  160,
+                              "rhp":  "latest actual lineup vs RHP",
+                              "lhp":  "latest actual lineup vs LHP"
+                          },
+                  "HOU":  {
+                              "url":  "https://www.rotowire.com/baseball/tables/batting-order-data.php?team=HOU",
+                              "rows":  160,
+                              "rhp":  "latest actual lineup vs RHP",
+                              "lhp":  "latest actual lineup vs LHP"
+                          },
+                  "KC":  {
+                             "url":  "https://www.rotowire.com/baseball/tables/batting-order-data.php?team=KC",
+                             "rows":  161,
+                             "rhp":  "latest actual lineup vs RHP",
+                             "lhp":  "latest actual lineup vs LHP"
+                         },
+                  "LAA":  {
+                              "url":  "https://www.rotowire.com/baseball/tables/batting-order-data.php?team=LAA",
+                              "rows":  162,
+                              "rhp":  "latest actual lineup vs RHP",
+                              "lhp":  "latest actual lineup vs LHP"
+                          },
+                  "LAD":  {
+                              "url":  "https://www.rotowire.com/baseball/tables/batting-order-data.php?team=LAD",
+                              "rows":  162,
+                              "rhp":  "latest actual lineup vs RHP",
+                              "lhp":  "latest actual lineup vs LHP"
+                          },
+                  "MIA":  {
+                              "url":  "https://www.rotowire.com/baseball/tables/batting-order-data.php?team=MIA",
+                              "rows":  162,
+                              "rhp":  "latest actual lineup vs RHP",
+                              "lhp":  "latest actual lineup vs LHP"
+                          },
+                  "MIL":  {
+                              "url":  "https://www.rotowire.com/baseball/tables/batting-order-data.php?team=MIL",
+                              "rows":  160,
+                              "rhp":  "latest actual lineup vs RHP",
+                              "lhp":  "latest actual lineup vs LHP"
+                          },
+                  "MIN":  {
+                              "url":  "https://www.rotowire.com/baseball/tables/batting-order-data.php?team=MIN",
+                              "rows":  162,
+                              "rhp":  "latest actual lineup vs RHP",
+                              "lhp":  "latest actual lineup vs LHP"
+                          },
+                  "NYM":  {
+                              "url":  "https://www.rotowire.com/baseball/tables/batting-order-data.php?team=NYM",
+                              "rows":  159,
+                              "rhp":  "latest actual lineup vs RHP",
+                              "lhp":  "latest actual lineup vs LHP"
+                          },
+                  "NYY":  {
+                              "url":  "https://www.rotowire.com/baseball/tables/batting-order-data.php?team=NYY",
+                              "rows":  161,
+                              "rhp":  "latest actual lineup vs RHP",
+                              "lhp":  "latest actual lineup vs LHP"
+                          },
+                  "PHI":  {
+                              "url":  "https://www.rotowire.com/baseball/tables/batting-order-data.php?team=PHI",
+                              "rows":  162,
+                              "rhp":  "latest actual lineup vs RHP",
+                              "lhp":  "latest actual lineup vs LHP"
+                          },
+                  "PIT":  {
+                              "url":  "https://www.rotowire.com/baseball/tables/batting-order-data.php?team=PIT",
+                              "rows":  162,
+                              "rhp":  "latest actual lineup vs RHP",
+                              "lhp":  "latest actual lineup vs LHP"
+                          },
+                  "SD":  {
+                             "url":  "https://www.rotowire.com/baseball/tables/batting-order-data.php?team=SD",
+                             "rows":  162,
+                             "rhp":  "latest actual lineup vs RHP",
+                             "lhp":  "latest actual lineup vs LHP"
+                         },
+                  "SEA":  {
+                              "url":  "https://www.rotowire.com/baseball/tables/batting-order-data.php?team=SEA",
+                              "rows":  162,
+                              "rhp":  "latest actual lineup vs RHP",
+                              "lhp":  "latest actual lineup vs LHP"
+                          },
+                  "SF":  {
+                             "url":  "https://www.rotowire.com/baseball/tables/batting-order-data.php?team=SF",
+                             "rows":  160,
+                             "rhp":  "latest actual lineup vs RHP",
+                             "lhp":  "latest actual lineup vs LHP"
+                         },
+                  "STL":  {
+                              "url":  "https://www.rotowire.com/baseball/tables/batting-order-data.php?team=STL",
+                              "rows":  159,
+                              "rhp":  "latest actual lineup vs RHP",
+                              "lhp":  "latest actual lineup vs LHP"
+                          },
+                  "TB":  {
+                             "url":  "https://www.rotowire.com/baseball/tables/batting-order-data.php?team=TB",
+                             "rows":  160,
+                             "rhp":  "latest actual lineup vs RHP",
+                             "lhp":  "latest actual lineup vs LHP"
+                         },
+                  "TEX":  {
+                              "url":  "https://www.rotowire.com/baseball/tables/batting-order-data.php?team=TEX",
+                              "rows":  162,
+                              "rhp":  "latest actual lineup vs RHP",
+                              "lhp":  "latest actual lineup vs LHP"
+                          },
+                  "TOR":  {
+                              "url":  "https://www.rotowire.com/baseball/tables/batting-order-data.php?team=TOR",
+                              "rows":  160,
+                              "rhp":  "latest actual lineup vs RHP",
+                              "lhp":  "latest actual lineup vs LHP"
+                          },
+                  "WSH":  {
+                              "url":  "https://www.rotowire.com/baseball/tables/batting-order-data.php?team=WSH",
+                              "rows":  162,
+                              "rhp":  "latest actual lineup vs RHP",
+                              "lhp":  "latest actual lineup vs LHP"
+                          }
+              }
 }

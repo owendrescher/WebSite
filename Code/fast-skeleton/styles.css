@@ -4739,6 +4739,136 @@ body[data-overlay-dock='bottom'] .player-stat-overlay {
   text-transform: uppercase;
 }
 
+.player-stat-contract {
+  position: relative;
+  height: 100%;
+  min-width: 0;
+  overflow: auto;
+  padding: 10px;
+  overscroll-behavior: contain;
+  background:
+    radial-gradient(circle at 16% 8%, color-mix(in srgb, var(--contract-team-color, var(--accent)) 18%, transparent), transparent 32%),
+    linear-gradient(180deg, color-mix(in srgb, var(--contract-team-color, var(--accent)) 8%, transparent), transparent 38%);
+}
+
+.player-stat-contract[hidden] {
+  display: none !important;
+}
+
+.player-contract-shell {
+  position: relative;
+  display: grid;
+  gap: 10px;
+  min-height: 100%;
+  overflow: hidden;
+  isolation: isolate;
+}
+
+.player-contract-shell::before {
+  content: '';
+  position: absolute;
+  inset: 1% auto auto 50%;
+  width: min(57vw, 540px);
+  aspect-ratio: 1;
+  transform: translateX(-50%);
+  background-image: var(--contract-team-logo, none);
+  background-position: center;
+  background-repeat: no-repeat;
+  background-size: contain;
+  opacity: 0.16;
+  filter:
+    saturate(1.22)
+    drop-shadow(0 0 54px color-mix(in srgb, var(--contract-team-color, var(--accent)) 58%, transparent));
+  mix-blend-mode: screen;
+  pointer-events: none;
+  z-index: 0;
+}
+
+.player-contract-bg-logo {
+  position: absolute;
+  top: 1%;
+  left: 50%;
+  width: min(57vw, 540px);
+  max-width: none;
+  aspect-ratio: 1;
+  object-fit: contain;
+  transform: translateX(-50%);
+  opacity: 0.16;
+  filter:
+    saturate(1.22)
+    drop-shadow(0 0 54px color-mix(in srgb, var(--contract-team-color, var(--accent)) 58%, transparent));
+  mix-blend-mode: screen;
+  pointer-events: none;
+  user-select: none;
+  z-index: 0;
+}
+
+.player-contract-hero {
+  position: relative;
+  z-index: 1;
+  display: grid;
+  gap: 2px;
+  padding: 12px 14px;
+  border: 1px solid color-mix(in srgb, var(--contract-team-color, var(--accent)) 55%, var(--line));
+  border-radius: 10px;
+  background:
+    linear-gradient(90deg, color-mix(in srgb, var(--contract-team-color, var(--accent)) 20%, transparent), transparent 70%),
+    color-mix(in srgb, var(--panel-item) 78%, transparent);
+  box-shadow: inset 3px 0 0 color-mix(in srgb, var(--contract-team-color, var(--accent)) 75%, transparent);
+}
+
+.player-contract-hero span,
+.player-contract-hero em {
+  color: var(--muted);
+  font: 900 0.68rem var(--font-ui);
+  letter-spacing: 0.08em;
+  text-transform: uppercase;
+}
+
+.player-contract-hero strong {
+  color: var(--text);
+  font: 950 clamp(1rem, 1.9vw, 1.45rem)/1.1 var(--font-ui);
+  overflow-wrap: anywhere;
+}
+
+.player-contract-grid {
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: 10px;
+}
+
+.player-contract-card {
+  position: relative;
+  z-index: 1;
+  min-width: 0;
+  border: 1px solid color-mix(in srgb, var(--contract-team-color, var(--line)) 24%, var(--line));
+  border-radius: 10px;
+  padding: 9px 10px;
+  background:
+    linear-gradient(180deg, color-mix(in srgb, var(--contract-team-color, var(--accent)) 6%, transparent), transparent 68%),
+    color-mix(in srgb, var(--panel-item) 92%, transparent);
+}
+
+.player-contract-card > strong {
+  display: block;
+  margin-bottom: 5px;
+  color: color-mix(in srgb, var(--contract-team-color, var(--badge-text)) 30%, var(--badge-text));
+  font: 900 0.68rem var(--font-ui);
+  letter-spacing: 0.08em;
+  text-transform: uppercase;
+}
+
+.player-contract-card a {
+  color: var(--accent);
+  font-weight: 900;
+}
+
+@media (max-width: 720px) {
+  .player-contract-grid {
+    grid-template-columns: 1fr;
+  }
+}
+
 .player-recent-window-toggle {
   display: inline-flex;
   align-items: center;
@@ -8269,7 +8399,7 @@ body[data-overlay-dock='bottom'] .score-state-strip,
 }
 .bet-leg-builder {
   display: grid;
-  grid-template-columns: minmax(0, 1fr) 84px 68px;
+  grid-template-columns: minmax(140px, 1.35fr) repeat(3, minmax(92px, 0.8fr)) 84px 68px;
   gap: 7px;
   align-items: end;
 }
@@ -8301,14 +8431,20 @@ body[data-overlay-dock='bottom'] .score-state-strip,
   border-radius: 7px;
   box-shadow: 0 10px 20px rgba(0,0,0,0.14), inset 0 1px 0 rgba(255,255,255,0.08);
 }
-#betPlayerSearch, #betPropSelect, #betPropTarget { box-sizing: border-box; }
-#betPlayerSearch, #betPropSelect { width: 100%; min-width: 0; }
+#betPlayerSearch, #betPlayerTeamFilter, #betPlayerSkillFilter, #betPlayerPositionFilter, #betPropSelect, #betPropTarget { box-sizing: border-box; }
+#betPlayerSearch, #betPlayerTeamFilter, #betPlayerSkillFilter, #betPlayerPositionFilter, #betPropSelect { width: 100%; min-width: 0; }
 #betPropTarget { width: 100%; min-width: 0; }
 .bet-leg-builder label.is-disabled {
   opacity: 0.52;
 }
-.bet-leg-builder label.is-disabled input {
+.bet-leg-builder label.is-disabled input,
+.bet-leg-builder label.is-disabled select {
   pointer-events: none;
+}
+@media (max-width: 900px) {
+  .bet-leg-builder {
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+  }
 }
 
 .panel-tabs {

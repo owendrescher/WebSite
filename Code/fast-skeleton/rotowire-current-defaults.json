@@ -1,722 +1,722 @@
-{
-  "ARI": {
-    "RHP": [
-      "Ketel Marte",
-      "Geraldo Perdomo",
-      "Corbin Carroll",
-      "Gabriel Moreno",
-      "Pavin Smith",
-      "Nolan Arenado",
-      "Lourdes Gurriel",
-      "Max Kepler",
-      "Tommy Troy"
-    ],
-    "LHP": [
-      "Ketel Marte",
-      "Geraldo Perdomo",
-      "Corbin Carroll",
-      "Gabriel Moreno",
-      "Nolan Arenado",
-      "Tommy Troy",
-      "Lourdes Gurriel",
-      "Ildemaro Vargas",
-      "LuJames Groover"
-    ]
-  },
-  "ATH": {
-    "RHP": [
-      "Henry Bolte",
-      "Nick Kurtz",
-      "Shea Langeliers",
-      "Tyler Soderstrom",
-      "Jacob Wilson",
-      "Jonah Heim",
-      "Lawrence Butler",
-      "Max Muncy",
-      "Jeff McNeil"
-    ],
-    "LHP": [
-      "Henry Bolte",
-      "Nick Kurtz",
-      "Shea Langeliers",
-      "Jacob Wilson",
-      "Tyler Soderstrom",
-      "Joey Meneses",
-      "Colby Thomas",
-      "Alika Williams",
-      "Max Muncy"
-    ]
-  },
-  "ATL": {
-    "RHP": [
-      "Drake Baldwin",
-      "Michael Harris",
-      "Matt Olson",
-      "Ozzie Albies",
-      "Dominic Smith",
-      "Mauricio Dubon",
-      "Austin Riley",
-      "Mike Yastrzemski",
-      "Eli White"
-    ],
-    "LHP": [
-      "Mauricio Dubon",
-      "Drake Baldwin",
-      "Ozzie Albies",
-      "Matt Olson",
-      "Michael Harris",
-      "Austin Riley",
-      "Joey Bart",
-      "Eli White",
-      "Jorge Mateo"
-    ]
-  },
-  "BAL": {
-    "RHP": [
-      "Taylor Ward",
-      "Gunnar Henderson",
-      "Pete Alonso",
-      "Samuel Basallo",
-      "Leody Taveras",
-      "Colton Cowser",
-      "Tyler O'Neill",
-      "Jackson Holliday",
-      "Blaze Alexander"
-    ],
-    "LHP": [
-      "Taylor Ward",
-      "Gunnar Henderson",
-      "Pete Alonso",
-      "Tyler O'Neill",
-      "Coby Mayo",
-      "Jeremiah Jackson",
-      "Blaze Alexander",
-      "Sam Huff",
-      "Leody Taveras"
-    ]
-  },
-  "BOS": {
-    "RHP": [
-      "Masataka Yoshida",
-      "Ceddanne Rafaela",
-      "Wilyer Abreu",
-      "Willson Contreras",
-      "Jarren Duran",
-      "Caleb Durbin",
-      "Carlos Narvaez",
-      "Anthony Seigler",
-      "Tsung-Che Cheng"
-    ],
-    "LHP": [
-      "Nate Eaton",
-      "Ceddanne Rafaela",
-      "Wilyer Abreu",
-      "Willson Contreras",
-      "Jarren Duran",
-      "Caleb Durbin",
-      "Andruw Monasterio",
-      "Anthony Seigler",
-      "Carlos Narvaez"
-    ]
-  },
-  "CHC": {
-    "RHP": [
-      "Pete Crow-Armstrong",
-      "Alex Bregman",
-      "Michael Busch",
-      "Seiya Suzuki",
-      "Ian Happ",
-      "Matt Shaw",
-      "Nico Hoerner",
-      "Carson Kelly",
-      "Dansby Swanson"
-    ],
-    "LHP": [
-      "Pete Crow-Armstrong",
-      "Matt Shaw",
-      "Seiya Suzuki",
-      "Alex Bregman",
-      "Michael Busch",
-      "Ian Happ",
-      "Nico Hoerner",
-      "Carson Kelly",
-      "Dansby Swanson"
-    ]
-  },
-  "CIN": {
-    "RHP": [
-      "Blake Dunn",
-      "Elly De La Cruz",
-      "JJ Bleday",
-      "Sal Stewart",
-      "Nathaniel Lowe",
-      "Spencer Steer",
-      "Eugenio Suarez",
-      "Tyler Stephenson",
-      "Matt McLain"
-    ],
-    "LHP": [
-      "Blake Dunn",
-      "Elly De La Cruz",
-      "Dane Myers",
-      "Sal Stewart",
-      "Spencer Steer",
-      "JJ Bleday",
-      "Eugenio Suarez",
-      "Tyler Stephenson",
-      "Matt McLain"
-    ]
-  },
-  "CLE": {
-    "RHP": [
-      "Travis Bazzana",
-      "Kyle Manzardo",
-      "Brayan Rocchio",
-      "Rhys Hoskins",
-      "Cooper Ingle",
-      "Kahlil Watson",
-      "Daniel Schneemann",
-      "Patrick Bailey",
-      "Steven Kwan"
-    ],
-    "LHP": [
-      "Travis Bazzana",
-      "David Fry",
-      "Brayan Rocchio",
-      "Rhys Hoskins",
-      "Kyle Manzardo",
-      "Gabriel Arias",
-      "Stuart Fairchild",
-      "Austin Hedges",
-      "Petey Halpin"
-    ]
-  },
-  "COL": {
-    "RHP": [
-      "Jake McCarthy",
-      "Mickey Moniak",
-      "TJ Rumfield",
-      "Hunter Goodman",
-      "Willi Castro",
-      "Tyler Freeman",
-      "Cole Carrigg",
-      "Ezequiel Tovar",
-      "Kyle Karros"
-    ],
-    "LHP": [
-      "Willi Castro",
-      "Tyler Freeman",
-      "TJ Rumfield",
-      "Hunter Goodman",
-      "Cole Carrigg",
-      "Jake McCarthy",
-      "Braxton Fulford",
-      "Ezequiel Tovar",
-      "Kyle Karros"
-    ]
-  },
-  "CWS": {
-    "RHP": [
-      "Sam Antonacci",
-      "Miguel Vargas",
-      "Andrew Benintendi",
-      "Kyle Teel",
-      "Colson Montgomery",
-      "Chase Meidroth",
-      "Braden Montgomery",
-      "Jacob Gonzalez",
-      "Tristan Peters"
-    ],
-    "LHP": [
-      "Miguel Vargas",
-      "Randal Grichuk",
-      "Chase Meidroth",
-      "Colson Montgomery",
-      "Braden Montgomery",
-      "Sam Antonacci",
-      "Drew Romo",
-      "Luisangel Acuna",
-      "Tristan Peters"
-    ]
-  },
-  "DET": {
-    "RHP": [
-      "Kevin McGonigle",
-      "Kerry Carpenter",
-      "Dillon Dingler",
-      "Riley Greene",
-      "Colt Keith",
-      "Spencer Torkelson",
-      "Zach McKinstry",
-      "James Outman",
-      "Hao-Yu Lee"
-    ],
-    "LHP": [
-      "Kevin McGonigle",
-      "Dillon Dingler",
-      "Matt Vierling",
-      "Riley Greene",
-      "Spencer Torkelson",
-      "Jahmai Jones",
-      "Hao-Yu Lee",
-      "Zach McKinstry",
-      "Ben Malgeri"
-    ]
-  },
-  "HOU": {
-    "RHP": [
-      "Jeremy Pena",
-      "Yordan Alvarez",
-      "Christian Walker",
-      "Isaac Paredes",
-      "Jose Altuve",
-      "Yainer Diaz",
-      "Cam Smith",
-      "Joey Loperfido",
-      "Jake Meyers"
-    ],
-    "LHP": [
-      "Jeremy Pena",
-      "Yordan Alvarez",
-      "Christian Walker",
-      "Isaac Paredes",
-      "Jose Altuve",
-      "Yainer Diaz",
-      "Cam Smith",
-      "Jake Meyers",
-      "Brice Matthews"
-    ]
-  },
-  "KC": {
-    "RHP": [
-      "Carter Jensen",
-      "Bobby Witt",
-      "Jac Caglianone",
-      "Salvador Perez",
-      "Michael Massey",
-      "Lane Thomas",
-      "John Rave",
-      "Nick Loftin",
-      "Isaac Collins"
-    ],
-    "LHP": [
-      "Lane Thomas",
-      "Bobby Witt",
-      "Jac Caglianone",
-      "Salvador Perez",
-      "Starling Marte",
-      "Nick Loftin",
-      "Tyler Tolbert",
-      "Carter Jensen",
-      "Isaac Collins"
-    ]
-  },
-  "LAA": {
-    "RHP": [
-      "Zach Neto",
-      "Nolan Schanuel",
-      "Jo Adell",
-      "Jorge Soler",
-      "Wade Meckler",
-      "Denzer Guzman",
-      "Donovan Walton",
-      "Logan O'Hoppe",
-      "Josh Lowe"
-    ],
-    "LHP": [
-      "Zach Neto",
-      "Vaughn Grissom",
-      "Jo Adell",
-      "Jorge Soler",
-      "Oswald Peraza",
-      "Christian Moore",
-      "Denzer Guzman",
-      "Logan O'Hoppe",
-      "Josh Lowe"
-    ]
-  },
-  "LAD": {
-    "RHP": [
-      "Shohei Ohtani",
-      "Andy Pages",
-      "Freddie Freeman",
-      "Mookie Betts",
-      "Max Muncy",
-      "Kyle Tucker",
-      "Tommy Edman",
-      "Dalton Rushing",
-      "Ryan Ward"
-    ],
-    "LHP": [
-      "Shohei Ohtani",
-      "Andy Pages",
-      "Freddie Freeman",
-      "Mookie Betts",
-      "Kyle Tucker",
-      "Alex Call",
-      "Miguel Rojas",
-      "Dalton Rushing",
-      "Alex Freeland"
-    ]
-  },
-  "MIA": {
-    "RHP": [
-      "Xavier Edwards",
-      "Otto Lopez",
-      "Kyle Stowers",
-      "Heriberto Hernandez",
-      "Griffin Conine",
-      "Jakob Marsee",
-      "Owen Caissie",
-      "Joe Mack",
-      "Javier Sanoja"
-    ],
-    "LHP": [
-      "Xavier Edwards",
-      "Otto Lopez",
-      "Kyle Stowers",
-      "Heriberto Hernandez",
-      "Leo Jimenez",
-      "Esteury Ruiz",
-      "Javier Sanoja",
-      "Jakob Marsee",
-      "Brian Navarreto"
-    ]
-  },
-  "MIL": {
-    "RHP": [
-      "Christian Yelich",
-      "Jackson Chourio",
-      "Brice Turang",
-      "William Contreras",
-      "Jake Bauers",
-      "Garrett Mitchell",
-      "Sal Frelick",
-      "Cooper Pratt",
-      "David Hamilton"
-    ],
-    "LHP": [
-      "Christian Yelich",
-      "Jackson Chourio",
-      "Brice Turang",
-      "William Contreras",
-      "Andrew Vaughn",
-      "Blake Perkins",
-      "Garrett Mitchell",
-      "Cooper Pratt",
-      "Joey Ortiz"
-    ]
-  },
-  "MIN": {
-    "RHP": [
-      "Trevor Larnach",
-      "Byron Buxton",
-      "Kody Clemens",
-      "Josh Bell",
-      "Royce Lewis",
-      "Brooks Lee",
-      "Victor Caratini",
-      "Luke Keaschall",
-      "Ryan Kreidler"
-    ],
-    "LHP": [
-      "Austin Martin",
-      "Byron Buxton",
-      "Brooks Lee",
-      "Royce Lewis",
-      "Josh Bell",
-      "Kyler Fedko",
-      "Luke Keaschall",
-      "Ryan Kreidler",
-      "Alex Jackson"
-    ]
-  },
-  "NYM": {
-    "RHP": [
-      "Francisco Lindor",
-      "Bo Bichette",
-      "Juan Soto",
-      "Carson Benge",
-      "Jared Young",
-      "Francisco Alvarez",
-      "A.J. Ewing",
-      "Brett Baty",
-      "MJ Melendez"
-    ],
-    "LHP": [
-      "Carson Benge",
-      "Francisco Lindor",
-      "Juan Soto",
-      "Bo Bichette",
-      "Mark Vientos",
-      "Francisco Alvarez",
-      "Eric Wagaman",
-      "A.J. Ewing",
-      "Ronny Mauricio"
-    ]
-  },
-  "NYY": {
-    "RHP": [
-      "Ben Rice",
-      "Jasson Dominguez",
-      "Cody Bellinger",
-      "Paul Goldschmidt",
-      "Jazz Chisholm",
-      "Spencer Jones",
-      "Jose Caballero",
-      "Austin Wells",
-      "Anthony Volpe"
-    ],
-    "LHP": [
-      "Amed Rosario",
-      "Ben Rice",
-      "Paul Goldschmidt",
-      "Cody Bellinger",
-      "Anthony Volpe",
-      "Jazz Chisholm",
-      "Jasson Dominguez",
-      "Jose Caballero",
-      "Austin Wells"
-    ]
-  },
-  "PHI": {
-    "RHP": [
-      "Trea Turner",
-      "Kyle Schwarber",
-      "Bryce Harper",
-      "Brandon Marsh",
-      "Alec Bohm",
-      "Bryson Stott",
-      "J.T. Realmuto",
-      "Gabriel Rincones",
-      "Justin Crawford"
-    ],
-    "LHP": [
-      "Trea Turner",
-      "Kyle Schwarber",
-      "Bryce Harper",
-      "Alec Bohm",
-      "Edmundo Sosa",
-      "Brandon Marsh",
-      "J.T. Realmuto",
-      "Derek Hill",
-      "Bryson Stott"
-    ]
-  },
-  "PIT": {
-    "RHP": [
-      "Jake Mangum",
-      "Brandon Lowe",
-      "Bryan Reynolds",
-      "Nick Gonzales",
-      "Ryan O'Hearn",
-      "Endy Rodriguez",
-      "Esmerlyn Valdez",
-      "Tyler Callihan",
-      "Jared Triolo"
-    ],
-    "LHP": [
-      "Nick Gonzales",
-      "Brandon Lowe",
-      "Bryan Reynolds",
-      "Marcell Ozuna",
-      "Esmerlyn Valdez",
-      "Ryan O'Hearn",
-      "Jared Triolo",
-      "Billy Cook",
-      "Endy Rodriguez"
-    ]
-  },
-  "SD": {
-    "RHP": [
-      "Fernando Tatis",
-      "Samad Taylor",
-      "Jackson Merrill",
-      "Manny Machado",
-      "Gavin Sheets",
-      "Xander Bogaerts",
-      "Will Wagner",
-      "Ty France",
-      "Freddy Fermin"
-    ],
-    "LHP": [
-      "Fernando Tatis",
-      "Samad Taylor",
-      "Manny Machado",
-      "Xander Bogaerts",
-      "Jackson Merrill",
-      "Miguel Andujar",
-      "Ty France",
-      "Freddy Fermin",
-      "Jase Bowen"
-    ]
-  },
-  "SEA": {
-    "RHP": [
-      "J.P. Crawford",
-      "Cal Raleigh",
-      "Julio Rodriguez",
-      "Josh Naylor",
-      "Randy Arozarena",
-      "Dominic Canzone",
-      "Luke Raley",
-      "Cole Young",
-      "Colt Emerson"
-    ],
-    "LHP": [
-      "J.P. Crawford",
-      "Cal Raleigh",
-      "Julio Rodriguez",
-      "Josh Naylor",
-      "Randy Arozarena",
-      "Rob Refsnyder",
-      "Victor Robles",
-      "Colt Emerson",
-      "Cole Young"
-    ]
-  },
-  "SF": {
-    "RHP": [
-      "Luis Arraez",
-      "Bryce Eldridge",
-      "Casey Schmitt",
-      "Rafael Devers",
-      "Jung Hoo Lee",
-      "Willy Adames",
-      "Matt Chapman",
-      "Drew Gilbert",
-      "Daniel Susac"
-    ],
-    "LHP": [
-      "Casey Schmitt",
-      "Rafael Devers",
-      "Luis Arraez",
-      "Willy Adames",
-      "Jung Hoo Lee",
-      "Bryce Eldridge",
-      "Matt Chapman",
-      "Daniel Susac",
-      "Jonah Cox"
-    ]
-  },
-  "STL": {
-    "RHP": [
-      "JJ Wetherholt",
-      "Ivan Herrera",
-      "Alec Burleson",
-      "Jordan Walker",
-      "Lars Nootbaar",
-      "Masyn Winn",
-      "Jimmy Crooks",
-      "Blaze Jordan",
-      "Nathan Church"
-    ],
-    "LHP": [
-      "JJ Wetherholt",
-      "Ivan Herrera",
-      "Jordan Walker",
-      "Nelson Velazquez",
-      "Alec Burleson",
-      "Masyn Winn",
-      "Lars Nootbaar",
-      "Blaze Jordan",
-      "Pedro Pages"
-    ]
-  },
-  "TB": {
-    "RHP": [
-      "Yandy Diaz",
-      "Jonathan Aranda",
-      "Cedric Mullins",
-      "Junior Caminero",
-      "Richie Palacios",
-      "Chandler Simpson",
-      "Jonny DeLuca",
-      "Hunter Feduccia",
-      "Taylor Walls"
-    ],
-    "LHP": [
-      "Yandy Diaz",
-      "Jonny DeLuca",
-      "Junior Caminero",
-      "Ryan Vilade",
-      "Jonathan Aranda",
-      "Ben Williamson",
-      "Taylor Walls",
-      "Chandler Simpson",
-      "Nick Fortes"
-    ]
-  },
-  "TEX": {
-    "RHP": [
-      "Joc Pederson",
-      "Wyatt Langford",
-      "Corey Seager",
-      "Brandon Nimmo",
-      "Jake Burger",
-      "Josh Jung",
-      "Alejandro Osuna",
-      "Kyle Higashioka",
-      "Nicky Lopez"
-    ],
-    "LHP": [
-      "Wyatt Langford",
-      "Corey Seager",
-      "Josh Jung",
-      "Brandon Nimmo",
-      "Justin Foscue",
-      "Jake Burger",
-      "Kyle Higashioka",
-      "Ezequiel Duran",
-      "Elias Diaz"
-    ]
-  },
-  "TOR": {
-    "RHP": [
-      "George Springer",
-      "Nathan Lukes",
-      "Vladimir Guerrero",
-      "Alejandro Kirk",
-      "Daulton Varsho",
-      "Kazuma Okamoto",
-      "Jesus Sanchez",
-      "Ernie Clement",
-      "Andres Gimenez"
-    ],
-    "LHP": [
-      "George Springer",
-      "Vladimir Guerrero",
-      "Kazuma Okamoto",
-      "Alejandro Kirk",
-      "Daulton Varsho",
-      "Ernie Clement",
-      "Davis Schneider",
-      "Luis Urias",
-      "Myles Straw"
-    ]
-  },
-  "WSH": {
-    "RHP": [
-      "James Wood",
-      "Luis Garcia",
-      "Curtis Mead",
-      "CJ Abrams",
-      "Dylan Crews",
-      "Daylen Lile",
-      "Jacob Young",
-      "Keibert Ruiz",
-      "Nasim Nunez"
-    ],
-    "LHP": [
-      "James Wood",
-      "Curtis Mead",
-      "Andres Chaparro",
-      "CJ Abrams",
-      "Dylan Crews",
-      "Daylen Lile",
-      "Jacob Young",
-      "Nasim Nunez",
-      "Keibert Ruiz"
-    ]
-  }
+﻿{
+    "ARI":  {
+                "RHP":  [
+                            "Ketel Marte",
+                            "Geraldo Perdomo",
+                            "Corbin Carroll",
+                            "Gabriel Moreno",
+                            "Max Kepler",
+                            "Nolan Arenado",
+                            "Pavin Smith",
+                            "James McCann",
+                            "Tim Tawa"
+                        ],
+                "LHP":  [
+                            "Ketel Marte",
+                            "Geraldo Perdomo",
+                            "Corbin Carroll",
+                            "Gabriel Moreno",
+                            "Lourdes Gurriel",
+                            "Nolan Arenado",
+                            "Ildemaro Vargas",
+                            "LuJames Groover",
+                            "Tommy Troy"
+                        ]
+            },
+    "ATH":  {
+                "RHP":  [
+                            "Henry Bolte",
+                            "Nick Kurtz",
+                            "Zack Gelof",
+                            "Lawrence Butler",
+                            "Joshua Kuroda-Grauer",
+                            "Carlos Cortes",
+                            "Max Muncy",
+                            "Jonah Heim",
+                            "Brian Serven"
+                        ],
+                "LHP":  [
+                            "Zack Gelof",
+                            "Nick Kurtz",
+                            "Shea Langeliers",
+                            "Jonah Heim",
+                            "Jacob Wilson",
+                            "Colby Thomas",
+                            "Joshua Kuroda-Grauer",
+                            "Max Muncy",
+                            "Henry Bolte"
+                        ]
+            },
+    "ATL":  {
+                "RHP":  [
+                            "Michael Harris",
+                            "Ozzie Albies",
+                            "Matt Olson",
+                            "Drake Baldwin",
+                            "Mauricio Dubon",
+                            "Dominic Smith",
+                            "Austin Riley",
+                            "Mike Yastrzemski",
+                            "Jim Jarvis"
+                        ],
+                "LHP":  [
+                            "Mauricio Dubon",
+                            "Drake Baldwin",
+                            "Ozzie Albies",
+                            "Matt Olson",
+                            "Austin Riley",
+                            "Michael Harris",
+                            "Eli White",
+                            "Joey Bart",
+                            "Jorge Mateo"
+                        ]
+            },
+    "BAL":  {
+                "RHP":  [
+                            "Gunnar Henderson",
+                            "Adley Rutschman",
+                            "Taylor Ward",
+                            "Pete Alonso",
+                            "Samuel Basallo",
+                            "Colton Cowser",
+                            "Leody Taveras",
+                            "Jackson Holliday",
+                            "Blaze Alexander"
+                        ],
+                "LHP":  [
+                            "Taylor Ward",
+                            "Adley Rutschman",
+                            "Gunnar Henderson",
+                            "Pete Alonso",
+                            "Coby Mayo",
+                            "Samuel Basallo",
+                            "Blaze Alexander",
+                            "Dylan Beavers",
+                            "Jackson Holliday"
+                        ]
+            },
+    "BOS":  {
+                "RHP":  [
+                            "Anthony Seigler",
+                            "Ceddanne Rafaela",
+                            "Wilyer Abreu",
+                            "Willson Contreras",
+                            "Masataka Yoshida",
+                            "Caleb Durbin",
+                            "Jarren Duran",
+                            "Carlos Narvaez",
+                            "Tsung-Che Cheng"
+                        ],
+                "LHP":  [
+                            "Anthony Seigler",
+                            "Ceddanne Rafaela",
+                            "Wilyer Abreu",
+                            "Willson Contreras",
+                            "Romy Gonzalez",
+                            "Caleb Durbin",
+                            "Jarren Duran",
+                            "Andruw Monasterio",
+                            "Connor Wong"
+                        ]
+            },
+    "CHC":  {
+                "RHP":  [
+                            "Pete Crow-Armstrong",
+                            "Alex Bregman",
+                            "Michael Busch",
+                            "Seiya Suzuki",
+                            "Ian Happ",
+                            "Nico Hoerner",
+                            "Michael Conforto",
+                            "Dansby Swanson",
+                            "Miguel Amaya"
+                        ],
+                "LHP":  [
+                            "Pete Crow-Armstrong",
+                            "Alex Bregman",
+                            "Seiya Suzuki",
+                            "Carson Kelly",
+                            "Michael Busch",
+                            "Nico Hoerner",
+                            "Ian Happ",
+                            "Dansby Swanson",
+                            "Kevin Alcantara"
+                        ]
+            },
+    "CIN":  {
+                "RHP":  [
+                            "Elly De La Cruz",
+                            "Sal Stewart",
+                            "JJ Bleday",
+                            "Eugenio Suarez",
+                            "Nathaniel Lowe",
+                            "Spencer Steer",
+                            "Tyler Stephenson",
+                            "TJ Friedl",
+                            "Matt McLain"
+                        ],
+                "LHP":  [
+                            "Elly De La Cruz",
+                            "Sal Stewart",
+                            "Spencer Steer",
+                            "Eugenio Suarez",
+                            "Noelvi Marte",
+                            "JJ Bleday",
+                            "Tyler Stephenson",
+                            "Matt McLain",
+                            "Edwin Arroyo"
+                        ]
+            },
+    "CLE":  {
+                "RHP":  [
+                            "Travis Bazzana",
+                            "Kahlil Watson",
+                            "Chase DeLauter",
+                            "Kyle Manzardo",
+                            "Rhys Hoskins",
+                            "Brayan Rocchio",
+                            "Daniel Schneemann",
+                            "Patrick Bailey",
+                            "Steven Kwan"
+                        ],
+                "LHP":  [
+                            "Travis Bazzana",
+                            "Kahlil Watson",
+                            "Chase DeLauter",
+                            "Kyle Manzardo",
+                            "Gabriel Arias",
+                            "Cooper Ingle",
+                            "Daniel Schneemann",
+                            "Patrick Bailey",
+                            "Steven Kwan"
+                        ]
+            },
+    "COL":  {
+                "RHP":  [
+                            "Jake McCarthy",
+                            "Mickey Moniak",
+                            "Hunter Goodman",
+                            "TJ Rumfield",
+                            "Troy Johnston",
+                            "Kyle Karros",
+                            "Edouard Julien",
+                            "Brett Sullivan",
+                            "Ezequiel Tovar"
+                        ],
+                "LHP":  [
+                            "Willi Castro",
+                            "Kyle Karros",
+                            "TJ Rumfield",
+                            "Cole Carrigg",
+                            "Tyler Freeman",
+                            "Jake McCarthy",
+                            "Ezequiel Tovar",
+                            "Braxton Fulford",
+                            "Mickey Moniak"
+                        ]
+            },
+    "CWS":  {
+                "RHP":  [
+                            "Sam Antonacci",
+                            "Miguel Vargas",
+                            "Kyle Teel",
+                            "Andrew Benintendi",
+                            "Colson Montgomery",
+                            "Braden Montgomery",
+                            "Chase Meidroth",
+                            "Tristan Peters",
+                            "Jacob Gonzalez"
+                        ],
+                "LHP":  [
+                            "Miguel Vargas",
+                            "Randal Grichuk",
+                            "Colson Montgomery",
+                            "Chase Meidroth",
+                            "Sam Antonacci",
+                            "Junior Perez",
+                            "Kyle Teel",
+                            "Luisangel Acuna",
+                            "Tristan Peters"
+                        ]
+            },
+    "DET":  {
+                "RHP":  [
+                            "Kevin McGonigle",
+                            "Colt Keith",
+                            "Riley Greene",
+                            "Dillon Dingler",
+                            "Kerry Carpenter",
+                            "Zach McKinstry",
+                            "Spencer Torkelson",
+                            "James Outman",
+                            "Matt Vierling"
+                        ],
+                "LHP":  [
+                            "Matt Vierling",
+                            "Dillon Dingler",
+                            "Kevin McGonigle",
+                            "Spencer Torkelson",
+                            "Hao-Yu Lee",
+                            "Jahmai Jones",
+                            "Zach McKinstry",
+                            "Ben Malgeri",
+                            "James Outman"
+                        ]
+            },
+    "HOU":  {
+                "RHP":  [
+                            "Jose Altuve",
+                            "Yordan Alvarez",
+                            "Isaac Paredes",
+                            "Christian Walker",
+                            "LaMonte Wade",
+                            "Cam Smith",
+                            "Yainer Diaz",
+                            "Braden Shewmake",
+                            "Brice Matthews"
+                        ],
+                "LHP":  [
+                            "Jose Altuve",
+                            "Yordan Alvarez",
+                            "Isaac Paredes",
+                            "Christian Walker",
+                            "Cam Smith",
+                            "Zach Dezenzo",
+                            "Brice Matthews",
+                            "Nick Allen",
+                            "Christian Vazquez"
+                        ]
+            },
+    "KC":  {
+               "RHP":  [
+                           "Carter Jensen",
+                           "Bobby Witt",
+                           "Jac Caglianone",
+                           "Lane Thomas",
+                           "Michael Massey",
+                           "Salvador Perez",
+                           "Josh Rojas",
+                           "Kameron Misner",
+                           "Isaac Collins"
+                       ],
+               "LHP":  [
+                           "Carter Jensen",
+                           "Bobby Witt",
+                           "Lane Thomas",
+                           "Salvador Perez",
+                           "Jac Caglianone",
+                           "Nick Loftin",
+                           "Isaac Collins",
+                           "Michael Massey",
+                           "Tyler Tolbert"
+                       ]
+           },
+    "LAA":  {
+                "RHP":  [
+                            "Zach Neto",
+                            "Nolan Schanuel",
+                            "Denzer Guzman",
+                            "Jorge Soler",
+                            "Josh Lowe",
+                            "Jo Adell",
+                            "Oswald Peraza",
+                            "Wade Meckler",
+                            "Logan O\u0027Hoppe"
+                        ],
+                "LHP":  [
+                            "Zach Neto",
+                            "Denzer Guzman",
+                            "Vaughn Grissom",
+                            "Jorge Soler",
+                            "Oswald Peraza",
+                            "Jo Adell",
+                            "Jose Siri",
+                            "Logan O\u0027Hoppe",
+                            "Josh Lowe"
+                        ]
+            },
+    "LAD":  {
+                "RHP":  [
+                            "Shohei Ohtani",
+                            "Andy Pages",
+                            "Freddie Freeman",
+                            "Max Muncy",
+                            "Tommy Edman",
+                            "Kyle Tucker",
+                            "Dalton Rushing",
+                            "Alex Freeland",
+                            "Miguel Rojas"
+                        ],
+                "LHP":  [
+                            "Shohei Ohtani",
+                            "Andy Pages",
+                            "Freddie Freeman",
+                            "Mookie Betts",
+                            "Kyle Tucker",
+                            "Teoscar Hernandez",
+                            "Max Muncy",
+                            "Miguel Rojas",
+                            "Dalton Rushing"
+                        ]
+            },
+    "MIA":  {
+                "RHP":  [
+                            "Liam Hicks",
+                            "Kyle Stowers",
+                            "Otto Lopez",
+                            "Xavier Edwards",
+                            "Griffin Conine",
+                            "Owen Caissie",
+                            "Jakob Marsee",
+                            "Joe Mack",
+                            "Javier Sanoja"
+                        ],
+                "LHP":  [
+                            "Otto Lopez",
+                            "Heriberto Hernandez",
+                            "Liam Hicks",
+                            "Xavier Edwards",
+                            "Javier Sanoja",
+                            "Esteury Ruiz",
+                            "Leo Jimenez",
+                            "Jakob Marsee",
+                            "Brian Navarreto"
+                        ]
+            },
+    "MIL":  {
+                "RHP":  [
+                            "Christian Yelich",
+                            "Jackson Chourio",
+                            "Brice Turang",
+                            "William Contreras",
+                            "Jake Bauers",
+                            "Garrett Mitchell",
+                            "Sal Frelick",
+                            "Cooper Pratt",
+                            "Joey Ortiz"
+                        ],
+                "LHP":  [
+                            "Brice Turang",
+                            "Jackson Chourio",
+                            "Christian Yelich",
+                            "Andrew Vaughn",
+                            "Jake Bauers",
+                            "Garrett Mitchell",
+                            "Gary Sanchez",
+                            "David Hamilton",
+                            "Joey Ortiz"
+                        ]
+            },
+    "MIN":  {
+                "RHP":  [
+                            "Trevor Larnach",
+                            "Byron Buxton",
+                            "Kody Clemens",
+                            "Josh Bell",
+                            "Royce Lewis",
+                            "Brooks Lee",
+                            "Ryan Kreidler",
+                            "Luke Keaschall",
+                            "Alex Jackson"
+                        ],
+                "LHP":  [
+                            "Austin Martin",
+                            "Brooks Lee",
+                            "Josh Bell",
+                            "Royce Lewis",
+                            "Victor Caratini",
+                            "Kody Clemens",
+                            "Ryan Kreidler",
+                            "Luke Keaschall",
+                            "Kyler Fedko"
+                        ]
+            },
+    "NYM":  {
+                "RHP":  [
+                            "A.J. Ewing",
+                            "Juan Soto",
+                            "Bo Bichette",
+                            "Francisco Lindor",
+                            "Carson Benge",
+                            "Jorge Polanco",
+                            "Jared Young",
+                            "Brett Baty",
+                            "Luis Torrens"
+                        ],
+                "LHP":  [
+                            "Francisco Lindor",
+                            "Juan Soto",
+                            "Bo Bichette",
+                            "Mark Vientos",
+                            "Carson Benge",
+                            "Tyrone Taylor",
+                            "A.J. Ewing",
+                            "Luis Torrens",
+                            "Brett Baty"
+                        ]
+            },
+    "NYY":  {
+                "RHP":  [
+                            "Trent Grisham",
+                            "Ben Rice",
+                            "Paul Goldschmidt",
+                            "Cody Bellinger",
+                            "Jasson Dominguez",
+                            "Jazz Chisholm",
+                            "Jose Caballero",
+                            "Ryan McMahon",
+                            "Austin Wells"
+                        ],
+                "LHP":  [
+                            "Trent Grisham",
+                            "Paul Goldschmidt",
+                            "Ben Rice",
+                            "Amed Rosario",
+                            "Cody Bellinger",
+                            "Jose Caballero",
+                            "Jazz Chisholm",
+                            "Max Schuemann",
+                            "Ali Sanchez"
+                        ]
+            },
+    "PHI":  {
+                "RHP":  [
+                            "Trea Turner",
+                            "Kyle Schwarber",
+                            "Bryce Harper",
+                            "Brandon Marsh",
+                            "Alec Bohm",
+                            "Bryson Stott",
+                            "Gabriel Rincones",
+                            "Justin Crawford",
+                            "Garrett Stubbs"
+                        ],
+                "LHP":  [
+                            "Trea Turner",
+                            "Kyle Schwarber",
+                            "Bryce Harper",
+                            "Alec Bohm",
+                            "Edmundo Sosa",
+                            "J.T. Realmuto",
+                            "Bryson Stott",
+                            "Derek Hill",
+                            "Justin Crawford"
+                        ]
+            },
+    "PIT":  {
+                "RHP":  [
+                            "Jake Mangum",
+                            "Brandon Lowe",
+                            "Bryan Reynolds",
+                            "Esmerlyn Valdez",
+                            "Ryan O\u0027Hearn",
+                            "Nick Gonzales",
+                            "Tyler Callihan",
+                            "Jared Triolo",
+                            "Henry Davis"
+                        ],
+                "LHP":  [
+                            "Konnor Griffin",
+                            "Brandon Lowe",
+                            "Bryan Reynolds",
+                            "Esmerlyn Valdez",
+                            "Ryan O\u0027Hearn",
+                            "Nick Gonzales",
+                            "Jake Mangum",
+                            "Tyler Callihan",
+                            "Henry Davis"
+                        ]
+            },
+    "SD":  {
+               "RHP":  [
+                           "Fernando Tatis",
+                           "Jackson Merrill",
+                           "Xander Bogaerts",
+                           "Manny Machado",
+                           "Gavin Sheets",
+                           "Jake Cronenworth",
+                           "Luis Campusano",
+                           "Samad Taylor",
+                           "Sung-Mun Song"
+                       ],
+               "LHP":  [
+                           "Fernando Tatis",
+                           "Samad Taylor",
+                           "Manny Machado",
+                           "Miguel Andujar",
+                           "Ty France",
+                           "Jackson Merrill",
+                           "Xander Bogaerts",
+                           "Jase Bowen",
+                           "Freddy Fermin"
+                       ]
+           },
+    "SEA":  {
+                "RHP":  [
+                            "J.P. Crawford",
+                            "Randy Arozarena",
+                            "Dominic Canzone",
+                            "Cal Raleigh",
+                            "Josh Naylor",
+                            "Luke Raley",
+                            "Cole Young",
+                            "Victor Robles",
+                            "Colt Emerson"
+                        ],
+                "LHP":  [
+                            "Randy Arozarena",
+                            "Julio Rodriguez",
+                            "Cal Raleigh",
+                            "Dominic Canzone",
+                            "Josh Naylor",
+                            "J.P. Crawford",
+                            "Rob Refsnyder",
+                            "Cole Young",
+                            "Colt Emerson"
+                        ]
+            },
+    "SF":  {
+               "RHP":  [
+                           "Heliot Ramos",
+                           "Luis Arraez",
+                           "Casey Schmitt",
+                           "Rafael Devers",
+                           "Jung Hoo Lee",
+                           "Willy Adames",
+                           "Bryce Eldridge",
+                           "Victor Bericoto",
+                           "Drew Cavanaugh"
+                       ],
+               "LHP":  [
+                           "Heliot Ramos",
+                           "Luis Arraez",
+                           "Casey Schmitt",
+                           "Rafael Devers",
+                           "Jung Hoo Lee",
+                           "Willy Adames",
+                           "Bryce Eldridge",
+                           "Victor Bericoto",
+                           "Eric Haase"
+                       ]
+           },
+    "STL":  {
+                "RHP":  [
+                            "JJ Wetherholt",
+                            "Ivan Herrera",
+                            "Alec Burleson",
+                            "Jordan Walker",
+                            "Lars Nootbaar",
+                            "Bryan Torres",
+                            "Nathan Church",
+                            "Jose Fermin",
+                            "Jimmy Crooks"
+                        ],
+                "LHP":  [
+                            "JJ Wetherholt",
+                            "Ivan Herrera",
+                            "Jordan Walker",
+                            "Nelson Velazquez",
+                            "Alec Burleson",
+                            "Masyn Winn",
+                            "Jose Fermin",
+                            "Blaze Jordan",
+                            "Nathan Church"
+                        ]
+            },
+    "TB":  {
+               "RHP":  [
+                           "Yandy Diaz",
+                           "Jonathan Aranda",
+                           "Junior Caminero",
+                           "Cedric Mullins",
+                           "Chandler Simpson",
+                           "Victor Mesa",
+                           "Taylor Walls",
+                           "Richie Palacios",
+                           "Hunter Feduccia"
+                       ],
+               "LHP":  [
+                           "Yandy Diaz",
+                           "Jonathan Aranda",
+                           "Junior Caminero",
+                           "Ryan Vilade",
+                           "Jonny DeLuca",
+                           "Chandler Simpson",
+                           "Ben Williamson",
+                           "Taylor Walls",
+                           "Nick Fortes"
+                       ]
+           },
+    "TEX":  {
+                "RHP":  [
+                            "Joc Pederson",
+                            "Josh Smith",
+                            "Jake Burger",
+                            "Brandon Nimmo",
+                            "Ezequiel Duran",
+                            "Evan Carter",
+                            "Alejandro Osuna",
+                            "Elias Diaz",
+                            "Nicky Lopez"
+                        ],
+                "LHP":  [
+                            "Justin Foscue",
+                            "Josh Jung",
+                            "Ezequiel Duran",
+                            "Jake Burger",
+                            "Kyle Higashioka",
+                            "Cameron Cauley",
+                            "Elias Diaz",
+                            "Alejandro Osuna",
+                            "Nicky Lopez"
+                        ]
+            },
+    "TOR":  {
+                "RHP":  [
+                            "Ernie Clement",
+                            "Nathan Lukes",
+                            "Vladimir Guerrero",
+                            "Kazuma Okamoto",
+                            "Brandon Valenzuela",
+                            "Daulton Varsho",
+                            "Sean Keys",
+                            "Jonatan Clase",
+                            "Andres Gimenez"
+                        ],
+                "LHP":  [
+                            "George Springer",
+                            "Nathan Lukes",
+                            "Vladimir Guerrero",
+                            "Kazuma Okamoto",
+                            "Ernie Clement",
+                            "Brandon Valenzuela",
+                            "Luis Urias",
+                            "Yohendrick Pinango",
+                            "Myles Straw"
+                        ]
+            },
+    "WSH":  {
+                "RHP":  [
+                            "James Wood",
+                            "Luis Garcia",
+                            "Curtis Mead",
+                            "CJ Abrams",
+                            "Keibert Ruiz",
+                            "Daylen Lile",
+                            "Nasim Nunez",
+                            "Jorbit Vivas",
+                            "Jacob Young"
+                        ],
+                "LHP":  [
+                            "James Wood",
+                            "Curtis Mead",
+                            "Andres Chaparro",
+                            "Dylan Crews",
+                            "Daylen Lile",
+                            "Jacob Young",
+                            "Jorbit Vivas",
+                            "Nasim Nunez",
+                            "Drew Millas"
+                        ]
+            }
 }
