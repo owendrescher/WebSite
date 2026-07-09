@@ -471,9 +471,43 @@
     return flushUploads();
   }
 
+  async function forceUploadLocalState() {
+    if (!client || !session || pageConfig.loginOnly) return true;
+    const now = new Date().toISOString();
+    const rows = listSyncableLocalKeys().map((key) => ({
+      user_id: session.user.id,
+      tool_id: pageConfig.toolId,
+      state_key: key,
+      data: encodeValue(readLocalValue(key)),
+      updated_at: now
+    }));
+    if (!rows.length) return true;
+    let result;
+    try {
+      result = await withTimeout(
+        client.from("tool_state").upsert(rows, { onConflict: "user_id,tool_id,state_key" }),
+        "Sync push"
+      );
+    } catch (error) {
+      setErrorStatus(error, "Sync push timed out");
+      console.warn("owentools sync push timed out", error);
+      return false;
+    }
+    const { error } = result;
+    if (error) {
+      setErrorStatus(error, "Sync push failed");
+      console.warn("owentools sync push failed", error);
+      return false;
+    }
+    rows.forEach((row) => markSyncedUpdated(row.state_key, now));
+    pendingUploads.clear();
+    setStatus("Synced");
+    return true;
+  }
+
   async function pushLocalState(reason = "manual-push") {
     dispatchSyncLifecycleEvent("owentools:sync-before-push", { source: reason });
-    const uploaded = await uploadLocalState();
+    const uploaded = reason === "manual-push" ? await forceUploadLocalState() : await uploadLocalState();
     if (uploaded) dispatchSyncLifecycleEvent("owentools:sync-pushed", { source: reason });
     return uploaded;
   }
@@ -995,6 +1029,7 @@
 
   window.OwenToolsSync = {
     uploadLocalState,
+    forceUploadLocalState,
     loadCloudState,
     pullCloudState,
     pullRemoteState,

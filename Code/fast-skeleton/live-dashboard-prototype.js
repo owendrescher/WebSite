@@ -20,6 +20,7 @@ const globalPlayerTeamFilterEl = document.getElementById('globalPlayerTeamFilter
 const globalPlayerSkillFilterEl = document.getElementById('globalPlayerSkillFilter');
 const globalPlayerPositionFilterEl = document.getElementById('globalPlayerPositionFilter');
 const globalPlayerAgeFilterEl = document.getElementById('globalPlayerAgeFilter');
+const globalPlayerHandFilterEl = document.getElementById('globalPlayerHandFilter');
 const siteHelpDialogEl = document.getElementById('siteHelpDialog');
 const siteHelpCloseBtnEl = document.getElementById('siteHelpCloseBtn');
 const themeSelectEl = document.getElementById('themeSelect');
@@ -120,6 +121,7 @@ const betPlayerOptionsEl = document.getElementById('betPlayerOptions');
 const betPlayerTeamFilterEl = document.getElementById('betPlayerTeamFilter');
 const betPlayerSkillFilterEl = document.getElementById('betPlayerSkillFilter');
 const betPlayerPositionFilterEl = document.getElementById('betPlayerPositionFilter');
+const betPlayerHandFilterEl = document.getElementById('betPlayerHandFilter');
 const betPropSelectEl = document.getElementById('betPropSelect');
 const betPropTargetEl = document.getElementById('betPropTarget');
 const betAddLegBtnEl = document.getElementById('betAddLegBtn');
@@ -1679,7 +1681,7 @@ function initGlobalPlayerSearch() {
   globalPlayerSearchCloseBtnEl?.addEventListener('click', closeGlobalPlayerSearch);
   globalPlayerSearchBackdropEl?.addEventListener('click', closeGlobalPlayerSearch);
   globalPlayerSearchInputEl?.addEventListener('input', () => renderGlobalPlayerSearchResults(globalPlayerSearchInputEl.value));
-  for (const filter of [globalPlayerTeamFilterEl, globalPlayerSkillFilterEl, globalPlayerPositionFilterEl, globalPlayerAgeFilterEl]) {
+  for (const filter of [globalPlayerTeamFilterEl, globalPlayerSkillFilterEl, globalPlayerPositionFilterEl, globalPlayerAgeFilterEl, globalPlayerHandFilterEl]) {
     filter?.addEventListener('change', () => renderGlobalPlayerSearchResults(globalPlayerSearchInputEl?.value || ''));
   }
   globalPlayerSearchResultsEl?.addEventListener('click', (e) => {
@@ -21269,6 +21271,21 @@ function betSearchPlayerMatchesPosition(player = {}, filter = betPlayerPositionF
   return position === cleanSummary(filter).toUpperCase();
 }
 
+function betSearchPlayerHand(player = {}) {
+  const profile = player?.profile || player;
+  const isPitcher = betSearchIsPitcher(profile) || ['SP', 'RP', 'CP', 'P'].includes(cleanSummary(player?.position || '').toUpperCase());
+  const handValue = (value) => (value && typeof value === 'object' ? (value.code || value.description || '') : value);
+  return handednessCode(isPitcher
+    ? (profile?.throws || handValue(profile?.pitchHand) || player?.throws || handValue(player?.pitchHand))
+    : (profile?.bats || handValue(profile?.batSide) || player?.bats || handValue(player?.batSide)));
+}
+
+function betSearchPlayerMatchesHand(player = {}, filter = betPlayerHandFilterEl?.value || '') {
+  const hand = handednessCode(filter);
+  if (!hand) return true;
+  return betSearchPlayerHand(player) === hand;
+}
+
 function selectedBetPlayerTeamClassification() {
   const date = String(dateInput?.value || formatDate(new Date()));
   return playerSearchTeamClassCache.get(date) || null;
@@ -21369,7 +21386,7 @@ function populateBetPlayerPositionFilterOptions() {
 }
 
 function betPlayerSearchFiltersActive() {
-  return Boolean(betPlayerTeamFilterEl?.value || betPlayerSkillFilterEl?.value || betPlayerPositionFilterEl?.value);
+  return Boolean(betPlayerTeamFilterEl?.value || betPlayerSkillFilterEl?.value || betPlayerPositionFilterEl?.value || betPlayerHandFilterEl?.value);
 }
 
 function betSearchPlayerMatchesTeam(player = {}, filter = betPlayerTeamFilterEl?.value || '') {
@@ -21387,7 +21404,8 @@ function betSearchPlayerMatchesTeam(player = {}, filter = betPlayerTeamFilterEl?
 function betSearchPlayerMatchesFilters(player = {}) {
   return betSearchPlayerMatchesTeam(player)
     && betSearchPlayerMatchesSkill(player)
-    && betSearchPlayerMatchesPosition(player);
+    && betSearchPlayerMatchesPosition(player)
+    && betSearchPlayerMatchesHand(player);
 }
 
 function getFilteredBetSearchPool(games = latestRenderedGames) {
@@ -21447,7 +21465,7 @@ function populateGlobalPlayerPositionFilterOptions() {
 }
 
 function globalPlayerSearchFiltersActive() {
-  return Boolean(globalPlayerTeamFilterEl?.value || globalPlayerSkillFilterEl?.value || globalPlayerPositionFilterEl?.value || globalPlayerAgeFilterEl?.value);
+  return Boolean(globalPlayerTeamFilterEl?.value || globalPlayerSkillFilterEl?.value || globalPlayerPositionFilterEl?.value || globalPlayerAgeFilterEl?.value || globalPlayerHandFilterEl?.value);
 }
 
 function globalPlayerSearchAge(player = {}) {
@@ -21474,7 +21492,8 @@ function globalPlayerSearchMatchesFilters(player = {}) {
   return betSearchPlayerMatchesTeam(player, globalPlayerTeamFilterEl?.value || '')
     && betSearchPlayerMatchesSkill(player, globalPlayerSkillFilterEl?.value || '')
     && betSearchPlayerMatchesPosition(player, globalPlayerPositionFilterEl?.value || '')
-    && globalPlayerSearchMatchesAge(player);
+    && globalPlayerSearchMatchesAge(player)
+    && betSearchPlayerMatchesHand(player, globalPlayerHandFilterEl?.value || '');
 }
 
 function globalPlayerSearchGames() {
@@ -21531,6 +21550,8 @@ function globalPlayerSearchPool(games = globalPlayerSearchGames()) {
         id: entry?.id,
         fullName: entry?.fullName || entry?.name,
         position: entry?.position,
+        bats: entry?.bats || entry?.batSide?.code || entry?.batSide?.description || '',
+        throws: entry?.throws || entry?.pitchHand?.code || entry?.pitchHand?.description || '',
         teamAbbrev: entry?.teamAbbrev || entry?.team,
       }, game, 1);
     }
@@ -21601,7 +21622,7 @@ function renderGlobalPlayerSearchResults(query = '') {
     <button type="button" class="global-player-search-result" role="option" data-global-player-id="${player.id}" data-game-pk="${escapeHtml(player.game?.gamePk || '')}" style="--result-team-color:${escapeHtml(player.teamColor || getTeamColor(player.teamAbbrev) || '#7bd0ff')}">
       <img src="${escapeHtml(player.headshot || playerHeadshotUrl(player.id))}" alt="" loading="lazy" />
       <strong>${escapeHtml(player.fullName)}</strong>
-      <span>${escapeHtml(player.position || '-')}</span>
+      <span>${escapeHtml(`${player.position || '-'}${betSearchPlayerHand(player) ? ` | ${betSearchPlayerHand(player)}` : ''}`)}</span>
     </button>
   `).join('');
 }
@@ -21778,7 +21799,7 @@ function updateBetBuilderMode() {
     betPropTargetEl.disabled = isTeamWin;
     betPropTargetEl.closest('label')?.classList.toggle('is-disabled', isTeamWin);
   }
-  for (const filter of [betPlayerTeamFilterEl, betPlayerSkillFilterEl, betPlayerPositionFilterEl]) {
+  for (const filter of [betPlayerTeamFilterEl, betPlayerSkillFilterEl, betPlayerPositionFilterEl, betPlayerHandFilterEl]) {
     if (!filter) continue;
     filter.disabled = isTeamWin;
     filter.closest('label')?.classList.toggle('is-disabled', isTeamWin);
@@ -23173,7 +23194,7 @@ function initBetInput() {
   initPlayerBetContextMenu();
   updateBetBuilderMode();
   betPlayerSearchEl?.addEventListener('input', () => refreshBetPlayerOptions(latestRenderedGames, betPlayerSearchEl.value));
-  for (const filter of [betPlayerTeamFilterEl, betPlayerSkillFilterEl, betPlayerPositionFilterEl]) {
+  for (const filter of [betPlayerTeamFilterEl, betPlayerSkillFilterEl, betPlayerPositionFilterEl, betPlayerHandFilterEl]) {
     filter?.addEventListener('change', () => {
       refreshBetPlayerOptions(latestRenderedGames, betPlayerSearchEl?.value || '');
       if (betPlayerSearchEl && betPlayerSearchEl.value && !resolveBetSearchPlayer(betPlayerSearchEl.value, latestRenderedGames)) {
@@ -43637,12 +43658,14 @@ function pitcherLastThreeStartsHtml(starts = [], label = 'Last 3 Starts') {
   const rows = starts.map((split) => {
     const stat = split?.stat || {};
     const opponent = displayTeamAbbrev(split?.opponent?.abbreviation || split?.opponent?.teamCode || split?.opponent?.name || '');
+    const pitches = statNumber(stat.numberOfPitches ?? stat.pitchesThrown ?? stat.pitchCount ?? stat.pitches);
+    const pitchText = pitches > 0 ? ` | P${pitches}` : '';
     const hrBatters = listify(split?.hrAllowedDetails)
       .map((entry) => `<button type="button" class="player-card-link" data-player-card-link data-player-id="${escapeHtml(entry.id || '')}" data-player-role="hitter">${escapeHtml(`${entry.name}${entry.hand ? ` (${entry.hand})` : ''}`)}</button>`)
       .join('');
     return `<div class="player-heatmap-metric-row">
       <span>${escapeHtml(formatLeadersDateLabel(split?.date || ''))}${opponent ? ` vs ${escapeHtml(opponent)}` : ''}</span>
-      <b>${escapeHtml(cleanSummary(stat.inningsPitched) || '0.0')} IP</b>
+      <b>${escapeHtml(`${cleanSummary(stat.inningsPitched) || '0.0'} IP${pitchText}`)}</b>
       <b>${escapeHtml(statNumber(stat.earnedRuns))} ER</b>
       <b>${escapeHtml(statNumber(stat.homeRuns))} HR</b>
       <b>${escapeHtml(statNumber(stat.strikeOuts))} K</b>

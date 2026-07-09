@@ -450,6 +450,14 @@
                     <option value="37-40">37-40</option>
                   </select>
                 </label>
+                <label>Hand
+                  <select id="globalPlayerHandFilter">
+                    <option value="">Any Hand</option>
+                    <option value="R">Right</option>
+                    <option value="L">Left</option>
+                    <option value="S">Switch</option>
+                  </select>
+                </label>
               </div>
               <div id="globalPlayerSearchResults" class="global-player-search-results" role="listbox" aria-label="Player results"></div>
               <button id="globalPlayerSearchCloseBtn" class="global-player-search-close" type="button" aria-label="Close player search">x</button>
@@ -538,6 +546,14 @@
                     <option value="IF">IF</option>
                     <option value="OF">OF</option>
                     <option value="MIF">Middle IF</option>
+                  </select>
+                </label>
+                <label>Hand
+                  <select id="betPlayerHandFilter">
+                    <option value="">Any Hand</option>
+                    <option value="R">Right</option>
+                    <option value="L">Left</option>
+                    <option value="S">Switch</option>
                   </select>
                 </label>
                 <label>Prop
@@ -675,13 +691,13 @@
         ]
       };
     </script>
-    <script src="../shared/owentools-sync.js?v=20260709manualSync1"></script>
+    <script src="../shared/owentools-sync.js?v=20260709forcePush1"></script>
     <script src="rotowire-default-lineups.js?v=20260708rotowireFallback1"></script>
     <script src="mlb-contracts-data.js?v=20260708liveSearchFix1"></script>
     <script>
       window.MLB_DASHBOARD_BUILD_ID="20260709-sync-skillfix1-dev";
       window.MLB_STATS_PROFILER_FORCE=true;
     </script>
-    <script src="live-dashboard-prototype.js?v=20260709syncSkillfix1"></script>
+    <script src="live-dashboard-prototype.js?v=20260709forcePushHandPitches1"></script>
   </body>
 </html>
