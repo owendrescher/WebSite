@@ -15787,27 +15787,11 @@ function linescoreLastCompletedInningNumber(linescore = {}, play = null) {
 }
 
 function gameLooksFinalByScore(game, linescore = {}, allPlays = [], activePlay = null) {
-  const statusText = `${game?.status?.abstractGameState || ''} ${game?.status?.detailedState || ''} ${game?.status || ''}`.toLowerCase();
+  const status = game?.status && typeof game.status === 'object' ? game.status : {};
+  const statusText = `${status.abstractGameState || ''} ${status.detailedState || ''} ${game?.status || ''}`.toLowerCase();
   if (/final|game over|completed/.test(statusText)) return true;
-  if (!gameHasReachedOfficialStart(game)) return false;
-  const playList = listify(allPlays);
-  const play = activePlay?.about ? activePlay : playList[playList.length - 1] || null;
-  const completedInning = linescoreLastCompletedInningNumber(linescore, play);
-  if (completedInning < 9) return false;
-  const inning = Number(linescore?.currentInning ?? play?.about?.inning ?? completedInning);
-  if (!Number.isFinite(inning) || inning < 9) return false;
-  const away = Number(gameScoreForSide(game, linescore, playList, 'away'));
-  const home = Number(gameScoreForSide(game, linescore, playList, 'home'));
-  if (!Number.isFinite(away) || !Number.isFinite(home) || away === home) return false;
-  const inningState = String(linescore?.inningState || '').toLowerCase();
-  const stateHalf = normalizeHalfInning(linescore?.inningHalf || linescore?.inningState);
-  if (stateHalf === 'end' || /over|final|complete/.test(inningState)) return completedInning >= 9;
-  const playHalf = normalizeHalfInning(play?.about?.halfInning);
-  const outsAfter = liveLabReplayOutsAfterPlay(play);
-  if (completedInning >= 9 && playHalf === 'top' && outsAfter >= 3 && home > away) return true;
-  if (completedInning >= 9 && playHalf === 'bottom' && home > away) return true;
-  if (completedInning >= 9 && playHalf === 'bottom' && outsAfter >= 3 && away > home) return true;
-  return false;
+  const coded = String(status.codedGameState || status.statusCode || '').toUpperCase();
+  return coded === 'F' || coded === 'O';
 }
 
 function ordinalForDisplay(linescore) {
@@ -17657,6 +17641,30 @@ function manualStateCandidate(value, updatedAt = 0, source = '') {
   };
 }
 
+function syncMetaUpdatedAt(key = '') {
+  try {
+    const parsed = JSON.parse(localStorage.getItem('owentools-sync-meta:baseball-dashboard') || '{}') || {};
+    const time = Date.parse(parsed[String(key || '')] || '');
+    return Number.isFinite(time) ? time : 0;
+  } catch {
+    return 0;
+  }
+}
+
+function trackedPlayersBackupUpdatedAt(date = dateInput.value || formatDate(new Date())) {
+  const times = [];
+  const remember = (source) => {
+    if (hasOwnManualStateField(source, 'trackedPlayers')) times.push(Number(source?.updatedAt) || 0);
+  };
+  remember(readManualStateMirror(date));
+  remember(readManualStateBackup(date));
+  remember(readManualStateDurable(date));
+  try {
+    remember(JSON.parse(sessionStorage.getItem(manualStateBackupKey(date)) || '{}'));
+  } catch {}
+  return Math.max(0, ...times);
+}
+
 function activeManualStateDateMatches(date = dateInput.value || formatDate(new Date())) {
   const selectedDate = String(date || dateInput.value || formatDate(new Date()));
   return String(manualStateInMemoryDate || dateInput.value || '') === selectedDate;
@@ -17756,7 +17764,13 @@ function chooseManualStateFieldValue(date, field, normalizer = (value) => value)
   if (activeValue !== null) candidates.push(manualStateCandidate(activeValue, Date.now(), 'active'));
   if (field === 'trackedPlayers') {
     const directTracked = readTrackedPlayersStore(date);
-    if (directTracked !== null) candidates.push(manualStateCandidate(normalizer(directTracked), Date.now(), 'tracked-date-key'));
+    if (directTracked !== null) {
+      const trackedKey = trackedPlayersStorageKey(date);
+      const updatedAt = syncMetaUpdatedAt(trackedKey);
+      if (directTracked.length || updatedAt >= trackedPlayersBackupUpdatedAt(date)) {
+        candidates.push(manualStateCandidate(normalizer(directTracked), updatedAt, 'tracked-date-key'));
+      }
+    }
   }
   remember(readManualStateMirror(date));
   remember(readManualStateBackup(date));
@@ -18185,15 +18199,14 @@ function restoreTossupScoreboards(date = dateInput.value || formatDate(new Date(
   const selectedDate = String(date || dateInput.value || formatDate(new Date()));
   const stored = readTossupScoreboardStore(selectedDate);
   if (!stored.length && tossupScoreboardGamePks.size) {
-    if (activeManualStateDateMatches(selectedDate)) saveTossupScoreboards(selectedDate);
+    saveTossupScoreboards(selectedDate);
     return;
   }
   tossupScoreboardGamePks.clear();
   stored.forEach((gamePk) => tossupScoreboardGamePks.add(String(gamePk)));
   const lockedStored = readLockedTossupScoreboardStore(selectedDate);
   if (!lockedStored.length && lockedTossupScoreboardGamePks.size) {
-    if (activeManualStateDateMatches(selectedDate)) saveLockedTossupScoreboards(selectedDate);
-    else lockedTossupScoreboardGamePks.clear();
+    saveLockedTossupScoreboards(selectedDate);
   } else {
     lockedTossupScoreboardGamePks.clear();
     lockedStored.forEach((gamePk) => lockedTossupScoreboardGamePks.add(String(gamePk)));
@@ -18359,7 +18372,61 @@ function initCrossDeviceManualStateSync() {
   window.setInterval(() => reconcileCrossDeviceManualState(), 4000);
 }
 
+function snapshotManualStateForSync(date = dateInput.value || formatDate(new Date())) {
+  const selectedDate = String(date || dateInput.value || formatDate(new Date()));
+  const trackedKey = trackedPlayersStorageKey(selectedDate);
+  persistManualStateSnapshot(selectedDate);
+  savePendingGamePicks({
+    allowEmpty: true,
+    forceEmpty: !pendingGamePickSelections.size,
+    date: selectedDate,
+  });
+  saveTossupScoreboards(selectedDate, {
+    allowEmpty: true,
+    forceEmpty: !tossupScoreboardGamePks.size,
+  });
+  saveLockedTossupScoreboards(selectedDate, {
+    allowEmpty: true,
+    forceEmpty: !lockedTossupScoreboardGamePks.size,
+  });
+  saveOverUnderScoreboards(selectedDate, {
+    allowEmpty: true,
+    forceEmpty: !overUnderScoreboardSelections.size,
+  });
+  if (trackedPlayersMemoryByDate.has(trackedKey)) {
+    const tracked = normalizeTrackedPlayerEntries(trackedPlayersMemoryByDate.get(trackedKey) || []);
+    saveTrackedPlayers(tracked, selectedDate, {
+      allowEmpty: true,
+      forceEmpty: !tracked.length,
+    });
+  } else {
+    const tracked = normalizeTrackedPlayerEntries(getTrackedPlayers(selectedDate));
+    if (tracked.length) saveTrackedPlayers(tracked, selectedDate);
+  }
+}
+
+function refreshManualStateAfterSync(date = dateInput.value || formatDate(new Date())) {
+  const selectedDate = String(date || dateInput.value || formatDate(new Date()));
+  manualStateInMemoryDate = '';
+  manualStateCrossDeviceFingerprint = '';
+  trackedPlayersMemoryByDate.delete(trackedPlayersStorageKey(selectedDate));
+  reconcileCrossDeviceManualState(selectedDate);
+  if (playerTrackerListEl) playerTrackerListEl.dataset.renderFingerprint = '';
+  renderPlayerTrackerList(latestRenderedGames);
+  renderPendingGamePicks(latestRenderedGames);
+  syncAllCardGamePickStates(latestRenderedGames);
+  syncTossupScoreboardStates(latestRenderedGames);
+  syncOverUnderScoreboardStates(latestRenderedGames);
+  if (activeLineupGame) syncLineupGamePickState(activeLineupGame);
+}
+
 function initOwenToolsSoftSyncRefresh() {
+  window.addEventListener('owentools:sync-before-push', () => {
+    snapshotManualStateForSync();
+  });
+  window.addEventListener('owentools:sync-pulled', () => {
+    refreshManualStateAfterSync();
+  });
   window.addEventListener('owentools:sync-state-changed', (event) => {
     const selectedDate = dateInput.value || formatDate(new Date());
     const keys = new Set(listify(event?.detail?.changedKeys).map((key) => String(key || '')));
@@ -22347,6 +22414,12 @@ function getTrackedPlayers(date = dateInput.value || formatDate(new Date())) {
     if (Array.isArray(parsed)) {
       const filtered = normalizeTrackedPlayerEntries(parsed);
       if (!filtered.length && rawTracked != null) {
+        const backupUpdatedAt = trackedPlayersBackupUpdatedAt(date);
+        const directUpdatedAt = syncMetaUpdatedAt(key);
+        if (backupUpdatedAt > directUpdatedAt) {
+          const restored = restoreFromBackup();
+          if (restored.length) return restored;
+        }
         trackedPlayersMemoryByDate.set(key, []);
         writeManualStateBackupPatch({ trackedPlayers: [] }, date, { allowEmpty: true, forceEmpty: true });
         return [];
@@ -22401,17 +22474,22 @@ function saveTrackedPlayers(players = [], date = dateInput.value || formatDate(n
 }
 
 function persistManualStateSnapshot(date = dateInput.value || formatDate(new Date())) {
+  const selectedDate = String(date || dateInput.value || formatDate(new Date()));
+  const trackedKey = trackedPlayersStorageKey(selectedDate);
   const picks = normalizePendingGamePickEntries([...pendingGamePickSelections.entries()]);
-  const tracked = trackedPlayersMemoryByDate.has(trackedPlayersStorageKey(date))
-    ? normalizeTrackedPlayerEntries(trackedPlayersMemoryByDate.get(trackedPlayersStorageKey(date)) || [])
-    : normalizeTrackedPlayerEntries(getTrackedPlayers(date));
+  const tracked = trackedPlayersMemoryByDate.has(trackedKey)
+    ? normalizeTrackedPlayerEntries(trackedPlayersMemoryByDate.get(trackedKey) || [])
+    : normalizeTrackedPlayerEntries(getTrackedPlayers(selectedDate));
   const patch = {};
   patch.pendingGamePicks = picks;
   patch.tossupScoreboards = [...tossupScoreboardGamePks];
   patch.lockedTossupScoreboards = [...lockedTossupScoreboardGamePks];
   patch.overUnderScoreboards = serializeOverUnderScoreboards();
-  if (tracked.length) patch.trackedPlayers = tracked;
-  writeManualStateBackupPatch(patch, date);
+  if (tracked.length || trackedPlayersMemoryByDate.has(trackedKey)) patch.trackedPlayers = tracked;
+  writeManualStateBackupPatch(patch, selectedDate, {
+    allowEmpty: true,
+    forceEmpty: trackedPlayersMemoryByDate.has(trackedKey) && !tracked.length,
+  });
 }
 
 function moveTrackedPlayer(playerId, beforePlayerId = '') {

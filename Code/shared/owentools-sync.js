@@ -44,11 +44,7 @@
     "games:",
     "games-archive:",
     "analytics-day:",
-    "hrs:",
-    "pending-game-picks:v1:",
-    "tossup-scoreboards:v1:",
-    "locked-tossup-scoreboards:v1:",
-    "over-under-scoreboards:v1:"
+    "hrs:"
   ];
   const LOCAL_CLEANUP_DENY_PATTERNS = [
     "games:",
@@ -172,6 +168,13 @@
     if (!shouldSyncKey(key)) return;
     const meta = readMeta();
     meta[key] = new Date().toISOString();
+    writeMeta(meta);
+  }
+
+  function markSyncedUpdated(key, updatedAt) {
+    if (!shouldSyncKey(key)) return;
+    const meta = readMeta();
+    meta[key] = new Date(Date.parse(updatedAt || "") || Date.now()).toISOString();
     writeMeta(meta);
   }
 
@@ -337,6 +340,20 @@
     }
   }
 
+  function dispatchSyncLifecycleEvent(name, detail = {}) {
+    try {
+      window.dispatchEvent(new CustomEvent(name, {
+        detail: {
+          toolId: pageConfig.toolId,
+          label: pageConfig.label,
+          ...detail
+        }
+      }));
+    } catch {
+      // CustomEvent can be unavailable in very old embedded browsers.
+    }
+  }
+
   function queueUpload(key, value) {
     if (suppressUpload || !shouldSyncKey(key)) return;
     markLocalUpdated(key);
@@ -438,6 +455,7 @@
         pendingUploads.set(key, localValue);
         return;
       }
+      markSyncedUpdated(key, row.updated_at);
       if (localValue !== value) {
         writeLocalValue(key, value);
         changed = true;
@@ -451,6 +469,13 @@
     if (!client || !session || pageConfig.loginOnly) return true;
     listSyncableLocalKeys().forEach((key) => pendingUploads.set(key, readLocalValue(key)));
     return flushUploads();
+  }
+
+  async function pushLocalState(reason = "manual-push") {
+    dispatchSyncLifecycleEvent("owentools:sync-before-push", { source: reason });
+    const uploaded = await uploadLocalState();
+    if (uploaded) dispatchSyncLifecycleEvent("owentools:sync-pushed", { source: reason });
+    return uploaded;
   }
 
   async function pullCloudState(reason = "auto") {
@@ -470,6 +495,12 @@
     } finally {
       pullInFlight = false;
     }
+  }
+
+  async function pullRemoteState(reason = "manual-pull") {
+    const changed = await pullCloudState(reason);
+    dispatchSyncLifecycleEvent("owentools:sync-pulled", { source: reason, changed: Boolean(changed) });
+    return changed;
   }
 
   function scheduleCloudPull(delay = 0, reason = "auto") {
@@ -554,7 +585,7 @@
         return;
       }
       syncReady = true;
-      const uploaded = await uploadLocalState();
+      const uploaded = await pushLocalState("reconcile");
       if (!uploaded) return;
       setState("signed-in");
       setStatus(session?.user?.email || "Synced");
@@ -622,7 +653,10 @@
           </div>
           <button class="owentools-sync__reset" type="button">Reset password</button>
         </form>
-        <button class="owentools-sync__manual" type="button" hidden>Sync now</button>
+        <div class="owentools-sync__manual-row" hidden>
+          <button class="owentools-sync__pull" type="button">Pull</button>
+          <button class="owentools-sync__push" type="button">Push</button>
+        </div>
         <button class="owentools-sync__signout" type="button" hidden>Sign out</button>
       </div>
     `;
@@ -642,11 +676,13 @@
       .owentools-sync__form{display:grid;gap:8px}
       .owentools-sync input{min-width:0;padding:9px 10px;border:1px solid #d4d4d8;border-radius:10px;font:inherit}
       .owentools-sync__actions{display:grid;grid-template-columns:1fr 1fr;gap:8px}
-      .owentools-sync__form button,.owentools-sync__manual,.owentools-sync__signout{padding:9px 10px;border:0;border-radius:10px;background:#111827;color:white;font:700 13px/1 system-ui;cursor:pointer}
+      .owentools-sync__form button,.owentools-sync__pull,.owentools-sync__push,.owentools-sync__signout{padding:9px 10px;border:0;border-radius:10px;background:#111827;color:white;font:700 13px/1 system-ui;cursor:pointer}
       .owentools-sync__signup{background:#3f3f46!important}
       .owentools-sync__reset{background:transparent!important;color:#3f3f46!important;border:1px solid #d4d4d8!important}
-      .owentools-sync__manual,.owentools-sync__signout{width:100%;margin-top:6px}
-      .owentools-sync__manual{background:#0f766e!important}
+      .owentools-sync__manual-row{display:grid;grid-template-columns:1fr 1fr;gap:8px;margin-top:6px}
+      .owentools-sync__signout{width:100%;margin-top:6px}
+      .owentools-sync__pull{background:#1d4ed8!important}
+      .owentools-sync__push{background:#0f766e!important}
       .owentools-sync__signout{background:#27272a}
       .owentools-sync.is-bottom-right .owentools-sync__menu{top:auto;bottom:48px}
       @media (max-width: 700px){.owentools-sync{top:auto;bottom:max(14px,env(safe-area-inset-bottom))}.owentools-sync__menu{top:auto;bottom:48px}}
@@ -666,7 +702,9 @@
     const signIn = root.querySelector(".owentools-sync__signin");
     const signUp = root.querySelector(".owentools-sync__signup");
     const reset = root.querySelector(".owentools-sync__reset");
-    manualSyncButton = root.querySelector(".owentools-sync__manual");
+    manualSyncButton = root.querySelector(".owentools-sync__manual-row");
+    const pullButton = root.querySelector(".owentools-sync__pull");
+    const pushButton = root.querySelector(".owentools-sync__push");
     const signOut = root.querySelector(".owentools-sync__signout");
     try {
       email.value = window.localStorage.getItem(EMAIL_STORAGE_KEY) || "";
@@ -831,16 +869,21 @@
       if (client) await client.auth.signOut();
     });
 
-    manualSyncButton.addEventListener("click", async () => {
+    pullButton.addEventListener("click", async () => {
       if (!session) return;
-      setStatus("Syncing...");
-      const download = await loadCloudState();
-      if (!download.ok) return;
-      const uploaded = await uploadLocalState();
+      setStatus("Pulling...");
+      await pullRemoteState("manual-pull");
+      setState("signed-in");
+      setStatus("Synced");
+    });
+
+    pushButton.addEventListener("click", async () => {
+      if (!session) return;
+      setStatus("Pushing...");
+      const uploaded = await pushLocalState("manual-push");
       if (!uploaded) return;
       setState("signed-in");
       setStatus("Synced");
-      if (download.changed) dispatchSyncStateChanged({ changedKeys: download.changedKeys || [], source: "manual" });
     });
 
     root.__refresh = () => {
@@ -954,6 +997,8 @@
     uploadLocalState,
     loadCloudState,
     pullCloudState,
+    pullRemoteState,
+    pushLocalState,
     flushUploads,
     getSession: () => session
   };
