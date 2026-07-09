@@ -17754,6 +17754,10 @@ function chooseManualStateFieldValue(date, field, normalizer = (value) => value)
   };
   const activeValue = activeManualStateFieldValue(date, field, normalizer);
   if (activeValue !== null) candidates.push(manualStateCandidate(activeValue, Date.now(), 'active'));
+  if (field === 'trackedPlayers') {
+    const directTracked = readTrackedPlayersStore(date);
+    if (directTracked !== null) candidates.push(manualStateCandidate(normalizer(directTracked), Date.now(), 'tracked-date-key'));
+  }
   remember(readManualStateMirror(date));
   remember(readManualStateBackup(date));
   remember(readManualStateDurable(date));
@@ -21108,6 +21112,15 @@ function betSearchRateValue(...values) {
   return null;
 }
 
+function betSearchStatValue(...values) {
+  for (const value of values) {
+    if (value === null || value === undefined || value === '') continue;
+    const parsed = Number(String(value).replace(/,/g, ''));
+    if (Number.isFinite(parsed)) return parsed;
+  }
+  return null;
+}
+
 function betSearchIsPitcher(player = {}) {
   const rawPosition = cleanSummary(player?.position || player?.primaryPosition?.abbreviation || player?.primaryPosition?.code || '').toUpperCase();
   if (['P', 'SP', 'RP', 'CP'].includes(rawPosition)) return true;
@@ -21131,15 +21144,32 @@ function betSearchPrimaryPosition(player = {}) {
 }
 
 function betSearchPlayerObp(player = {}) {
-  const batting = player?.batting || betSearchBattingStats(player?.profile || player);
-  return betSearchRateValue(batting?.obp, batting?.onBasePercentage, batting?.onBasePct, player?.obp);
+  const profileBatting = betSearchBattingStats(player?.profile || player);
+  const batting = { ...(profileBatting || {}), ...(player?.batting || {}) };
+  const direct = betSearchRateValue(
+    batting?.obp,
+    batting?.onBasePercentage,
+    batting?.onBasePct,
+    batting?.onBase,
+    player?.obp,
+    player?.onBasePercentage,
+  );
+  if (direct != null) return direct;
+  const hits = betSearchStatValue(batting?.hits, batting?.h) || 0;
+  const walks = betSearchStatValue(batting?.baseOnBalls, batting?.walks, batting?.bb) || 0;
+  const hbp = betSearchStatValue(batting?.hitByPitch, batting?.hbp) || 0;
+  const atBats = betSearchStatValue(batting?.atBats, batting?.ab) || 0;
+  const sacFlies = betSearchStatValue(batting?.sacFlies, batting?.sacrificeFlies, batting?.sf) || 0;
+  const denominator = atBats + walks + hbp + sacFlies;
+  return denominator > 0 ? (hits + walks + hbp) / denominator : null;
 }
 
 function betSearchPlayerGamesPerHomeRun(player = {}) {
-  const batting = player?.batting || betSearchBattingStats(player?.profile || player);
-  const homeRuns = statNumber(batting?.homeRuns ?? batting?.hr ?? player?.homeRuns ?? player?.hr);
+  const profileBatting = betSearchBattingStats(player?.profile || player);
+  const batting = { ...(profileBatting || {}), ...(player?.batting || {}) };
+  const homeRuns = betSearchStatValue(batting?.homeRuns, batting?.hr, batting?.homeruns, player?.homeRuns, player?.hr);
   if (homeRuns <= 0) return null;
-  const games = statNumber(batting?.gamesPlayed ?? batting?.games ?? player?.gamesPlayed ?? player?.games);
+  const games = betSearchStatValue(batting?.gamesPlayed, batting?.games, batting?.g, player?.gamesPlayed, player?.games);
   return games > 0 ? games / homeRuns : null;
 }
 
@@ -22255,6 +22285,16 @@ function normalizeTrackedPlayerEntries(players = []) {
     });
   }
   return deduped;
+}
+
+function readTrackedPlayersStore(date = dateInput.value || formatDate(new Date())) {
+  try {
+    const raw = localStorage.getItem(trackedPlayersStorageKey(date));
+    if (raw == null) return null;
+    return normalizeTrackedPlayerEntries(JSON.parse(raw || '[]'));
+  } catch {
+    return null;
+  }
 }
 
 function readTrackedPlayersBackup(date = dateInput.value || formatDate(new Date())) {
