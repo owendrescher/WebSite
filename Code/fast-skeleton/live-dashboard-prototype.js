@@ -411,7 +411,6 @@ const teamMatchupHistoryCache = new Map();
 const playerCareerStartCache = new Map();
 const betPlayerLastFiveCache = new Map();
 const playerSearchTeamClassCache = new Map();
-const globalPlayerSkillHydrationCache = new Map();
 let playerContractsLoadPromise = null;
 let playerContractsRows = [];
 let returnToGlobalSearchOnPlayerClose = false;
@@ -16133,10 +16132,6 @@ function chooseManualStateFieldValue(date, field, normalizer = (value) => value)
   };
   const activeValue = activeManualStateFieldValue(date, field, normalizer);
   if (activeValue !== null) candidates.push(manualStateCandidate(activeValue, Date.now(), 'active'));
-  if (field === 'trackedPlayers') {
-    const directTracked = readTrackedPlayersStore(date);
-    if (directTracked !== null) candidates.push(manualStateCandidate(normalizer(directTracked), Date.now(), 'tracked-date-key'));
-  }
   remember(readManualStateMirror(date));
   remember(readManualStateBackup(date));
   remember(readManualStateDurable(date));
@@ -19792,60 +19787,6 @@ function globalPlayerSearchMatchesFilters(player = {}) {
     && globalPlayerSearchMatchesAge(player);
 }
 
-function globalPlayerSearchMatchesNonSkillFilters(player = {}) {
-  return betSearchPlayerMatchesTeam(player, globalPlayerTeamFilterEl?.value || '')
-    && betSearchPlayerMatchesPosition(player, globalPlayerPositionFilterEl?.value || '')
-    && globalPlayerSearchMatchesAge(player);
-}
-
-function globalPlayerSkillStatGroup(skill = globalPlayerSkillFilterEl?.value || '') {
-  if (skill === 'contact' || skill === 'power') return 'hitting';
-  if (skill === 'qualityStarter' || skill === 'qualityRelief' || skill === 'qualityCloser') return 'pitching';
-  return '';
-}
-
-function globalPlayerSkillStatsReady(player = {}, skill = globalPlayerSkillFilterEl?.value || '') {
-  if (!skill) return true;
-  if (skill === 'contact') return betSearchPlayerObp(player) != null;
-  if (skill === 'power') return betSearchPlayerGamesPerHomeRun(player) != null;
-  return betSearchPlayerEra(player) != null && betSearchPitcherRole(player.profile || player);
-}
-
-function hydrateGlobalPlayerSkillStats(players = [], skill = globalPlayerSkillFilterEl?.value || '') {
-  const group = globalPlayerSkillStatGroup(skill);
-  if (!group) return false;
-  const season = seasonForDate(dateInput?.value || formatDate(new Date()));
-  const candidates = players
-    .filter((player) => {
-      if (Number(player?.id) <= 0 || globalPlayerSkillStatsReady(player, skill)) return false;
-      const key = `${Number(player.id)}:${group}:${season}`;
-      const cached = globalPlayerSkillHydrationCache.get(key);
-      return !(cached?.stats || cached?.promise);
-    })
-    .slice(0, 36);
-  let started = false;
-  for (const player of candidates) {
-    const id = Number(player.id);
-    const key = `${id}:${group}:${season}`;
-    started = true;
-    const entry = { stats: null, promise: null };
-    entry.promise = getPlayerSeasonStatSplit(id, group, season)
-      .then((stat) => {
-        entry.stats = stat || {};
-        return entry.stats;
-      })
-      .catch(() => {
-        entry.stats = {};
-        return entry.stats;
-      })
-      .finally(() => {
-        window.setTimeout(() => renderGlobalPlayerSearchResults(globalPlayerSearchInputEl?.value || ''), 0);
-      });
-    globalPlayerSkillHydrationCache.set(key, entry);
-  }
-  return started;
-}
-
 function globalPlayerSearchGames() {
   const map = new Map();
   for (const game of [...(latestRenderedGames || []), ...getCachedGames()]) {
@@ -19870,17 +19811,6 @@ function globalPlayerSearchPool(games = globalPlayerSearchGames()) {
       fullName,
       teamAbbrev,
     };
-    for (const group of ['hitting', 'pitching']) {
-      const hydrated = globalPlayerSkillHydrationCache.get(`${id}:${group}:${seasonForDate(dateInput?.value || formatDate(new Date()))}`)?.stats;
-      if (!hydrated || !Object.keys(hydrated).length) continue;
-      if (group === 'hitting') {
-        profile.batting = { ...(profile.seasonStats?.batting || {}), ...(profile.batting || {}), ...hydrated };
-        profile.seasonStats = { ...(profile.seasonStats || {}), batting: profile.batting };
-      } else {
-        profile.pitching = { ...(profile.seasonStats?.pitching || {}), ...(profile.pitching || {}), ...hydrated };
-        profile.seasonStats = { ...(profile.seasonStats || {}), pitching: profile.pitching };
-      }
-    }
     const next = {
       id,
       fullName,
@@ -19962,12 +19892,7 @@ function renderGlobalPlayerSearchResults(query = '') {
       .then(() => renderGlobalPlayerSearchResults(globalPlayerSearchInputEl?.value || ''))
       .catch(() => {});
   }
-  const pool = globalPlayerSearchPool();
-  const skill = globalPlayerSkillFilterEl?.value || '';
-  if (skill) {
-    hydrateGlobalPlayerSkillStats(pool.filter(globalPlayerSearchMatchesNonSkillFilters), skill);
-  }
-  const results = pool
+  const results = globalPlayerSearchPool()
     .filter(globalPlayerSearchMatchesFilters)
     .map((player) => ({ player, score: normalized ? globalPlayerSearchScore(player, q) : 1 }))
     .filter((entry) => entry.score > 0 || globalPlayerSearchFiltersActive())
@@ -20737,16 +20662,6 @@ function normalizeTrackedPlayerEntries(players = []) {
     });
   }
   return deduped;
-}
-
-function readTrackedPlayersStore(date = dateInput.value || formatDate(new Date())) {
-  try {
-    const raw = localStorage.getItem(trackedPlayersStorageKey(date));
-    if (raw == null) return null;
-    return normalizeTrackedPlayerEntries(JSON.parse(raw || '[]'));
-  } catch {
-    return null;
-  }
 }
 
 function readTrackedPlayersBackup(date = dateInput.value || formatDate(new Date())) {
