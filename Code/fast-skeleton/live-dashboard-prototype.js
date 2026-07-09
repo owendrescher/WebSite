@@ -413,6 +413,7 @@ const teamMatchupHistoryCache = new Map();
 const playerCareerStartCache = new Map();
 const betPlayerLastFiveCache = new Map();
 const playerSearchTeamClassCache = new Map();
+const playerSearchHandProfileCache = new Map();
 let playerContractsLoadPromise = null;
 let playerContractsRows = [];
 let returnToGlobalSearchOnPlayerClose = false;
@@ -18355,23 +18356,7 @@ function reconcileCrossDeviceManualState(date = dateInput.value || formatDate(ne
 }
 
 function initCrossDeviceManualStateSync() {
-  window.addEventListener('storage', (event) => {
-    const selectedDate = dateInput.value || formatDate(new Date());
-    if (!event?.key || ![
-      MANUAL_STATE_MIRROR_KEY,
-      MANUAL_STATE_DURABLE_KEY,
-      PLAYER_TRACKER_STORAGE_KEY,
-      PLAYER_TRACKER_BACKUP_STORAGE_KEY,
-      trackedPlayersStorageKey(selectedDate),
-      `${PENDING_GAME_PICKS_STORAGE_KEY}:${selectedDate}`,
-      tossupScoreboardStorageKey(selectedDate),
-      lockedTossupScoreboardStorageKey(selectedDate),
-      overUnderScoreboardStorageKey(selectedDate),
-      manualStateBackupKey(selectedDate),
-    ].includes(event.key)) return;
-    reconcileCrossDeviceManualState();
-  });
-  window.setInterval(() => reconcileCrossDeviceManualState(), 4000);
+  // Cross-device state now moves only through the explicit Push/Pull sync controls.
 }
 
 function snapshotManualStateForSync(date = dateInput.value || formatDate(new Date())) {
@@ -21115,7 +21100,7 @@ function betLegActive(candidate, leg) {
 
 function getBetSearchPool(games = latestRenderedGames) {
   const map = new Map();
-  const upsert = (player = {}, fallback = {}) => {
+  const upsert = (player = {}, fallback = {}, game = null) => {
     const id = Number(player?.id ?? player?.playerId ?? fallback?.id);
     if (!Number.isFinite(id)) return;
     const existing = map.get(String(id)) || {};
@@ -21136,11 +21121,12 @@ function getBetSearchPool(games = latestRenderedGames) {
       profile: merged,
       batting: betSearchBattingStats(merged),
       pitching: betSearchPitchingStats(merged),
+      game: game || existing.game || null,
     });
   };
   for (const game of games || []) {
     for (const profile of Object.values(game?.playerLookup || {})) {
-      upsert(profile);
+      upsert(profile, {}, game);
     }
     for (const entry of [
       ...(game?.lineup?.away || []),
@@ -21148,7 +21134,7 @@ function getBetSearchPool(games = latestRenderedGames) {
       ...(game?.lineup?.awayBench || []),
       ...(game?.lineup?.homeBench || []),
     ]) {
-      upsert(entry);
+      upsert(entry, {}, game);
     }
   }
   return [...map.values()].sort((a, b) => (
@@ -21284,6 +21270,38 @@ function betSearchPlayerMatchesHand(player = {}, filter = betPlayerHandFilterEl?
   const hand = handednessCode(filter);
   if (!hand) return true;
   return betSearchPlayerHand(player) === hand;
+}
+
+function playerSearchNeedsHandProfile(player = {}) {
+  if (!player?.id && !player?.playerId) return false;
+  if (betSearchPlayerHand(player)) return false;
+  const profile = player?.profile || player;
+  if (betSearchIsPitcher(profile) || ['SP', 'RP', 'CP', 'P'].includes(cleanSummary(player?.position || '').toUpperCase())) return false;
+  return Boolean(player?.game);
+}
+
+function requestPlayerSearchHandProfiles(players = [], rerender = null) {
+  const targets = listify(players)
+    .filter(playerSearchNeedsHandProfile)
+    .filter((player) => {
+      const key = `${player.game?.gamePk || 'game'}:${Number(player.id ?? player.playerId)}`;
+      if (playerSearchHandProfileCache.has(key)) return false;
+      playerSearchHandProfileCache.set(key, true);
+      return true;
+    })
+    .slice(0, 48);
+  if (!targets.length) return false;
+  mapWithConcurrency(targets, 6, async (player) => {
+    const id = Number(player.id ?? player.playerId);
+    const game = player.game || null;
+    const profile = await fetchMlbPlayerProfile(id, game, { role: 'hitter', allowFirstAppearanceFallback: false }).catch(() => null);
+    if (!profile) return null;
+    persistPlayerLookupForGame(game, { [String(id)]: { ...(game?.playerLookup?.[String(id)] || {}), ...profile } });
+    return profile;
+  }).then(() => {
+    if (typeof rerender === 'function') rerender();
+  }).catch(() => {});
+  return true;
 }
 
 function selectedBetPlayerTeamClassification() {
@@ -21603,7 +21621,11 @@ function renderGlobalPlayerSearchResults(query = '') {
       .then(() => renderGlobalPlayerSearchResults(globalPlayerSearchInputEl?.value || ''))
       .catch(() => {});
   }
-  const results = globalPlayerSearchPool()
+  const pool = globalPlayerSearchPool();
+  const hydratingHands = handednessCode(globalPlayerHandFilterEl?.value || '')
+    ? requestPlayerSearchHandProfiles(pool, () => renderGlobalPlayerSearchResults(globalPlayerSearchInputEl?.value || ''))
+    : false;
+  const results = pool
     .filter(globalPlayerSearchMatchesFilters)
     .map((player) => ({ player, score: normalized ? globalPlayerSearchScore(player, q) : 1 }))
     .filter((entry) => entry.score > 0 || globalPlayerSearchFiltersActive())
@@ -21615,7 +21637,9 @@ function renderGlobalPlayerSearchResults(query = '') {
     ))
     .slice(0, globalPlayerSearchFiltersActive() ? 30 : 12);
   if (!results.length) {
-    globalPlayerSearchResultsEl.innerHTML = '<div class="global-player-search-empty">No matching players</div>';
+    globalPlayerSearchResultsEl.innerHTML = hydratingHands
+      ? '<div class="global-player-search-empty">Loading handedness...</div>'
+      : '<div class="global-player-search-empty">No matching players</div>';
     return;
   }
   globalPlayerSearchResultsEl.innerHTML = results.map(({ player }, index) => `
@@ -21714,7 +21738,12 @@ function refreshBetPlayerOptions(games = latestRenderedGames, searchValue = betP
         .then(() => refreshBetPlayerOptions(games, betPlayerSearchEl?.value || ''))
         .catch(() => {});
     }
-    const matches = getFilteredBetSearchPool(games)
+    const pool = getBetSearchPool(games);
+    if (handednessCode(betPlayerHandFilterEl?.value || '')) {
+      requestPlayerSearchHandProfiles(pool, () => refreshBetPlayerOptions(games, betPlayerSearchEl?.value || ''));
+    }
+    const matches = pool
+      .filter(betSearchPlayerMatchesFilters)
       .filter((player) => !query || player.playerNameKey.includes(query))
       .slice(0, 50);
     for (const player of matches) {
@@ -43659,13 +43688,14 @@ function pitcherLastThreeStartsHtml(starts = [], label = 'Last 3 Starts') {
     const stat = split?.stat || {};
     const opponent = displayTeamAbbrev(split?.opponent?.abbreviation || split?.opponent?.teamCode || split?.opponent?.name || '');
     const pitches = statNumber(stat.numberOfPitches ?? stat.pitchesThrown ?? stat.pitchCount ?? stat.pitches);
-    const pitchText = pitches > 0 ? ` | P${pitches}` : '';
+    const pitchText = pitches > 0 ? `P${pitches}` : '--';
     const hrBatters = listify(split?.hrAllowedDetails)
       .map((entry) => `<button type="button" class="player-card-link" data-player-card-link data-player-id="${escapeHtml(entry.id || '')}" data-player-role="hitter">${escapeHtml(`${entry.name}${entry.hand ? ` (${entry.hand})` : ''}`)}</button>`)
       .join('');
     return `<div class="player-heatmap-metric-row">
       <span>${escapeHtml(formatLeadersDateLabel(split?.date || ''))}${opponent ? ` vs ${escapeHtml(opponent)}` : ''}</span>
-      <b>${escapeHtml(`${cleanSummary(stat.inningsPitched) || '0.0'} IP${pitchText}`)}</b>
+      <b>${escapeHtml(cleanSummary(stat.inningsPitched) || '0.0')} IP</b>
+      <b>${escapeHtml(pitchText)}</b>
       <b>${escapeHtml(statNumber(stat.earnedRuns))} ER</b>
       <b>${escapeHtml(statNumber(stat.homeRuns))} HR</b>
       <b>${escapeHtml(statNumber(stat.strikeOuts))} K</b>
@@ -43676,7 +43706,7 @@ function pitcherLastThreeStartsHtml(starts = [], label = 'Last 3 Starts') {
   return `<section class="player-heatmap-table-panel">
     <h3>${escapeHtml(label)}</h3>
     <div class="player-heatmap-metric-table pitcher-heatmap-starts-table">
-      <div class="player-heatmap-metric-row header"><span>Date</span><b>IP</b><b>ER</b><b>HR</b><b>K</b><b>H</b><b>HR Batter</b></div>
+      <div class="player-heatmap-metric-row header"><span>Date</span><b>IP</b><b>P</b><b>ER</b><b>HR</b><b>K</b><b>H</b><b>HR Batter</b></div>
       ${rows || `<div class="player-heatmap-metric-row"><span>${escapeHtml(label)}</span><b>--</b></div>`}
     </div>
   </section>`;

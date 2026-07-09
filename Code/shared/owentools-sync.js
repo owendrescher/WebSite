@@ -400,8 +400,9 @@
     return true;
   }
 
-  async function loadCloudState() {
+  async function loadCloudState(options = {}) {
     if (!client || !session || pageConfig.loginOnly) return { ok: true, changed: false };
+    const forceCloud = Boolean(options.forceCloud);
     let result;
     try {
       result = await withTimeout(
@@ -451,7 +452,7 @@
       const localValue = readLocalValue(key);
       const cloudTime = Date.parse(row.updated_at || "") || 0;
       const localTime = localUpdatedAt(key);
-      if (!shouldUseCloudValue(localValue, value, localTime, cloudTime, key)) {
+      if (!forceCloud && !shouldUseCloudValue(localValue, value, localTime, cloudTime, key)) {
         pendingUploads.set(key, localValue);
         return;
       }
@@ -516,8 +517,7 @@
     if (!client || !session || pageConfig.loginOnly || pullInFlight) return false;
     pullInFlight = true;
     try {
-      if (pendingUploads.size) await flushUploads();
-      const download = await loadCloudState();
+      const download = await loadCloudState({ forceCloud: reason === "manual-pull" });
       if (!download.ok) return false;
       lastPullAt = Date.now();
       if (download.changed) dispatchSyncStateChanged({ changedKeys: download.changedKeys || [], source: reason });
@@ -611,20 +611,9 @@
 
   async function reconcileAfterSignIn() {
     try {
-      setState("working");
-      setStatus("Syncing...");
-      const download = await loadCloudState();
-      if (!download.ok) {
-        syncReady = Boolean(session);
-        return;
-      }
       syncReady = true;
-      const uploaded = await pushLocalState("reconcile");
-      if (!uploaded) return;
       setState("signed-in");
       setStatus(session?.user?.email || "Synced");
-      if (download.changed) dispatchSyncStateChanged({ changedKeys: download.changedKeys || [], source: "reconcile" });
-      scheduleCloudPull(1200, "post-reconcile");
     } catch (error) {
       syncReady = Boolean(session);
       setErrorStatus(error);
@@ -638,12 +627,10 @@
 
     Storage.prototype.setItem = function (key, value) {
       originalSetItem.call(this, key, value);
-      if (this === window.localStorage) queueUpload(String(key), String(value));
     };
 
     Storage.prototype.removeItem = function (key) {
       originalRemoveItem.call(this, key);
-      if (this === window.localStorage) queueUpload(String(key), null);
     };
   }
 
@@ -1006,9 +993,7 @@
     refreshWidget();
     if (session) {
       await reconcileAfterSignIn();
-      startRealtimeSubscription();
     }
-    startAutoPullLoop();
 
     client.auth.onAuthStateChange(async (_event, nextSession) => {
       stopRealtimeSubscription();
@@ -1018,7 +1003,6 @@
       refreshWidget();
       if (session) {
         await reconcileAfterSignIn();
-        startRealtimeSubscription();
       }
       else {
         setState("signed-out");
