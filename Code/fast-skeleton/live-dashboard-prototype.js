@@ -288,6 +288,7 @@ const HOME_RUN_AUDIO_WINDOW_MS = 60 * 1000;
 const MANUAL_STATE_BACKUP_KEY = 'manual-state-backup:v1';
 const MANUAL_STATE_MIRROR_KEY = 'manual-state-mirror:v1';
 const MANUAL_STATE_DURABLE_KEY = 'manual-state-durable:v1';
+const MANUAL_STATE_SYNC_KEY = 'manual-state-current:v1';
 const STORAGE_COMPACTED_KEY = 'storage-compacted:v2';
 const PITCHER_START_MEMORY_KEY = 'pitcher-start-memory:v3';
 const LEGACY_BET_PREFIX = 'bets:';
@@ -17698,6 +17699,10 @@ function manualStateBackupKey(date = dateInput.value || formatDate(new Date())) 
   return `${MANUAL_STATE_BACKUP_KEY}:${date || formatDate(new Date())}`;
 }
 
+function manualStateSyncKey(date = dateInput.value || formatDate(new Date())) {
+  return `${MANUAL_STATE_SYNC_KEY}:${date || formatDate(new Date())}`;
+}
+
 function readManualStateBackup(date = dateInput.value || formatDate(new Date())) {
   try {
     const parsed = JSON.parse(localStorage.getItem(manualStateBackupKey(date)) || '{}');
@@ -17720,6 +17725,17 @@ function readManualStateDurable(date = dateInput.value || formatDate(new Date())
   try {
     const parsed = JSON.parse(localStorage.getItem(MANUAL_STATE_DURABLE_KEY) || '{}');
     return parsed?.[date] && typeof parsed[date] === 'object' ? parsed[date] : {};
+  } catch {
+    return {};
+  }
+}
+
+function readManualStateSyncSnapshot(date = dateInput.value || formatDate(new Date())) {
+  try {
+    const selectedDate = String(date || dateInput.value || formatDate(new Date()));
+    const parsed = JSON.parse(localStorage.getItem(manualStateSyncKey(selectedDate)) || '{}');
+    if (!parsed || typeof parsed !== 'object' || String(parsed.date || selectedDate) !== selectedDate) return {};
+    return parsed;
   } catch {
     return {};
   }
@@ -18359,6 +18375,68 @@ function initCrossDeviceManualStateSync() {
   // Cross-device state now moves only through the explicit Push/Pull sync controls.
 }
 
+function currentManualStatePatchForSync(date = dateInput.value || formatDate(new Date())) {
+  const selectedDate = String(date || dateInput.value || formatDate(new Date()));
+  const trackedKey = trackedPlayersStorageKey(selectedDate);
+  const tracked = trackedPlayersMemoryByDate.has(trackedKey)
+    ? normalizeTrackedPlayerEntries(trackedPlayersMemoryByDate.get(trackedKey) || [])
+    : normalizeTrackedPlayerEntries(getTrackedPlayers(selectedDate));
+  return {
+    trackedPlayers: tracked,
+    pendingGamePicks: normalizePendingGamePickEntries([...pendingGamePickSelections.entries()]),
+    tossupScoreboards: [...tossupScoreboardGamePks].map((key) => String(key)).filter(Boolean),
+    lockedTossupScoreboards: [...lockedTossupScoreboardGamePks].map((key) => String(key)).filter(Boolean),
+    overUnderScoreboards: normalizeOverUnderScoreboardEntries(serializeOverUnderScoreboards()),
+  };
+}
+
+function writeManualStateSyncSnapshot(date = dateInput.value || formatDate(new Date())) {
+  const selectedDate = String(date || dateInput.value || formatDate(new Date()));
+  const snapshot = {
+    date: selectedDate,
+    updatedAt: Date.now(),
+    ...currentManualStatePatchForSync(selectedDate),
+  };
+  try {
+    localStorage.setItem(manualStateSyncKey(selectedDate), JSON.stringify(snapshot));
+  } catch {}
+  writeManualStateBackupPatch(snapshot, selectedDate, { allowEmpty: true, forceEmpty: true });
+  return snapshot;
+}
+
+function applyManualStateSnapshot(snapshot = {}, date = dateInput.value || formatDate(new Date())) {
+  const selectedDate = String(snapshot?.date || date || dateInput.value || formatDate(new Date()));
+  if (!snapshot || typeof snapshot !== 'object') return false;
+  const hasAny = ['trackedPlayers', 'pendingGamePicks', 'tossupScoreboards', 'lockedTossupScoreboards', 'overUnderScoreboards']
+    .some((key) => hasOwnManualStateField(snapshot, key));
+  if (!hasAny) return false;
+
+  const tracked = normalizeTrackedPlayerEntries(snapshot.trackedPlayers || []);
+  const pending = normalizePendingGamePickEntries(snapshot.pendingGamePicks || []);
+  const tossups = listify(snapshot.tossupScoreboards).map((key) => String(key)).filter(Boolean);
+  const locked = listify(snapshot.lockedTossupScoreboards).map((key) => String(key)).filter(Boolean);
+  const overUnder = normalizeOverUnderScoreboardEntries(snapshot.overUnderScoreboards || []);
+
+  pendingGamePickSelections = new Map(pending);
+  tossupScoreboardGamePks.clear();
+  tossups.forEach((key) => tossupScoreboardGamePks.add(String(key)));
+  lockedTossupScoreboardGamePks.clear();
+  locked.forEach((key) => lockedTossupScoreboardGamePks.add(String(key)));
+  overUnderScoreboardSelections.clear();
+  overUnder.forEach((entry) => overUnderScoreboardSelections.set(String(entry.key), { side: entry.side, locked: Boolean(entry.locked) }));
+
+  saveTrackedPlayers(tracked, selectedDate, { allowEmpty: true, forceEmpty: !tracked.length });
+  savePendingGamePicks({ allowEmpty: true, forceEmpty: !pendingGamePickSelections.size, date: selectedDate });
+  saveTossupScoreboards(selectedDate, { allowEmpty: true, forceEmpty: !tossupScoreboardGamePks.size });
+  saveLockedTossupScoreboards(selectedDate, { allowEmpty: true, forceEmpty: !lockedTossupScoreboardGamePks.size });
+  saveOverUnderScoreboards(selectedDate, { allowEmpty: true, forceEmpty: !overUnderScoreboardSelections.size });
+  try {
+    localStorage.setItem(manualStateSyncKey(selectedDate), JSON.stringify({ date: selectedDate, updatedAt: Number(snapshot.updatedAt) || Date.now(), trackedPlayers: tracked, pendingGamePicks: pending, tossupScoreboards: tossups, lockedTossupScoreboards: locked, overUnderScoreboards: overUnder }));
+  } catch {}
+  manualStateInMemoryDate = selectedDate;
+  return true;
+}
+
 function snapshotManualStateForSync(date = dateInput.value || formatDate(new Date())) {
   const selectedDate = String(date || dateInput.value || formatDate(new Date()));
   const trackedKey = trackedPlayersStorageKey(selectedDate);
@@ -18390,6 +18468,7 @@ function snapshotManualStateForSync(date = dateInput.value || formatDate(new Dat
     const tracked = normalizeTrackedPlayerEntries(getTrackedPlayers(selectedDate));
     if (tracked.length) saveTrackedPlayers(tracked, selectedDate);
   }
+  writeManualStateSyncSnapshot(selectedDate);
 }
 
 function refreshManualStateAfterSync(date = dateInput.value || formatDate(new Date())) {
@@ -18397,7 +18476,8 @@ function refreshManualStateAfterSync(date = dateInput.value || formatDate(new Da
   manualStateInMemoryDate = '';
   manualStateCrossDeviceFingerprint = '';
   trackedPlayersMemoryByDate.delete(trackedPlayersStorageKey(selectedDate));
-  reconcileCrossDeviceManualState(selectedDate);
+  const snapshotApplied = applyManualStateSnapshot(readManualStateSyncSnapshot(selectedDate), selectedDate);
+  if (!snapshotApplied) reconcileCrossDeviceManualState(selectedDate);
   if (playerTrackerListEl) playerTrackerListEl.dataset.renderFingerprint = '';
   renderPlayerTrackerList(latestRenderedGames);
   renderPendingGamePicks(latestRenderedGames);
@@ -20439,6 +20519,7 @@ function pitcherOpponentColumnFromSplit(split = {}, strengthMap = new Map()) {
     logo: strength?.logo || getLogoPath(opponent),
     color: strength?.color || getTeamColor(opponent),
     innings: cleanSummary(stat.inningsPitched) || outsToInnings(inningsToOuts(stat.inningsPitched)),
+    pitches: statNumber(stat.numberOfPitches ?? stat.pitchesThrown ?? stat.pitchCount ?? stat.pitches),
     hits: statNumber(stat.hits),
     homeRuns: statNumber(stat.homeRuns ?? stat.hrAllowed ?? stat.hr),
     earnedRuns: statNumber(stat.earnedRuns),
@@ -20505,6 +20586,7 @@ function renderPitcherOpponentHistoryHtml(details = null) {
           <span class="pitcher-opponent-date">${escapeHtml(item.date || '--')}</span>
           <img src="${escapeHtml(item.logo || 'placeholder.png')}" alt="${escapeHtml(item.opponent || 'Opponent')} logo" />
           <b>${escapeHtml(item.innings || '0.0')} IP</b>
+          <b>${Number(item.pitches) > 0 ? `P${escapeHtml(item.pitches)}` : 'P--'}</b>
           <span>${item.hits} H</span>
           <span>${item.homeRuns} HR</span>
           ${item.hrBatters?.length ? `<span class="pitcher-opponent-hr-batters">${item.hrBatters.map((entry) => `<i><button type="button" class="player-card-link" data-player-card-link data-player-id="${escapeHtml(entry.id || '')}" data-player-role="hitter"${entry.pitchInfo ? ` title="${escapeHtml(entry.pitchInfo)}"` : ''}>${escapeHtml(entry.label || '')}</button></i>`).join('')}</span>` : ''}
@@ -21289,7 +21371,7 @@ function requestPlayerSearchHandProfiles(players = [], rerender = null) {
       playerSearchHandProfileCache.set(key, true);
       return true;
     })
-    .slice(0, 48);
+    .slice(0, 150);
   if (!targets.length) return false;
   mapWithConcurrency(targets, 6, async (player) => {
     const id = Number(player.id ?? player.playerId);
@@ -21622,13 +21704,16 @@ function renderGlobalPlayerSearchResults(query = '') {
       .catch(() => {});
   }
   const pool = globalPlayerSearchPool();
+  const scored = pool
+    .map((player) => ({ player, score: normalized ? globalPlayerSearchScore(player, q) : 1 }))
+    .filter((entry) => entry.score > 0 || globalPlayerSearchFiltersActive());
   const hydratingHands = handednessCode(globalPlayerHandFilterEl?.value || '')
-    ? requestPlayerSearchHandProfiles(pool, () => renderGlobalPlayerSearchResults(globalPlayerSearchInputEl?.value || ''))
+    ? requestPlayerSearchHandProfiles(scored.map((entry) => entry.player), () => renderGlobalPlayerSearchResults(globalPlayerSearchInputEl?.value || ''))
     : false;
-  const results = pool
+  const results = scored
+    .map((entry) => entry.player)
     .filter(globalPlayerSearchMatchesFilters)
     .map((player) => ({ player, score: normalized ? globalPlayerSearchScore(player, q) : 1 }))
-    .filter((entry) => entry.score > 0 || globalPlayerSearchFiltersActive())
     .sort((a, b) => (
       b.score - a.score
       || b.player.sourceRank - a.player.sourceRank
@@ -21739,12 +21824,12 @@ function refreshBetPlayerOptions(games = latestRenderedGames, searchValue = betP
         .catch(() => {});
     }
     const pool = getBetSearchPool(games);
+    const queryPool = pool.filter((player) => !query || player.playerNameKey.includes(query));
     if (handednessCode(betPlayerHandFilterEl?.value || '')) {
-      requestPlayerSearchHandProfiles(pool, () => refreshBetPlayerOptions(games, betPlayerSearchEl?.value || ''));
+      requestPlayerSearchHandProfiles(queryPool, () => refreshBetPlayerOptions(games, betPlayerSearchEl?.value || ''));
     }
-    const matches = pool
+    const matches = queryPool
       .filter(betSearchPlayerMatchesFilters)
-      .filter((player) => !query || player.playerNameKey.includes(query))
       .slice(0, 50);
     for (const player of matches) {
       values.push(`${player.playerName} | ${player.teamAbbrev || 'MLB'} | ${player.playerId}`);
