@@ -512,6 +512,7 @@
             <div class="panel-header-actions">
               <span class="hint">DAY: <span id="betDayLabel"></span></span>
               <button id="playerTrackerSortBtn" class="hint panel-sort-toggle" type="button">time added</button>
+              <button id="playerTrackerCopyBtn" class="panel-action-btn" type="button">COPY</button>
               <div id="playerTrackerCounts" class="player-tracker-summary player-tracker-summary-header" aria-label="Player tracker counts" hidden></div>
               <button id="clearBetsBtn" class="panel-action-btn" type="button">CLEAR</button>
             </div>
@@ -675,6 +676,7 @@
       window.OWENTOOLS_SYNC = {
         toolId: "baseball-dashboard",
         label: "Baseball dashboard",
+        manualOnly: true,
         include: [
           "manual-state-mirror:v1",
           "manual-state-durable:v1",
@@ -692,13 +694,13 @@
         ]
       };
     </script>
-    <script src="../shared/owentools-sync.js?v=20260710syncReconnect1"></script>
+    <script src="../shared/owentools-sync.js?v=20260710manualSync1"></script>
     <script src="rotowire-default-lineups.js?v=20260708rotowireFallback1"></script>
     <script src="mlb-contracts-data.js?v=20260708liveSearchFix1"></script>
     <script>
-      window.MLB_DASHBOARD_BUILD_ID="20260710-sync-reconnect1-dev";
+      window.MLB_DASHBOARD_BUILD_ID="20260710-manual-sync1-dev";
       window.MLB_STATS_PROFILER_FORCE=true;
     </script>
-    <script src="live-dashboard-prototype.js?v=20260710syncReconnect1"></script>
+    <script src="live-dashboard-prototype.js?v=20260710manualSync1"></script>
   </body>
 </html>

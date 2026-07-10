@@ -358,6 +358,7 @@
   function queueUpload(key, value) {
     if (suppressUpload || !shouldSyncKey(key)) return;
     markLocalUpdated(key);
+    if (pageConfig.manualOnly) return;
     if (!syncReady || !session) return;
     pendingUploads.set(key, value);
     window.clearTimeout(flushTimer);
@@ -548,6 +549,7 @@
 
   function startAutoPullLoop() {
     if (!configured) return;
+    if (pageConfig.manualOnly) return;
     if (autoPullStarted) return;
     autoPullStarted = true;
     const interval = Math.max(2500, Number(pageConfig.pullIntervalMs) || 5000);
@@ -580,6 +582,7 @@
   }
 
   function startRealtimeSubscription() {
+    if (pageConfig.manualOnly) return;
     if (!client || !session || pageConfig.loginOnly || realtimeChannel || typeof client.channel !== "function") return;
     try {
       const userId = session.user?.id;
@@ -619,6 +622,7 @@
       setStatus(session?.user?.email || "Synced");
       startAutoPullLoop();
       startRealtimeSubscription();
+      if (pageConfig.manualOnly) return;
       await pullCloudState("signin");
       await uploadLocalState();
     } catch (error) {

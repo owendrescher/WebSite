@@ -138,6 +138,7 @@ const betLogTabBtnEl = document.getElementById('betLogTabBtn');
 const betInputTabBtnEl = document.getElementById('betInputTabBtn');
 const playerTrackerTabBtnEl = document.getElementById('playerTrackerTabBtn');
 const playerTrackerSortBtnEl = document.getElementById('playerTrackerSortBtn');
+const playerTrackerCopyBtnEl = document.getElementById('playerTrackerCopyBtn');
 const gamePickDialogEl = document.getElementById('gamePickDialog');
 const gamePickDialogFormEl = document.getElementById('gamePickDialogForm');
 const gamePickDialogSummaryEl = document.getElementById('gamePickDialogSummary');
@@ -22710,6 +22711,7 @@ function setBetPanelMode(mode = 'bets') {
     playerTrackerSortBtnEl.hidden = betPanelMode !== 'players';
     playerTrackerSortBtnEl.textContent = currentPlayerTrackerSortLabel();
   }
+  if (playerTrackerCopyBtnEl) playerTrackerCopyBtnEl.hidden = betPanelMode !== 'players';
   if (playerTrackerCountsEl) {
     playerTrackerCountsEl.hidden = betPanelMode !== 'players';
   }
@@ -23077,6 +23079,33 @@ function renderPlayerTrackerList(games = latestRenderedGames) {
   playerTrackerListEl.scrollTop = scrollTop;
 }
 
+async function copyTrackedPlayerNames() {
+  const names = getTrackedPlayers()
+    .map((entry) => cleanSummary(entry?.playerName || entry?.fullName || entry?.name || ''))
+    .filter(Boolean);
+  if (!names.length) return false;
+  const text = names.join('\n');
+  try {
+    await navigator.clipboard.writeText(text);
+  } catch {
+    const textarea = document.createElement('textarea');
+    textarea.value = text;
+    textarea.setAttribute('readonly', '');
+    textarea.style.position = 'fixed';
+    textarea.style.opacity = '0';
+    document.body.appendChild(textarea);
+    textarea.select();
+    const copied = document.execCommand('copy');
+    textarea.remove();
+    if (!copied) return false;
+  }
+  if (playerTrackerCopyBtnEl) {
+    playerTrackerCopyBtnEl.textContent = 'COPIED';
+    window.setTimeout(() => { playerTrackerCopyBtnEl.textContent = 'COPY'; }, 1200);
+  }
+  return true;
+}
+
 function refreshLineupTrackedPlayerHighlights() {
   if (!lineupOverlayEl) return;
   const trackedIds = new Set(normalizeTrackedPlayerEntries(getTrackedPlayers()).map((entry) => String(entry.playerId)));
@@ -23358,6 +23387,9 @@ function initBetInput() {
     playerTrackerSortMode = nextPlayerTrackerSortMode();
     if (playerTrackerListEl) playerTrackerListEl.dataset.renderFingerprint = '';
     renderPlayerTrackerList(latestRenderedGames);
+  });
+  playerTrackerCopyBtnEl?.addEventListener('click', () => {
+    void copyTrackedPlayerNames();
   });
   clearPendingPicksBtnEl?.addEventListener('click', () => clearPendingGamePicks());
   gamePickDialogCancelBtnEl?.addEventListener('click', closeGamePickDialog);
@@ -36335,7 +36367,7 @@ async function pitcherLastThreeComparisonMetrics(pitcher = null, game = null) {
     .filter(starter ? isPitchingStartSplit : playerStatPitchingAppearanceSplit)
     .slice(0, 3);
   const recent = aggregatePlayerCardPitchingSplits(recentSplits);
-  if (!recent || recent.outs <= 0) return seasonPitcherComparisonMetrics(pitcher);
+  if (!recent || recent.outs <= 0) return null;
   return {
     ip: recent.outs / 3,
     era: (recent.earnedRuns * 27) / recent.outs,
@@ -36374,14 +36406,19 @@ async function hydrateLineupPitcherL3Comparison(game, awayStaff, homeStaff, away
   const awayPitcher = lineupDisplayPitcherForComparison(awayStaff);
   const homePitcher = lineupDisplayPitcherForComparison(homeStaff);
   if (!awayPitcher || !homePitcher) return;
-  if (pitcherUsageRole(awayPitcher) !== pitcherUsageRole(homePitcher)) return;
   const apply = (el, pitcher, leaderFlags) => {
     const meta = el?.querySelector?.('.pitcher-priority-meta');
     if (meta && pitcher) meta.innerHTML = pitcherSeasonMetaLine(pitcher, leaderFlags);
   };
-  const seasonFlags = pitcherComparisonLeaderFlags(seasonPitcherComparisonMetrics(awayPitcher), seasonPitcherComparisonMetrics(homePitcher));
-  apply(awayEl, awayPitcher, seasonFlags.a);
-  apply(homeEl, homePitcher, seasonFlags.b);
+  const [awayRecent, homeRecent] = await Promise.all([
+    pitcherLastThreeComparisonMetrics(awayPitcher, game),
+    pitcherLastThreeComparisonMetrics(homePitcher, game),
+  ]);
+  const improvedFlags = (pitcher, recent) => (
+    recent ? pitcherComparisonLeaderFlags(recent, seasonPitcherComparisonMetrics(pitcher)).a : {}
+  );
+  apply(awayEl, awayPitcher, improvedFlags(awayPitcher, awayRecent));
+  apply(homeEl, homePitcher, improvedFlags(homePitcher, homeRecent));
 }
 
 function pitcherAppearanceHistoryForSide(boxscore, side, allPlays = []) {
