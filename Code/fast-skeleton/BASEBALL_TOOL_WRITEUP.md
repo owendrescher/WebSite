@@ -109,6 +109,7 @@ Important synced keys include:
 - `manual-state-backup:v1:{date}`
 - `manual-state-mirror:v1`
 - `manual-state-durable:v1`
+- `manual-state-last-push:v1`
 - `player-tracker:v1:{date}`
 - `player-tracker-backup:v1`
 - `pending-game-picks:v1:{date}`
@@ -149,6 +150,7 @@ window.OWENTOOLS_SYNC = {
     "manual-state-durable:v1",
     "manual-state-backup:v1",
     "manual-state-current:v1",
+    "manual-state-last-push:v1",
     "player-tracker:v1:",
     "player-tracker-backup:v1",
     "pending-game-picks:v1",

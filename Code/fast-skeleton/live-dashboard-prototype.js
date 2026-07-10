@@ -291,6 +291,7 @@ const MANUAL_STATE_BACKUP_KEY = 'manual-state-backup:v1';
 const MANUAL_STATE_MIRROR_KEY = 'manual-state-mirror:v1';
 const MANUAL_STATE_DURABLE_KEY = 'manual-state-durable:v1';
 const MANUAL_STATE_SYNC_KEY = 'manual-state-current:v1';
+const MANUAL_STATE_LAST_PUSH_KEY = 'manual-state-last-push:v1';
 const STORAGE_COMPACTED_KEY = 'storage-compacted:v2';
 const PITCHER_START_MEMORY_KEY = 'pitcher-start-memory:v3';
 const LEGACY_BET_PREFIX = 'bets:';
@@ -17753,6 +17754,40 @@ function readManualStateSyncSnapshot(date = dateInput.value || formatDate(new Da
   }
 }
 
+function manualStateSnapshotHasFields(snapshot = {}) {
+  return Boolean(snapshot && typeof snapshot === 'object' && ['trackedPlayers', 'pendingGamePicks', 'tossupScoreboards', 'lockedTossupScoreboards', 'overUnderScoreboards']
+    .some((key) => hasOwnManualStateField(snapshot, key)));
+}
+
+function readManualStateLastPushSnapshot(date = dateInput.value || formatDate(new Date())) {
+  try {
+    const selectedDate = String(date || dateInput.value || formatDate(new Date()));
+    const parsed = JSON.parse(localStorage.getItem(MANUAL_STATE_LAST_PUSH_KEY) || '{}');
+    const snapshot = parsed?.snapshot && typeof parsed.snapshot === 'object' ? parsed.snapshot : parsed;
+    if (!snapshot || typeof snapshot !== 'object') return {};
+    if (String(snapshot.date || parsed?.date || selectedDate) !== selectedDate) return {};
+    if (!manualStateSnapshotHasFields(snapshot)) return {};
+    return {
+      ...snapshot,
+      date: selectedDate,
+      updatedAt: Number(snapshot.updatedAt || parsed?.updatedAt) || Date.now(),
+    };
+  } catch {
+    return {};
+  }
+}
+
+function readBestManualStateSyncSnapshot(date = dateInput.value || formatDate(new Date())) {
+  const selectedDate = String(date || dateInput.value || formatDate(new Date()));
+  const candidates = [
+    readManualStateSyncSnapshot(selectedDate),
+    readManualStateLastPushSnapshot(selectedDate),
+  ].filter(manualStateSnapshotHasFields);
+  if (!candidates.length) return {};
+  candidates.sort((a, b) => (Number(b?.updatedAt) || 0) - (Number(a?.updatedAt) || 0));
+  return candidates[0];
+}
+
 function normalizeManualStatePatchField(key = '', value = []) {
   if (key === 'trackedPlayers') return normalizeTrackedPlayerEntries(value);
   if (key === 'pendingGamePicks') return normalizePendingGamePickEntries(value);
@@ -18429,12 +18464,33 @@ function writeManualStateSyncSnapshot(date = dateInput.value || formatDate(new D
   return snapshot;
 }
 
+function writeManualStateLastPushSnapshot(snapshot = {}, date = dateInput.value || formatDate(new Date())) {
+  try {
+    const selectedDate = String(snapshot?.date || date || dateInput.value || formatDate(new Date()));
+    const cleanSnapshot = {
+      date: selectedDate,
+      updatedAt: Number(snapshot?.updatedAt) || Date.now(),
+      trackedPlayers: normalizeTrackedPlayerEntries(snapshot.trackedPlayers || []),
+      pendingGamePicks: normalizePendingGamePickEntries(snapshot.pendingGamePicks || []),
+      tossupScoreboards: listify(snapshot.tossupScoreboards).map((key) => String(key)).filter(Boolean),
+      lockedTossupScoreboards: listify(snapshot.lockedTossupScoreboards).map((key) => String(key)).filter(Boolean),
+      overUnderScoreboards: normalizeOverUnderScoreboardEntries(snapshot.overUnderScoreboards || []),
+    };
+    localStorage.setItem(MANUAL_STATE_LAST_PUSH_KEY, JSON.stringify({
+      date: selectedDate,
+      updatedAt: cleanSnapshot.updatedAt,
+      snapshot: cleanSnapshot,
+    }));
+    return cleanSnapshot;
+  } catch {
+    return snapshot;
+  }
+}
+
 function applyManualStateSnapshot(snapshot = {}, date = dateInput.value || formatDate(new Date())) {
   const selectedDate = String(snapshot?.date || date || dateInput.value || formatDate(new Date()));
   if (!snapshot || typeof snapshot !== 'object') return false;
-  const hasAny = ['trackedPlayers', 'pendingGamePicks', 'tossupScoreboards', 'lockedTossupScoreboards', 'overUnderScoreboards']
-    .some((key) => hasOwnManualStateField(snapshot, key));
-  if (!hasAny) return false;
+  if (!manualStateSnapshotHasFields(snapshot)) return false;
 
   const snapshotHasTrackedPlayers = hasOwnManualStateField(snapshot, 'trackedPlayers');
   const tracked = snapshotHasTrackedPlayers
@@ -18496,7 +18552,7 @@ function snapshotManualStateForSync(date = dateInput.value || formatDate(new Dat
     const tracked = normalizeTrackedPlayerEntries(getTrackedPlayers(selectedDate));
     if (tracked.length) saveTrackedPlayers(tracked, selectedDate);
   }
-  writeManualStateSyncSnapshot(selectedDate);
+  writeManualStateLastPushSnapshot(writeManualStateSyncSnapshot(selectedDate), selectedDate);
 }
 
 function refreshManualStateAfterSync(date = dateInput.value || formatDate(new Date()), changedKeys = new Set()) {
@@ -18507,7 +18563,7 @@ function refreshManualStateAfterSync(date = dateInput.value || formatDate(new Da
   manualStateInMemoryDate = '';
   manualStateCrossDeviceFingerprint = '';
   trackedPlayersMemoryByDate.delete(trackedKey);
-  const snapshotApplied = applyManualStateSnapshot(readManualStateSyncSnapshot(selectedDate), selectedDate);
+  const snapshotApplied = applyManualStateSnapshot(readBestManualStateSyncSnapshot(selectedDate), selectedDate);
   if (!snapshotApplied) reconcileCrossDeviceManualState(selectedDate);
   // The dated tracker row is the tracker source of truth on Pull. A broader,
   // older manual snapshot must not overwrite a tracker list pulled in the same operation.
@@ -18533,6 +18589,13 @@ function syncChangedManualStateDates(keys = new Set(), fallbackDate = dateInput.
     const value = String(key || '');
     const match = value.match(/(?:manual-state-current:v1|manual-state-backup:v1|player-tracker:v1|pending-game-picks:v1|tossup-scoreboards:v1|locked-tossup-scoreboards:v1|over-under-scoreboards:v1):(\d{4}-\d{2}-\d{2})$/);
     if (match?.[1]) dates.add(match[1]);
+    if (value === MANUAL_STATE_LAST_PUSH_KEY) {
+      try {
+        const parsed = JSON.parse(localStorage.getItem(MANUAL_STATE_LAST_PUSH_KEY) || '{}');
+        const pushedDate = String(parsed?.snapshot?.date || parsed?.date || '');
+        if (/^\d{4}-\d{2}-\d{2}$/.test(pushedDate)) dates.add(pushedDate);
+      } catch {}
+    }
   }
   return [...dates];
 }
@@ -18565,6 +18628,7 @@ function initOwenToolsSoftSyncRefresh() {
       BETS_STORAGE_KEY,
       MANUAL_STATE_MIRROR_KEY,
       MANUAL_STATE_DURABLE_KEY,
+      MANUAL_STATE_LAST_PUSH_KEY,
       PLAYER_TRACKER_STORAGE_KEY,
       PLAYER_TRACKER_BACKUP_STORAGE_KEY,
       trackedPlayersStorageKey(selectedDate),
