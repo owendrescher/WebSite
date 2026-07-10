@@ -18548,6 +18548,7 @@ function initOwenToolsSoftSyncRefresh() {
       storageKey(PLAYER_STAT_SEASON_RECENT_DAYS_KEY),
     ]);
     const manualKeys = new Set([
+      BETS_STORAGE_KEY,
       MANUAL_STATE_MIRROR_KEY,
       MANUAL_STATE_DURABLE_KEY,
       PLAYER_TRACKER_STORAGE_KEY,
@@ -18581,6 +18582,11 @@ function initOwenToolsSoftSyncRefresh() {
     }
     if (manualChanged) {
       refreshManualStateDatesAfterSync(keys, selectedDate);
+    }
+    if (allChanged || keys.has(BETS_STORAGE_KEY)) {
+      volatileBetCache = [];
+      if (betListEl) betListEl.dataset.renderFingerprint = '';
+      renderBetList(latestRenderedGames);
     }
     if (allChanged || [...lineupWindowKeys].some((key) => keys.has(key))) {
       const nextWindow = savedLineupStatWindow();

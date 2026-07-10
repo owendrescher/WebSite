@@ -366,6 +366,7 @@
   }
 
   async function flushUploads() {
+    if (pageConfig.manualOnly) return true;
     if (!client || !session || pendingUploads.size === 0) return;
     const rows = Array.from(pendingUploads.entries()).map(([key, value]) => ({
       user_id: session.user.id,
@@ -469,6 +470,7 @@
   }
 
   async function uploadLocalState() {
+    if (pageConfig.manualOnly) return true;
     if (!client || !session || pageConfig.loginOnly) return true;
     listSyncableLocalKeys().forEach((key) => pendingUploads.set(key, readLocalValue(key)));
     return flushUploads();
