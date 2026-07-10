@@ -18432,18 +18432,46 @@ function initCrossDeviceManualStateSync() {
   // Cross-device state now moves only through the explicit Push/Pull sync controls.
 }
 
+function manualStateArrayWeight(value = []) {
+  return Array.isArray(value) ? value.length : 0;
+}
+
+function readDirectJsonArray(key = '') {
+  try {
+    const parsed = JSON.parse(localStorage.getItem(key) || '[]');
+    return Array.isArray(parsed) ? parsed : [];
+  } catch {
+    return [];
+  }
+}
+
+function currentManualStateArrayForSave(activeValue = [], storedValue = [], normalizer = (value) => value) {
+  const active = normalizer(activeValue);
+  const stored = normalizer(storedValue);
+  return manualStateArrayWeight(active) >= manualStateArrayWeight(stored) ? active : stored;
+}
+
 function currentManualStatePatchForSync(date = dateInput.value || formatDate(new Date())) {
   const selectedDate = String(date || dateInput.value || formatDate(new Date()));
   const trackedKey = trackedPlayersStorageKey(selectedDate);
-  const tracked = trackedPlayersMemoryByDate.has(trackedKey)
+  const activeTracked = trackedPlayersMemoryByDate.has(trackedKey)
     ? normalizeTrackedPlayerEntries(trackedPlayersMemoryByDate.get(trackedKey) || [])
     : normalizeTrackedPlayerEntries(getTrackedPlayers(selectedDate));
+  const storedTracked = normalizeTrackedPlayerEntries(readTrackedPlayersStore(selectedDate) || []);
+  const activePicks = normalizePendingGamePickEntries([...pendingGamePickSelections.entries()]);
+  const storedPicks = normalizePendingGamePickEntries(readDirectJsonArray(`${PENDING_GAME_PICKS_STORAGE_KEY}:${selectedDate}`));
+  const activeTossups = [...tossupScoreboardGamePks].map((key) => String(key)).filter(Boolean);
+  const storedTossups = readDirectJsonArray(tossupScoreboardStorageKey(selectedDate)).map((key) => String(key)).filter(Boolean);
+  const activeLocked = [...lockedTossupScoreboardGamePks].map((key) => String(key)).filter(Boolean);
+  const storedLocked = readDirectJsonArray(lockedTossupScoreboardStorageKey(selectedDate)).map((key) => String(key)).filter(Boolean);
+  const activeOverUnder = normalizeOverUnderScoreboardEntries(serializeOverUnderScoreboards());
+  const storedOverUnder = normalizeOverUnderScoreboardEntries(readDirectJsonArray(overUnderScoreboardStorageKey(selectedDate)));
   return {
-    trackedPlayers: tracked,
-    pendingGamePicks: normalizePendingGamePickEntries([...pendingGamePickSelections.entries()]),
-    tossupScoreboards: [...tossupScoreboardGamePks].map((key) => String(key)).filter(Boolean),
-    lockedTossupScoreboards: [...lockedTossupScoreboardGamePks].map((key) => String(key)).filter(Boolean),
-    overUnderScoreboards: normalizeOverUnderScoreboardEntries(serializeOverUnderScoreboards()),
+    trackedPlayers: currentManualStateArrayForSave(activeTracked, storedTracked, normalizeTrackedPlayerEntries),
+    pendingGamePicks: currentManualStateArrayForSave(activePicks, storedPicks, normalizePendingGamePickEntries),
+    tossupScoreboards: currentManualStateArrayForSave(activeTossups, storedTossups, (value) => listify(value).map((key) => String(key)).filter(Boolean)),
+    lockedTossupScoreboards: currentManualStateArrayForSave(activeLocked, storedLocked, (value) => listify(value).map((key) => String(key)).filter(Boolean)),
+    overUnderScoreboards: currentManualStateArrayForSave(activeOverUnder, storedOverUnder, normalizeOverUnderScoreboardEntries),
   };
 }
 
@@ -18460,6 +18488,30 @@ function writeManualStateSyncSnapshot(date = dateInput.value || formatDate(new D
   writeManualStateBackupPatch(snapshot, selectedDate, { allowEmpty: true, forceEmpty: true });
   return snapshot;
 }
+
+function manualStateSnapshotCounts(snapshot = {}) {
+  return {
+    trackedPlayers: normalizeTrackedPlayerEntries(snapshot.trackedPlayers || []).length,
+    pendingGamePicks: normalizePendingGamePickEntries(snapshot.pendingGamePicks || []).length,
+    tossupScoreboards: listify(snapshot.tossupScoreboards).length,
+    lockedTossupScoreboards: listify(snapshot.lockedTossupScoreboards).length,
+    overUnderScoreboards: normalizeOverUnderScoreboardEntries(snapshot.overUnderScoreboards || []).length,
+  };
+}
+
+window.MLBDashboardManualSyncDebug = function MLBDashboardManualSyncDebug(date = dateInput.value || formatDate(new Date())) {
+  const selectedDate = String(date || dateInput.value || formatDate(new Date()));
+  const pendingSnapshot = { date: selectedDate, ...currentManualStatePatchForSync(selectedDate) };
+  return {
+    buildId: window.MLB_DASHBOARD_BUILD_ID || '',
+    date: selectedDate,
+    pendingSnapshot,
+    pendingCounts: manualStateSnapshotCounts(pendingSnapshot),
+    lastPushSnapshot: readManualStateLastPushSnapshot(selectedDate),
+    lastPushCounts: manualStateSnapshotCounts(readManualStateLastPushSnapshot(selectedDate)),
+    syncInclude: window.OWENTOOLS_SYNC?.include || [],
+  };
+};
 
 function writeManualStateLastPushSnapshot(snapshot = {}, date = dateInput.value || formatDate(new Date())) {
   try {
@@ -18549,7 +18601,14 @@ function snapshotManualStateForSync(date = dateInput.value || formatDate(new Dat
     const tracked = normalizeTrackedPlayerEntries(getTrackedPlayers(selectedDate));
     if (tracked.length) saveTrackedPlayers(tracked, selectedDate);
   }
-  writeManualStateLastPushSnapshot(writeManualStateSyncSnapshot(selectedDate), selectedDate);
+  const snapshot = writeManualStateLastPushSnapshot(writeManualStateSyncSnapshot(selectedDate), selectedDate);
+  try {
+    console.info('MLB manual sync push snapshot', {
+      date: selectedDate,
+      counts: manualStateSnapshotCounts(snapshot),
+      snapshot,
+    });
+  } catch {}
 }
 
 function refreshManualStateAfterSync(date = dateInput.value || formatDate(new Date()), changedKeys = new Set()) {
