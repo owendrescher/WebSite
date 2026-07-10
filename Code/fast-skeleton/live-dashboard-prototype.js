@@ -18445,10 +18445,11 @@ function readDirectJsonArray(key = '') {
   }
 }
 
-function currentManualStateArrayForSave(activeValue = [], storedValue = [], normalizer = (value) => value) {
+function currentManualStateArrayForSave(activeValue = [], storedValue = [], normalizer = (value) => value, options = {}) {
   const active = normalizer(activeValue);
   const stored = normalizer(storedValue);
-  return manualStateArrayWeight(active) >= manualStateArrayWeight(stored) ? active : stored;
+  if (options.preferActive || activeManualStateDateMatches(options.date)) return active;
+  return manualStateArrayWeight(active) > 0 || manualStateArrayWeight(stored) === 0 ? active : stored;
 }
 
 function currentManualStatePatchForSync(date = dateInput.value || formatDate(new Date())) {
@@ -18467,11 +18468,11 @@ function currentManualStatePatchForSync(date = dateInput.value || formatDate(new
   const activeOverUnder = normalizeOverUnderScoreboardEntries(serializeOverUnderScoreboards());
   const storedOverUnder = normalizeOverUnderScoreboardEntries(readDirectJsonArray(overUnderScoreboardStorageKey(selectedDate)));
   return {
-    trackedPlayers: currentManualStateArrayForSave(activeTracked, storedTracked, normalizeTrackedPlayerEntries),
-    pendingGamePicks: currentManualStateArrayForSave(activePicks, storedPicks, normalizePendingGamePickEntries),
-    tossupScoreboards: currentManualStateArrayForSave(activeTossups, storedTossups, (value) => listify(value).map((key) => String(key)).filter(Boolean)),
-    lockedTossupScoreboards: currentManualStateArrayForSave(activeLocked, storedLocked, (value) => listify(value).map((key) => String(key)).filter(Boolean)),
-    overUnderScoreboards: currentManualStateArrayForSave(activeOverUnder, storedOverUnder, normalizeOverUnderScoreboardEntries),
+    trackedPlayers: currentManualStateArrayForSave(activeTracked, storedTracked, normalizeTrackedPlayerEntries, { date: selectedDate }),
+    pendingGamePicks: currentManualStateArrayForSave(activePicks, storedPicks, normalizePendingGamePickEntries, { date: selectedDate }),
+    tossupScoreboards: currentManualStateArrayForSave(activeTossups, storedTossups, (value) => listify(value).map((key) => String(key)).filter(Boolean), { date: selectedDate }),
+    lockedTossupScoreboards: currentManualStateArrayForSave(activeLocked, storedLocked, (value) => listify(value).map((key) => String(key)).filter(Boolean), { date: selectedDate }),
+    overUnderScoreboards: currentManualStateArrayForSave(activeOverUnder, storedOverUnder, normalizeOverUnderScoreboardEntries, { date: selectedDate }),
   };
 }
 
