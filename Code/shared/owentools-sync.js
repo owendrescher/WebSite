@@ -30,6 +30,7 @@
   let pullInFlight = false;
   let lastPullAt = 0;
   let realtimeChannel = null;
+  let autoPullStarted = false;
   let statusEl = null;
   let menuEl = null;
   let copyEl = null;
@@ -547,6 +548,8 @@
 
   function startAutoPullLoop() {
     if (!configured) return;
+    if (autoPullStarted) return;
+    autoPullStarted = true;
     const interval = Math.max(2500, Number(pageConfig.pullIntervalMs) || 5000);
     window.setInterval(() => {
       if (document.visibilityState === "hidden") return;
@@ -614,6 +617,10 @@
       syncReady = true;
       setState("signed-in");
       setStatus(session?.user?.email || "Synced");
+      startAutoPullLoop();
+      startRealtimeSubscription();
+      await pullCloudState("signin");
+      await uploadLocalState();
     } catch (error) {
       syncReady = Boolean(session);
       setErrorStatus(error);
@@ -627,10 +634,12 @@
 
     Storage.prototype.setItem = function (key, value) {
       originalSetItem.call(this, key, value);
+      if (this === window.localStorage) queueUpload(key, String(value));
     };
 
     Storage.prototype.removeItem = function (key) {
       originalRemoveItem.call(this, key);
+      if (this === window.localStorage) queueUpload(key, null);
     };
   }
 

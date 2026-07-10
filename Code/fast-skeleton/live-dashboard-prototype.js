@@ -22692,25 +22692,40 @@ function resolveTrackedPlayerProfile(entry, games = latestRenderedGames) {
     if (candidate?.playerLookup?.[String(playerId)]) return true;
     return Boolean(findLineupEntry(candidate).lineupEntry);
   };
+  const hydrateProfileFromLineup = (gameCard) => {
+    if (!gameCard) return null;
+    const { side, lineupEntry } = findLineupEntry(gameCard);
+    if (!lineupEntry) return null;
+    const teamAbbrev = side === 'away' ? gameCard.away : side === 'home' ? gameCard.home : entry?.teamAbbrev || '';
+    return {
+      id: playerId,
+      fullName: lineupEntry.fullName || entry?.playerName || lineupEntry.name || 'Unknown',
+      teamAbbrev,
+      teamColor: side === 'away' ? gameCard.awayColor : side === 'home' ? gameCard.homeColor : getTeamColor(teamAbbrev),
+      teamLogo: side === 'away' ? gameCard.awayLogo : side === 'home' ? gameCard.homeLogo : getLogoPath(teamAbbrev),
+      position: lineupEntry.position || entry?.position || '',
+      todayBatting: lineupEntry.today || '0-0',
+      todayPitching: lineupEntry.todayPitching || '',
+      gameBatting: lineupEntry.gameBatting || {},
+      batting: lineupEntry.batting || {},
+    };
+  };
   const game = (games || []).find(hasTrackedPlayer)
     || getCachedGames().find(hasTrackedPlayer)
     || null;
   const lookupProfile = game?.playerLookup?.[String(playerId)] || null;
-  if (lookupProfile || !game) return { profile: lookupProfile, game };
-  const { side, lineupEntry } = findLineupEntry(game);
-  const teamAbbrev = side === 'away' ? game.away : side === 'home' ? game.home : entry?.teamAbbrev || '';
-  const profile = lineupEntry ? {
-    id: playerId,
-    fullName: lineupEntry.fullName || entry?.playerName || lineupEntry.name || 'Unknown',
-    teamAbbrev,
-    teamColor: side === 'away' ? game.awayColor : side === 'home' ? game.homeColor : getTeamColor(teamAbbrev),
-    teamLogo: side === 'away' ? game.awayLogo : side === 'home' ? game.homeLogo : getLogoPath(teamAbbrev),
-    position: lineupEntry.position || entry?.position || '',
-    todayBatting: lineupEntry.today || '0-0',
-    todayPitching: '',
-    gameBatting: lineupEntry.gameBatting || {},
-    batting: lineupEntry.batting || {},
-  } : null;
+  const lineupProfile = hydrateProfileFromLineup(game);
+  const profile = lookupProfile
+    ? {
+      ...lookupProfile,
+      todayBatting: lineupProfile?.todayBatting || lookupProfile.todayBatting || '',
+      todayPitching: lineupProfile?.todayPitching || lookupProfile.todayPitching || '',
+      gameBatting: lineupProfile?.gameBatting || lookupProfile.gameBatting || {},
+      batting: lineupProfile?.batting || lookupProfile.batting || {},
+      teamColor: lookupProfile.teamColor || lineupProfile?.teamColor,
+      teamLogo: lookupProfile.teamLogo || lineupProfile?.teamLogo,
+    }
+    : lineupProfile;
   return { profile, game };
 }
 
@@ -48997,6 +49012,8 @@ function initThemedTooltips() {
     '.player-batted-ball-profile-table',
     '.player-batted-ball-stacked-cell',
     '.score-mini-no-tooltip',
+    '.dashboard-scoreboard > .topbar',
+    '.dashboard-scoreboard > .games',
   ].join(',');
   const SAME_TOOLTIP_GAP_PX = 7;
 
