@@ -181,6 +181,7 @@ let homeRunAudioUnlocked = false;
 let homeRunAudioUnlockInFlight = false;
 let pendingHomeRunAudioPlayCount = 0;
 let lastHomeRunAudioAttemptAt = 0;
+let homeRunAudioPlayInFlight = false;
 let homeRunAudioContext = null;
 let announcedHomeRunAudioKeys = new Set();
 let announcedScoreboardHomeRunAudioKeys = new Set();
@@ -3665,6 +3666,16 @@ function pitcherAverageInningsPerAppearance(player) {
   return inningsToOuts(pitcherInningsPitched(player)) / 3 / appearances;
 }
 
+function pitcherAverageStaminaText(outs = 0, pitches = 0, appearances = 0) {
+  const games = Math.max(0, Number(appearances) || 0);
+  if (games <= 0) return '--';
+  const avgOuts = Math.max(0, Math.round((Number(outs) || 0) / games));
+  const avgPitchCount = Math.max(0, (Number(pitches) || 0) / games);
+  const ipText = avgOuts > 0 ? outsToInnings(avgOuts) : '--';
+  const pitchText = Number.isFinite(avgPitchCount) && avgPitchCount > 0 ? String(Math.round(avgPitchCount)) : '--';
+  return `${ipText}IP | ${pitchText}P`;
+}
+
 function pitcherRoleFromUsageStats(player, teamGamesPlayed = 0) {
   const gp = pitcherGamesPlayed(player);
   const gs = pitcherGamesStarted(player);
@@ -5909,7 +5920,7 @@ function lineupPrewarmPriorityValue(priority = 'idle') {
 
 function lineupPrewarmLaneForKey(key = '') {
   const value = String(key || '');
-  if (/^(profile|gamelog|hands|pitcher-profile|pitcher-gamelog):/.test(value)) return 'player-stat';
+  if (/^(profile|gamelog|hands|pitcher-profile|pitcher-gamelog|pitcher-l3):/.test(value)) return 'player-stat';
   if (/^(lineup|rotowire|rotowire-refresh):/.test(value)) return 'lineup-source';
   return 'default';
 }
@@ -18171,11 +18182,20 @@ function saveLockedTossupScoreboards(date = dateInput.value || formatDate(new Da
 }
 
 function lockedTossupScoreboardMarkedForGame(game) {
-  return manualGameStateKeysForGame(game).some((key) => lockedTossupScoreboardGamePks.has(key));
+  return manualGameStateKeysForGame(game).some((key) => lockedTossupScoreboardGamePks.has(key) && tossupScoreboardGamePks.has(key));
+}
+
+function unlockedTossupScoreboardMarkedForGame(game) {
+  return manualGameStateKeysForGame(game).some((key) => lockedTossupScoreboardGamePks.has(key) && !tossupScoreboardGamePks.has(key));
 }
 
 function tossupScoreboardStateForGame(game) {
-  return lockedTossupScoreboardMarkedForGame(game) ? 'lock' : tossupScoreboardMarkedForGame(game) ? 'tossup' : 'default';
+  const keys = manualGameStateKeysForGame(game);
+  const hasTossup = keys.some((key) => tossupScoreboardGamePks.has(key));
+  const hasLocked = keys.some((key) => lockedTossupScoreboardGamePks.has(key));
+  if (hasTossup && hasLocked) return 'lock';
+  if (hasLocked) return 'unlock';
+  return hasTossup ? 'tossup' : 'default';
 }
 
 function readTossupScoreboardStore(date = dateInput.value || formatDate(new Date())) {
@@ -18242,14 +18262,18 @@ function syncTossupScoreboardStates(games = latestRenderedGames) {
   for (const game of games || []) {
     const card = cardForGamePk(game?.gamePk);
     const scoreboard = card?.querySelector('.scoreboard');
-    const tossup = tossupScoreboardMarkedForGame(game);
-    const locked = lockedTossupScoreboardMarkedForGame(game);
+    const state = tossupScoreboardStateForGame(game);
+    const tossup = state === 'tossup';
+    const unlocked = state === 'unlock';
+    const locked = state === 'lock';
     scoreboard?.classList.toggle('is-tossup-marked', tossup);
+    scoreboard?.classList.toggle('is-tossup-unlocked', unlocked);
     scoreboard?.classList.toggle('is-tossup-locked', locked);
     card?.querySelectorAll('.score-mini-inning.is-pregame-toggle')?.forEach((el) => {
+      el.classList.toggle('is-tossup-unlocked', unlocked);
       el.classList.toggle('is-tossup-locked', locked);
-      el.setAttribute('aria-pressed', locked ? 'mixed' : tossup ? 'true' : 'false');
-      el.setAttribute('title', locked ? 'Locked tossup. Click to clear.' : tossup ? 'Tossup marked. Click to lock.' : 'Mark this pregame as a tossup');
+      el.setAttribute('aria-pressed', locked ? 'mixed' : (tossup || unlocked) ? 'true' : 'false');
+      el.setAttribute('title', locked ? 'Locked. Click to clear.' : unlocked ? 'Nearly locked. Click to lock.' : tossup ? 'Tossup marked. Click for near-lock.' : 'Mark this pregame as a tossup');
     });
   }
 }
@@ -18480,6 +18504,7 @@ function refreshManualStateAfterSync(date = dateInput.value || formatDate(new Da
   if (!snapshotApplied) reconcileCrossDeviceManualState(selectedDate);
   if (playerTrackerListEl) playerTrackerListEl.dataset.renderFingerprint = '';
   renderPlayerTrackerList(latestRenderedGames);
+  refreshLineupTrackedPlayerHighlights();
   renderPendingGamePicks(latestRenderedGames);
   syncAllCardGamePickStates(latestRenderedGames);
   syncTossupScoreboardStates(latestRenderedGames);
@@ -22603,6 +22628,7 @@ function saveTrackedPlayers(players = [], date = dateInput.value || formatDate(n
     if (deduped.length || options.forceEmpty) writeTrackedPlayersBackup(deduped, selectedDate);
   }
   if (playerTrackerListEl) playerTrackerListEl.dataset.renderFingerprint = '';
+  refreshLineupTrackedPlayerHighlights();
   window.setTimeout(() => {
     window.OwenToolsSync?.flushUploads?.();
   }, 80);
@@ -23032,6 +23058,14 @@ function renderPlayerTrackerList(games = latestRenderedGames) {
     markPanelItemUpdated(item, color);
   }
   playerTrackerListEl.scrollTop = scrollTop;
+}
+
+function refreshLineupTrackedPlayerHighlights() {
+  if (!lineupOverlayEl) return;
+  const trackedIds = new Set(normalizeTrackedPlayerEntries(getTrackedPlayers()).map((entry) => String(entry.playerId)));
+  lineupOverlayEl.querySelectorAll('.lineup-list li[data-player-id]').forEach((row) => {
+    row.classList.toggle('lineup-row-tracked', trackedIds.has(String(row.dataset.playerId || '')));
+  });
 }
 
 function addSelectedPlayerToTracker() {
@@ -24797,45 +24831,36 @@ function initHomeRunAudioUnlock() {
 function playHomeRunAudio(options = {}) {
   const now = Date.now();
   if (!options.fromPendingQueue && now - (lastHomeRunAudioAttemptAt || 0) < 1200) return;
+  if (homeRunAudioPlayInFlight) return;
   lastHomeRunAudioAttemptAt = now;
+  homeRunAudioPlayInFlight = true;
   if (!homeRunAudioUnlocked) unlockHomeRunAudio();
 
-  let played = false;
-  const tryPlay = (isFinalAttempt = false) => {
-    if (played) return;
-    try {
-      const audio = ensureHomeRunAudio();
-      audio.muted = false;
-      audio.volume = 1;
-      audio.currentTime = 0;
-      const playPromise = audio.play();
-      if (playPromise?.then) {
-        playPromise
-          .then(() => {
-            played = true;
-            homeRunAudioUnlocked = true;
-          })
-          .catch(() => {
-            if (isFinalAttempt) {
-              pendingHomeRunAudioPlayCount = Math.min(3, pendingHomeRunAudioPlayCount + 1);
-              playHomeRunAudioFallbackBeep();
-            }
-          });
-      } else {
-        played = true;
-        homeRunAudioUnlocked = true;
-      }
-    } catch {
-      if (isFinalAttempt) {
-        pendingHomeRunAudioPlayCount = Math.min(3, pendingHomeRunAudioPlayCount + 1);
-        playHomeRunAudioFallbackBeep();
-      }
+  try {
+    const audio = ensureHomeRunAudio();
+    audio.muted = false;
+    audio.volume = 1;
+    audio.currentTime = 0;
+    const playPromise = audio.play();
+    if (playPromise?.then) {
+      playPromise
+        .then(() => {
+          homeRunAudioUnlocked = true;
+        })
+        .catch(() => {
+          playHomeRunAudioFallbackBeep();
+        })
+        .finally(() => {
+          homeRunAudioPlayInFlight = false;
+        });
+    } else {
+      homeRunAudioUnlocked = true;
+      homeRunAudioPlayInFlight = false;
     }
-  };
-
-  tryPlay(false);
-  window.setTimeout(() => tryPlay(false), 300);
-  window.setTimeout(() => tryPlay(true), 1100);
+  } catch {
+    playHomeRunAudioFallbackBeep();
+    homeRunAudioPlayInFlight = false;
+  }
 }
 
 function resetHomeRunAudioAlerts() {
@@ -26981,7 +27006,7 @@ function teamDetailLineupItemHtml(entry = {}) {
   return `
     <li class="${teamDetailBatterTrendClass(entry)}" data-player-id="${escapeHtml(String(entry.id || ''))}" role="button" tabindex="0" style="--team-color:${escapeHtml(color)}">
       <span class="lineup-slot">${escapeHtml(String(entry.slot || ''))}</span>
-      <span class="lineup-name" title="${escapeHtml(entry.fullName || entry.name || '')}">
+      <span class="lineup-name">
         <span class="lineup-name-text">${escapeHtml(lastName(entry.fullName || entry.name || 'Unknown'))}</span>
         ${handednessHtml(entry.bats)}
       </span>
@@ -36920,16 +36945,28 @@ function renderScoreStateStrip(card, game) {
     inningEl.classList.toggle('is-pregame-toggle', pregame);
     inningEl.setAttribute('role', pregame ? 'button' : 'text');
     inningEl.setAttribute('tabindex', pregame ? '0' : '-1');
-    const tossup = tossupScoreboardMarkedForGame(game);
-    const locked = lockedTossupScoreboardMarkedForGame(game);
+    const tossupState = tossupScoreboardStateForGame(game);
+    const tossup = tossupState === 'tossup';
+    const unlocked = tossupState === 'unlock';
+    const locked = tossupState === 'lock';
+    inningEl.classList.toggle('is-tossup-unlocked', unlocked);
     inningEl.classList.toggle('is-tossup-locked', locked);
-    inningEl.setAttribute('title', pregame ? (locked ? 'Locked tossup. Click to clear.' : tossup ? 'Tossup marked. Click to lock.' : 'Mark this pregame as a tossup') : '');
-    inningEl.setAttribute('aria-pressed', pregame ? (locked ? 'mixed' : tossup ? 'true' : 'false') : 'false');
+    inningEl.setAttribute('title', pregame ? (locked ? 'Locked. Click to clear.' : unlocked ? 'Nearly locked. Click to lock.' : tossup ? 'Tossup marked. Click for near-lock.' : 'Mark this pregame as a tossup') : '');
+    inningEl.setAttribute('aria-pressed', pregame ? (locked ? 'mixed' : (tossup || unlocked) ? 'true' : 'false') : 'false');
   }
   syncOverUnderControlsForGame(card, game, pregame);
   const boardEl = card.querySelector('.scoreboard');
-  boardEl?.classList.toggle('is-tossup-marked', tossupScoreboardMarkedForGame(game));
-  boardEl?.classList.toggle('is-tossup-locked', lockedTossupScoreboardMarkedForGame(game));
+  const boardTossupState = tossupScoreboardStateForGame(game);
+  boardEl?.classList.toggle('is-tossup-marked', boardTossupState === 'tossup');
+  boardEl?.classList.toggle('is-tossup-unlocked', boardTossupState === 'unlock');
+  boardEl?.classList.toggle('is-tossup-locked', boardTossupState === 'lock');
+  if (!pregame) {
+    card?.classList.remove('has-pitcher-hr-risk');
+    card?.style.removeProperty('--pitcher-hr-risk-opacity');
+    boardEl?.classList.remove('has-pitcher-hr-risk');
+    boardEl?.style.removeProperty('--pitcher-hr-risk-opacity');
+    syncScoreboardPitcherRiskNameClasses(card, {});
+  }
   card.querySelector('.score-mini-balls strong').textContent = pregame ? '-' : game.balls;
   card.querySelector('.score-mini-strikes strong').textContent = pregame ? '-' : game.strikes;
   card.querySelector('.score-mini-outs strong').textContent = pregame ? '-' : game.outs;
@@ -40310,10 +40347,13 @@ function renderLineupScoreboard(game) {
     inning.setAttribute('role', pregame ? 'button' : 'text');
     inning.setAttribute('tabindex', pregame ? '0' : '-1');
     const tossup = tossupScoreboardMarkedForGame(game);
-    const locked = lockedTossupScoreboardMarkedForGame(game);
+    const tossupState = tossupScoreboardStateForGame(game);
+    const unlocked = tossupState === 'unlock';
+    const locked = tossupState === 'lock';
+    inning.classList.toggle('is-tossup-unlocked', unlocked);
     inning.classList.toggle('is-tossup-locked', locked);
-    inning.setAttribute('title', pregame ? (locked ? 'Locked tossup. Click to clear.' : tossup ? 'Tossup marked. Click to lock.' : 'Mark this pregame as a tossup') : '');
-    inning.setAttribute('aria-pressed', locked ? 'mixed' : tossup ? 'true' : 'false');
+    inning.setAttribute('title', pregame ? (locked ? 'Locked. Click to clear.' : unlocked ? 'Nearly locked. Click to lock.' : tossup ? 'Tossup marked. Click for near-lock.' : 'Mark this pregame as a tossup') : '');
+    inning.setAttribute('aria-pressed', locked ? 'mixed' : (tossup || unlocked) ? 'true' : 'false');
     const homeScore = document.createElement('span');
     homeScore.className = 'lineup-state-score';
     homeScore.textContent = lineupTotalDisplay(game.homeScore);
@@ -41387,32 +41427,37 @@ function setTossupScoreboardState(gamePk, state = 'default') {
   const game = gameForManualStateKey(gamePk);
   const key = manualGameStateKey(game || gamePk);
   if (!key) return false;
-  const normalized = state === 'lock' ? 'lock' : state === 'tossup' ? 'tossup' : 'default';
+  const normalized = state === 'lock' ? 'lock' : state === 'unlock' ? 'unlock' : state === 'tossup' ? 'tossup' : 'default';
   const aliases = game ? manualGameStateKeysForGame(game) : [String(gamePk || '')].filter(Boolean);
   aliases.forEach((alias) => {
     tossupScoreboardGamePks.delete(alias);
     lockedTossupScoreboardGamePks.delete(alias);
   });
   if (normalized === 'tossup' || normalized === 'lock') tossupScoreboardGamePks.add(key);
-  if (normalized === 'lock') lockedTossupScoreboardGamePks.add(key);
+  if (normalized === 'unlock' || normalized === 'lock') lockedTossupScoreboardGamePks.add(key);
   saveTossupScoreboards(undefined, { allowEmpty: true, forceEmpty: !tossupScoreboardGamePks.size });
   saveLockedTossupScoreboards(undefined, { allowEmpty: true, forceEmpty: !lockedTossupScoreboardGamePks.size });
   const card = cardForGamePk(game?.gamePk || gamePk);
-  const tossup = game ? tossupScoreboardMarkedForGame(game) : tossupScoreboardGamePks.has(key);
-  const locked = game ? lockedTossupScoreboardMarkedForGame(game) : lockedTossupScoreboardGamePks.has(key);
+  const currentState = game ? tossupScoreboardStateForGame(game) : normalized;
+  const tossup = currentState === 'tossup';
+  const unlocked = currentState === 'unlock';
+  const locked = currentState === 'lock';
   const scoreboard = card?.querySelector('.scoreboard');
   scoreboard?.classList.toggle('is-tossup-marked', tossup);
+  scoreboard?.classList.toggle('is-tossup-unlocked', unlocked);
   scoreboard?.classList.toggle('is-tossup-locked', locked);
   card?.querySelectorAll('.score-mini-inning.is-pregame-toggle')?.forEach((el) => {
+    el.classList.toggle('is-tossup-unlocked', unlocked);
     el.classList.toggle('is-tossup-locked', locked);
-    el.setAttribute('aria-pressed', locked ? 'mixed' : tossup ? 'true' : 'false');
-    el.setAttribute('title', locked ? 'Locked tossup. Click to clear.' : tossup ? 'Tossup marked. Click to lock.' : 'Mark this pregame as a tossup');
+    el.setAttribute('aria-pressed', locked ? 'mixed' : (tossup || unlocked) ? 'true' : 'false');
+    el.setAttribute('title', locked ? 'Locked. Click to clear.' : unlocked ? 'Nearly locked. Click to lock.' : tossup ? 'Tossup marked. Click for near-lock.' : 'Mark this pregame as a tossup');
   });
   lineupOverlayEl?.querySelectorAll('.lineup-state-inning.is-pregame-toggle')
     ?.forEach((el) => {
+      el.classList.toggle('is-tossup-unlocked', unlocked);
       el.classList.toggle('is-tossup-locked', locked);
-      el.setAttribute('aria-pressed', locked ? 'mixed' : tossup ? 'true' : 'false');
-      el.setAttribute('title', locked ? 'Locked tossup. Click to clear.' : tossup ? 'Tossup marked. Click to lock.' : 'Mark this pregame as a tossup');
+      el.setAttribute('aria-pressed', locked ? 'mixed' : (tossup || unlocked) ? 'true' : 'false');
+      el.setAttribute('title', locked ? 'Locked. Click to clear.' : unlocked ? 'Nearly locked. Click to lock.' : tossup ? 'Tossup marked. Click for near-lock.' : 'Mark this pregame as a tossup');
     });
   return true;
 }
@@ -41423,8 +41468,8 @@ function setTossupScoreboardMarked(gamePk, marked) {
 
 function toggleTossupScoreboardMarked(gamePk) {
   const game = gameForManualStateKey(gamePk);
-  const current = game ? tossupScoreboardStateForGame(game) : lockedTossupScoreboardGamePks.has(String(gamePk || '')) ? 'lock' : tossupScoreboardGamePks.has(String(gamePk || '')) ? 'tossup' : 'default';
-  const next = current === 'default' ? 'tossup' : current === 'tossup' ? 'lock' : 'default';
+  const current = game ? tossupScoreboardStateForGame(game) : lockedTossupScoreboardGamePks.has(String(gamePk || '')) && tossupScoreboardGamePks.has(String(gamePk || '')) ? 'lock' : lockedTossupScoreboardGamePks.has(String(gamePk || '')) ? 'unlock' : tossupScoreboardGamePks.has(String(gamePk || '')) ? 'tossup' : 'default';
+  const next = current === 'default' ? 'tossup' : current === 'tossup' ? 'unlock' : current === 'unlock' ? 'lock' : 'default';
   return setTossupScoreboardState(gamePk, next);
 }
 
@@ -41545,6 +41590,7 @@ function aggregatePlayerCardPitchingSplits(splits = []) {
     sum.totalBases += totalBases || Math.max(0, hits + doubles + (triples * 2) + (homeRuns * 3));
     sum.earnedRuns += statNumber(stat.earnedRuns);
     sum.homeRuns += homeRuns;
+    sum.pitches += statNumber(stat.numberOfPitches ?? stat.pitchesThrown ?? stat.pitchCount ?? stat.pitches);
     sum.wins += statNumber(stat.wins);
     sum.losses += statNumber(stat.losses);
     sum.saves += statNumber(stat.saves);
@@ -41560,6 +41606,7 @@ function aggregatePlayerCardPitchingSplits(splits = []) {
     totalBases: 0,
     earnedRuns: 0,
     homeRuns: 0,
+    pitches: 0,
     wins: 0,
     losses: 0,
     saves: 0,
@@ -42182,7 +42229,93 @@ async function pitcherOpponentStrengthSummaryForSplits(splits = [], game = null,
     slg: summarizePitcherOpponentStrengthItems(items, 'slgRank', currentOpponent, currentStrengthMap, pitcherTeam),
   };
 }
-function playerPitchingComparisonRows(profile, recent = null, recentLabel = 'L3', rankInfo = null, sos = null) {
+
+function pitcherSplitGamePk(split = {}) {
+  const value = split?.game?.gamePk ?? split?.gamePk ?? split?.game?.pk ?? split?.game?.id;
+  const gamePk = Number(value);
+  if (Number.isFinite(gamePk) && gamePk > 0) return gamePk;
+  const linkMatch = String(split?.game?.link || split?.game?.url || '').match(/game\/(\d+)/i);
+  const linkPk = Number(linkMatch?.[1]);
+  return Number.isFinite(linkPk) && linkPk > 0 ? linkPk : null;
+}
+
+function pitcherSplitTeamAbbrev(split = {}, profile = {}) {
+  return canonicalTeamAbbrev(
+    split?.team?.abbreviation
+      || split?.team?.teamCode
+      || split?.team?.fileCode
+      || split?.team?.name
+      || profile?.teamAbbrev
+      || profile?.team
+      || '',
+  );
+}
+
+function teamSideFromLiveFeed(live = null, teamAbbrev = '', teamId = null) {
+  const awayTeam = live?.gameData?.teams?.away || {};
+  const homeTeam = live?.gameData?.teams?.home || {};
+  const id = Number(teamId);
+  const team = canonicalTeamAbbrev(teamAbbrev);
+  const awayAbbrev = canonicalTeamAbbrev(awayTeam.abbreviation || awayTeam.teamCode || awayTeam.fileCode || awayTeam.name || '');
+  const homeAbbrev = canonicalTeamAbbrev(homeTeam.abbreviation || homeTeam.teamCode || homeTeam.fileCode || homeTeam.name || '');
+  if (Number.isFinite(id) && id > 0) {
+    if (Number(awayTeam.id) === id) return 'away';
+    if (Number(homeTeam.id) === id) return 'home';
+  }
+  if (team && team === awayAbbrev) return 'away';
+  if (team && team === homeAbbrev) return 'home';
+  return '';
+}
+
+function pitcherStartedTeamWonFromLiveFeed(live = null, split = {}, profile = {}) {
+  const teamAbbrev = pitcherSplitTeamAbbrev(split, profile);
+  const teamId = Number(split?.team?.id ?? TEAM_IDS?.[teamAbbrev]);
+  const side = teamSideFromLiveFeed(live, teamAbbrev, teamId);
+  if (!side) return null;
+  const awayRuns = Number(live?.liveData?.linescore?.teams?.away?.runs);
+  const homeRuns = Number(live?.liveData?.linescore?.teams?.home?.runs);
+  if (!Number.isFinite(awayRuns) || !Number.isFinite(homeRuns) || awayRuns === homeRuns) return null;
+  return side === 'away' ? awayRuns > homeRuns : homeRuns > awayRuns;
+}
+
+async function pitcherExtendedStarterRecordForSplits(splits = [], profile = {}) {
+  const starts = listify(splits).filter(isPitchingStartSplit);
+  if (!starts.length) return { wins: 0, losses: 0, games: 0 };
+  const results = await mapWithConcurrency(starts, 4, async (split) => {
+    const gamePk = pitcherSplitGamePk(split);
+    if (!gamePk) return null;
+    const live = await getLiveGameFeed(gamePk).catch(() => null);
+    const won = pitcherStartedTeamWonFromLiveFeed(live, split, profile);
+    return typeof won === 'boolean' ? won : null;
+  });
+  const decided = results.filter((value) => typeof value === 'boolean');
+  return {
+    wins: decided.filter(Boolean).length,
+    losses: decided.filter((value) => value === false).length,
+    games: decided.length,
+  };
+}
+
+async function pitcherExtendedStarterRecordSummary(seasonSplits = [], recentSplits = [], profile = {}) {
+  const [seasonRecord, recentRecord] = await Promise.all([
+    pitcherExtendedStarterRecordForSplits(seasonSplits, profile).catch(() => null),
+    pitcherExtendedStarterRecordForSplits(recentSplits, profile).catch(() => null),
+  ]);
+  return { season: seasonRecord, recent: recentRecord };
+}
+
+function pitcherExtendedStarterRecordCell(record = null, loading = false) {
+  if (loading) {
+    return {
+      html: `<span class="player-stat-mini-loading">${playerStatLoadingDotsHtml('Loading extended starter record')}</span>`,
+      text: 'Loading extended starter record',
+    };
+  }
+  if (!record || !Number.isFinite(Number(record.games)) || Number(record.games) <= 0) return '--';
+  return `${statNumber(record.wins)}-${statNumber(record.losses)}`;
+}
+
+function playerPitchingComparisonRows(profile, recent = null, recentLabel = 'L3', rankInfo = null, sos = null, season = null, extendedRecord = undefined) {
   const role = rankInfo?.role || pitcherDisplayUsageRole(profile, profile?.role || '');
   const ranks = rankInfo?.ranks || {};
   const starter = role === 'SP' || pitcherShouldUseStartHistory(profile);
@@ -42192,9 +42325,12 @@ function playerPitchingComparisonRows(profile, recent = null, recentLabel = 'L3'
   const recentOuts = recent?.outs || 0;
   const recentEra = recent && recentOuts > 0 ? (recent.earnedRuns * 27) / recentOuts : null;
   const recentWhip = recent && recentOuts > 0 ? ((recent.hits + recent.walks) * 3) / recentOuts : null;
-  const recentOppAvg = recent && recent.atBats > 0 ? recent.hits / recent.atBats : null;
   const recentOppSlg = recent && recent.atBats > 0 ? recent.totalBases / recent.atBats : null;
   const hrWithRate = (homeRuns, outs) => `${statNumber(homeRuns)}, ${formatRateValue(outs > 0 ? (statNumber(homeRuns) * 27) / outs : 0, 2, false)}`;
+  const seasonAppearances = Math.max(0, Number(season?.games) || (starter ? pitcherGamesStarted(profile) : pitcherGamesPlayed(profile)));
+  const recentAppearances = Math.max(0, Number(recentRoleValue) || 0);
+  const seasonOuts = Number(season?.outs) > 0 ? Number(season.outs) : inningsToOuts(pitcherInningsPitched(profile));
+  const seasonPitches = Number(season?.pitches) > 0 ? Number(season.pitches) : pitchCount(profile);
   const rows = [
     ['Rank', ranks.overall ? { html: `${rankOrdinalHtml(ranks.overall)} ${escapeHtml(role)}`, text: `${rankOrdinal(ranks.overall)} ${role}` } : '--', '--'],
     ['ERA', pitcherSeasonCellWithRank(pitcherEra(profile), ranks.era, 'ERA'), recent ? playerStatRecentRate(recentEra, 2, false) : '--'],
@@ -42203,18 +42339,27 @@ function playerPitchingComparisonRows(profile, recent = null, recentLabel = 'L3'
     ['HR, HR/9', pitcherSeasonCellWithRank(hrWithRate(pitcherHomeRunsAllowed(profile), inningsToOuts(pitcherInningsPitched(profile))), ranks.hr9, 'HR/9'), recent ? hrWithRate(recent.homeRuns, recent.outs) : '--'],
     ['IP', pitcherInningsPitched(profile), recent ? outsToInnings(recent.outs) : '--'],
     ['BB', statNumber(profile?.pitching?.bb), recent ? recent.walks : '--'],
-    ['Opp AVG', pitcherOpponentRate(profile, ['avgAgainst', 'opponentAvg', 'opponentsAvg', 'battingAverageAgainst', 'baa', 'avg'], 'avg'), recentOppAvg != null ? playerStatRecentRate(recentOppAvg) : '--'],
     ['Opp SLG', pitcherOpponentRate(profile, ['slgAgainst', 'opponentSlg', 'opponentsSlg', 'sluggingAgainst', 'sluggingPercentageAgainst', 'slg'], 'slg'), recentOppSlg != null ? playerStatRecentRate(recentOppSlg) : '--'],
     ['W-L', `${statNumber(profile?.pitching?.wins)}-${statNumber(profile?.pitching?.losses)}`, recent ? `${recent.wins}-${recent.losses}` : '--'],
   ];
+  if (starter) {
+    rows.push([
+      'Ext. W-L',
+      pitcherExtendedStarterRecordCell(extendedRecord?.season, extendedRecord === undefined),
+      recent ? pitcherExtendedStarterRecordCell(extendedRecord?.recent, extendedRecord === undefined) : '--',
+    ]);
+  }
   if (!starter) rows.push(['SV', pitcherSaveCount(profile), recent ? recent.saves : '--']);
   if (sos) {
-    rows.push(['Opp AVG SoS', pitcherOpponentStrengthSummaryCell(sos.season?.avg, 'AVG'), pitcherOpponentStrengthSummaryCell(sos.recent?.avg, 'AVG')]);
     rows.push(['Opp SLG SoS', pitcherOpponentStrengthSummaryCell(sos.season?.slg, 'SLG'), pitcherOpponentStrengthSummaryCell(sos.recent?.slg, 'SLG')]);
   } else {
-    rows.push(['Opp AVG SoS', { html: `<span class="player-stat-mini-loading">${playerStatLoadingDotsHtml('Loading opponent AVG strength')}</span>`, text: 'Loading opponent AVG strength' }, { html: `<span class="player-stat-mini-loading">${playerStatLoadingDotsHtml('Loading recent opponent AVG strength')}</span>`, text: 'Loading recent opponent AVG strength' }]);
     rows.push(['Opp SLG SoS', { html: `<span class="player-stat-mini-loading">${playerStatLoadingDotsHtml('Loading opponent SLG strength')}</span>`, text: 'Loading opponent SLG strength' }, { html: `<span class="player-stat-mini-loading">${playerStatLoadingDotsHtml('Loading recent opponent SLG strength')}</span>`, text: 'Loading recent opponent SLG strength' }]);
   }
+  rows.push([
+    'Average Stamina',
+    pitcherAverageStaminaText(seasonOuts, seasonPitches, seasonAppearances),
+    recent ? pitcherAverageStaminaText(recent.outs, recent.pitches, recentAppearances) : '--',
+  ]);
   return {
     recentLabel: starter ? 'L3 GS' : 'L3 A',
     rows,
@@ -42363,10 +42508,11 @@ function renderPlayerPitchingSeasonBlock(profile, game = null) {
       }
       const recent = recentSplits.length ? aggregatePlayerCardPitchingSplits(recentSplits) : null;
       const seasonRoleSplits = historySplits.filter(roleForRecent ? isPitchingStartSplit : playerStatPitchingAppearanceSplit);
+      const season = seasonRoleSplits.length ? aggregatePlayerCardPitchingSplits(seasonRoleSplits) : null;
 
-      const paint = (sos = null, sosDone = false) => {
+      const paint = (sos = null, sosDone = false, extendedRecord = undefined) => {
         if (!playerStatSeasonEl || playerStatSeasonEl.dataset.calendarToken !== token) return false;
-        const comparison = playerPitchingComparisonRows(profile, recent, 'L3', rankInfo, sosDone ? (sos || { season: null, recent: null }) : null);
+        const comparison = playerPitchingComparisonRows(profile, recent, 'L3', rankInfo, sosDone ? (sos || { season: null, recent: null }) : null, season, extendedRecord);
         playerStatSeasonEl.innerHTML = playerStatComparisonTableHtml('PITCHING', ['Stat', seasonHeading, comparison.recentLabel], comparison.rows);
         if (typeof installThemedTooltips === 'function') installThemedTooltips(playerStatSeasonEl);
         if (rankInfo?.role && playerStatMetaEl && String(playerStatOverlayEl?.dataset?.playerId || '') === String(profile.id || '')) {
@@ -42380,7 +42526,8 @@ function renderPlayerPitchingSeasonBlock(profile, game = null) {
       return Promise.all([
         pitcherOpponentStrengthSummaryForSplits(seasonRoleSplits, game, profile).catch(() => null),
         pitcherOpponentStrengthSummaryForSplits(recentSplits, game, profile).catch(() => null),
-      ]).then(([seasonSos, recentSos]) => paint({ season: seasonSos, recent: recentSos }, true));
+        roleForRecent ? pitcherExtendedStarterRecordSummary(seasonRoleSplits, recentSplits, profile).catch(() => null) : Promise.resolve(null),
+      ]).then(([seasonSos, recentSos, extendedRecord]) => paint({ season: seasonSos, recent: recentSos }, true, extendedRecord));
     })
     .catch(() => {
       if (!playerStatSeasonEl || playerStatSeasonEl.dataset.calendarToken !== token) return;
@@ -43781,6 +43928,166 @@ async function getPitcherLastThreeStarts(playerId, game = null, profile = null) 
   if (!pitcherShouldUseStartHistory(profile)) return enrichPitcherSplitsWithHrAllowedDetails(appearances, id);
   const starts = eligible.filter(isPitchingStartSplit).slice(0, 3);
   return enrichPitcherSplitsWithHrAllowedDetails(starts.length ? starts : appearances, id);
+}
+
+const pitcherPregameHrRiskCache = new Map();
+
+function pitcherRecentHrRiskFromSplits(splits = []) {
+  const homeRuns = listify(splits).slice(0, 3).reduce((sum, split) => {
+    const stat = split?.stat || {};
+    return sum + statNumber(stat.homeRuns ?? stat.hrAllowed ?? stat.hr);
+  }, 0);
+  return homeRuns >= 3;
+}
+
+function pitcherIdForPregameRisk(pitcher = null, game = null) {
+  const direct = Number(pitcher?.id ?? pitcher?.person?.id ?? pitcher?.playerId);
+  if (Number.isFinite(direct) && direct > 0) return direct;
+  const targetName = cleanSummary(pitcher?.fullName || pitcher?.name || pitcher?.person?.fullName || '').toLowerCase();
+  if (!targetName) return null;
+  const lookup = game?.playerLookup || {};
+  for (const [id, profile] of Object.entries(lookup)) {
+    const profileName = cleanSummary(profile?.fullName || profile?.name || profile?.person?.fullName || '').toLowerCase();
+    if (profileName && profileName === targetName) {
+      const numericId = Number(id || profile?.id || profile?.person?.id);
+      if (Number.isFinite(numericId) && numericId > 0) return numericId;
+    }
+  }
+  return null;
+}
+
+async function pitcherHasPregameHrRisk(pitcher = null, game = null) {
+  const candidate = probableFallbackStarter(pitcher) || pitcher;
+  const id = pitcherIdForPregameRisk(candidate, game);
+  if (!Number.isFinite(id) || id <= 0) return false;
+  const key = `${id}:${officialDateForGame(game) || dateInput.value || formatDate(new Date())}:hr-risk-v1`;
+  if (pitcherPregameHrRiskCache.has(key)) return pitcherPregameHrRiskCache.get(key);
+  const starterCandidate = { ...candidate, role: 'SP' };
+  const promise = getPitcherLastThreeStarts(id, game, starterCandidate)
+    .then(pitcherRecentHrRiskFromSplits)
+    .catch(() => false);
+  pitcherPregameHrRiskCache.set(key, promise);
+  return promise;
+}
+
+function scoreboardPitcherRiskTargets(game = null) {
+  const seen = new Set();
+  const targets = [];
+  const normalizeRiskPitcher = (pitcher) => {
+    const candidate = probableFallbackStarter(pitcher) || pitcher;
+    if (!candidate) return null;
+    const id = Number(candidate?.id ?? candidate?.person?.id ?? candidate?.playerId);
+    const name = cleanSummary(candidate?.fullName || candidate?.name || candidate?.person?.fullName || '');
+    if ((!Number.isFinite(id) || id <= 0) && !name) return null;
+    if (isPlaceholderProbablePitcherText(name) && !probableFallbackStarter(pitcher)) return null;
+    const key = Number.isFinite(id) && id > 0 ? `id:${id}` : `name:${name.toLowerCase()}`;
+    if (seen.has(key)) return null;
+    seen.add(key);
+    return candidate;
+  };
+  for (const side of ['away', 'home']) {
+    const candidates = [
+      scoreboardPitcherForSide(game, side),
+      previewProbableForSide(game, side),
+      predictionProbableStarterForSide(game, side),
+      game?.probablePitchers?.[side],
+      game?.teams?.[side]?.probablePitcher,
+    ];
+    let pitcher = null;
+    for (const candidate of candidates) {
+      pitcher = normalizeRiskPitcher(candidate);
+      if (pitcher) break;
+    }
+    if (pitcher) targets.push({ side, pitcher });
+  }
+  return targets;
+}
+
+function probablePitchersForPregameRisk(game = null) {
+  return scoreboardPitcherRiskTargets(game).map((target) => target.pitcher);
+}
+
+function scoreboardPregamePitcherRiskAllowed(game = null) {
+  if (!game) return false;
+  if (!gameHasReachedOfficialStart(game)) return true;
+  const status = String(game?.status?.detailedState || game?.status || '').toLowerCase();
+  const coded = String(game?.status?.codedGameState || game?.status?.statusCode || '').toUpperCase();
+  return game?.status?.abstractGameState === 'Preview'
+    || String(game?.inningShort || '').toUpperCase() === 'PRE'
+    || status.includes('not started')
+    || status.includes('scheduled')
+    || status.includes('pre-game')
+    || coded === 'P';
+}
+
+function hydrateScoreboardPregamePitcherRisk(card = null, game = null) {
+  const scoreboard = card?.querySelector?.('.scoreboard') || null;
+  if (!scoreboard || !card) return;
+  if (!scoreboardPregamePitcherRiskAllowed(game)) {
+    card.classList.remove('has-pitcher-hr-risk');
+    card.style.removeProperty('--pitcher-hr-risk-opacity');
+    scoreboard.classList.remove('has-pitcher-hr-risk');
+    scoreboard.style.removeProperty('--pitcher-hr-risk-opacity');
+    syncScoreboardPitcherRiskNameClasses(card, {});
+    return;
+  }
+  const token = `${game?.gamePk || ''}:${officialDateForGame(game) || ''}:${Date.now()}`;
+  card.dataset.pitcherRiskToken = token;
+  const targets = scoreboardPitcherRiskTargets(game);
+  if (!targets.length) {
+    card.classList.remove('has-pitcher-hr-risk');
+    card.style.removeProperty('--pitcher-hr-risk-opacity');
+    scoreboard.classList.remove('has-pitcher-hr-risk');
+    scoreboard.style.removeProperty('--pitcher-hr-risk-opacity');
+    syncScoreboardPitcherRiskNameClasses(card, {});
+    return;
+  }
+  Promise.all(targets.map((target) => pitcherHasPregameHrRisk(target.pitcher, game)))
+    .then((flags) => {
+      if (card.dataset.pitcherRiskToken !== token) return;
+      const riskCount = flags.filter(Boolean).length;
+      const active = riskCount > 0 && scoreboardPregamePitcherRiskAllowed(game);
+      const riskBySide = {};
+      flags.forEach((flag, index) => {
+        if (flag && targets[index]?.side) riskBySide[targets[index].side] = true;
+      });
+      card.classList.toggle('has-pitcher-hr-risk', active);
+      scoreboard.classList.toggle('has-pitcher-hr-risk', active);
+      syncScoreboardPitcherRiskNameClasses(card, active ? riskBySide : {}, game);
+      if (active) {
+        const opacity = riskCount > 1 ? '1' : '0.55';
+        card.style.setProperty('--pitcher-hr-risk-opacity', opacity);
+        scoreboard.style.setProperty('--pitcher-hr-risk-opacity', opacity);
+      } else {
+        card.style.removeProperty('--pitcher-hr-risk-opacity');
+        scoreboard.style.removeProperty('--pitcher-hr-risk-opacity');
+      }
+    })
+    .catch(() => {
+      if (card.dataset.pitcherRiskToken === token) {
+        card.classList.remove('has-pitcher-hr-risk');
+        card.style.removeProperty('--pitcher-hr-risk-opacity');
+        scoreboard.classList.remove('has-pitcher-hr-risk');
+        scoreboard.style.removeProperty('--pitcher-hr-risk-opacity');
+        syncScoreboardPitcherRiskNameClasses(card, {});
+      }
+    });
+}
+
+function syncScoreboardPitcherRiskNameClasses(card = null, riskBySide = {}, game = null) {
+  const renderGame = game || card?._game || null;
+  for (const side of ['away', 'home']) {
+    const el = card?.querySelector?.(`.${side}-matchup`);
+    if (!el) continue;
+    const active = Boolean(riskBySide?.[side]);
+    el.classList.toggle('is-pitcher-hr-risk-name', active);
+    if (active) {
+      const color = side === 'away' ? renderGame?.awayColor : renderGame?.homeColor;
+      el.style.setProperty('--pitcher-risk-line-color', color || getTeamColor(side === 'away' ? renderGame?.away : renderGame?.home) || '#ffe870');
+    } else {
+      el.style.removeProperty('--pitcher-risk-line-color');
+    }
+  }
 }
 
 function pitcherLastThreeStartsHtml(starts = [], label = 'Last 3 Starts') {
@@ -47570,9 +47877,11 @@ function lineupRowEndHrScoreHtml(scoreEntry = null, options = {}) {
 function renderLineupList(listEl, lineup, color, teamCode = '', hotPlayerIds = new Set(), coldPlayerIds = new Set(), hitStreakMap = new Map(), batterBadgeMap = new Map(), recentStatsMap = new Map(), handedSplitFlagMap = new Map(), eliteMatchupMap = new Map(), dueBadgeMap = new Map(), hrScoreMap = new Map(), hrTopPickId = '', hrSecondPickId = '', hrScoreLoading = false) {
   if (!listEl) return;
   listEl.dataset.teamCode = String(teamCode || '');
+  const trackedPlayerIds = new Set(normalizeTrackedPlayerEntries(getTrackedPlayers()).map((entry) => String(entry.playerId)));
   const fingerprint = JSON.stringify({
     loadingFallback: listEl.dataset.lineupLoadingFallback === 'true',
     fallbackMode: listEl.dataset.lineupFallbackMode || 'rotowire',
+    tracked: [...trackedPlayerIds].sort(),
     rows: (lineup || []).map((entry) => {
       const id = String(entry?.id || '');
       const recent = recentStatsMap?.get?.(id) || null;
@@ -47654,6 +47963,7 @@ function renderLineupList(listEl, lineup, color, teamCode = '', hotPlayerIds = n
     if (isAtBat) rowClasses.push('lineup-row-atbat');
     if (isOnDeck) rowClasses.push('lineup-row-ondeck');
     if (isNextUp) rowClasses.push('lineup-row-nextup');
+    if (trackedPlayerIds.has(String(entry?.id))) rowClasses.push('lineup-row-tracked');
     if (isHot) rowClasses.push('lineup-row-hot');
     if (isCold) rowClasses.push('lineup-row-cold');
     if (eliteMatchupTitle) rowClasses.push('lineup-row-elite-matchup');
@@ -47702,7 +48012,7 @@ function renderLineupList(listEl, lineup, color, teamCode = '', hotPlayerIds = n
     const hasSubstitutionChain = substitutionPlayers.length > 1;
     const subToday = normalizeLineupTodayValue(entry?.substitutionLineToday || entry.today);
     const substitutionHtml = substitutionPlayers.map((subPlayer) => `
-          <span class="lineup-sub-player" data-player-id="${Number.isFinite(Number(subPlayer?.id)) ? String(subPlayer.id) : ''}" data-player-name="${escapeHtml(cleanSummary(subPlayer?.fullName || subPlayer?.name || ''))}" data-display-name="${escapeHtml(correctedPlayerDisplayName(subPlayer?.fullName || subPlayer?.name || ''))}" data-team="${escapeHtml(teamCode || '')}" role="button" tabindex="0" title="${escapeHtml(correctedPlayerDisplayName(subPlayer?.fullName || subPlayer?.name || 'Substitution'))}">
+          <span class="lineup-sub-player" data-player-id="${Number.isFinite(Number(subPlayer?.id)) ? String(subPlayer.id) : ''}" data-player-name="${escapeHtml(cleanSummary(subPlayer?.fullName || subPlayer?.name || ''))}" data-display-name="${escapeHtml(correctedPlayerDisplayName(subPlayer?.fullName || subPlayer?.name || ''))}" data-team="${escapeHtml(teamCode || '')}" role="button" tabindex="0">
             <span class="lineup-name-text">${escapeHtml(lineupBatterLastName(subPlayer))}</span>${handednessHtml(subPlayer?.bats)}
             <span class="lineup-sub-today">${escapeHtml(normalizeLineupTodayValue(subPlayer?.today))}</span>
           </span>
@@ -47731,7 +48041,7 @@ function renderLineupList(listEl, lineup, color, teamCode = '', hotPlayerIds = n
     li.dataset.hot = isHot ? '1' : '0';
     li.innerHTML = `
       <span class="lineup-slot">${entry.slot}</span>
-      <span class="lineup-name" title="${escapeHtml(displayFullName || entry.fullName || '')}">
+      <span class="lineup-name">
         ${nameBlockHtml}
       </span>
       <span class="lineup-pos">${escapeHtml(entry.position || '')}</span>
@@ -48062,8 +48372,7 @@ function scoreboardLiveStateFingerprint(game = {}) {
     Boolean(game?.bases?.first), Boolean(game?.bases?.second), Boolean(game?.bases?.third),
     game?.activeBatterId || '', game?.battingSide || '',
     pitcherKey(awayPitcher), pitcherKey(homePitcher),
-    lockedTossupScoreboardGamePks?.has?.(String(game?.gamePk || '')) ? 1 : 0,
-    tossupScoreboardGamePks?.has?.(String(game?.gamePk || '')) ? 1 : 0,
+    tossupScoreboardStateForGame(game),
     JSON.stringify(overUnderScoreboardStateForGame(game)),
   ]);
 }
@@ -48078,6 +48387,7 @@ function upsertCard(game) {
   if (card && card.dataset.scoreboardRenderFingerprint === nextRenderFingerprint) {
     card._game = chooseBestGameCard(card._game || game, game);
     card.dataset.scoreboardLiveStateFingerprint = nextLiveStateFingerprint;
+    hydrateScoreboardPregamePitcherRisk(card, card._game);
     return;
   }
   if (!card) {
@@ -48151,6 +48461,7 @@ function upsertCard(game) {
   hydratePitcherLastStartHrMarkers(card);
   hydratePitcherOpponentHandMarkers(card);
   renderScoreStateStrip(card, game);
+  hydrateScoreboardPregamePitcherRisk(card, game);
   renderScorePlaySummary(card, game);
   syncScoreboardScale(scoreboardEl);
   renderFocusedMatchupPanel(card, game);
@@ -48479,6 +48790,7 @@ function applyPregamePreviewHydratedCard(hydratedGame = null, selectedDate = '')
   saveCachedGames(latestRenderedGames);
   saveArchivedGames(targetDate, latestRenderedGames);
   prewarmLineupHrScoresForGames([merged]);
+  hydrateScoreboardPregamePitcherRisk(cardForGamePk(merged.gamePk), merged);
   if (activeLineupGame && String(activeLineupGame?.gamePk || '') === String(merged.gamePk)) {
     activeLineupGame = chooseBestGameCard(activeLineupGame, merged);
     syncLineupOverlay(activeLineupGame, { forceOpen: true }).catch(() => {});
