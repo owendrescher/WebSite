@@ -18436,7 +18436,10 @@ function applyManualStateSnapshot(snapshot = {}, date = dateInput.value || forma
     .some((key) => hasOwnManualStateField(snapshot, key));
   if (!hasAny) return false;
 
-  const tracked = normalizeTrackedPlayerEntries(snapshot.trackedPlayers || []);
+  const snapshotHasTrackedPlayers = hasOwnManualStateField(snapshot, 'trackedPlayers');
+  const tracked = snapshotHasTrackedPlayers
+    ? normalizeTrackedPlayerEntries(snapshot.trackedPlayers || [])
+    : normalizeTrackedPlayerEntries(readTrackedPlayersStore(selectedDate) || []);
   const pending = normalizePendingGamePickEntries(snapshot.pendingGamePicks || []);
   const tossups = listify(snapshot.tossupScoreboards).map((key) => String(key)).filter(Boolean);
   const locked = listify(snapshot.lockedTossupScoreboards).map((key) => String(key)).filter(Boolean);
@@ -18496,13 +18499,24 @@ function snapshotManualStateForSync(date = dateInput.value || formatDate(new Dat
   writeManualStateSyncSnapshot(selectedDate);
 }
 
-function refreshManualStateAfterSync(date = dateInput.value || formatDate(new Date())) {
+function refreshManualStateAfterSync(date = dateInput.value || formatDate(new Date()), changedKeys = new Set()) {
   const selectedDate = String(date || dateInput.value || formatDate(new Date()));
+  const trackedKey = trackedPlayersStorageKey(selectedDate);
+  const directTrackerChanged = changedKeys.has(trackedKey);
+  const pulledTrackedPlayers = directTrackerChanged ? readTrackedPlayersStore(selectedDate) : null;
   manualStateInMemoryDate = '';
   manualStateCrossDeviceFingerprint = '';
-  trackedPlayersMemoryByDate.delete(trackedPlayersStorageKey(selectedDate));
+  trackedPlayersMemoryByDate.delete(trackedKey);
   const snapshotApplied = applyManualStateSnapshot(readManualStateSyncSnapshot(selectedDate), selectedDate);
   if (!snapshotApplied) reconcileCrossDeviceManualState(selectedDate);
+  // The dated tracker row is the tracker source of truth on Pull. A broader,
+  // older manual snapshot must not overwrite a tracker list pulled in the same operation.
+  if (pulledTrackedPlayers !== null) {
+    saveTrackedPlayers(pulledTrackedPlayers, selectedDate, {
+      allowEmpty: true,
+      forceEmpty: !pulledTrackedPlayers.length,
+    });
+  }
   if (playerTrackerListEl) playerTrackerListEl.dataset.renderFingerprint = '';
   renderPlayerTrackerList(latestRenderedGames);
   refreshLineupTrackedPlayerHighlights();
@@ -18525,7 +18539,7 @@ function syncChangedManualStateDates(keys = new Set(), fallbackDate = dateInput.
 
 function refreshManualStateDatesAfterSync(keys = new Set(), fallbackDate = dateInput.value || formatDate(new Date())) {
   for (const syncDate of syncChangedManualStateDates(keys, fallbackDate)) {
-    refreshManualStateAfterSync(syncDate);
+    refreshManualStateAfterSync(syncDate, keys);
   }
 }
 

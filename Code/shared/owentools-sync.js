@@ -29,6 +29,7 @@
   let pullTimer = 0;
   let pullInFlight = false;
   let lastPullAt = 0;
+  let lastPullChangedKeys = [];
   let realtimeChannel = null;
   let autoPullStarted = false;
   let statusEl = null;
@@ -523,6 +524,7 @@
     try {
       const download = await loadCloudState({ forceCloud: reason === "manual-pull" });
       if (!download.ok) return false;
+      lastPullChangedKeys = download.changedKeys || [];
       lastPullAt = Date.now();
       if (download.changed) dispatchSyncStateChanged({ changedKeys: download.changedKeys || [], source: reason });
       if (session) {
@@ -536,8 +538,13 @@
   }
 
   async function pullRemoteState(reason = "manual-pull") {
+    lastPullChangedKeys = [];
     const changed = await pullCloudState(reason);
-    dispatchSyncLifecycleEvent("owentools:sync-pulled", { source: reason, changed: Boolean(changed) });
+    dispatchSyncLifecycleEvent("owentools:sync-pulled", {
+      source: reason,
+      changed: Boolean(changed),
+      changedKeys: [...lastPullChangedKeys]
+    });
     return changed;
   }
 
