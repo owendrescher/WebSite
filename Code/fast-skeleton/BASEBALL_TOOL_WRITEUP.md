@@ -101,15 +101,15 @@ The app favors quick first paint, then hydrates heavier details in the backgroun
 
 ## Local Storage And Manual State
 
-The app stores both volatile data and user-authored manual state. Manual state is the important part for push/pull.
+The app stores both volatile data and user-authored manual state. Push/pull treats `manual-state-last-push:v1` as the save-file source of truth, while the dated keys below remain local recovery/UI stores.
 
-Important synced keys include:
+Important manual keys include:
 
+- `manual-state-last-push:v1`
 - `manual-state-current:v1:{date}`
 - `manual-state-backup:v1:{date}`
 - `manual-state-mirror:v1`
 - `manual-state-durable:v1`
-- `manual-state-last-push:v1`
 - `player-tracker:v1:{date}`
 - `player-tracker-backup:v1`
 - `pending-game-picks:v1:{date}`
@@ -146,17 +146,7 @@ window.OWENTOOLS_SYNC = {
   toolId: "baseball-dashboard",
   label: "Baseball dashboard",
   include: [
-    "manual-state-mirror:v1",
-    "manual-state-durable:v1",
-    "manual-state-backup:v1",
-    "manual-state-current:v1",
     "manual-state-last-push:v1",
-    "player-tracker:v1:",
-    "player-tracker-backup:v1",
-    "pending-game-picks:v1",
-    "tossup-scoreboards:v1",
-    "locked-tossup-scoreboards:v1",
-    "over-under-scoreboards:v1",
     "rotowire-dynamic-lineup-source:v1",
     "lineup-stat-window:v1",
     "player-stat-season-recent-days:v1"
