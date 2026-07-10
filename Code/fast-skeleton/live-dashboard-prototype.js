@@ -17779,13 +17779,10 @@ function readManualStateLastPushSnapshot(date = dateInput.value || formatDate(ne
 
 function readBestManualStateSyncSnapshot(date = dateInput.value || formatDate(new Date())) {
   const selectedDate = String(date || dateInput.value || formatDate(new Date()));
-  const candidates = [
-    readManualStateSyncSnapshot(selectedDate),
-    readManualStateLastPushSnapshot(selectedDate),
-  ].filter(manualStateSnapshotHasFields);
-  if (!candidates.length) return {};
-  candidates.sort((a, b) => (Number(b?.updatedAt) || 0) - (Number(a?.updatedAt) || 0));
-  return candidates[0];
+  const lastPush = readManualStateLastPushSnapshot(selectedDate);
+  if (manualStateSnapshotHasFields(lastPush)) return lastPush;
+  const current = readManualStateSyncSnapshot(selectedDate);
+  return manualStateSnapshotHasFields(current) ? current : {};
 }
 
 function normalizeManualStatePatchField(key = '', value = []) {
@@ -18611,7 +18608,9 @@ function initOwenToolsSoftSyncRefresh() {
     snapshotManualStateForSync();
   });
   window.addEventListener('owentools:sync-pulled', (event) => {
-    refreshManualStateDatesAfterSync(new Set(listify(event?.detail?.changedKeys).map((key) => String(key || ''))));
+    const keys = new Set(listify(event?.detail?.changedKeys).map((key) => String(key || '')));
+    if (event?.detail?.source === 'manual-pull') keys.add(MANUAL_STATE_LAST_PUSH_KEY);
+    refreshManualStateDatesAfterSync(keys);
   });
   window.addEventListener('owentools:sync-state-changed', (event) => {
     const selectedDate = dateInput.value || formatDate(new Date());
