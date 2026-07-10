@@ -18512,12 +18512,28 @@ function refreshManualStateAfterSync(date = dateInput.value || formatDate(new Da
   if (activeLineupGame) syncLineupGamePickState(activeLineupGame);
 }
 
+function syncChangedManualStateDates(keys = new Set(), fallbackDate = dateInput.value || formatDate(new Date())) {
+  const dates = new Set([String(fallbackDate || dateInput.value || formatDate(new Date()))]);
+  for (const key of keys || []) {
+    const value = String(key || '');
+    const match = value.match(/(?:manual-state-current:v1|manual-state-backup:v1|player-tracker:v1|pending-game-picks:v1|tossup-scoreboards:v1|locked-tossup-scoreboards:v1|over-under-scoreboards:v1):(\d{4}-\d{2}-\d{2})$/);
+    if (match?.[1]) dates.add(match[1]);
+  }
+  return [...dates];
+}
+
+function refreshManualStateDatesAfterSync(keys = new Set(), fallbackDate = dateInput.value || formatDate(new Date())) {
+  for (const syncDate of syncChangedManualStateDates(keys, fallbackDate)) {
+    refreshManualStateAfterSync(syncDate);
+  }
+}
+
 function initOwenToolsSoftSyncRefresh() {
   window.addEventListener('owentools:sync-before-push', () => {
     snapshotManualStateForSync();
   });
-  window.addEventListener('owentools:sync-pulled', () => {
-    refreshManualStateAfterSync();
+  window.addEventListener('owentools:sync-pulled', (event) => {
+    refreshManualStateDatesAfterSync(new Set(listify(event?.detail?.changedKeys).map((key) => String(key || ''))));
   });
   window.addEventListener('owentools:sync-state-changed', (event) => {
     const selectedDate = dateInput.value || formatDate(new Date());
@@ -18541,6 +18557,7 @@ function initOwenToolsSoftSyncRefresh() {
       lockedTossupScoreboardStorageKey(selectedDate),
       overUnderScoreboardStorageKey(selectedDate),
       manualStateBackupKey(selectedDate),
+      manualStateSyncKey(selectedDate),
     ]);
     const allChanged = keys.size === 0;
     if (allChanged || keys.has(ROTOWIRE_DYNAMIC_LINEUP_STORAGE_KEY)) {
@@ -18556,13 +18573,13 @@ function initOwenToolsSoftSyncRefresh() {
       manualStateInMemoryDate = '';
       manualStateCrossDeviceFingerprint = '';
     }
-    if (allChanged || keys.has(trackedPlayersStorageKey(selectedDate)) || keys.has(PLAYER_TRACKER_STORAGE_KEY) || keys.has(PLAYER_TRACKER_BACKUP_STORAGE_KEY) || keys.has(MANUAL_STATE_MIRROR_KEY) || keys.has(MANUAL_STATE_DURABLE_KEY) || keys.has(manualStateBackupKey(selectedDate))) {
+    if (allChanged || keys.has(trackedPlayersStorageKey(selectedDate)) || keys.has(PLAYER_TRACKER_STORAGE_KEY) || keys.has(PLAYER_TRACKER_BACKUP_STORAGE_KEY) || keys.has(MANUAL_STATE_MIRROR_KEY) || keys.has(MANUAL_STATE_DURABLE_KEY) || keys.has(manualStateBackupKey(selectedDate)) || keys.has(manualStateSyncKey(selectedDate))) {
       trackedPlayersMemoryByDate.delete(trackedPlayersStorageKey(selectedDate));
       if (playerTrackerListEl) playerTrackerListEl.dataset.renderFingerprint = '';
       renderPlayerTrackerList(latestRenderedGames);
     }
     if (manualChanged) {
-      reconcileCrossDeviceManualState(selectedDate);
+      refreshManualStateDatesAfterSync(keys, selectedDate);
     }
     if (allChanged || [...lineupWindowKeys].some((key) => keys.has(key))) {
       const nextWindow = savedLineupStatWindow();
