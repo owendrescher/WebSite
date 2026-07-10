@@ -216,6 +216,11 @@
   }
 
   function shouldUseCloudValue(localValue, cloudValue, localTime, cloudTime, key = "") {
+    if (String(key || "") === "manual-state-last-push:v1") {
+      if (dataWeight(cloudValue) === 0 && dataWeight(localValue) > 0) return false;
+      if (localValue == null && cloudValue != null) return true;
+      return cloudTime > localTime;
+    }
     if (String(key || "").startsWith("player-tracker:v1:")) {
       if (localValue == null && cloudValue != null) return true;
       if (dataWeight(localValue) === 0 && dataWeight(cloudValue) > 0) return true;
@@ -456,7 +461,8 @@
       const localValue = readLocalValue(key);
       const cloudTime = Date.parse(row.updated_at || "") || 0;
       const localTime = localUpdatedAt(key);
-      if (!forceCloud && !shouldUseCloudValue(localValue, value, localTime, cloudTime, key)) {
+      const protectLocalSaveBundle = String(key || "") === "manual-state-last-push:v1";
+      if ((!forceCloud || protectLocalSaveBundle) && !shouldUseCloudValue(localValue, value, localTime, cloudTime, key)) {
         pendingUploads.set(key, localValue);
         return;
       }
