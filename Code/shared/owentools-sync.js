@@ -233,6 +233,25 @@
     return cloudTime > localTime;
   }
 
+  function isExplicitManualPushBundle(value) {
+    try {
+      const parsed = JSON.parse(String(value || ""));
+      const snapshot = parsed?.snapshot && typeof parsed.snapshot === "object" ? parsed.snapshot : parsed;
+      return Boolean(
+        snapshot &&
+        typeof snapshot === "object" &&
+        String(snapshot.pushId || parsed?.pushId || "").trim() &&
+        Array.isArray(snapshot.trackedPlayers) &&
+        Array.isArray(snapshot.pendingGamePicks) &&
+        Array.isArray(snapshot.tossupScoreboards) &&
+        Array.isArray(snapshot.lockedTossupScoreboards) &&
+        Array.isArray(snapshot.overUnderScoreboards)
+      );
+    } catch {
+      return false;
+    }
+  }
+
   function readLocalValue(key) {
     try {
       const localValue = window.localStorage.getItem(key);
@@ -462,7 +481,8 @@
       const cloudTime = Date.parse(row.updated_at || "") || 0;
       const localTime = localUpdatedAt(key);
       const protectLocalSaveBundle = String(key || "") === "manual-state-last-push:v1";
-      if ((!forceCloud || protectLocalSaveBundle) && !shouldUseCloudValue(localValue, value, localTime, cloudTime, key)) {
+      const forceVerifiedManualBundle = forceCloud && protectLocalSaveBundle && isExplicitManualPushBundle(value);
+      if ((!forceCloud || (protectLocalSaveBundle && !forceVerifiedManualBundle)) && !shouldUseCloudValue(localValue, value, localTime, cloudTime, key)) {
         pendingUploads.set(key, localValue);
         return;
       }

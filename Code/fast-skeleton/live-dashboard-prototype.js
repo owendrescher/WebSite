@@ -18517,9 +18517,11 @@ window.MLBDashboardManualSyncDebug = function MLBDashboardManualSyncDebug(date =
 function writeManualStateLastPushSnapshot(snapshot = {}, date = dateInput.value || formatDate(new Date())) {
   try {
     const selectedDate = String(snapshot?.date || date || dateInput.value || formatDate(new Date()));
+    const pushId = `${Date.now()}-${Math.random().toString(36).slice(2, 10)}`;
     const cleanSnapshot = {
       date: selectedDate,
       updatedAt: Number(snapshot?.updatedAt) || Date.now(),
+      pushId,
       trackedPlayers: normalizeTrackedPlayerEntries(snapshot.trackedPlayers || []),
       pendingGamePicks: normalizePendingGamePickEntries(snapshot.pendingGamePicks || []),
       tossupScoreboards: listify(snapshot.tossupScoreboards).map((key) => String(key)).filter(Boolean),
@@ -18529,6 +18531,7 @@ function writeManualStateLastPushSnapshot(snapshot = {}, date = dateInput.value 
     localStorage.setItem(MANUAL_STATE_LAST_PUSH_KEY, JSON.stringify({
       date: selectedDate,
       updatedAt: cleanSnapshot.updatedAt,
+      pushId,
       snapshot: cleanSnapshot,
     }));
     return cleanSnapshot;
