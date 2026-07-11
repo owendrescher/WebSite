@@ -461,8 +461,11 @@
       const localValue = readLocalValue(key);
       const cloudTime = Date.parse(row.updated_at || "") || 0;
       const localTime = localUpdatedAt(key);
-      const protectLocalSaveBundle = String(key || "") === "manual-state-last-push:v1";
-      if ((!forceCloud || protectLocalSaveBundle) && !shouldUseCloudValue(localValue, value, localTime, cloudTime, key)) {
+      // A manual Pull is an explicit restore operation: the cloud row is the
+      // source of truth, including the manual save bundle.  Protecting the
+      // local bundle here made Pull behave like a merge, so a locally removed
+      // pick/tracked player could survive instead of being restored.
+      if (!forceCloud && !shouldUseCloudValue(localValue, value, localTime, cloudTime, key)) {
         pendingUploads.set(key, localValue);
         return;
       }
