@@ -18,7 +18,7 @@
     <link rel="icon" type="image/png" href="baseball.png" />
     <link rel="apple-touch-icon" href="baseball.png" />
     <link rel="stylesheet" href="styles.css?v=20260708globalSearchContracts5" />
-    <link rel="stylesheet" href="dashboard.css?v=20260708globalSearchContracts5" />
+    <link rel="stylesheet" href="dashboard.css?v=20260711bullpen14d1" />
     <link rel="stylesheet" href="live-prototype.css?v=20260710pitcherRiskTeamLine" />
   </head>
   <body class="dashboard-page" data-dashboard-page="scoreboard">
@@ -89,7 +89,6 @@
                 <span class="date-step-row">
                   <button id="datePrevBtn" class="date-step-btn" type="button" aria-label="Back day">&lsaquo;</button>
                   <button id="dateNextBtn" class="date-step-btn" type="button" aria-label="Forward day">&rsaquo;</button>
-                  <button id="dateRefreshBtn" class="date-step-btn date-refresh-btn" type="button" aria-label="Refresh selected day" title="Refresh selected day">&#8635;</button>
                 </span>
               </label>
             </div>
@@ -201,7 +200,7 @@
                 <div class="lineup-modal-columns" data-lineup-panel="lineups">
                   <div class="lineup-matchup-strip">
                     <div class="lineup-team-header">
-                      <img class="lineup-logo away-lineup-logo lineup-logo-pick-trigger" data-lineup-pick-side="away" role="button" tabindex="0" src="placeholder.png" alt="Away logo" title="Pick away team to win" />
+                      <img class="lineup-logo away-lineup-logo lineup-logo-pick-trigger" data-lineup-pick-side="away" role="button" tabindex="0" src="placeholder.png" alt="Away logo" />
                       <div class="lineup-team-lines">
                         <div class="lineup-team-info-line">
                           <span class="team-streak lineup-team-streak away-lineup-streak"></span>
@@ -231,7 +230,7 @@
                           <button type="button" class="lineup-prediction-chip home-lineup-prediction" data-lineup-prediction-side="home" hidden>--</button>
                         </div>
                       </div>
-                      <img class="lineup-logo home-lineup-logo lineup-logo-pick-trigger" data-lineup-pick-side="home" role="button" tabindex="0" src="placeholder.png" alt="Home logo" title="Pick home team to win" />
+                      <img class="lineup-logo home-lineup-logo lineup-logo-pick-trigger" data-lineup-pick-side="home" role="button" tabindex="0" src="placeholder.png" alt="Home logo" />
                     </div>
                   </div>
                   <section class="lineup-modal-team away-lineup">
@@ -688,10 +687,10 @@
         ]
       };
     </script>
-    <script src="../shared/owentools-sync.js?v=20260711saveLoad2"></script>
+    <script src="../shared/owentools-sync.js?v=20260711saveLoad3"></script>
     <script src="rotowire-default-lineups.js?v=20260708rotowireFallback1"></script>
     <script src="mlb-contracts-data.js?v=20260708liveSearchFix1"></script>
-    <script>window.MLB_DASHBOARD_BUILD_ID="20260711-save-load2";</script>
-    <script src="live-dashboard-prototype.js?v=20260711saveLoad2"></script>
+    <script>window.MLB_DASHBOARD_BUILD_ID="20260711-tooltip-cleanup2";</script>
+    <script src="live-dashboard-prototype.js?v=20260711tooltipCleanup2"></script>
   </body>
 </html>

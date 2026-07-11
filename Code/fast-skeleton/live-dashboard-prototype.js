@@ -3,7 +3,6 @@ const template = document.getElementById('gameTemplate');
 const dateInput = document.getElementById('dateInput');
 const datePrevBtnEl = document.getElementById('datePrevBtn');
 const dateNextBtnEl = document.getElementById('dateNextBtn');
-const dateRefreshBtnEl = document.getElementById('dateRefreshBtn');
 const overlayEl = document.getElementById('overlay');
 const overlayResizeHandleEl = document.getElementById('overlayResizeHandle');
 const overlayDockToggleBtnEl = document.getElementById('overlayDockToggleBtn');
@@ -2457,14 +2456,14 @@ function cycleLineupSplitMode() {
   setLineupSplitMode(lineupSplitMode === 'none' ? 'left' : lineupSplitMode === 'left' ? 'right' : 'none');
 }
 
-function handleLineupPregameTossupToggle(e) {
+function handleLineupPregameTossupToggle(e, direction = 1) {
   const pregameToggle = e?.target?.closest?.('.lineup-state-inning.is-pregame-toggle');
   if (!pregameToggle) return false;
   const gamePk = pregameToggle.closest('.lineup-state-scoreboard')?.dataset?.gamePk || activeLineupGame?.gamePk || '';
   if (!gamePk) return false;
   e.preventDefault();
   e.stopPropagation();
-  toggleTossupScoreboardMarked(gamePk);
+  cycleTossupScoreboardState(gamePk, direction);
   return true;
 }
 
@@ -4978,7 +4977,7 @@ function seriesStarterRowHtml(item = {}, side = '') {
   const color = side === 'away' ? item.awayColor : item.homeColor;
   const label = side === 'away' ? 'A' : 'H';
   return `
-    <span class="lineup-series-pitcher lineup-series-${escapeHtml(side)}-pitcher" style="--series-pitcher:${escapeHtml(color || getTeamColor(team) || '#7bd0ff')}" title="${escapeHtml(seriesStarterPitcherTitle(starter))}">
+    <span class="lineup-series-pitcher lineup-series-${escapeHtml(side)}-pitcher" style="--series-pitcher:${escapeHtml(color || getTeamColor(team) || '#7bd0ff')}">
       <span>${escapeHtml(label)}</span>
       <b>${escapeHtml(starter?.name || 'SP')}</b>
     </span>
@@ -17785,6 +17784,19 @@ function readBestManualStateSyncSnapshot(date = dateInput.value || formatDate(ne
   return manualStateSnapshotHasFields(current) ? current : {};
 }
 
+function ordinalDateHtml(date) {
+  const value = String(date || formatDate(new Date()));
+  const [year, month, day] = value.split('-').map(Number);
+  if (!year || !month || !day) return escapeHtml(value);
+  const monthName = new Intl.DateTimeFormat('en-US', {
+    timeZone: 'America/New_York',
+    month: 'long',
+  }).format(new Date(Date.UTC(year, month - 1, day, 12, 0, 0)));
+  const mod100 = day % 100;
+  const suffix = mod100 >= 11 && mod100 <= 13 ? 'th' : day % 10 === 1 ? 'st' : day % 10 === 2 ? 'nd' : day % 10 === 3 ? 'rd' : 'th';
+  return `${escapeHtml(monthName)} ${day}<sup>${suffix}</sup>, ${year}`;
+}
+
 function normalizeManualStatePatchField(key = '', value = []) {
   if (key === 'trackedPlayers') return normalizeTrackedPlayerEntries(value);
   if (key === 'pendingGamePicks') return normalizePendingGamePickEntries(value);
@@ -18306,7 +18318,7 @@ function syncTossupScoreboardStates(games = latestRenderedGames) {
       el.classList.toggle('is-tossup-unlocked', unlocked);
       el.classList.toggle('is-tossup-locked', locked);
       el.setAttribute('aria-pressed', locked ? 'mixed' : (tossup || unlocked) ? 'true' : 'false');
-      el.setAttribute('title', locked ? 'Locked. Click to clear.' : unlocked ? 'Nearly locked. Click to lock.' : tossup ? 'Tossup marked. Click for near-lock.' : 'Mark this pregame as a tossup');
+      el.removeAttribute('title');
     });
   }
 }
@@ -18683,6 +18695,9 @@ window.MLBDashboardManualSyncBridge = {
     } catch {
       return { date: '', counts: {}, total: 0 };
     }
+  },
+  getActiveDate() {
+    return String(dateInput?.value || formatDate(new Date()));
   },
 };
 
@@ -20671,9 +20686,7 @@ function battingSeriesStarterHtml(starters = []) {
       starter.hrOffStarter ? 'is-hr-off-starter' : '',
     ].filter(Boolean).join(' ');
     const label = `${starter.name || 'Starter'}${starter.hand ? ` (${starter.hand})` : ''}`;
-    const hover = batterPitcherStatlineHoverTitle(starter.pitcherLines || []);
-    const titleAttr = hover ? ` title="${escapeHtml(hover)}"` : '';
-    const name = `<button type="button" class="player-card-link batter-series-starter-link" data-player-card-link data-player-id="${escapeHtml(starter.id || '')}" data-player-role="pitcher"${titleAttr}>${escapeHtml(label)}</button>`;
+    const name = `<button type="button" class="player-card-link batter-series-starter-link" data-player-card-link data-player-id="${escapeHtml(starter.id || '')}" data-player-role="pitcher">${escapeHtml(label)}</button>`;
     const styledName = starter.hrOffStarter
       ? `<em><u>${name}</u></em>`
       : starter.hrInStarterGame
@@ -22286,7 +22299,7 @@ function quickAddBetLeg(player, propType, target = 1) {
   return true;
 }
 
-function openBetContextMenu(player, x, y) {
+function openBetContextMenu(player, x, y, options = {}) {
   const existing = document.getElementById('playerBetMenu');
   if (existing) existing.remove();
   activeBetContextMenuPlayer = player;
@@ -22348,6 +22361,7 @@ function openBetContextMenu(player, x, y) {
   }, true);
   menu.addEventListener('click', handleMenuAction, true);
   menu.addEventListener('contextmenu', (event) => event.preventDefault());
+  if (options.expectationOnly) showTrackExpectationStep(menu, player);
   document.body.appendChild(menu);
   const rect = menu.getBoundingClientRect();
   menu.style.left = `${Math.min(Math.max(8, x), window.innerWidth - rect.width - 8)}px`;
@@ -22386,7 +22400,7 @@ function initPlayerBetContextMenu() {
       document.getElementById('playerBetMenu')?.remove();
       return;
     }
-    openBetContextMenu(player, e.clientX, e.clientY);
+    openBetContextMenu(player, e.clientX, e.clientY, { expectationOnly: true });
   });
   document.addEventListener('pointerdown', (e) => {
     const target = e.target instanceof Element ? e.target : null;
@@ -26396,7 +26410,7 @@ function updateDashboardSummary(games = latestRenderedGames) {
   if (!dashboardSummaryEl) return;
   const list = Array.isArray(games) ? games : [];
   const live = list.filter((game) => /top|bot|live/i.test(`${game?.inningShort || ''} ${game?.status || ''}`)).length;
-  dashboardSummaryEl.textContent = `${list.length} games | ${live} live | ${dateInput.value || formatDate(new Date())}`;
+  dashboardSummaryEl.innerHTML = `<span>${live}/${list.length} Live Games</span><span class="dashboard-summary-date">${ordinalDateHtml(dateInput.value || formatDate(new Date()))}</span>`;
 }
 
 function refreshScoreboardPageOnReturn() {
@@ -27321,7 +27335,7 @@ function teamDetailPitcherItemHtml(arm = {}, color = '') {
   return `
     <li class="bullpen-item${teamDetailPitcherTrendClass(arm)}${isBullpenDay ? ' is-bullpen-day' : ''}" data-player-id="${escapeHtml(String(arm.id || ''))}"${isBullpenDay ? '' : ' role="button" tabindex="0"'}>
       <div class="bullpen-main pitcher-priority-line">
-        <span class="bullpen-name pitcher-priority-name" title="${escapeHtml(arm.fullName || arm.name || 'Pitcher')}" style="color:${escapeHtml(color)}">${isBullpenDay ? 'Bullpen Day' : teamDetailPitcherNameHtml(arm)}</span>
+        <span class="bullpen-name pitcher-priority-name" style="color:${escapeHtml(color)}">${isBullpenDay ? 'Bullpen Day' : teamDetailPitcherNameHtml(arm)}</span>
         <span class="bullpen-meta pitcher-priority-meta">${teamDetailPitcherMetaLine(arm)}</span>
       </div>
     </li>
@@ -31186,32 +31200,34 @@ function aggregateBullpenBoxStats(aggregate, teamBox = {}) {
     aggregate.hits += statNumber(pitching.hits);
     aggregate.walks += statNumber(pitching.baseOnBalls ?? pitching.walks);
     aggregate.homeRuns += statNumber(pitching.homeRuns ?? pitching.hrAllowed ?? pitching.hr);
+    aggregate.strikeOuts += statNumber(pitching.strikeOuts);
     aggregate.pitchers += 1;
   }
 }
 
-async function getTeamRecentBullpenStats(teamAbbrev, date, gameLimit = 10) {
+async function getTeamRecentBullpenStats(teamAbbrev, date, gameLimit = 10, options = {}) {
   const team = canonicalTeamAbbrev(teamAbbrev);
   const teamId = TEAM_IDS[team];
   const selectedDate = String(date || dateInput.value || formatDate(new Date()));
   const limit = Math.max(1, Math.min(15, Math.floor(Number(gameLimit)) || 10));
   if (!teamId || !selectedDate) return null;
-  const cacheKey = `${team}:${selectedDate}:bullpen-l${limit}:v1`;
+  const calendarDays = Math.max(0, Math.floor(Number(options.calendarDays)) || 0);
+  const cacheKey = `${team}:${selectedDate}:bullpen-${calendarDays ? `${calendarDays}d` : `l${limit}`}:v2`;
   if (teamRecentBullpenCache.has(cacheKey)) return teamRecentBullpenCache.get(cacheKey);
   const promise = (async () => {
     const url = new URL(`${MLB_API_BASE}/schedule`);
     url.searchParams.set('sportId', '1');
     url.searchParams.set('teamId', String(teamId));
-    url.searchParams.set('startDate', addDaysToDateValue(selectedDate, -45));
+    url.searchParams.set('startDate', addDaysToDateValue(selectedDate, calendarDays ? -(calendarDays - 1) : -45));
     url.searchParams.set('endDate', selectedDate);
     url.searchParams.set('gameTypes', 'S,E,R');
     const response = await getJson(url.toString());
-    const games = listify(response?.dates)
+    const eligibleGames = listify(response?.dates)
       .flatMap((day) => listify(day?.games))
       .filter(gameIsFinalForTeamRecord)
-      .sort((a, b) => String(b?.gameDate || '').localeCompare(String(a?.gameDate || '')))
-      .slice(0, limit);
-    const aggregate = { games: games.length, pitchers: 0, outs: 0, earnedRuns: 0, hits: 0, walks: 0, homeRuns: 0 };
+      .sort((a, b) => String(b?.gameDate || '').localeCompare(String(a?.gameDate || '')));
+    const games = calendarDays ? eligibleGames : eligibleGames.slice(0, limit);
+    const aggregate = { games: games.length, pitchers: 0, outs: 0, earnedRuns: 0, hits: 0, walks: 0, homeRuns: 0, strikeOuts: 0 };
     await mapWithConcurrency(games, 3, async (game) => {
       const side = teamBoxSideForGame(game, team);
       if (!side || !game?.gamePk) return;
@@ -31223,6 +31239,8 @@ async function getTeamRecentBullpenStats(teamAbbrev, date, gameLimit = 10) {
       ...aggregate,
       era: (aggregate.earnedRuns * 27) / aggregate.outs,
       whip: ((aggregate.hits + aggregate.walks) * 3) / aggregate.outs,
+      hr9: (aggregate.homeRuns * 27) / aggregate.outs,
+      k9: (aggregate.strikeOuts * 27) / aggregate.outs,
       ip: outsToInnings(aggregate.outs),
     };
   })().catch((error) => {
@@ -33335,7 +33353,7 @@ function renderPredictionPlayerCard(entry, mode = 'hitting') {
       ].join('');
   const badgeHtml = isPitcher ? '' : `${entry.handedEmoji || ''}${entry.duePayload?.hr ? `<span class="lineup-due-badge lineup-due-badge-hr" title="${escapeHtml(entry.duePayload.hr)}">HR</span>` : ''}${entry.duePayload?.xbh ? `<span class="lineup-due-badge lineup-due-badge-xbh" title="${escapeHtml(entry.duePayload.xbh)}">XBH</span>` : ''}`;
   const pitcherButtonHtml = !isPitcher && Number.isFinite(Number(entry.pitcherId)) && Number(entry.pitcherId) > 0
-    ? `<button type="button" class="prediction-pitcher-link" data-pitcher-id="${Number(entry.pitcherId)}" data-team-abbrev="${escapeHtml(entry.pitcherTeamAbbrev || entry.opponentAbbrev || '')}" data-game-pk="${escapeHtml(entry.gamePk || '')}" title="Open ${escapeHtml(entry.pitcherName || 'pitcher')} card">${escapeHtml(entry.pitcherName || 'Opposing pitcher')}</button>`
+    ? `<button type="button" class="prediction-pitcher-link" data-pitcher-id="${Number(entry.pitcherId)}" data-team-abbrev="${escapeHtml(entry.pitcherTeamAbbrev || entry.opponentAbbrev || '')}" data-game-pk="${escapeHtml(entry.gamePk || '')}">${escapeHtml(entry.pitcherName || 'Opposing pitcher')}</button>`
     : `<span>${escapeHtml(entry.pitcherName || 'Opposing pitcher')}</span>`;
   const sourceRows = isPitcher
     ? [
@@ -35986,7 +36004,7 @@ function renderPitcherListItems(listEl, pitchers, color, emptyText, contextDate 
     li.innerHTML = `
       <div class="bullpen-main pitcher-priority-line">
         ${predictionBadge}
-        <span class="bullpen-name pitcher-priority-name" title="${escapeHtml(arm.fullName || arm.name || 'Pitcher')}" style="color:${color}">${lineupPitcherNameHtml(arm)}${pitchTag ? ` <span class="pitch-count-inline">${escapeHtml(pitchTag)}</span>` : ''}</span>
+        <span class="bullpen-name pitcher-priority-name" style="color:${color}">${lineupPitcherNameHtml(arm)}${pitchTag ? ` <span class="pitch-count-inline">${escapeHtml(pitchTag)}</span>` : ''}</span>
         <span class="bullpen-meta pitcher-priority-meta">${pitcherSeasonMetaLine(arm)}</span>
       </div>
       <div class="bullpen-today">${escapeHtml(pitcherListStatusLine(arm, contextDate))}</div>
@@ -36172,8 +36190,6 @@ function renderPitchingSide(sectionEl, teamCode, color, staff, game = null) {
     const currentLabel = currentIsTbdFallback ? 'Starter TBD' : current?.isPotentialStarter ? 'Potential Starter:' : current?.role === 'starter' ? 'Starter' : 'Current Pitcher';
     const currentPitchCount = pitchCount(current);
     const currentPitchChip = '';
-    const fallbackTitleName = current?.fullName || current?.name || 'Pitcher';
-    const currentTitle = currentIsTbdFallback ? `TBD probable | fallback ${fallbackTitleName}` : fallbackTitleName;
     const currentNameHtml = currentIsTbdFallback
       ? `<span class="lineup-team-pitcher-tbd">TBD</span><span class="lineup-team-pitcher-fallback">Fallback: ${lineupPitcherNameHtml(current, game)}</span>`
       : `${lineupPitcherNameHtml(current, game)}${currentPitchCount && !currentIsTbdFallback ? ` <span class="pitch-count-inline">(P${currentPitchCount})</span>` : ''}`;
@@ -36181,7 +36197,7 @@ function renderPitchingSide(sectionEl, teamCode, color, staff, game = null) {
     const currentHtml = current ? `
       <div class="pitching-card-label">${currentLabel}${currentPitchChip}</div>
       <div class="pitching-card-main pitcher-priority-line${currentIsTbdFallback ? ' has-tbd-fallback' : ''}">
-        <div class="pitching-card-name pitcher-priority-name${currentIsTbdFallback ? ' has-tbd-fallback' : ''}" title="${escapeHtml(currentTitle)}" style="color:${color}">${currentNameHtml}</div>
+        <div class="pitching-card-name pitcher-priority-name${currentIsTbdFallback ? ' has-tbd-fallback' : ''}" style="color:${color}">${currentNameHtml}</div>
         <div class="pitching-card-meta pitcher-priority-meta">${currentMetaLine}</div>
       </div>
       ${starterExited ? `<div class="pitcher-substitution-note">Starter ${escapeHtml(lastName(starter.fullName || starter.name || 'Pitcher'))} has exited</div>` : ''}
@@ -36268,9 +36284,6 @@ function buildVerifiedBullpenRankData(rows = [], expectedTeamCount = 30) {
     k9: bullpenMetricRankingList(rows, 'k9', false),
   };
   const verified = Object.values(lists).every((list) => list.length >= expected);
-  if (!verified) {
-    return { verified: false, expectedTeamCount: expected, teamCount: rows.length, lists, ranks: new Map() };
-  }
   const ranks = new Map(rows.map((row) => [row.teamCode, {}]));
   for (const [metric, list] of Object.entries(lists)) {
     list.forEach((row, index) => {
@@ -36279,29 +36292,38 @@ function buildVerifiedBullpenRankData(rows = [], expectedTeamCount = 30) {
       ranks.set(row.teamCode, entry);
     });
   }
-  return { verified: true, expectedTeamCount: expected, teamCount: rows.length, lists, ranks };
+  return { verified, expectedTeamCount: expected, teamCount: rows.length, lists, ranks };
 }
 
 async function getBullpenRankData(game) {
   const officialDate = officialDateForGame(game) || formatDate(new Date());
   const season = seasonForDate(officialDate);
-  const cacheKey = `${season}:${officialDate}:bullpen-ranks:v2`;
+  const cacheKey = `${season}:${officialDate}:bullpen-ranks-with-14d:v3`;
   if (teamBullpenRanksCache.has(cacheKey)) return teamBullpenRanksCache.get(cacheKey);
   const promise = (async () => {
     const teams = await getTeamsForSeason(season);
     const expectedTeamCount = teams.length || 30;
-    const rows = (await mapWithConcurrency(teams, 3, async (team) => {
+    const teamResults = await mapWithConcurrency(teams, 3, async (team) => {
       const teamCode = canonicalTeamAbbrev(team?.abbreviation);
       if (!teamCode) return null;
-      const profiles = await fetchTeamPitcherRosterProfiles(teamCode, { officialDate }).catch(() => []);
+      const [profiles, recent] = await Promise.all([
+        fetchTeamPitcherRosterProfiles(teamCode, { officialDate }).catch(() => []),
+        getTeamRecentBullpenStats(teamCode, officialDate, 14, { calendarDays: 14 }).catch(() => null),
+      ]);
       const relievers = listify(profiles)
         .filter((profile) => !isStarterLikePitcher(profile))
         .map((profile) => normalizePitcherDisplayEntry(profile, 'bullpen'))
         .filter(Boolean);
       const values = bullpenSummaryValues(relievers);
-      return values ? { teamCode, ranks: {}, ...values } : null;
-    })).filter(Boolean);
-    return buildVerifiedBullpenRankData(rows, expectedTeamCount);
+      return {
+        overall: values ? { teamCode, ranks: {}, ...values } : null,
+        recent: recent ? { teamCode, ranks: {}, ...recent } : null,
+      };
+    });
+    const overallRows = teamResults.map((entry) => entry?.overall).filter(Boolean);
+    const recentRows = teamResults.map((entry) => entry?.recent).filter(Boolean);
+    const overall = buildVerifiedBullpenRankData(overallRows, expectedTeamCount);
+    return { ...overall, recent: buildVerifiedBullpenRankData(recentRows, expectedTeamCount) };
   })().catch((error) => {
     teamBullpenRanksCache.delete(cacheKey);
     throw error;
@@ -36317,7 +36339,9 @@ async function hydrateBullpenSummaryRanks(containerEl, teamCode, relievers = [],
   const rankData = await getBullpenRankData(game).catch(() => null);
   if (!rankData?.verified || containerEl.dataset.rankToken !== token) return;
   const ranks = rankData.ranks.get(canonicalTeamAbbrev(teamCode)) || null;
-  renderBullpenSummary(containerEl, relievers, color, ranks, rankData);
+  const recentRanks = rankData.recent?.ranks?.get(canonicalTeamAbbrev(teamCode)) || null;
+  const recentValues = rankData.recent?.lists?.era?.find((row) => row.teamCode === canonicalTeamAbbrev(teamCode)) || null;
+  renderBullpenSummary(containerEl, relievers, color, ranks, rankData, recentValues, recentRanks);
 }
 
 function formatBullpenRankValue(value, rank) {
@@ -36325,7 +36349,14 @@ function formatBullpenRankValue(value, rank) {
   return Number.isFinite(numericRank) && numericRank > 0 ? `${value} - ${numericRank}` : value;
 }
 
-function renderBullpenSummary(containerEl, relievers = [], color = '', ranks = null, rankData = null) {
+function formatBullpenOverallRecentValue(overallValue, recentValue, overallRank, recentRank) {
+  const recentText = recentValue == null || recentValue === '' ? '--' : recentValue;
+  const overallRankText = Number(overallRank) > 0 ? Number(overallRank) : '--';
+  const recentRankText = Number(recentRank) > 0 ? Number(recentRank) : '--';
+  return `${overallValue}/${recentText} - ${overallRankText}/${recentRankText}`;
+}
+
+function renderBullpenSummary(containerEl, relievers = [], color = '', ranks = null, rankData = null, recentValues = null, recentRanks = null) {
   if (!containerEl) return;
   const values = bullpenSummaryValues(relievers);
   const fingerprint = JSON.stringify([
@@ -36340,6 +36371,16 @@ function renderBullpenSummary(containerEl, relievers = [], color = '', ranks = n
     ranks?.whip || '',
     ranks?.hr9 || '',
     ranks?.k9 || '',
+    recentValues?.outs || 0,
+    Number(recentValues?.era || 0).toFixed(3),
+    Number(recentValues?.whip || 0).toFixed(3),
+    Number(recentValues?.hr9 || 0).toFixed(3),
+    Number(recentValues?.k9 || 0).toFixed(3),
+    recentRanks?.ip || '',
+    recentRanks?.era || '',
+    recentRanks?.whip || '',
+    recentRanks?.hr9 || '',
+    recentRanks?.k9 || '',
     rankData?.verified ? `${rankData.teamCount}:${rankData.expectedTeamCount}` : '',
   ]);
   if (containerEl.dataset.renderFingerprint === fingerprint) return;
@@ -36350,12 +36391,13 @@ function renderBullpenSummary(containerEl, relievers = [], color = '', ranks = n
   }
   containerEl.innerHTML = `
     <div class="bullpen-summary-label" style="color:${color}" title="${rankData?.verified ? `Ranks verified against ${rankData.teamCount} clubs` : 'Bullpen ranks loading'}">Bullpen</div>
+    <div class="bullpen-summary-window">Overall / Last 14D - MLB Rank / Last 14D Rank</div>
     <div class="bullpen-summary-grid">
-      <span><b>IP</b>${formatBullpenRankValue(values.ip, ranks?.ip)}</span>
-      <span><b>ERA</b>${formatBullpenRankValue(formatRateValue(values.era, 2, false), ranks?.era)}</span>
-      <span><b>WHIP</b>${formatBullpenRankValue(formatRateValue(values.whip, 2, false), ranks?.whip)}</span>
-      <span><b>HR/9</b>${formatBullpenRankValue(formatRateValue(values.hr9, 2, false), ranks?.hr9)}</span>
-      <span><b>K/9</b>${formatBullpenRankValue(formatRateValue(values.k9, 2, false), ranks?.k9)}</span>
+      <span><b>IP</b>${formatBullpenOverallRecentValue(values.ip, recentValues?.ip, ranks?.ip, recentRanks?.ip)}</span>
+      <span><b>ERA</b>${formatBullpenOverallRecentValue(formatRateValue(values.era, 2, false), Number.isFinite(Number(recentValues?.era)) ? formatRateValue(recentValues.era, 2, false) : '--', ranks?.era, recentRanks?.era)}</span>
+      <span><b>WHIP</b>${formatBullpenOverallRecentValue(formatRateValue(values.whip, 2, false), Number.isFinite(Number(recentValues?.whip)) ? formatRateValue(recentValues.whip, 2, false) : '--', ranks?.whip, recentRanks?.whip)}</span>
+      <span><b>HR/9</b>${formatBullpenOverallRecentValue(formatRateValue(values.hr9, 2, false), Number.isFinite(Number(recentValues?.hr9)) ? formatRateValue(recentValues.hr9, 2, false) : '--', ranks?.hr9, recentRanks?.hr9)}</span>
+      <span><b>K/9</b>${formatBullpenOverallRecentValue(formatRateValue(values.k9, 2, false), Number.isFinite(Number(recentValues?.k9)) ? formatRateValue(recentValues.k9, 2, false) : '--', ranks?.k9, recentRanks?.k9)}</span>
     </div>
   `;
 }
@@ -36429,9 +36471,6 @@ function renderLineupPitcherSummary(containerEl, color, staff, game = null) {
   }
   const label = displayPitcherForRender?.isTbdFallbackStarter ? 'Starter TBD' : displayPitcherForRender?.isPotentialStarter ? 'Potential Starter:' : showingCurrent ? 'Current Pitcher' : 'Starter';
   const renderDate = officialDateForGame(game) || dateInput?.value || formatDate(new Date());
-  const pitcherTitle = displayPitcherForRender?.isTbdFallbackStarter
-    ? `TBD probable | fallback ${displayPitcherForRender?.fullName || displayPitcherForRender?.name || 'Pitcher'}`
-    : (displayPitcherForRender?.fullName || displayPitcherForRender?.name || 'Pitcher');
   const pitcherNameBlock = displayPitcherForRender?.isTbdFallbackStarter
     ? `<span class="lineup-team-pitcher-tbd">TBD</span><span class="lineup-team-pitcher-fallback">Fallback: ${lineupPitcherNameHtml(displayPitcherForRender, game)}</span>`
     : `${lineupPitcherNameHtml(displayPitcherForRender, game)}`;
@@ -36439,7 +36478,7 @@ function renderLineupPitcherSummary(containerEl, color, staff, game = null) {
   const html = `
     <span class="lineup-team-pitcher-label">${label}</span>
     <span class="lineup-team-pitcher-main pitcher-priority-line${displayPitcherForRender?.isTbdFallbackStarter ? ' has-tbd-fallback' : ''}">
-      <span class="lineup-team-pitcher-name pitcher-priority-name${displayPitcherForRender?.isTbdFallbackStarter ? ' has-tbd-fallback' : ''}" title="${escapeHtml(pitcherTitle)}" style="color:${color}">${pitcherNameBlock}</span>
+      <span class="lineup-team-pitcher-name pitcher-priority-name${displayPitcherForRender?.isTbdFallbackStarter ? ' has-tbd-fallback' : ''}" style="color:${color}">${pitcherNameBlock}</span>
       <span class="lineup-team-pitcher-meta pitcher-priority-meta">${metaLine}</span>
     </span>
     ${detailLine}
@@ -37167,12 +37206,6 @@ function isDateShortcutTypingTarget(target) {
 function initDateKeyboardShortcuts() {
   datePrevBtnEl?.addEventListener('click', () => shiftSelectedDate(-1));
   dateNextBtnEl?.addEventListener('click', () => shiftSelectedDate(1));
-  dateRefreshBtnEl?.addEventListener('click', () => {
-    refreshForSelectedDate({ fallbackToToday: true, force: true });
-    requestAnimationFrame(() => {
-      if (isTextEntryTarget(document.activeElement)) document.activeElement.blur();
-    });
-  });
   document.addEventListener('keydown', (e) => {
     if (e.defaultPrevented || e.ctrlKey || e.metaKey || e.altKey || e.shiftKey) return;
     if (isDateShortcutTypingTarget(e.target)) return;
@@ -37219,7 +37252,7 @@ function renderScoreStateStrip(card, game) {
     const locked = tossupState === 'lock';
     inningEl.classList.toggle('is-tossup-unlocked', unlocked);
     inningEl.classList.toggle('is-tossup-locked', locked);
-    inningEl.setAttribute('title', pregame ? (locked ? 'Locked. Click to clear.' : unlocked ? 'Nearly locked. Click to lock.' : tossup ? 'Tossup marked. Click for near-lock.' : 'Mark this pregame as a tossup') : '');
+    inningEl.removeAttribute('title');
     inningEl.setAttribute('aria-pressed', pregame ? (locked ? 'mixed' : (tossup || unlocked) ? 'true' : 'false') : 'false');
   }
   syncOverUnderControlsForGame(card, game, pregame);
@@ -40620,7 +40653,7 @@ function renderLineupScoreboard(game) {
     const locked = tossupState === 'lock';
     inning.classList.toggle('is-tossup-unlocked', unlocked);
     inning.classList.toggle('is-tossup-locked', locked);
-    inning.setAttribute('title', pregame ? (locked ? 'Locked. Click to clear.' : unlocked ? 'Nearly locked. Click to lock.' : tossup ? 'Tossup marked. Click for near-lock.' : 'Mark this pregame as a tossup') : '');
+    inning.removeAttribute('title');
     inning.setAttribute('aria-pressed', locked ? 'mixed' : (tossup || unlocked) ? 'true' : 'false');
     const homeScore = document.createElement('span');
     homeScore.className = 'lineup-state-score';
@@ -41718,14 +41751,14 @@ function setTossupScoreboardState(gamePk, state = 'default') {
     el.classList.toggle('is-tossup-unlocked', unlocked);
     el.classList.toggle('is-tossup-locked', locked);
     el.setAttribute('aria-pressed', locked ? 'mixed' : (tossup || unlocked) ? 'true' : 'false');
-    el.setAttribute('title', locked ? 'Locked. Click to clear.' : unlocked ? 'Nearly locked. Click to lock.' : tossup ? 'Tossup marked. Click for near-lock.' : 'Mark this pregame as a tossup');
+    el.removeAttribute('title');
   });
   lineupOverlayEl?.querySelectorAll('.lineup-state-inning.is-pregame-toggle')
     ?.forEach((el) => {
       el.classList.toggle('is-tossup-unlocked', unlocked);
       el.classList.toggle('is-tossup-locked', locked);
       el.setAttribute('aria-pressed', locked ? 'mixed' : (tossup || unlocked) ? 'true' : 'false');
-      el.setAttribute('title', locked ? 'Locked. Click to clear.' : unlocked ? 'Nearly locked. Click to lock.' : tossup ? 'Tossup marked. Click for near-lock.' : 'Mark this pregame as a tossup');
+      el.removeAttribute('title');
     });
   return true;
 }
@@ -41735,9 +41768,16 @@ function setTossupScoreboardMarked(gamePk, marked) {
 }
 
 function toggleTossupScoreboardMarked(gamePk) {
+  return cycleTossupScoreboardState(gamePk, 1);
+}
+
+function cycleTossupScoreboardState(gamePk, direction = 1) {
   const game = gameForManualStateKey(gamePk);
   const current = game ? tossupScoreboardStateForGame(game) : lockedTossupScoreboardGamePks.has(String(gamePk || '')) && tossupScoreboardGamePks.has(String(gamePk || '')) ? 'lock' : lockedTossupScoreboardGamePks.has(String(gamePk || '')) ? 'unlock' : tossupScoreboardGamePks.has(String(gamePk || '')) ? 'tossup' : 'default';
-  const next = current === 'default' ? 'tossup' : current === 'tossup' ? 'unlock' : current === 'unlock' ? 'lock' : 'default';
+  const states = ['default', 'tossup', 'unlock', 'lock'];
+  const currentIndex = Math.max(0, states.indexOf(current));
+  const step = Number(direction) < 0 ? -1 : 1;
+  const next = states[(currentIndex + step + states.length) % states.length];
   return setTossupScoreboardState(gamePk, next);
 }
 
@@ -42241,7 +42281,7 @@ function batterStarterStrengthSummaryCell(summary = null) {
   const teamFromId = Object.entries(TEAM_IDS || {}).find(([, teamId]) => Number(teamId) === Number(equivalent.teamId))?.[0] || '';
   const team = canonicalTeamAbbrev(equivalent.teamAbbrev || teamFromId || '');
   const color = getTeamColor(team) || 'var(--accent)';
-  const html = `<span class="sos-equivalent-pitcher" title="${escapeHtml(titleParts.join('\n'))}" style="--sos-pitcher-color:${escapeHtml(color)}"><span>#${rank}</span> ${escapeHtml(label)}</span>`;
+  const html = `<span class="sos-equivalent-pitcher" style="--sos-pitcher-color:${escapeHtml(color)}"><span>#${rank}</span> ${escapeHtml(label)}</span>`;
   return {
     html,
     text: `#${rank} ${label}`,
@@ -47129,6 +47169,9 @@ function initLineupOverlay() {
     homeRunRatingDisplayMode = homeRunRatingDisplayMode === 'letter' ? 'number' : 'letter';
     refreshHomeRunFeedAfterControlChange();
   });
+  lineupOverlayEl.addEventListener('contextmenu', (e) => {
+    handleLineupPregameTossupToggle(e, -1);
+  });
   lineupOverlayEl.addEventListener('touchstart', (e) => {
     if (lineupOverlayEl.hidden || e.touches.length !== 1) return;
     const touch = e.touches[0];
@@ -48507,6 +48550,15 @@ function bindCardInteractions(card, game) {
     togglePregameTossup(e);
   }, true);
 
+  card.addEventListener('contextmenu', (e) => {
+    const pregameToggle = e.target.closest('.score-mini-inning.is-pregame-toggle');
+    if (!pregameToggle) return;
+    const liveGame = card._game || game;
+    if (!shouldPreferProbablePitcher(liveGame)) return;
+    e.preventDefault();
+    e.stopPropagation();
+    cycleTossupScoreboardState(card.dataset.gamePk || liveGame?.gamePk || '', -1);
+  });
   card.addEventListener('keydown', (e) => {
     if (e.key === 'Enter' || e.key === ' ') {
       if (togglePregameOverUnder(e)) return;

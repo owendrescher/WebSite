@@ -592,8 +592,9 @@
   }
 
   function saveHistoryTimestamp(row = {}) {
-    const fromKey = String(row.state_key || "").slice(saveHistoryPrefix().length).split(":")[0];
-    return Date.parse(row.updated_at || "") || Number(fromKey) || 0;
+    const keyParts = String(row.state_key || "").slice(saveHistoryPrefix().length).split(":");
+    const fromKey = keyParts.map(Number).find((part) => Number.isFinite(part) && part > 1000000000000);
+    return Date.parse(row.updated_at || "") || fromKey || 0;
   }
 
   function formatSaveTime(value, includeDate = true) {
@@ -612,9 +613,13 @@
     return window.MLBDashboardManualSyncBridge?.describeSaveValue?.(saveRowValue(row)) || { date: "", counts: {}, total: 0 };
   }
 
+  function activeSaveDate() {
+    return String(window.MLBDashboardManualSyncBridge?.getActiveDate?.() || "");
+  }
+
   function renderSaveHistory() {
     const latest = saveHistoryRows[0] || null;
-    if (quickLoadTimeEl) quickLoadTimeEl.textContent = latest ? formatSaveTime(saveHistoryTimestamp(latest)) : "No saves yet";
+    if (quickLoadTimeEl) quickLoadTimeEl.textContent = latest ? formatSaveTime(saveHistoryTimestamp(latest), false) : "No saves yet";
     if (!saveHistoryListEl) return;
     saveHistoryListEl.replaceChildren();
     if (!saveHistoryRows.length) {
@@ -666,7 +671,11 @@
       setErrorStatus(result.error, "Could not load saves");
       return saveHistoryRows;
     }
-    saveHistoryRows = (result.data || []).filter((row) => saveRowValue(row) != null);
+    const selectedDate = activeSaveDate();
+    saveHistoryRows = (result.data || []).filter((row) => {
+      if (saveRowValue(row) == null) return false;
+      return !selectedDate || saveRowDescription(row).date === selectedDate;
+    });
     renderSaveHistory();
     return saveHistoryRows;
   }
@@ -680,7 +689,8 @@
       return false;
     }
     const now = Date.now();
-    const stateKey = `${saveHistoryPrefix()}${now}:${Math.random().toString(36).slice(2, 10)}`;
+    const saveDate = activeSaveDate() || "undated";
+    const stateKey = `${saveHistoryPrefix()}${saveDate}:${now}:${Math.random().toString(36).slice(2, 10)}`;
     const row = {
       user_id: session.user.id,
       tool_id: pageConfig.toolId,
@@ -702,7 +712,10 @@
       setErrorStatus(result.error, "Save failed");
       return false;
     }
-    saveHistoryRows = [{ state_key: stateKey, data: row.data, updated_at: row.updated_at }, ...saveHistoryRows];
+    saveHistoryRows = [
+      { state_key: stateKey, data: row.data, updated_at: row.updated_at },
+      ...saveHistoryRows.filter((savedRow) => saveRowDescription(savedRow).date === saveDate),
+    ];
     renderSaveHistory();
     setState("signed-in");
     setStatus("Saved");
@@ -1154,6 +1167,11 @@
       saveHistoryListEl.hidden = !opening;
       loadListToggle.setAttribute("aria-expanded", String(opening));
       if (opening) await fetchSaveHistory();
+    });
+    document.getElementById("dateInput")?.addEventListener("change", () => {
+      saveHistoryRows = [];
+      renderSaveHistory();
+      if (pageConfig.saveHistory && session) void fetchSaveHistory();
     });
 
     root.__refresh = () => {

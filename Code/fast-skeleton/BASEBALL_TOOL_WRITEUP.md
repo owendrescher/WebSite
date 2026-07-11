@@ -30,6 +30,7 @@ The lineup overlay opens from a scoreboard card and gives a deeper game-level vi
 - Projected or confirmed batting orders.
 - Batter handedness, position, today status, recent stat badges, streak markers, hot/cold indicators, HR indicators, and matchup flags.
 - Opposing pitcher context and pitcher markers.
+- Team bullpen cards with overall and last-14-calendar-day IP, ERA, WHIP, HR/9, and K/9 plus MLB ranks for both windows. Values use `overall/14D - overall rank/14D rank`.
 - Lineup HR score buttons and prediction detail links.
 - Manual game pick and over/under controls mirrored from the scoreboard.
 - Tracked player styling in the lineup row when a player is added to the player tracker.
@@ -58,6 +59,8 @@ For pitchers, the card includes:
 - Ext. W-L, which counts whether the pitcher's club won games he started, independent of pitcher decision W-L.
 - Last-start/HR risk details and pitcher heatmap sections.
 
+Pitcher names themselves do not carry hover tooltips. Indicator badges and analytical cells may still provide their own focused explanations.
+
 ### Player Tracker
 
 The tracker lets you mark players to monitor across games. Tracked players are saved locally and synced. When a tracked player appears in the lineup view, the corresponding lineup slot gets a visual effect so the player is easier to spot.
@@ -71,7 +74,7 @@ The dashboard includes prediction surfaces and manual pick controls:
 - Manual game picks are stored separately from prediction output.
 - Picked teams get visual live result states such as leading/trailing or hit/miss.
 - Prediction pages and detail panels explain model-derived team/player views.
-- Manual game picks are included in sync state.
+- Manual game picks are included in each explicit save snapshot.
 
 ### Tossup, Near-Lock, And Lock States
 
@@ -81,7 +84,7 @@ Pregame games support a three-step manual confidence ladder:
 2. Near-lock: unlocked emoji and intermediate color.
 3. Lock: gray lock state.
 
-This uses the existing tossup and locked tossup storage sets, so it does not require a new sync key.
+This uses the existing tossup and locked tossup storage sets, and both are captured in every save snapshot.
 
 ### Over/Under Controls
 
@@ -95,17 +98,17 @@ The site uses several data layers:
 - RotoWire/projected lineup fallbacks when official lineups are incomplete.
 - Local cached schedule/game data for fast rendering.
 - Player profile and stat caches to avoid repeated network work.
-- Supabase-backed OwenTools sync for cross-device localStorage state.
+- Supabase-backed immutable save history for cross-device Save and Load.
 
 The app favors quick first paint, then hydrates heavier details in the background.
 
 ## Local Storage And Manual State
 
-The app stores both volatile data and user-authored manual state. Push/pull treats `manual-state-last-push:v1` as the save-file source of truth, while the dated keys below remain local recovery/UI stores.
+The app stores both volatile data and user-authored manual state. Local dated keys drive the active UI and provide recovery copies. Cross-device persistence uses immutable Supabase save rows rather than continuously synchronizing or merging localStorage.
 
 Important manual keys include:
 
-- `manual-state-last-push:v1`
+- `manual-save:v2:{date}:{timestamp}:{id}` (Supabase save-history row)
 - `manual-state-current:v1:{date}`
 - `manual-state-backup:v1:{date}`
 - `manual-state-mirror:v1`
@@ -122,22 +125,21 @@ Important manual keys include:
 
 Heavy schedule/cache keys such as `games:`, `games-archive:`, `analytics-day:`, and `hrs:` should not be synced.
 
-## Push/Pull Sync
+## Save And Load
 
-### What Sync Is Responsible For
+### What A Save Contains
 
-Push/pull should keep manual user state aligned across devices:
+Each save is a complete snapshot for one selected dashboard date:
 
 - Tracked players.
 - Game picks.
 - Tossup/near-lock/lock states.
 - Over/under markers.
-- Lineup/player-stat window preferences.
-- Dynamic lineup source preference.
+- The dashboard date associated with the snapshot.
 
-It should not try to sync large schedule/game caches.
+Large schedule, game, analytics, and home-run-feed caches are never included.
 
-### How Sync Is Wired
+### How Save/Load Is Wired
 
 The HTML page defines `window.OWENTOOLS_SYNC` before loading the shared sync helper:
 
@@ -145,7 +147,11 @@ The HTML page defines `window.OWENTOOLS_SYNC` before loading the shared sync hel
 window.OWENTOOLS_SYNC = {
   toolId: "baseball-dashboard",
   label: "Baseball dashboard",
+  manualOnly: true,
+  saveHistory: true,
+  saveHistoryPrefix: "manual-save:v2:",
   include: [
+    "manual-save:v2:",
     "manual-state-last-push:v1",
     "rotowire-dynamic-lineup-source:v1",
     "lineup-stat-window:v1",
@@ -160,86 +166,70 @@ Then it loads:
 <script src="../shared/owentools-sync.js?..."></script>
 ```
 
-The shared helper patches `localStorage.setItem` and `localStorage.removeItem`, queues changed included keys, uploads them to Supabase, pulls cloud state, and dispatches lifecycle events.
+The dashboard exposes `window.MLBDashboardManualSyncBridge`. Before Save, the shared helper asks the dashboard to create a snapshot from current in-memory state. The serialized snapshot is inserted directly into Supabase; localStorage is not used as the transport layer.
 
-The dashboard listens for:
+### Save Flow
 
-- `owentools:sync-before-push`
-- `owentools:sync-pulled`
-- `owentools:sync-state-changed`
+1. The user selects a dashboard date and changes manual state.
+2. The user clicks **Save**.
+3. The dashboard serializes the current tracker, picks, tossup/lock states, and over/under selections.
+4. The helper inserts a new unique `manual-save:v2:{date}:{timestamp}:{id}` row.
+5. No previous row is updated or deleted.
+6. The widget reports the save time and refreshes the history for that date.
 
-Before a push, the dashboard writes a fresh manual snapshot. After a pull or state change, the dashboard re-reads synced manual snapshots and refreshes visible UI.
+### Load Controls
 
-### Expected Push Flow
+- **Quick Load** restores the newest save for the currently selected dashboard date. The smaller italic line beneath the label shows its save time.
+- The right half of the split Load control opens every save for the currently selected date.
+- Each history entry shows its timestamp, dashboard date, and counts for picks, tracked players, tossups, and over/under selections.
+- Changing the dashboard date changes which saves are shown. Saves from other dates are not mixed into the list.
 
-1. User changes manual state, such as tracking a player or locking a game.
-2. The app writes the relevant localStorage key.
-3. The shared sync helper queues that key for upload.
-4. On manual Push, the dashboard first writes `manual-state-current:v1:{date}`.
-5. The shared helper uploads all syncable local keys for the signed-in user.
-6. The sync widget should return to `Synced`.
+### Load Flow
 
-### Expected Pull Flow
+1. The helper queries immutable `manual-save:v2:` rows for the signed-in user.
+2. It filters them to the currently selected dashboard date and sorts newest first.
+3. Quick Load chooses the first row; a history click chooses that exact row.
+4. The serialized value is passed directly to the dashboard bridge.
+5. The dashboard replaces its current in-memory manual state with the saved snapshot.
+6. It updates local recovery keys and repaints the tracker, picks, tossup/lock, and over/under UI.
+7. Loading never changes or deletes the saved row.
 
-1. User clicks Pull, or realtime/polling detects remote changes.
-2. The shared helper downloads cloud state for `tool_id = baseball-dashboard`.
-3. It writes newer or stronger cloud values into localStorage.
-4. It dispatches a sync event with changed keys.
-5. The dashboard derives the affected date or dates from those keys.
-6. The dashboard applies `manual-state-current:v1:{date}` if present, falling back to durable/mirror/backup reconciliation.
-7. Scoreboard, tracker, tossup, lock, and over/under UI refresh.
+### Save/Load Health Checklist
 
-### Sync Health Checklist
+1. Confirm the widget is signed in.
+2. Confirm the page build and shared-helper query strings are current.
+3. Confirm `saveHistory` is enabled and `manual-save:v2:` is included.
+4. Select the intended dashboard date before saving.
+5. Make a pick, Save, remove the pick, then Quick Load. The pick should return.
+6. Repeat with a tracked player, tossup/lock state, and over/under selection.
+7. Open the Load list and confirm only saves for the selected date appear.
+8. Confirm an older history entry restores that exact snapshot without removing newer saves.
 
-Use this checklist when push/pull appears disconnected:
+### Safe Rules For Future Changes
 
-1. Confirm the page has loaded `../shared/supabase-config.js`.
-2. Confirm the page has loaded `../shared/owentools-sync.js` with a fresh query string.
-3. Confirm `window.OWENTOOLS_SYNC.toolId` is exactly `baseball-dashboard`.
-4. Confirm included keys still contain all manual-state prefixes listed above.
-5. Confirm the sync widget is signed in and not showing `Sync setup`, `Sync offline`, or `Sync failed`.
-6. Make a small manual change, such as toggling a tossup state.
-7. Check localStorage for the relevant dated key and `manual-state-current:v1:{date}`.
-8. Click Push and verify the widget returns to `Synced`.
-9. On another device, click Pull or focus the tab and wait for auto-pull.
-10. Confirm the UI updates without needing a full reload.
-
-### Common Sync Failure Modes
-
-The most likely issues are:
-
-- A browser cached an old sync helper script. Fix with a query-string bump on `owentools-sync.js`.
-- The dashboard writes manual state but does not snapshot it before Push. Fix by keeping `owentools:sync-before-push` wired to `snapshotManualStateForSync()`.
-- Pull updates localStorage but the UI does not refresh. Fix by keeping `owentools:sync-state-changed` and `owentools:sync-pulled` wired to manual-state refresh.
-- A dated key changes but the dashboard refreshes only the currently selected date. Fix by deriving dates from changed keys.
-- Empty local state overwrites richer cloud state. The shared sync helper uses data weight checks to reduce this risk, but manual Push intentionally uploads local state, so avoid pushing from a stale/empty device unless that is intended.
-
-### Safe Rules For Future Sync Changes
-
-- Do not rename synced localStorage keys unless a migration is added.
-- Do not add new manual states without adding them to `window.OWENTOOLS_SYNC.include`.
-- Do not sync large schedule or game cache keys.
-- Keep `manual-state-current:v1:{date}` as the compact source of truth for manual state.
-- Keep backup/durable/mirror stores as recovery layers.
-- Before manual Push, always snapshot current in-memory state into localStorage.
-- After Pull, always apply the synced snapshot and then repaint tracker, picks, tossup/lock, and over/under UI.
-- Avoid changing sync behavior while working on unrelated visual features.
+- Never turn save-history rows back into one mutable overwrite key.
+- Never merge a loaded snapshot with newer local state; Load means replace with the chosen save.
+- Never delete an older save as a side effect of Save or Load.
+- Keep the date inside both the snapshot and new save-row key.
+- Keep local backup/durable/mirror stores only as recovery layers, not as the Supabase upload payload.
+- Add new manual fields to snapshot creation, normalization, counts, and application together.
+- Do not include large schedule or game cache data in snapshots.
 
 ## Current Relevant Files
 
-- `dashboard-live-prototype.html`: production dashboard entrypoint and sync configuration.
-- `dashboard-live-prototype-dev.html`: development dashboard entrypoint and sync configuration.
-- `live-dashboard-prototype.js`: main app logic, rendering, state, hydration, and sync event bridge.
+- `dashboard-live-prototype.html`: production dashboard entrypoint and Save/Load configuration.
+- `dashboard-live-prototype-dev.html`: development dashboard entrypoint and Save/Load configuration.
+- `live-dashboard-prototype.js`: main app logic, rendering, state, hydration, and save bridge.
 - `live-prototype.css`: scoreboard, lineup, player-card, and dashboard styling.
-- `../shared/owentools-sync.js`: shared Supabase-backed localStorage sync helper.
+- `../shared/owentools-sync.js`: shared Supabase authentication and immutable save-history helper.
 - `../shared/supabase-config.js`: Supabase URL/key configuration.
 
 ## Practical Maintenance Notes
 
-- When changing scoreboard UI, avoid touching sync keys or manual-state storage unless the change explicitly requires it.
-- When adding a new manual control, decide whether it must sync before implementing it.
+- When changing scoreboard UI, avoid touching save keys or manual-state storage unless the change explicitly requires it.
+- When adding a new manual control, decide whether it belongs in save snapshots before implementing it.
 - Prefer date-scoped keys for game-day state.
 - Keep visible UI refresh separate from localStorage writes: write state first, then repaint.
 - Use cache-busting query strings when changing JS/CSS used by the HTML entrypoints.
-- If something works only after refresh, look for a missing repaint after async hydration or sync pull.
-- If something syncs only one way, inspect the pre-push snapshot and post-pull apply paths.
+- If a loaded value appears only after refresh, inspect the snapshot application and repaint path.
+- If Save works but Load does not, inspect the immutable row value, dashboard bridge, and selected-date filter.
