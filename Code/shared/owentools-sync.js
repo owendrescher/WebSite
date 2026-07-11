@@ -524,7 +524,7 @@
     let result;
     try {
       result = await withTimeout(
-        client.from("tool_state").upsert(rows, { onConflict: "user_id,tool_id,state_key" }).select("state_key,data,updated_at"),
+        client.from("tool_state").upsert(rows, { onConflict: "user_id,tool_id,state_key" }),
         "Sync push"
       );
     } catch (error) {
@@ -532,20 +532,11 @@
       console.warn("owentools sync push timed out", error);
       return false;
     }
-    const { data: uploadedRows, error } = result;
+    const { error } = result;
     if (error) {
       setErrorStatus(error, "Sync push failed");
       console.warn("owentools sync push failed", error);
       return false;
-    }
-    const expectedManualValue = values.get("manual-state-last-push:v1");
-    if (expectedManualValue != null) {
-      const uploadedManualRow = (uploadedRows || []).find((row) => row.state_key === "manual-state-last-push:v1");
-      const uploadedManualValue = uploadedManualRow?.data?.deleted ? null : String(uploadedManualRow?.data?.value ?? "");
-      if (uploadedManualValue !== String(expectedManualValue)) {
-        setErrorStatus(new Error("The dashboard save was not confirmed by the server."), "Sync push verification failed");
-        return false;
-      }
     }
     rows.forEach((row) => markSyncedUpdated(row.state_key, now));
     pendingUploads.clear();
