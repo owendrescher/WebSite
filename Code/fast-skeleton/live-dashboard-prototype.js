@@ -18634,11 +18634,11 @@ function repaintAppliedManualState() {
   if (activeLineupGame) syncLineupGamePickState(activeLineupGame);
 }
 
-function applyPulledManualPushValue(value) {
+function applyManualSnapshotValue(value, options = {}) {
   try {
     const parsed = JSON.parse(String(value || ''));
     const snapshot = parsed?.snapshot && typeof parsed.snapshot === 'object' ? parsed.snapshot : parsed;
-    if (!String(snapshot?.pushId || parsed?.pushId || '').trim()) return false;
+    if (options.requirePushId && !String(snapshot?.pushId || parsed?.pushId || '').trim()) return false;
     if (!manualStateSnapshotHasFields(snapshot)) return false;
     const selectedDate = String(snapshot?.date || parsed?.date || '');
     if (!/^\d{4}-\d{2}-\d{2}$/.test(selectedDate)) return false;
@@ -18647,11 +18647,17 @@ function applyPulledManualPushValue(value) {
     manualStateCrossDeviceFingerprint = '';
     trackedPlayersMemoryByDate.delete(trackedPlayersStorageKey(selectedDate));
     if (!applyManualStateSnapshot(snapshot, selectedDate)) return false;
-    repaintAppliedManualState();
+    try { repaintAppliedManualState(); } catch (error) {
+      console.warn('MLB manual save loaded but UI repaint was incomplete', error);
+    }
     return true;
   } catch {
     return false;
   }
+}
+
+function applyPulledManualPushValue(value) {
+  return applyManualSnapshotValue(value, { requirePushId: true });
 }
 
 window.MLBDashboardManualSyncBridge = {
@@ -18662,7 +18668,7 @@ window.MLBDashboardManualSyncBridge = {
     return preparedManualPushValue;
   },
   applySaveValue(value) {
-    return applyPulledManualPushValue(value);
+    return applyManualSnapshotValue(value);
   },
   describeSaveValue(value) {
     try {

@@ -912,6 +912,7 @@
       .owentools-sync__title{margin:0 0 6px;font-weight:800}
       .owentools-sync__copy{margin:0 0 12px;color:#52525b}
       .owentools-sync__form{display:grid;gap:8px}
+      .owentools-sync__form[hidden],.owentools-sync__manual-row[hidden],.owentools-sync__signout[hidden],.owentools-sync__save-list[hidden]{display:none!important}
       .owentools-sync input{min-width:0;padding:9px 10px;border:1px solid #d4d4d8;border-radius:10px;font:inherit}
       .owentools-sync__actions{display:grid;grid-template-columns:1fr 1fr;gap:8px}
       .owentools-sync__form button,.owentools-sync__pull,.owentools-sync__push,.owentools-sync__save,.owentools-sync__quick-load,.owentools-sync__load-list-toggle,.owentools-sync__signout{padding:9px 10px;border:0;border-radius:10px;background:#111827;color:white;font:700 13px/1 system-ui;cursor:pointer}
