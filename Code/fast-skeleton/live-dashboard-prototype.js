@@ -18658,6 +18658,26 @@ window.MLBDashboardManualSyncBridge = {
   getPushEntries() {
     return preparedManualPushValue ? { [MANUAL_STATE_LAST_PUSH_KEY]: preparedManualPushValue } : {};
   },
+  getSaveValue() {
+    return preparedManualPushValue;
+  },
+  applySaveValue(value) {
+    return applyPulledManualPushValue(value);
+  },
+  describeSaveValue(value) {
+    try {
+      const parsed = JSON.parse(String(value || ''));
+      const snapshot = parsed?.snapshot && typeof parsed.snapshot === 'object' ? parsed.snapshot : parsed;
+      const counts = manualStateSnapshotCounts(snapshot);
+      return {
+        date: String(snapshot?.date || parsed?.date || ''),
+        counts,
+        total: Object.values(counts).reduce((sum, count) => sum + Number(count || 0), 0),
+      };
+    } catch {
+      return { date: '', counts: {}, total: 0 };
+    }
+  },
 };
 
 function refreshManualStateAfterSync(date = dateInput.value || formatDate(new Date()), changedKeys = new Set()) {

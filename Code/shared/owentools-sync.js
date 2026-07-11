@@ -38,6 +38,9 @@
   let copyEl = null;
   let recoveryMode = false;
   let manualSyncButton = null;
+  let saveHistoryListEl = null;
+  let quickLoadTimeEl = null;
+  let saveHistoryRows = [];
 
   const META_KEY = `owentools-sync-meta:${pageConfig.toolId}`;
   const AUTH_STORAGE_KEY = "owentools-auth-session";
@@ -584,6 +587,153 @@
     return changed;
   }
 
+  function saveHistoryPrefix() {
+    return String(pageConfig.saveHistoryPrefix || "manual-save:v2:");
+  }
+
+  function saveHistoryTimestamp(row = {}) {
+    const fromKey = String(row.state_key || "").slice(saveHistoryPrefix().length).split(":")[0];
+    return Date.parse(row.updated_at || "") || Number(fromKey) || 0;
+  }
+
+  function formatSaveTime(value, includeDate = true) {
+    const time = Number(value) || Date.parse(String(value || ""));
+    if (!Number.isFinite(time) || time <= 0) return "No saves yet";
+    return new Date(time).toLocaleString([], includeDate
+      ? { month: "short", day: "numeric", year: "numeric", hour: "numeric", minute: "2-digit" }
+      : { hour: "numeric", minute: "2-digit" });
+  }
+
+  function saveRowValue(row = {}) {
+    return row?.data?.deleted ? null : String(row?.data?.value ?? "");
+  }
+
+  function saveRowDescription(row = {}) {
+    return window.MLBDashboardManualSyncBridge?.describeSaveValue?.(saveRowValue(row)) || { date: "", counts: {}, total: 0 };
+  }
+
+  function renderSaveHistory() {
+    const latest = saveHistoryRows[0] || null;
+    if (quickLoadTimeEl) quickLoadTimeEl.textContent = latest ? formatSaveTime(saveHistoryTimestamp(latest)) : "No saves yet";
+    if (!saveHistoryListEl) return;
+    saveHistoryListEl.replaceChildren();
+    if (!saveHistoryRows.length) {
+      const empty = document.createElement("p");
+      empty.className = "owentools-sync__save-empty";
+      empty.textContent = "No saved snapshots yet.";
+      saveHistoryListEl.appendChild(empty);
+      return;
+    }
+    saveHistoryRows.forEach((row, index) => {
+      const description = saveRowDescription(row);
+      const counts = description.counts || {};
+      const details = [
+        counts.pendingGamePicks ? `${counts.pendingGamePicks} picks` : "",
+        counts.trackedPlayers ? `${counts.trackedPlayers} players` : "",
+        counts.tossupScoreboards || counts.lockedTossupScoreboards ? `${Number(counts.tossupScoreboards || 0) + Number(counts.lockedTossupScoreboards || 0)} tossups` : "",
+        counts.overUnderScoreboards ? `${counts.overUnderScoreboards} O/U` : "",
+      ].filter(Boolean).join(" · ") || "Empty snapshot";
+      const button = document.createElement("button");
+      button.type = "button";
+      button.className = "owentools-sync__save-item";
+      button.innerHTML = `<strong>${index === 0 ? "Latest · " : ""}${formatSaveTime(saveHistoryTimestamp(row))}</strong><small>${description.date ? `${description.date} · ` : ""}${details}</small>`;
+      button.addEventListener("click", async () => {
+        await loadSaveRow(row);
+      });
+      saveHistoryListEl.appendChild(button);
+    });
+  }
+
+  async function fetchSaveHistory() {
+    if (!client || !session) return [];
+    let result;
+    try {
+      result = await withTimeout(
+        client
+          .from("tool_state")
+          .select("state_key,data,updated_at")
+          .eq("user_id", session.user.id)
+          .eq("tool_id", pageConfig.toolId)
+          .like("state_key", `${saveHistoryPrefix()}%`)
+          .order("updated_at", { ascending: false }),
+        "Load save list"
+      );
+    } catch (error) {
+      setErrorStatus(error, "Could not load saves");
+      return saveHistoryRows;
+    }
+    if (result.error) {
+      setErrorStatus(result.error, "Could not load saves");
+      return saveHistoryRows;
+    }
+    saveHistoryRows = (result.data || []).filter((row) => saveRowValue(row) != null);
+    renderSaveHistory();
+    return saveHistoryRows;
+  }
+
+  async function saveSnapshot() {
+    if (!client || !session) return false;
+    dispatchSyncLifecycleEvent("owentools:sync-before-push", { source: "manual-save" });
+    const value = window.MLBDashboardManualSyncBridge?.getSaveValue?.();
+    if (!value) {
+      setErrorStatus(new Error("The dashboard did not produce a save snapshot."), "Save failed");
+      return false;
+    }
+    const now = Date.now();
+    const stateKey = `${saveHistoryPrefix()}${now}:${Math.random().toString(36).slice(2, 10)}`;
+    const row = {
+      user_id: session.user.id,
+      tool_id: pageConfig.toolId,
+      state_key: stateKey,
+      data: encodeValue(String(value)),
+      updated_at: new Date(now).toISOString(),
+    };
+    let result;
+    try {
+      result = await withTimeout(
+        client.from("tool_state").insert(row),
+        "Save snapshot"
+      );
+    } catch (error) {
+      setErrorStatus(error, "Save timed out");
+      return false;
+    }
+    if (result.error) {
+      setErrorStatus(result.error, "Save failed");
+      return false;
+    }
+    saveHistoryRows = [{ state_key: stateKey, data: row.data, updated_at: row.updated_at }, ...saveHistoryRows];
+    renderSaveHistory();
+    setState("signed-in");
+    setStatus("Saved");
+    if (copyEl) copyEl.textContent = `Saved ${formatSaveTime(now)}. Previous saves were kept.`;
+    return true;
+  }
+
+  async function loadSaveRow(row) {
+    if (!row) return false;
+    setStatus("Loading...");
+    const applied = Boolean(window.MLBDashboardManualSyncBridge?.applySaveValue?.(saveRowValue(row)));
+    if (!applied) {
+      setErrorStatus(new Error("This snapshot could not be read."), "Load failed");
+      return false;
+    }
+    setState("signed-in");
+    setStatus("Loaded");
+    if (copyEl) copyEl.textContent = `Loaded the save from ${formatSaveTime(saveHistoryTimestamp(row))}.`;
+    if (saveHistoryListEl) saveHistoryListEl.hidden = true;
+    return true;
+  }
+
+  async function quickLoadLatest() {
+    const rows = await fetchSaveHistory();
+    if (!rows.length) {
+      setStatus("No saves");
+      return false;
+    }
+    return loadSaveRow(rows[0]);
+  }
+
   function scheduleCloudPull(delay = 0, reason = "auto") {
     if (!client || !session || pageConfig.loginOnly) return;
     window.clearTimeout(pullTimer);
@@ -733,8 +883,17 @@
           <button class="owentools-sync__reset" type="button">Reset password</button>
         </form>
         <div class="owentools-sync__manual-row" hidden>
-          <button class="owentools-sync__pull" type="button">Pull</button>
-          <button class="owentools-sync__push" type="button">Push</button>
+          ${pageConfig.saveHistory ? `
+            <button class="owentools-sync__save" type="button">Save</button>
+            <div class="owentools-sync__load-split">
+              <button class="owentools-sync__quick-load" type="button"><span>Quick Load</span><small>No saves yet</small></button>
+              <button class="owentools-sync__load-list-toggle" type="button" aria-expanded="false">Load <span aria-hidden="true">▾</span></button>
+            </div>
+            <div class="owentools-sync__save-list" hidden></div>
+          ` : `
+            <button class="owentools-sync__pull" type="button">Pull</button>
+            <button class="owentools-sync__push" type="button">Push</button>
+          `}
         </div>
         <button class="owentools-sync__signout" type="button" hidden>Sign out</button>
       </div>
@@ -755,10 +914,21 @@
       .owentools-sync__form{display:grid;gap:8px}
       .owentools-sync input{min-width:0;padding:9px 10px;border:1px solid #d4d4d8;border-radius:10px;font:inherit}
       .owentools-sync__actions{display:grid;grid-template-columns:1fr 1fr;gap:8px}
-      .owentools-sync__form button,.owentools-sync__pull,.owentools-sync__push,.owentools-sync__signout{padding:9px 10px;border:0;border-radius:10px;background:#111827;color:white;font:700 13px/1 system-ui;cursor:pointer}
+      .owentools-sync__form button,.owentools-sync__pull,.owentools-sync__push,.owentools-sync__save,.owentools-sync__quick-load,.owentools-sync__load-list-toggle,.owentools-sync__signout{padding:9px 10px;border:0;border-radius:10px;background:#111827;color:white;font:700 13px/1 system-ui;cursor:pointer}
       .owentools-sync__signup{background:#3f3f46!important}
       .owentools-sync__reset{background:transparent!important;color:#3f3f46!important;border:1px solid #d4d4d8!important}
       .owentools-sync__manual-row{display:grid;grid-template-columns:1fr 1fr;gap:8px;margin-top:6px}
+      .owentools-sync__save{background:#0f766e!important}
+      .owentools-sync__load-split{display:grid;grid-template-columns:minmax(0,1fr) auto;border-radius:10px;overflow:hidden;background:#1d4ed8}
+      .owentools-sync__quick-load,.owentools-sync__load-list-toggle{border-radius:0!important;background:#1d4ed8!important}
+      .owentools-sync__quick-load{display:flex;min-width:0;flex-direction:column;align-items:flex-start;justify-content:center;gap:2px;text-align:left}
+      .owentools-sync__quick-load small{max-width:100%;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;font:italic 10px/1.15 system-ui;opacity:.8}
+      .owentools-sync__load-list-toggle{border-left:1px solid rgba(255,255,255,.28)!important;padding-inline:10px!important}
+      .owentools-sync__save-list{grid-column:1/-1;max-height:260px;overflow:auto;padding:5px;border:1px solid #d4d4d8;border-radius:10px;background:white}
+      .owentools-sync__save-item{display:flex;width:100%;flex-direction:column;align-items:flex-start;gap:3px;padding:9px;border:0;border-bottom:1px solid #e4e4e7;background:white;color:#18181b;text-align:left;cursor:pointer}
+      .owentools-sync__save-item:last-child{border-bottom:0}.owentools-sync__save-item:hover{background:#f4f4f5}
+      .owentools-sync__save-item strong{font:700 12px/1.25 system-ui}.owentools-sync__save-item small{font:500 10px/1.25 system-ui;color:#71717a}
+      .owentools-sync__save-empty{margin:8px;color:#71717a;font:italic 12px/1.3 system-ui}
       .owentools-sync__signout{width:100%;margin-top:6px}
       .owentools-sync__pull{background:#1d4ed8!important}
       .owentools-sync__push{background:#0f766e!important}
@@ -784,6 +954,11 @@
     manualSyncButton = root.querySelector(".owentools-sync__manual-row");
     const pullButton = root.querySelector(".owentools-sync__pull");
     const pushButton = root.querySelector(".owentools-sync__push");
+    const saveButton = root.querySelector(".owentools-sync__save");
+    const quickLoadButton = root.querySelector(".owentools-sync__quick-load");
+    const loadListToggle = root.querySelector(".owentools-sync__load-list-toggle");
+    quickLoadTimeEl = quickLoadButton?.querySelector("small") || null;
+    saveHistoryListEl = root.querySelector(".owentools-sync__save-list");
     const signOut = root.querySelector(".owentools-sync__signout");
     try {
       email.value = window.localStorage.getItem(EMAIL_STORAGE_KEY) || "";
@@ -806,6 +981,7 @@
       const next = menuEl.hidden;
       menuEl.hidden = !next;
       button.setAttribute("aria-expanded", String(next));
+      if (next && pageConfig.saveHistory && session) void fetchSaveHistory();
     });
 
     form.addEventListener("submit", async (event) => {
@@ -948,7 +1124,7 @@
       if (client) await client.auth.signOut();
     });
 
-    pullButton.addEventListener("click", async () => {
+    pullButton?.addEventListener("click", async () => {
       if (!session) return;
       setStatus("Pulling...");
       await pullRemoteState("manual-pull");
@@ -956,13 +1132,27 @@
       setStatus("Synced");
     });
 
-    pushButton.addEventListener("click", async () => {
+    pushButton?.addEventListener("click", async () => {
       if (!session) return;
       setStatus("Pushing...");
       const uploaded = await pushLocalState("manual-push");
       if (!uploaded) return;
       setState("signed-in");
       setStatus("Synced");
+    });
+    saveButton?.addEventListener("click", async () => {
+      setStatus("Saving...");
+      await saveSnapshot();
+    });
+    quickLoadButton?.addEventListener("click", async () => {
+      await quickLoadLatest();
+    });
+    loadListToggle?.addEventListener("click", async () => {
+      if (!saveHistoryListEl) return;
+      const opening = saveHistoryListEl.hidden;
+      saveHistoryListEl.hidden = !opening;
+      loadListToggle.setAttribute("aria-expanded", String(opening));
+      if (opening) await fetchSaveHistory();
     });
 
     root.__refresh = () => {

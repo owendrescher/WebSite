@@ -677,7 +677,10 @@
         toolId: "baseball-dashboard",
         label: "Baseball dashboard",
         manualOnly: true,
+        saveHistory: true,
+        saveHistoryPrefix: "manual-save:v2:",
         include: [
+          "manual-save:v2:",
           "manual-state-last-push:v1",
           "rotowire-dynamic-lineup-source:v1",
           "lineup-stat-window:v1",
@@ -685,10 +688,10 @@
         ]
       };
     </script>
-    <script src="../shared/owentools-sync.js?v=20260711directSync2"></script>
+    <script src="../shared/owentools-sync.js?v=20260711saveLoad1"></script>
     <script src="rotowire-default-lineups.js?v=20260708rotowireFallback1"></script>
     <script src="mlb-contracts-data.js?v=20260708liveSearchFix1"></script>
-    <script>window.MLB_DASHBOARD_BUILD_ID="20260711-direct-sync2";</script>
-    <script src="live-dashboard-prototype.js?v=20260711directSync2"></script>
+    <script>window.MLB_DASHBOARD_BUILD_ID="20260711-save-load1";</script>
+    <script src="live-dashboard-prototype.js?v=20260711saveLoad1"></script>
   </body>
 </html>
