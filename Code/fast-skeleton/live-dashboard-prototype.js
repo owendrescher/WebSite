@@ -18371,6 +18371,7 @@ function normalizeManualGameStateForGames(games = latestRenderedGames, date = da
 }
 
 let manualStateCrossDeviceFingerprint = '';
+let preparedManualPushValue = '';
 
 function hasOwnManualStateField(source = {}, key = '') {
   return Boolean(source && Object.prototype.hasOwnProperty.call(source, key));
@@ -18606,6 +18607,12 @@ function snapshotManualStateForSync(date = dateInput.value || formatDate(new Dat
     if (tracked.length) saveTrackedPlayers(tracked, selectedDate);
   }
   const snapshot = writeManualStateLastPushSnapshot(writeManualStateSyncSnapshot(selectedDate), selectedDate);
+  preparedManualPushValue = JSON.stringify({
+    date: selectedDate,
+    updatedAt: Number(snapshot?.updatedAt) || Date.now(),
+    pushId: String(snapshot?.pushId || ''),
+    snapshot,
+  });
   try {
     console.info('MLB manual sync push snapshot', {
       date: selectedDate,
@@ -18613,7 +18620,45 @@ function snapshotManualStateForSync(date = dateInput.value || formatDate(new Dat
       snapshot,
     });
   } catch {}
+  return snapshot;
 }
+
+function repaintAppliedManualState() {
+  if (playerTrackerListEl) playerTrackerListEl.dataset.renderFingerprint = '';
+  renderPlayerTrackerList(latestRenderedGames);
+  refreshLineupTrackedPlayerHighlights();
+  renderPendingGamePicks(latestRenderedGames);
+  syncAllCardGamePickStates(latestRenderedGames);
+  syncTossupScoreboardStates(latestRenderedGames);
+  syncOverUnderScoreboardStates(latestRenderedGames);
+  if (activeLineupGame) syncLineupGamePickState(activeLineupGame);
+}
+
+function applyPulledManualPushValue(value) {
+  try {
+    const parsed = JSON.parse(String(value || ''));
+    const snapshot = parsed?.snapshot && typeof parsed.snapshot === 'object' ? parsed.snapshot : parsed;
+    if (!String(snapshot?.pushId || parsed?.pushId || '').trim()) return false;
+    if (!manualStateSnapshotHasFields(snapshot)) return false;
+    const selectedDate = String(snapshot?.date || parsed?.date || '');
+    if (!/^\d{4}-\d{2}-\d{2}$/.test(selectedDate)) return false;
+    try { localStorage.setItem(MANUAL_STATE_LAST_PUSH_KEY, String(value)); } catch {}
+    manualStateInMemoryDate = '';
+    manualStateCrossDeviceFingerprint = '';
+    trackedPlayersMemoryByDate.delete(trackedPlayersStorageKey(selectedDate));
+    if (!applyManualStateSnapshot(snapshot, selectedDate)) return false;
+    repaintAppliedManualState();
+    return true;
+  } catch {
+    return false;
+  }
+}
+
+window.MLBDashboardManualSyncBridge = {
+  getPushEntries() {
+    return preparedManualPushValue ? { [MANUAL_STATE_LAST_PUSH_KEY]: preparedManualPushValue } : {};
+  },
+};
 
 function refreshManualStateAfterSync(date = dateInput.value || formatDate(new Date()), changedKeys = new Set()) {
   const selectedDate = String(date || dateInput.value || formatDate(new Date()));
@@ -18633,14 +18678,7 @@ function refreshManualStateAfterSync(date = dateInput.value || formatDate(new Da
       forceEmpty: !pulledTrackedPlayers.length,
     });
   }
-  if (playerTrackerListEl) playerTrackerListEl.dataset.renderFingerprint = '';
-  renderPlayerTrackerList(latestRenderedGames);
-  refreshLineupTrackedPlayerHighlights();
-  renderPendingGamePicks(latestRenderedGames);
-  syncAllCardGamePickStates(latestRenderedGames);
-  syncTossupScoreboardStates(latestRenderedGames);
-  syncOverUnderScoreboardStates(latestRenderedGames);
-  if (activeLineupGame) syncLineupGamePickState(activeLineupGame);
+  repaintAppliedManualState();
 }
 
 function syncChangedManualStateDates(keys = new Set(), fallbackDate = dateInput.value || formatDate(new Date())) {
@@ -18673,7 +18711,8 @@ function initOwenToolsSoftSyncRefresh() {
   window.addEventListener('owentools:sync-pulled', (event) => {
     const keys = new Set(listify(event?.detail?.changedKeys).map((key) => String(key || '')));
     if (event?.detail?.source === 'manual-pull') keys.add(MANUAL_STATE_LAST_PUSH_KEY);
-    refreshManualStateDatesAfterSync(keys);
+    const pulledManualValue = event?.detail?.pulledValues?.[MANUAL_STATE_LAST_PUSH_KEY];
+    if (!applyPulledManualPushValue(pulledManualValue)) refreshManualStateDatesAfterSync(keys);
   });
   window.addEventListener('owentools:sync-state-changed', (event) => {
     const selectedDate = dateInput.value || formatDate(new Date());
@@ -19047,24 +19086,27 @@ function statLogSplitGamePk(split) {
 
 function filteredRecentHistorySplits(splits = [], game = null) {
   const selectedDate = dateInput.value || formatDate(new Date());
-  const currentDate = calendarDateOnly(game?.officialDate || game?.gameDate || selectedDate, selectedDate);
   const eligible = listify(splits)
     .filter((split) => split?.date && String(split.date) <= String(selectedDate))
-    .sort((a, b) => String(b.date || '').localeCompare(String(a.date || '')));
-  if (currentDate) {
-    return eligible.filter((split) => String(split?.date || '') < currentDate);
-  }
-  if (!gameIsLiveForRecentHistory(game)) return eligible;
+    .filter((split) => {
+      const stat = split?.stat || {};
+      return statNumber(stat.gamesPlayed) > 0
+        || statNumber(stat.plateAppearances) > 0
+        || statNumber(stat.atBats) > 0
+        || statNumber(stat.baseOnBalls ?? stat.walks) > 0
+        || statNumber(stat.hitByPitch) > 0
+        || statNumber(stat.sacFlies ?? stat.sacrificeFlies) > 0
+        || statNumber(stat.sacBunts ?? stat.sacrificeBunts) > 0;
+    })
+    .sort((a, b) => {
+      const dateOrder = String(b.date || '').localeCompare(String(a.date || ''));
+      if (dateOrder) return dateOrder;
+      return (statLogSplitGamePk(b) || 0) - (statLogSplitGamePk(a) || 0);
+    });
   const currentGamePk = Number(game?.gamePk);
-  let skippedSameDayFallback = false;
   return eligible.filter((split) => {
-    if (String(split?.date || '') !== currentDate) return true;
     const splitGamePk = statLogSplitGamePk(split);
     if (Number.isFinite(currentGamePk) && Number.isFinite(splitGamePk) && splitGamePk === currentGamePk) return false;
-    if (!skippedSameDayFallback) {
-      skippedSameDayFallback = true;
-      return false;
-    }
     return true;
   });
 }

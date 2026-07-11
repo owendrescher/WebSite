@@ -30,6 +30,7 @@
   let pullInFlight = false;
   let lastPullAt = 0;
   let lastPullChangedKeys = [];
+  let lastPulledValues = {};
   let realtimeChannel = null;
   let autoPullStarted = false;
   let statusEl = null;
@@ -423,7 +424,6 @@
       console.warn("owentools sync upload failed", error);
       return false;
     }
-
     setStatus("Synced");
     return true;
   }
@@ -457,6 +457,7 @@
 
     let changed = false;
     const changedKeys = [];
+    const pulledValues = {};
     const rows = data || [];
     const deniedCloudKeys = rows
       .map((row) => row.state_key)
@@ -477,6 +478,7 @@
       const key = row.state_key;
       if (!shouldSyncKey(key)) return;
       const value = row.data?.deleted ? null : String(row.data?.value ?? "");
+      pulledValues[key] = value;
       const localValue = readLocalValue(key);
       const cloudTime = Date.parse(row.updated_at || "") || 0;
       const localTime = localUpdatedAt(key);
@@ -493,7 +495,7 @@
         changedKeys.push(key);
       }
     });
-    return { ok: true, changed, changedKeys };
+    return { ok: true, changed, changedKeys, pulledValues };
   }
 
   async function uploadLocalState() {
@@ -506,18 +508,23 @@
   async function forceUploadLocalState() {
     if (!client || !session || pageConfig.loginOnly) return true;
     const now = new Date().toISOString();
-    const rows = listSyncableLocalKeys().map((key) => ({
+    const values = new Map(listSyncableLocalKeys().map((key) => [key, readLocalValue(key)]));
+    const bridgeEntries = window.MLBDashboardManualSyncBridge?.getPushEntries?.() || {};
+    Object.entries(bridgeEntries).forEach(([key, value]) => {
+      if (shouldSyncKey(key)) values.set(key, value == null ? null : String(value));
+    });
+    const rows = Array.from(values.entries()).map(([key, value]) => ({
       user_id: session.user.id,
       tool_id: pageConfig.toolId,
       state_key: key,
-      data: encodeValue(readLocalValue(key)),
+      data: encodeValue(value),
       updated_at: now
     }));
     if (!rows.length) return true;
     let result;
     try {
       result = await withTimeout(
-        client.from("tool_state").upsert(rows, { onConflict: "user_id,tool_id,state_key" }),
+        client.from("tool_state").upsert(rows, { onConflict: "user_id,tool_id,state_key" }).select("state_key,data,updated_at"),
         "Sync push"
       );
     } catch (error) {
@@ -525,11 +532,20 @@
       console.warn("owentools sync push timed out", error);
       return false;
     }
-    const { error } = result;
+    const { data: uploadedRows, error } = result;
     if (error) {
       setErrorStatus(error, "Sync push failed");
       console.warn("owentools sync push failed", error);
       return false;
+    }
+    const expectedManualValue = values.get("manual-state-last-push:v1");
+    if (expectedManualValue != null) {
+      const uploadedManualRow = (uploadedRows || []).find((row) => row.state_key === "manual-state-last-push:v1");
+      const uploadedManualValue = uploadedManualRow?.data?.deleted ? null : String(uploadedManualRow?.data?.value ?? "");
+      if (uploadedManualValue !== String(expectedManualValue)) {
+        setErrorStatus(new Error("The dashboard save was not confirmed by the server."), "Sync push verification failed");
+        return false;
+      }
     }
     rows.forEach((row) => markSyncedUpdated(row.state_key, now));
     pendingUploads.clear();
@@ -551,6 +567,7 @@
       const download = await loadCloudState({ forceCloud: reason === "manual-pull" });
       if (!download.ok) return false;
       lastPullChangedKeys = download.changedKeys || [];
+      lastPulledValues = download.pulledValues || {};
       lastPullAt = Date.now();
       if (download.changed) dispatchSyncStateChanged({ changedKeys: download.changedKeys || [], source: reason });
       if (session) {
@@ -565,11 +582,13 @@
 
   async function pullRemoteState(reason = "manual-pull") {
     lastPullChangedKeys = [];
+    lastPulledValues = {};
     const changed = await pullCloudState(reason);
     dispatchSyncLifecycleEvent("owentools:sync-pulled", {
       source: reason,
       changed: Boolean(changed),
-      changedKeys: [...lastPullChangedKeys]
+      changedKeys: [...lastPullChangedKeys],
+      pulledValues: { ...lastPulledValues }
     });
     return changed;
   }
