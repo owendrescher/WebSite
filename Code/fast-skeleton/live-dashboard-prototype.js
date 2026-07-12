@@ -129,6 +129,7 @@ const betOddsEl = document.getElementById('betOdds');
 const betAmountEl = document.getElementById('betAmount');
 const betListEl = document.getElementById('betList');
 const playerTrackerListEl = document.getElementById('playerTrackerList');
+const playerTrackerCollapseBtnEl = document.getElementById('playerTrackerCollapseBtn');
 const playerTrackerCountsEl = document.getElementById('playerTrackerCounts');
 const betInputPanelEl = document.getElementById('betInputPanel');
 const betDayLabelEl = document.getElementById('betDayLabel');
@@ -148,7 +149,7 @@ const gamePickDialogDismissBtnEl = document.getElementById('gamePickDialogDismis
 const gamePickDialogSaveBtnEl = document.getElementById('gamePickDialogSaveBtn');
 const hrListEl = document.getElementById('hrList');
 const hrSortToggleBtnEl = document.getElementById('hrSortToggleBtn');
-const hrGradeToggleBtnEl = document.getElementById('hrGradeToggleBtn');
+const hrCollapseBtnEl = document.getElementById('hrCollapseBtn');
 const hrRatingDialogEl = document.getElementById('hrRatingDialog');
 
 const lineupUrlParams = new URLSearchParams(window.location.search);
@@ -2335,7 +2336,7 @@ function savePlayerStatSeasonRecentDays(value) {
 }
 
 function syncPlayerStatRecentToggle() {
-  playerStatMatchupEl?.querySelectorAll?.('.player-recent-window-toggle').forEach((button) => {
+  playerStatMatchupEl?.querySelectorAll?.('.player-recent-window-toggle:not([data-player-season-recent-toggle])').forEach((button) => {
     button.textContent = `L${playerStatRecentGameWindow}`;
     button.setAttribute('aria-pressed', playerStatRecentGameWindow === 10 ? 'true' : 'false');
     button.title = `Showing last ${playerStatRecentGameWindow} game stats`;
@@ -2344,9 +2345,8 @@ function syncPlayerStatRecentToggle() {
 
 function playerStatSeasonRecentHeadingHtml(days = playerStatSeasonRecentDays) {
   const normalized = normalizePlayerStatSeasonRecentDays(days);
-  const other = nextPlayerStatSeasonRecentDays(normalized);
   return {
-    html: `<button class="player-recent-window-toggle player-season-recent-toggle" type="button" data-player-season-recent-toggle aria-pressed="${normalized !== 14 ? 'true' : 'false'}" title="Showing last ${normalized} days. Click for last ${other} days.">${normalized}D</button>`,
+    html: `<button class="player-recent-window-toggle player-season-recent-toggle" type="button" data-player-season-recent-toggle aria-pressed="${normalized !== 14 ? 'true' : 'false'}" aria-label="Recent stat window: ${normalized} days">${normalized}D</button>`,
     text: `Last ${normalized}D`,
   };
 }
@@ -15213,7 +15213,17 @@ function isAdministrativePlayText(value = '') {
 }
 
 function latestBaseballPlayEvent(play = null) {
-  const events = Array.isArray(play?.playEvents) ? play.playEvents : [];
+  const events = (Array.isArray(play?.playEvents) ? play.playEvents : [])
+    .map((event, sourceIndex) => ({ event, sourceIndex }))
+    .sort((a, b) => {
+      const aIndex = Number(a.event?.index);
+      const bIndex = Number(b.event?.index);
+      if (Number.isFinite(aIndex) && Number.isFinite(bIndex) && aIndex !== bIndex) return aIndex - bIndex;
+      const aTime = Date.parse(a.event?.endTime || a.event?.startTime || '') || 0;
+      const bTime = Date.parse(b.event?.endTime || b.event?.startTime || '') || 0;
+      return aTime - bTime || a.sourceIndex - b.sourceIndex;
+    })
+    .map(({ event }) => event);
   for (const event of [...events].reverse()) {
     const text = cleanPlayText(event?.details?.description || event?.details?.event || event?.type || '');
     if (!text || isAdministrativePlayText(text)) continue;
@@ -23273,6 +23283,7 @@ function renderPlayerTrackerList(games = latestRenderedGames) {
       <button class="player-track-drag" type="button" draggable="true" data-player-track-drag="${playerId}" aria-label="Drag to reorder tracked player">||</button>
       <img class="player-track-face" src="${playerHeadshotUrl(playerId)}" alt="${escapeHtml(playerName)} headshot" />
       <div class="player-track-copy">
+        <div class="player-track-compact-line"><strong>${escapeHtml(lastName(playerName))}</strong><span>${escapeHtml(todayLine)}</span></div>
         <strong>${escapeHtml(playerName)}</strong>
         <div class="player-track-meta">
           <span>${escapeHtml([displayTeamAbbrev(teamAbbrev), position].filter(Boolean).join(' | '))}</span>
@@ -25369,7 +25380,6 @@ function renderHomeRunFeed(homeRuns, options = {}) {
   const hasVisibleHrItems = homeRunFeedHasVisibleItems();
   if (explicitEmptyInput && hasVisibleHrItems && !options.forceClear && !latestRenderedHomeRuns.length) return;
   if (hrSortToggleBtnEl) hrSortToggleBtnEl.textContent = currentHomeRunSortLabel();
-  if (hrGradeToggleBtnEl) hrGradeToggleBtnEl.textContent = homeRunRatingDisplayMode === 'letter' ? 'letter' : 'number';
   const list = options.forceClear ? [] : mergeHomeRunFeedItems([], currentHomeRunFeedItems(homeRuns));
   const seen = new Set();
   const hadHrItems = Boolean(hrListEl.querySelector('.hr-item[data-hr-key]'));
@@ -25384,6 +25394,7 @@ function renderHomeRunFeed(homeRuns, options = {}) {
       item.dataset.hrKey = key;
       item.innerHTML = `
         <img class="hr-logo" src="placeholder.png" alt="team" />
+        <div class="hr-compact-line"></div>
         <div class="hr-copy">
           <div class="hr-name"></div>
           <div class="hr-meta"></div>
@@ -25463,6 +25474,15 @@ function renderHomeRunFeed(homeRuns, options = {}) {
         hr.pitchDetailLine || '',
       ].filter(Boolean);
       metaEl.textContent = lines.join('\n');
+    }
+    const compactEl = item.querySelector('.hr-compact-line');
+    if (compactEl) {
+      const detail = [
+        hr.hrNo ? `${ordinalNumber(hr.hrNo)} HR` : 'HR',
+        hr.distance ? `${hr.distance} ft` : '',
+        hr.inningText || '',
+      ].filter(Boolean).join(' · ');
+      compactEl.innerHTML = `<strong class="hr-compact-player" style="color:${escapeHtml(hr.teamColor || '#dbebff')}">${escapeHtml(lastName(hr.batter || 'Unknown'))}</strong><span class="hr-compact-detail"> · ${escapeHtml(detail)}</span>`;
     }
     const ratingEl = item.querySelector('.hr-rating');
     if (ratingEl) {
@@ -36344,6 +36364,38 @@ async function hydrateBullpenSummaryRanks(containerEl, teamCode, relievers = [],
   renderBullpenSummary(containerEl, relievers, color, ranks, rankData, recentValues, recentRanks);
 }
 
+function initTrackerRailControls() {
+  const rail = document.querySelector('.dashboard-rail');
+  const playerPanel = document.getElementById('betDisplay');
+  const hrPanel = document.getElementById('hrDisplay');
+  if (!rail || !playerPanel || !hrPanel) return;
+  const read = (key) => {
+    try { return localStorage.getItem(key) === '1'; } catch { return false; }
+  };
+  const write = (key, value) => {
+    try { localStorage.setItem(key, value ? '1' : '0'); } catch {}
+  };
+  const setCompact = (panel, button, compact, key) => {
+    panel.classList.toggle('is-compact', compact);
+    if (button) {
+      button.textContent = compact ? 'expand' : 'compact';
+      button.setAttribute('aria-pressed', compact ? 'true' : 'false');
+    }
+    write(key, compact);
+  };
+  setCompact(playerPanel, playerTrackerCollapseBtnEl, read('dashboard-player-tracker-compact:v1'), 'dashboard-player-tracker-compact:v1');
+  setCompact(hrPanel, hrCollapseBtnEl, read('dashboard-hr-feed-compact:v1'), 'dashboard-hr-feed-compact:v1');
+  if (read('dashboard-rail-hr-first:v1')) rail.insertBefore(hrPanel, playerPanel);
+  playerTrackerCollapseBtnEl?.addEventListener('click', () => setCompact(playerPanel, playerTrackerCollapseBtnEl, !playerPanel.classList.contains('is-compact'), 'dashboard-player-tracker-compact:v1'));
+  hrCollapseBtnEl?.addEventListener('click', () => setCompact(hrPanel, hrCollapseBtnEl, !hrPanel.classList.contains('is-compact'), 'dashboard-hr-feed-compact:v1'));
+  rail.querySelectorAll('[data-rail-swap]').forEach((button) => button.addEventListener('click', () => {
+    const hrFirst = hrPanel.compareDocumentPosition(playerPanel) & Node.DOCUMENT_POSITION_FOLLOWING;
+    if (hrFirst) rail.insertBefore(playerPanel, hrPanel);
+    else rail.insertBefore(hrPanel, playerPanel);
+    write('dashboard-rail-hr-first:v1', !hrFirst);
+  }));
+}
+
 function formatBullpenRankValue(value, rank) {
   const numericRank = Number(rank);
   return Number.isFinite(numericRank) && numericRank > 0 ? `${value} - ${numericRank}` : value;
@@ -47165,10 +47217,6 @@ function initLineupOverlay() {
         : 'latest';
     refreshHomeRunFeedAfterControlChange();
   });
-  hrGradeToggleBtnEl?.addEventListener('click', () => {
-    homeRunRatingDisplayMode = homeRunRatingDisplayMode === 'letter' ? 'number' : 'letter';
-    refreshHomeRunFeedAfterControlChange();
-  });
   lineupOverlayEl.addEventListener('contextmenu', (e) => {
     handleLineupPregameTossupToggle(e, -1);
   });
@@ -49229,6 +49277,7 @@ async function finalizeRenderedGames(cards, homeRuns = [], options = {}) {
     });
   } else {
     updateHomeRunFeedIfChanged(homeRuns, { date: selectedDate, allowEmpty: false });
+    renderPlayerTrackerList(dedupedCards);
   }
   syncAllCardGamePickStates(dedupedCards);
   syncTossupScoreboardStates(dedupedCards);
@@ -49961,6 +50010,7 @@ initScoreboardLineupShortcuts();
 initMovables();
 initBetInput();
 initPanelScrollPerformance();
+initTrackerRailControls();
 initHomeRunAudioUnlock();
 initLeadersControls();
 initTeamStatsTableSorting();
@@ -50074,7 +50124,7 @@ function scoreboardAutoRefreshStaleMs() {
   if (loadGamesInFlight) return 10000;
   if (scoreboardHydrationIncomplete()) return 8000;
   const hasLiveGame = scoreboardHasLiveGameForAutoRefresh() || liveLineupOverlayNeedsAutoRefresh();
-  if (hasLiveGame) return 8000;
+  if (hasLiveGame) return 3000;
   if (scoreboardHasTodayRefreshCandidate()) return scoreboardTodayRefreshWindowMs();
   return 5 * 60_000;
 }

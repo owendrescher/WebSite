@@ -67,6 +67,19 @@ The tracker lets you mark players to monitor across games. Tracked players are s
 
 Tracked player state is date-scoped and backed up through multiple manual-state stores.
 
+The Player Tracker and Home Run Feed can be swapped vertically with either **SWAP** control. Each panel also has a persisted **compact** mode. Both compact feeds use the same 48px row height. Compact player rows show a small inline portrait with a slight inset so the face remains prominent, the player's last name in its existing team/status color, live daily statline, and a right-aligned remove button. Compact home-run rows show the team logo, a team-colored player last name, season HR number, footage, and inning. The Home Run Rating display is fixed to letter grades and no longer exposes a style toggle. The former tracker count indicators and bulk Clear Tracker button are intentionally hidden; players are removed individually. These display preferences are local UI settings and are not part of manual save snapshots.
+
+The player-card recent-days selector is intentionally trim and has an accessibility label without a hover tooltip.
+
+Player tracker statlines repaint during passive live-game refreshes; a full page refresh is not required.
+
+### Live Refresh And Event Ordering
+
+- Active games poll approximately every 3 seconds while the page is visible.
+- Passive refreshes repaint scoreboards, the player tracker, and the home-run feed.
+- Pitch events retain MLB's chronological event index/time ordering so ball, strike, in-play, and completed-play calls advance in sequence.
+- Administrative events such as game advisories, mound visits, reviews, and status changes remain in chronological source data but are excluded from the transient baseball-event flash, preventing an old advisory from repeatedly presenting as the newest play.
+
 ### Predictions And Picks
 
 The dashboard includes prediction surfaces and manual pick controls:

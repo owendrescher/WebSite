@@ -6891,3 +6891,92 @@ body.dashboard-page .player-velo-bucket-summary-grid b.is-active {
   outline: 1px solid color-mix(in srgb, var(--accent) 62%, rgba(255, 255, 255, 0.32));
   background: color-mix(in srgb, var(--accent) 22%, rgba(0, 0, 0, 0.2));
 }
+.player-track-compact-line, .hr-compact-line { display: none; }
+#betDisplay.is-compact .player-track-item, #hrDisplay.is-compact .hr-item {
+  height: 48px;
+  min-height: 48px;
+  padding: 5px 8px;
+  gap: 7px;
+  box-sizing: border-box;
+}
+#betDisplay.is-compact .player-track-drag,
+#betDisplay.is-compact .player-track-copy > strong, #betDisplay.is-compact .player-track-meta,
+#betDisplay.is-compact .player-track-line, #hrDisplay.is-compact .hr-copy,
+#hrDisplay.is-compact .hr-rating { display: none !important; }
+#betDisplay.is-compact .player-track-copy { min-width: 0; flex: 1; }
+#betDisplay.is-compact .player-track-compact-line, #hrDisplay.is-compact .hr-compact-line {
+  display: flex; align-items: center; gap: 8px; min-width: 0; white-space: nowrap; overflow: hidden; text-overflow: ellipsis;
+}
+#betDisplay.is-compact .player-track-compact-line span, #hrDisplay.is-compact .hr-compact-line { overflow: hidden; text-overflow: ellipsis; }
+#hrDisplay.is-compact .hr-logo { width: 22px; height: 22px; object-fit: contain; flex: 0 0 22px; }
+
+/* Compact tracker refinements: keep the existing panel treatment while making
+   the reduced rows easier to scan. */
+#betDisplay .player-tracker-summary-header,
+#betDisplay #clearBetsBtn {
+  display: none !important;
+}
+
+#betDisplay.is-compact .player-track-item {
+  display: flex;
+  width: 100%;
+  align-items: center;
+}
+
+#betDisplay.is-compact .player-track-copy,
+#betDisplay.is-compact .player-track-compact-line {
+  width: 100%;
+}
+
+#betDisplay.is-compact .player-track-remove {
+  margin-left: auto;
+  flex: 0 0 auto;
+}
+
+#betDisplay.is-compact .player-track-face {
+  display: block;
+  width: 32px;
+  height: 32px;
+  flex: 0 0 32px;
+  padding: 1px;
+  box-sizing: border-box;
+  border-radius: 50%;
+  object-fit: cover;
+  object-position: center;
+  background: rgba(var(--tracker-team-rgb, 102, 217, 255), 0.12);
+}
+
+#hrDisplay.is-compact .hr-compact-line {
+  flex: 1 1 auto;
+  font-size: 0.78rem;
+  font-weight: 850;
+  line-height: 1.2;
+  letter-spacing: 0.01em;
+}
+
+#hrDisplay.is-compact .hr-compact-player {
+  flex: 0 0 auto;
+  font: inherit;
+  font-weight: 900;
+  text-shadow: 0 1px 8px rgba(0,0,0,0.35);
+}
+
+#hrDisplay.is-compact .hr-compact-detail {
+  min-width: 0;
+  overflow: hidden;
+  color: var(--text);
+  text-overflow: ellipsis;
+}
+
+#hrDisplay.is-compact .hr-item {
+  display: grid;
+  grid-template-columns: 30px minmax(0, 1fr);
+  align-items: center;
+}
+
+#hrDisplay.is-compact .hr-logo {
+  width: 28px;
+  height: 28px;
+  margin: 0;
+  flex-basis: 28px;
+}

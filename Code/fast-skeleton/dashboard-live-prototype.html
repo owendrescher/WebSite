@@ -17,9 +17,9 @@
     <meta name="twitter:description" content="Live MLB scoreboard, lineups, pitcher trends, hot players, and betting stat tools." />
     <link rel="icon" type="image/png" href="baseball.png" />
     <link rel="apple-touch-icon" href="baseball.png" />
-    <link rel="stylesheet" href="styles.css?v=20260708globalSearchContracts5" />
+    <link rel="stylesheet" href="styles.css?v=20260712playerRecentTrim1" />
     <link rel="stylesheet" href="dashboard.css?v=20260711bullpen14d1" />
-    <link rel="stylesheet" href="live-prototype.css?v=20260710pitcherRiskTeamLine" />
+    <link rel="stylesheet" href="live-prototype.css?v=20260712hrNameColor1" />
   </head>
   <body class="dashboard-page" data-dashboard-page="scoreboard">
 
@@ -509,6 +509,8 @@
               <button id="betLogTabBtn" class="panel-tab-btn" type="button" hidden>BET LOG</button>
             </div>
             <div class="panel-header-actions">
+              <button class="hint panel-sort-toggle rail-swap-btn" type="button" data-rail-swap aria-label="Swap player tracker and home run feed order">SWAP</button>
+              <button id="playerTrackerCollapseBtn" class="hint panel-sort-toggle" type="button" aria-pressed="false">compact</button>
               <span class="hint">DAY: <span id="betDayLabel"></span></span>
               <button id="playerTrackerSortBtn" class="hint panel-sort-toggle" type="button">time added</button>
               <button id="playerTrackerCopyBtn" class="panel-action-btn" type="button">COPY</button>
@@ -590,8 +592,9 @@
           <header class="panel-header">
             <strong>HOME RUN FEED</strong>
             <div class="panel-header-actions">
+              <button class="hint panel-sort-toggle rail-swap-btn" type="button" data-rail-swap aria-label="Swap player tracker and home run feed order">SWAP</button>
+              <button id="hrCollapseBtn" class="hint panel-sort-toggle" type="button" aria-pressed="false">compact</button>
               <button id="hrSortToggleBtn" class="hint panel-sort-toggle" type="button">latest first</button>
-              <button id="hrGradeToggleBtn" class="hint panel-sort-toggle" type="button">letter</button>
             </div>
           </header>
           <section id="hrList" class="panel-list"></section>
@@ -688,9 +691,9 @@
       };
     </script>
     <script src="../shared/owentools-sync.js?v=20260711saveLoad3"></script>
-    <script src="rotowire-default-lineups.js?v=20260708rotowireFallback1"></script>
+    <script src="rotowire-default-lineups.js?v=20260712rotowireFallback2"></script>
     <script src="mlb-contracts-data.js?v=20260708liveSearchFix1"></script>
     <script>window.MLB_DASHBOARD_BUILD_ID="20260711-tooltip-cleanup2";</script>
-    <script src="live-dashboard-prototype.js?v=20260711tooltipCleanup2"></script>
+    <script src="live-dashboard-prototype.js?v=20260712hrNameColor1"></script>
   </body>
 </html>

@@ -4895,6 +4895,15 @@ body[data-overlay-dock='bottom'] .player-stat-overlay {
     color-mix(in srgb, var(--accent) 48%, var(--badge-bg) 52%);
 }
 
+.player-season-recent-toggle {
+  min-width: 27px;
+  min-height: 19px;
+  padding: 1px 5px;
+  border-radius: 5px;
+  box-shadow: inset 0 1px 0 rgba(255,255,255,0.1);
+  font-size: 0.62rem;
+}
+
 .player-recent-window-toggle:hover,
 .player-recent-window-toggle:focus-visible {
   border-color: color-mix(in srgb, var(--accent) 84%, white 14%);
