@@ -766,6 +766,24 @@ h3 {
   margin-left: auto;
 }
 
+.choice-type-toggle {
+  display: inline-flex;
+  gap: 4px;
+  padding: 3px;
+  border-radius: 12px;
+  background: rgba(53, 107, 140, 0.1);
+}
+
+.choice-type-toggle .button {
+  min-height: 34px;
+  padding: 6px 10px;
+}
+
+.choice-type-toggle .button.is-active {
+  background: var(--teal);
+  color: #fff;
+}
+
 .choice-layout {
   display: grid;
   grid-template-columns: minmax(0, 1.15fr) minmax(300px, 0.85fr);
@@ -835,6 +853,21 @@ h3 {
   text-align: left;
   cursor: pointer;
   transition: transform 140ms ease, box-shadow 140ms ease, border-color 140ms ease, background 140ms ease;
+  position: relative;
+}
+
+.choice-key {
+  position: absolute;
+  top: 7px;
+  right: 9px;
+  display: grid;
+  width: 22px;
+  height: 22px;
+  place-items: center;
+  border-radius: 7px;
+  background: rgba(53, 107, 140, 0.1);
+  color: var(--teal);
+  font: 700 0.75rem/1 system-ui, sans-serif;
 }
 
 .choice-option:hover:not(:disabled) {

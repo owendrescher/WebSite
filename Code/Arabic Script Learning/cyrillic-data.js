@@ -35,6 +35,43 @@
     ya: ["Draw the left vertical stroke.", "Build the upper bowl on the right.", "Finish with the diagonal leg down to the right."]
   };
 
+  const cyrillicWords = [
+    ["привет", "privet", "hello"], ["спасибо", "spasibo", "thank you"], ["да", "da", "yes"],
+    ["нет", "net", "no"], ["человек", "chelovek", "person"], ["мужчина", "muzhchina", "man"],
+    ["женщина", "zhenshchina", "woman"], ["ребёнок", "rebyonok", "child"], ["семья", "semya", "family"],
+    ["мать", "mat'", "mother"], ["отец", "otets", "father"], ["брат", "brat", "brother"],
+    ["сестра", "sestra", "sister"], ["друг", "drug", "friend"], ["имя", "imya", "name"],
+    ["дом", "dom", "house"], ["комната", "komnata", "room"], ["дверь", "dver'", "door"],
+    ["окно", "okno", "window"], ["школа", "shkola", "school"], ["книга", "kniga", "book"],
+    ["карандаш", "karandash", "pencil"], ["бумага", "bumaga", "paper"], ["работа", "rabota", "work"],
+    ["деньги", "den'gi", "money"], ["время", "vremya", "time"], ["день", "den'", "day"],
+    ["ночь", "noch'", "night"], ["утро", "utro", "morning"], ["вечер", "vecher", "evening"],
+    ["сегодня", "segodnya", "today"], ["завтра", "zavtra", "tomorrow"], ["вчера", "vchera", "yesterday"],
+    ["город", "gorod", "city"], ["страна", "strana", "country"], ["дорога", "doroga", "road"],
+    ["рынок", "rynok", "market"], ["магазин", "magazin", "store"], ["машина", "mashina", "car"],
+    ["автобус", "avtobus", "bus"], ["поезд", "poezd", "train"], ["самолёт", "samolyot", "airplane"],
+    ["море", "more", "sea"], ["река", "reka", "river"], ["гора", "gora", "mountain"],
+    ["дерево", "derevo", "tree"], ["цветок", "tsvetok", "flower"], ["небо", "nebo", "sky"],
+    ["земля", "zemlya", "earth"], ["огонь", "ogon'", "fire"], ["воздух", "vozdukh", "air"],
+    ["дождь", "dozhd'", "rain"], ["снег", "sneg", "snow"], ["солнце", "solntse", "sun"],
+    ["луна", "luna", "moon"], ["вода", "voda", "water"], ["еда", "yeda", "food"],
+    ["хлеб", "khleb", "bread"], ["молоко", "moloko", "milk"], ["кофе", "kofe", "coffee"],
+    ["чай", "chay", "tea"], ["яблоко", "yabloko", "apple"], ["апельсин", "apel'sin", "orange"],
+    ["мясо", "myaso", "meat"], ["рыба", "ryba", "fish"], ["рис", "ris", "rice"],
+    ["соль", "sol'", "salt"], ["сахар", "sakhar", "sugar"], ["рука", "ruka", "hand"],
+    ["голова", "golova", "head"], ["глаз", "glaz", "eye"], ["ухо", "ukho", "ear"],
+    ["рот", "rot", "mouth"], ["сердце", "serdtse", "heart"], ["большой", "bol'shoy", "big"],
+    ["маленький", "malen'kiy", "small"], ["новый", "novyy", "new"], ["старый", "staryy", "old"],
+    ["красивый", "krasivyy", "beautiful"], ["хороший", "khoroshiy", "good"], ["плохой", "plokhoy", "bad"],
+    ["быстрый", "bystryy", "fast"], ["медленный", "medlennyy", "slow"], ["горячий", "goryachiy", "hot"],
+    ["холодный", "kholodnyy", "cold"], ["счастливый", "schastlivyy", "happy"], ["грустный", "grustnyy", "sad"],
+    ["любовь", "lyubov'", "love"], ["видеть", "videt'", "to see"], ["слышать", "slyshat'", "to hear"],
+    ["есть", "yest'", "to eat"], ["пить", "pit'", "to drink"], ["идти", "idti", "to go"],
+    ["приходить", "prikhodit'", "to come"], ["читать", "chitat'", "to read"], ["писать", "pisat'", "to write"],
+    ["говорить", "govorit'", "to speak"], ["знать", "znat'", "to know"], ["один", "odin", "one"],
+    ["два", "dva", "two"]
+  ].map(([symbol, pronunciation, translation], index) => ({ id: `cyrillic-word-${index + 1}`, symbol, pronunciation, translation }));
+
   window.ScriptLearningData.SCRIPTS.cyrillic = {
     id: "cyrillic",
     name: "Cyrillic",
@@ -69,6 +106,7 @@
       teal: "#2d6d5a"
     },
     strokeDemoFiles: {},
+    words: cyrillicWords,
     letters: [
       { id: "a", symbol: "А", name: "A", nativeName: "а", soundLabel: "a", soundHint: 'like "a" in "father"', note: "Cyrillic А matches the Latin A in both look and sound.", speechText: "а", strokeSteps: [...cyrillicStrokeSteps.a] },
       { id: "be", symbol: "Б", name: "Be", nativeName: "б", soundLabel: "b", soundHint: 'like "b" in "book"', note: "Б uses a top bar and a rounded lower bowl for the b sound.", speechText: "бэ", strokeSteps: [...cyrillicStrokeSteps.be] },

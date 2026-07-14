@@ -59,6 +59,43 @@
     ya: "Arabic Yaa.gif"
   };
 
+  const arabicWords = [
+    ["مرحبا", "marhaban", "hello"], ["كتاب", "kitaab", "book"], ["بيت", "bayt", "house"],
+    ["ماء", "maa'", "water"], ["شمس", "shams", "sun"], ["قمر", "qamar", "moon"],
+    ["مدرسة", "madrasa", "school"], ["صديق", "sadiiq", "friend"], ["شكرا", "shukran", "thank you"],
+    ["سلام", "salaam", "peace"], ["طعام", "ta'aam", "food"], ["باب", "baab", "door"],
+    ["نعم", "na'am", "yes"], ["لا", "laa", "no"], ["رجل", "rajul", "man"],
+    ["امرأة", "imra'a", "woman"], ["طفل", "tifl", "child"], ["عائلة", "aa'ila", "family"],
+    ["أم", "umm", "mother"], ["أب", "ab", "father"], ["أخ", "akh", "brother"],
+    ["أخت", "ukht", "sister"], ["اسم", "ism", "name"], ["يوم", "yawm", "day"],
+    ["ليل", "layl", "night"], ["صباح", "sabaah", "morning"], ["مساء", "masaa'", "evening"],
+    ["وقت", "waqt", "time"], ["اليوم", "al-yawm", "today"], ["غدا", "ghadan", "tomorrow"],
+    ["أمس", "ams", "yesterday"], ["طريق", "tariiq", "road"], ["مدينة", "madiina", "city"],
+    ["بلد", "balad", "country"], ["سوق", "suuq", "market"], ["متجر", "matjar", "store"],
+    ["عمل", "amal", "work"], ["مال", "maal", "money"], ["سيارة", "sayyaara", "car"],
+    ["حافلة", "haafila", "bus"], ["قطار", "qitaar", "train"], ["طائرة", "taa'ira", "airplane"],
+    ["بحر", "bahr", "sea"], ["نهر", "nahr", "river"], ["جبل", "jabal", "mountain"],
+    ["شجرة", "shajara", "tree"], ["زهرة", "zahra", "flower"], ["سماء", "samaa'", "sky"],
+    ["أرض", "ard", "earth"], ["نار", "naar", "fire"], ["هواء", "hawaa'", "air"],
+    ["مطر", "matar", "rain"], ["ثلج", "thalj", "snow"], ["خبز", "khubz", "bread"],
+    ["حليب", "haliib", "milk"], ["قهوة", "qahwa", "coffee"], ["شاي", "shaay", "tea"],
+    ["تفاحة", "tuffaaha", "apple"], ["برتقال", "burtuqaal", "orange"], ["لحم", "lahm", "meat"],
+    ["سمك", "samak", "fish"], ["أرز", "aruzz", "rice"], ["ملح", "milh", "salt"],
+    ["سكر", "sukkar", "sugar"], ["يد", "yad", "hand"], ["رأس", "ra's", "head"],
+    ["عين", "ayn", "eye"], ["أذن", "udhun", "ear"], ["فم", "fam", "mouth"],
+    ["قلب", "qalb", "heart"], ["كبير", "kabiir", "big"], ["صغير", "saghiir", "small"],
+    ["جديد", "jadiid", "new"], ["قديم", "qadiim", "old"], ["جميل", "jamiil", "beautiful"],
+    ["جيد", "jayyid", "good"], ["سيئ", "sayyi'", "bad"], ["سريع", "sarii'", "fast"],
+    ["بطيء", "batii'", "slow"], ["ساخن", "saakhin", "hot"], ["بارد", "baarid", "cold"],
+    ["سعيد", "sa'iid", "happy"], ["حزين", "haziin", "sad"], ["حب", "hubb", "love"],
+    ["يرى", "yaraa", "to see"], ["يسمع", "yasma'", "to hear"], ["يأكل", "ya'kul", "to eat"],
+    ["يشرب", "yashrab", "to drink"], ["يذهب", "yadhhab", "to go"], ["يأتي", "ya'tii", "to come"],
+    ["يقرأ", "yaqra'", "to read"], ["يكتب", "yaktub", "to write"], ["يتكلم", "yatakallam", "to speak"],
+    ["يعرف", "ya'rif", "to know"], ["واحد", "waahid", "one"], ["اثنان", "ithnaan", "two"],
+    ["ثلاثة", "thalaatha", "three"], ["أحمر", "ahmar", "red"], ["أزرق", "azraq", "blue"],
+    ["أخضر", "akhdar", "green"]
+  ].map(([symbol, pronunciation, translation], index) => ({ id: `arabic-word-${index + 1}`, symbol, pronunciation, translation }));
+
   window.ScriptLearningData.SCRIPTS.arabic = {
     id: "arabic",
     name: "Arabic",
@@ -94,6 +131,7 @@
       teal: "#1c6663"
     },
     strokeDemoFiles,
+    words: arabicWords,
     letters: [
       { id: "alif", symbol: "ا", name: "Alif", nativeName: "ألف", soundLabel: "aa / a", soundHint: 'long "a" as in "father"', note: "A tall carrier letter used heavily for the long aa sound.", speechText: "أَ", strokeSteps: [...arabicStrokeSteps.alif] },
       { id: "ba", symbol: "ب", name: "Ba", nativeName: "باء", soundLabel: "b", soundHint: 'like "b" in "bat"', note: "This family starts with the same base body. The dot below makes it ba.", speechText: "بَ", strokeSteps: [...arabicStrokeSteps.ba, "Place the single dot below the body."] },

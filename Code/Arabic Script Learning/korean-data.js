@@ -26,6 +26,43 @@
     i: ["Draw the single vertical line from top to bottom."]
   };
 
+  const koreanWords = [
+    ["안녕하세요", "annyeonghaseyo", "hello"], ["감사합니다", "gamsahamnida", "thank you"], ["네", "ne", "yes"],
+    ["아니요", "aniyo", "no"], ["사람", "saram", "person"], ["남자", "namja", "man"],
+    ["여자", "yeoja", "woman"], ["아이", "ai", "child"], ["가족", "gajok", "family"],
+    ["어머니", "eomeoni", "mother"], ["아버지", "abeoji", "father"], ["형제", "hyeongje", "siblings"],
+    ["친구", "chingu", "friend"], ["이름", "ireum", "name"], ["집", "jip", "house"],
+    ["방", "bang", "room"], ["문", "mun", "door"], ["창문", "changmun", "window"],
+    ["학교", "hakgyo", "school"], ["책", "chaek", "book"], ["연필", "yeonpil", "pencil"],
+    ["종이", "jongi", "paper"], ["일", "il", "work"], ["돈", "don", "money"],
+    ["시간", "sigan", "time"], ["날", "nal", "day"], ["밤", "bam", "night"],
+    ["아침", "achim", "morning"], ["저녁", "jeonyeok", "evening"], ["오늘", "oneul", "today"],
+    ["내일", "naeil", "tomorrow"], ["어제", "eoje", "yesterday"], ["도시", "dosi", "city"],
+    ["나라", "nara", "country"], ["길", "gil", "road"], ["시장", "sijang", "market"],
+    ["가게", "gage", "store"], ["자동차", "jadongcha", "car"], ["버스", "beoseu", "bus"],
+    ["기차", "gicha", "train"], ["비행기", "bihaenggi", "airplane"], ["바다", "bada", "sea"],
+    ["강", "gang", "river"], ["산", "san", "mountain"], ["나무", "namu", "tree"],
+    ["꽃", "kkot", "flower"], ["하늘", "haneul", "sky"], ["땅", "ttang", "ground"],
+    ["불", "bul", "fire"], ["공기", "gonggi", "air"], ["비", "bi", "rain"],
+    ["날씨", "nalssi", "weather"], ["해", "hae", "sun"], ["달", "dal", "moon"],
+    ["물", "mul", "water"], ["음식", "eumsik", "food"], ["빵", "ppang", "bread"],
+    ["우유", "uyu", "milk"], ["커피", "keopi", "coffee"], ["차", "cha", "tea"],
+    ["사과", "sagwa", "apple"], ["오렌지", "orenji", "orange"], ["고기", "gogi", "meat"],
+    ["생선", "saengseon", "fish"], ["밥", "bap", "rice"], ["소금", "sogeum", "salt"],
+    ["설탕", "seoltang", "sugar"], ["손", "son", "hand"], ["머리", "meori", "head"],
+    ["눈", "nun", "eye"], ["귀", "gwi", "ear"], ["입", "ip", "mouth"],
+    ["마음", "maeum", "heart"], ["크다", "keuda", "to be big"], ["작다", "jakda", "to be small"],
+    ["새롭다", "saeropda", "to be new"], ["오래되다", "oraedoeda", "to be old"], ["아름답다", "areumdapda", "beautiful"],
+    ["좋다", "jota", "good"], ["나쁘다", "nappeuda", "bad"], ["빠르다", "ppareuda", "fast"],
+    ["느리다", "neurida", "slow"], ["뜨겁다", "tteugeopda", "hot"], ["차갑다", "chagapda", "cold"],
+    ["행복하다", "haengbokhada", "happy"], ["슬프다", "seulpeuda", "sad"], ["사랑", "sarang", "love"],
+    ["보다", "boda", "to see"], ["듣다", "deutda", "to hear"], ["먹다", "meokda", "to eat"],
+    ["마시다", "masida", "to drink"], ["가다", "gada", "to go"], ["오다", "oda", "to come"],
+    ["읽다", "ikda", "to read"], ["쓰다", "sseuda", "to write"], ["말하다", "malhada", "to speak"],
+    ["알다", "alda", "to know"], ["하나", "hana", "one"], ["둘", "dul", "two"],
+    ["셋", "set", "three"]
+  ].map(([symbol, pronunciation, translation], index) => ({ id: `korean-word-${index + 1}`, symbol, pronunciation, translation }));
+
   window.ScriptLearningData.SCRIPTS.korean = {
     id: "korean",
     name: "Korean",
@@ -60,6 +97,7 @@
       teal: "#3762b7"
     },
     strokeDemoFiles: {},
+    words: koreanWords,
     letters: [
       { id: "giyeok", symbol: "ㄱ", name: "Giyeok", nativeName: "기역", soundLabel: "g / k", soundHint: "soft g before vowels, k at the end of a block", note: "Giyeok is the corner-shaped consonant used for g or k sounds.", speechText: "기역", strokeSteps: [...koreanStrokeSteps.giyeok] },
       { id: "nieun", symbol: "ㄴ", name: "Nieun", nativeName: "니은", soundLabel: "n", soundHint: 'like "n" in "no"', note: "Nieun is the clean L-shaped consonant for the n sound.", speechText: "니은", strokeSteps: [...koreanStrokeSteps.nieun] },

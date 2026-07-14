@@ -604,6 +604,8 @@
     elements.matchReset.addEventListener("click", runtime.resetRound);
     elements.choiceStart.addEventListener("click", runtime.startChoiceRound);
     elements.choiceReset.addEventListener("click", runtime.resetChoiceRound);
+    elements.choiceTypeLetters.addEventListener("click", () => runtime.setChoiceMode("letters"));
+    elements.choiceTypeWords.addEventListener("click", () => runtime.setChoiceMode("words"));
     elements.answerGrid.addEventListener("click", () => {
       if (!runtime.matchState.active) {
         runtime.startRound();
@@ -630,11 +632,18 @@
       }
     });
     document.addEventListener("keydown", (event) => {
-      if (event.code !== "Space" || runtime.uiState.stage !== "choice" || !runtime.choiceState.awaitingAdvance) {
+      if (runtime.uiState.stage !== "choice") {
         return;
       }
-      event.preventDefault();
-      runtime.advanceChoiceRound();
+      if (event.code === "Space" && runtime.choiceState.awaitingAdvance) {
+        event.preventDefault();
+        runtime.advanceChoiceRound();
+        return;
+      }
+      if (/^[1-4]$/.test(event.key) && runtime.choiceState.active && !runtime.choiceState.awaitingAdvance) {
+        event.preventDefault();
+        runtime.selectChoiceOption(Number(event.key) - 1);
+      }
     });
     elements.letterSelect.addEventListener("change", (event) => runtime.selectTraceLetter(event.target.value));
     elements.traceRandom.addEventListener("click", runtime.onRandomLetterClick);

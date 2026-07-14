@@ -2,15 +2,12 @@
   const runtime = window.ScriptLearningRuntime;
   const { elements, choiceState } = runtime;
 
-  runtime.getChoiceCompletedCount = () => {
-    if (!choiceState.totalQuestions) {
-      return 0;
-    }
-    if (!choiceState.active) {
-      return choiceState.questions.length ? choiceState.totalQuestions : 0;
-    }
-    return choiceState.questionIndex + (choiceState.currentQuestion?.revealed ? 1 : 0);
+  runtime.getChoiceEntries = () => {
+    const script = runtime.getActiveScript();
+    return choiceState.mode === "words" ? (script?.words || []) : runtime.getActiveLetters();
   };
+
+  runtime.getChoiceCompletedCount = () => choiceState.completedQuestions;
 
   runtime.updateChoiceStats = () => {
     elements.choiceTime.textContent = runtime.formatElapsed(choiceState.elapsedMs);
@@ -18,7 +15,7 @@
     elements.choiceStreak.textContent = String(choiceState.streak);
     elements.choiceAccuracy.textContent = runtime.formatAccuracy(choiceState.correct, choiceState.attempts);
     const completion = choiceState.totalQuestions
-      ? (runtime.getChoiceCompletedCount() / choiceState.totalQuestions) * 100
+      ? (choiceState.completedQuestions / choiceState.totalQuestions) * 100
       : 0;
     elements.choiceProgressFill.style.width = `${completion}%`;
   };
@@ -31,7 +28,6 @@
       elements.choiceLeaderboardList.append(placeholder);
       return;
     }
-
     choiceState.leaderboard.forEach((entry, index) => {
       const item = document.createElement("li");
       item.textContent = `#${index + 1} ${runtime.formatElapsed(entry.elapsedMs || 0)} | ${entry.accuracy} | ${entry.correct}/${entry.attempts}`;
@@ -43,71 +39,65 @@
     elements.choiceFeedback.textContent = message;
     elements.choiceFeedback.className = `feedback ${tone}`;
   };
-
-  runtime.hideChoiceSummary = () => {
-    elements.choiceSummary.classList.add("is-hidden");
-  };
-
+  runtime.hideChoiceSummary = () => elements.choiceSummary.classList.add("is-hidden");
   runtime.showChoiceSummary = (message) => {
     elements.choiceSummaryCopy.textContent = message;
     elements.choiceSummary.classList.remove("is-hidden");
   };
 
+  runtime.makeChoiceQuestion = (entry, serial) => {
+    const entries = runtime.getChoiceEntries();
+    const isWord = choiceState.mode === "words";
+    const distractors = runtime.shuffle(entries.filter((candidate) => candidate.id !== entry.id))
+      .slice(0, Math.min(runtime.CHOICE_OPTION_COUNT - 1, entries.length - 1));
+    const options = runtime.shuffle([entry, ...distractors]).map((candidate, optionIndex) => ({
+      optionId: `${entry.id}-${serial}-option-${optionIndex}`,
+      entryId: candidate.id,
+      label: isWord ? candidate.pronunciation : candidate.soundLabel,
+      hint: isWord ? "Choose this pronunciation" : candidate.soundHint,
+      isCorrect: candidate.id === entry.id
+    }));
+    return {
+      questionId: `${entry.id}-${serial}`,
+      entryId: entry.id,
+      symbol: entry.symbol,
+      revealName: isWord ? entry.pronunciation : entry.name,
+      answerLabel: isWord ? entry.pronunciation : entry.soundLabel,
+      translation: isWord ? entry.translation : "",
+      options,
+      revealed: false,
+      selectedOptionId: ""
+    };
+  };
+
   runtime.buildChoiceQuestions = () => {
-    const letters = runtime.getActiveLetters();
-    if (!letters.length) {
-      return [];
-    }
-
-    const totalQuestions = Math.min(runtime.CHOICE_QUESTION_COUNT, letters.length);
-    choiceState.totalQuestions = totalQuestions;
-
-    return runtime.shuffle(letters)
-      .slice(0, totalQuestions)
-      .map((entry, index) => {
-        const distractors = runtime.shuffle(letters.filter((letter) => letter.id !== entry.id))
-          .slice(0, Math.max(0, Math.min(runtime.CHOICE_OPTION_COUNT - 1, letters.length - 1)));
-        const options = runtime.shuffle([entry, ...distractors]).map((letter, optionIndex) => ({
-          optionId: `${entry.id}-option-${optionIndex}`,
-          letterId: letter.id,
-          label: letter.soundLabel,
-          hint: letter.soundHint,
-          isCorrect: letter.id === entry.id
-        }));
-
-        return {
-          questionId: `${entry.id}-${index}`,
-          symbol: entry.symbol,
-          revealName: entry.name,
-          soundLabel: entry.soundLabel,
-          soundHint: entry.soundHint,
-          options,
-          revealed: false,
-          selectedOptionId: ""
-        };
-      });
+    const entries = runtime.shuffle(runtime.getChoiceEntries());
+    choiceState.totalQuestions = entries.length;
+    return entries.map((entry, index) => runtime.makeChoiceQuestion(entry, index));
   };
 
   runtime.renderChoiceRound = () => {
     const script = runtime.getActiveScript();
     const question = choiceState.currentQuestion;
+    const isWord = choiceState.mode === "words";
+    if (!script) return;
 
-    if (!script) {
-      elements.choiceOptions.innerHTML = "";
-      elements.choiceSymbol.textContent = "?";
-      return;
-    }
-
+    const hasWords = Boolean(script.words?.length);
+    elements.choiceTypeWords.disabled = !hasWords;
+    elements.choiceTypeWords.title = hasWords ? "Practice word pronunciation" : "Word practice is not available for this script yet";
+    elements.choiceTypeLetters.classList.toggle("is-active", !isWord);
+    elements.choiceTypeWords.classList.toggle("is-active", isWord);
+    elements.choiceTitle.textContent = `${script.name} ${isWord ? "Word Choice" : "Quick Choice"}`;
     elements.choiceSymbol.style.fontFamily = script.glyphFont;
     elements.choiceSymbol.dir = script.textDirection;
     elements.choiceOptions.innerHTML = "";
 
     if (!choiceState.active || !question) {
+      const count = runtime.getChoiceEntries().length;
       elements.choicePromptLabel.textContent = "Warm-up";
       elements.choiceSymbol.textContent = "?";
-      elements.choiceReveal.textContent = "The character name appears after each answer.";
-      elements.choiceCopy.textContent = `Start a round to answer ${Math.min(runtime.CHOICE_QUESTION_COUNT, runtime.getActiveLetters().length)} quick ${script.name} prompts as fast as you can.`;
-
+      elements.choiceReveal.textContent = isWord ? "The English translation appears after a correct answer." : "The character name appears after each answer.";
+      elements.choiceCopy.textContent = `Start a round to work through all ${count} ${isWord ? "words" : script.unitPlural}. Missed answers return later in the round.`;
       const placeholder = document.createElement("div");
       placeholder.className = "choice-placeholder";
       placeholder.textContent = "Press this board to begin.";
@@ -115,56 +105,47 @@
       return;
     }
 
-    elements.choicePromptLabel.textContent = `Question ${choiceState.questionIndex + 1} of ${choiceState.totalQuestions}`;
+    elements.choicePromptLabel.textContent = `${choiceState.completedQuestions} of ${choiceState.totalQuestions} mastered · Attempt ${choiceState.questionIndex + 1}`;
     elements.choiceSymbol.textContent = question.symbol;
-
     if (question.revealed) {
-      elements.choiceReveal.textContent = `${question.revealName} - ${question.soundLabel}`;
-      elements.choiceCopy.textContent = question.selectedOptionId && choiceState.pendingResult === "correct"
-        ? "Nice hit. Tap the board or press Space to continue."
-        : `The correct sound was ${question.soundLabel}. Tap the board or press Space to continue.`;
+      const correct = choiceState.pendingResult === "correct";
+      elements.choiceReveal.textContent = isWord
+        ? `${question.revealName} — ${question.translation}`
+        : `${question.revealName}${isWord ? "" : ` — ${question.answerLabel}`}`;
+      elements.choiceCopy.textContent = correct
+        ? `${isWord ? `Translation: ${question.translation}. ` : "Nice hit. "}Press Space to continue.`
+        : `The correct ${isWord ? "pronunciation" : "sound"} was ${question.answerLabel}.${isWord ? ` Translation: ${question.translation}.` : ""} Press Space to continue; this ${isWord ? "word" : "letter"} will return later.`;
     } else {
-      elements.choiceReveal.textContent = "Pick the sound first. The romanized name stays hidden until you answer.";
-      elements.choiceCopy.textContent = `Choose the sound that matches this ${script.name} ${script.unitSingular}.`;
+      elements.choiceReveal.textContent = isWord ? "Which pronunciation matches this word?" : "Pick the sound first. The romanized name stays hidden until you answer.";
+      elements.choiceCopy.textContent = "Click an answer or use 1–4: top-left, top-right, bottom-left, bottom-right.";
     }
 
-    question.options.forEach((option) => {
+    question.options.forEach((option, index) => {
       const button = document.createElement("button");
       button.type = "button";
       button.className = "choice-option";
       button.dataset.optionId = option.optionId;
       button.disabled = choiceState.locked || question.revealed;
-
-      if (question.revealed && option.isCorrect) {
-        button.classList.add("is-correct");
-      }
-      if (question.revealed && question.selectedOptionId === option.optionId && !option.isCorrect) {
-        button.classList.add("is-wrong");
-      }
-
-      button.innerHTML = `<strong>${option.label}</strong><span class="answer-detail">${option.hint}</span>`;
+      if (question.revealed && option.isCorrect) button.classList.add("is-correct");
+      if (question.revealed && question.selectedOptionId === option.optionId && !option.isCorrect) button.classList.add("is-wrong");
+      button.innerHTML = `<span class="choice-key" aria-hidden="true">${index + 1}</span><strong>${option.label}</strong><span class="answer-detail">${option.hint}</span>`;
+      button.setAttribute("aria-label", `${index + 1}: ${option.label}`);
       button.addEventListener("click", runtime.onChoiceOptionClick);
       elements.choiceOptions.append(button);
     });
   };
 
   runtime.stopChoiceClock = () => {
-    if (choiceState.clockStarted) {
-      choiceState.elapsedMs = Date.now() - choiceState.startedAt;
-    }
+    if (choiceState.clockStarted) choiceState.elapsedMs = Date.now() - choiceState.startedAt;
     window.clearInterval(choiceState.intervalId);
     choiceState.intervalId = null;
     choiceState.clockStarted = false;
     runtime.updateChoiceStats();
   };
-
   runtime.beginChoiceClockIfNeeded = () => {
-    if (!choiceState.active || choiceState.clockStarted) {
-      return;
-    }
+    if (!choiceState.active || choiceState.clockStarted) return;
     choiceState.clockStarted = true;
     choiceState.startedAt = Date.now() - choiceState.elapsedMs;
-    window.clearInterval(choiceState.intervalId);
     choiceState.intervalId = window.setInterval(() => {
       choiceState.elapsedMs = Date.now() - choiceState.startedAt;
       runtime.updateChoiceStats();
@@ -176,150 +157,104 @@
     choiceState.locked = false;
     choiceState.awaitingAdvance = false;
     runtime.stopChoiceClock();
-    runtime.updateChoiceStats();
-    runtime.renderChoiceRound();
-
     const accuracy = runtime.formatAccuracy(choiceState.correct, choiceState.attempts);
-    if (choiceState.attempts) {
-      const entry = {
-        elapsedMs: choiceState.elapsedMs,
-        score: choiceState.score,
-        correct: choiceState.correct,
-        attempts: choiceState.attempts,
-        accuracy,
-        date: new Date().toLocaleDateString()
-      };
-      choiceState.leaderboard = [...choiceState.leaderboard, entry]
-        .sort((left, right) => (left.elapsedMs || Number.MAX_SAFE_INTEGER) - (right.elapsedMs || Number.MAX_SAFE_INTEGER) || right.score - left.score || right.correct - left.correct)
-        .slice(0, 5);
-      runtime.saveStoredArray(runtime.storageKey("choice-leaderboard"), choiceState.leaderboard);
-      runtime.renderChoiceLeaderboard();
-    }
-
+    const entry = { elapsedMs: choiceState.elapsedMs, score: choiceState.score, correct: choiceState.correct, attempts: choiceState.attempts, accuracy, date: new Date().toLocaleDateString(), mode: choiceState.mode };
+    choiceState.leaderboard = [...choiceState.leaderboard, entry]
+      .sort((a, b) => (a.elapsedMs || Number.MAX_SAFE_INTEGER) - (b.elapsedMs || Number.MAX_SAFE_INTEGER) || b.score - a.score)
+      .slice(0, 5);
+    runtime.saveStoredArray(runtime.storageKey("choice-leaderboard"), choiceState.leaderboard);
+    runtime.renderChoiceLeaderboard();
+    runtime.renderChoiceRound();
     runtime.showChoiceSummary(`Round finished in ${runtime.formatElapsed(choiceState.elapsedMs)} with ${accuracy} accuracy.`);
-    runtime.setChoiceFeedback("Choice round complete. Start again when you want to chase a faster run.", "success");
+    runtime.setChoiceFeedback("Round complete — every item was answered correctly.", "success");
     elements.choicePromptLabel.textContent = "Round Complete";
-    elements.choiceCopy.textContent = "Local speed rankings are saved only in this browser for the active script.";
   };
 
   runtime.startChoiceRound = () => {
     runtime.stopChoiceClock();
-    choiceState.active = true;
-    choiceState.elapsedMs = 0;
-    choiceState.score = 0;
-    choiceState.streak = 0;
-    choiceState.correct = 0;
-    choiceState.attempts = 0;
-    choiceState.questionIndex = 0;
-    choiceState.selectedOptionId = "";
-    choiceState.pendingResult = "";
-    choiceState.awaitingAdvance = false;
-    choiceState.revealed = false;
-    choiceState.locked = false;
-    choiceState.clockStarted = false;
-    choiceState.startedAt = 0;
+    Object.assign(choiceState, { active: true, elapsedMs: 0, score: 0, streak: 0, correct: 0, attempts: 0, completedQuestions: 0, questionIndex: 0, selectedOptionId: "", pendingResult: "", awaitingAdvance: false, revealed: false, locked: false, clockStarted: false, startedAt: 0 });
     choiceState.questions = runtime.buildChoiceQuestions();
     choiceState.currentQuestion = choiceState.questions[0] || null;
     runtime.hideChoiceSummary();
     runtime.updateChoiceStats();
     runtime.renderChoiceRound();
-    runtime.beginChoiceClockIfNeeded();
-    runtime.setChoiceFeedback("Round ready.", "info");
+    if (choiceState.currentQuestion) {
+      runtime.beginChoiceClockIfNeeded();
+      runtime.setChoiceFeedback("Round ready. Use the mouse or keys 1–4.", "info");
+    }
   };
 
   runtime.resetChoiceRound = () => {
-    const script = runtime.getActiveScript();
     runtime.stopChoiceClock();
-    choiceState.active = false;
-    choiceState.elapsedMs = 0;
-    choiceState.score = 0;
-    choiceState.streak = 0;
-    choiceState.correct = 0;
-    choiceState.attempts = 0;
-    choiceState.totalQuestions = Math.min(runtime.CHOICE_QUESTION_COUNT, runtime.getActiveLetters().length);
-    choiceState.questionIndex = 0;
-    choiceState.questions = [];
-    choiceState.currentQuestion = null;
-    choiceState.selectedOptionId = "";
-    choiceState.pendingResult = "";
-    choiceState.awaitingAdvance = false;
-    choiceState.revealed = false;
-    choiceState.locked = false;
-    choiceState.clockStarted = false;
-    choiceState.startedAt = 0;
+    if (choiceState.mode === "words" && !runtime.getActiveScript()?.words?.length) {
+      choiceState.mode = "letters";
+    }
+    Object.assign(choiceState, { active: false, elapsedMs: 0, score: 0, streak: 0, correct: 0, attempts: 0, completedQuestions: 0, totalQuestions: runtime.getChoiceEntries().length, questionIndex: 0, questions: [], currentQuestion: null, selectedOptionId: "", pendingResult: "", awaitingAdvance: false, revealed: false, locked: false, clockStarted: false, startedAt: 0 });
     runtime.hideChoiceSummary();
     runtime.updateChoiceStats();
     runtime.renderChoiceRound();
-    if (script) {
-      runtime.setChoiceFeedback(`Choose the matching sound for each ${script.name} ${script.unitSingular}.`, "info");
-    }
+    runtime.setChoiceFeedback("Choose an answer with a click or the 1–4 keys.", "info");
   };
 
-  runtime.onChoiceOptionClick = (event) => {
-    event.stopPropagation();
-    if (!choiceState.active || choiceState.locked || !choiceState.currentQuestion) {
-      return;
-    }
+  runtime.setChoiceMode = (mode) => {
+    if (mode === "words" && !runtime.getActiveScript()?.words?.length) return;
+    if (choiceState.mode === mode) return;
+    choiceState.mode = mode;
+    runtime.resetChoiceRound();
+  };
 
-    const optionId = event.currentTarget.dataset.optionId;
+  runtime.answerChoiceOption = (optionId) => {
+    if (!choiceState.active || choiceState.locked || !choiceState.currentQuestion) return;
     const question = choiceState.currentQuestion;
-    const selectedOption = question.options.find((option) => option.optionId === optionId);
-    if (!selectedOption) {
-      return;
-    }
-
+    const selected = question.options.find((option) => option.optionId === optionId);
+    if (!selected) return;
     choiceState.locked = true;
     choiceState.awaitingAdvance = true;
     choiceState.attempts += 1;
     choiceState.selectedOptionId = optionId;
-    choiceState.pendingResult = selectedOption.isCorrect ? "correct" : "wrong";
+    choiceState.pendingResult = selected.isCorrect ? "correct" : "wrong";
     question.selectedOptionId = optionId;
     question.revealed = true;
-
-    if (selectedOption.isCorrect) {
-      const streakBonus = choiceState.streak > 0 && (choiceState.streak + 1) % 3 === 0 ? 4 : 0;
+    if (selected.isCorrect) {
+      const bonus = choiceState.streak > 0 && (choiceState.streak + 1) % 3 === 0 ? 4 : 0;
       choiceState.correct += 1;
+      choiceState.completedQuestions += 1;
       choiceState.streak += 1;
-      choiceState.score += 10 + streakBonus;
-      runtime.setChoiceFeedback(
-        streakBonus
-          ? `Correct. ${question.symbol} is ${question.revealName} and sounds like ${question.soundLabel}. Bonus +${streakBonus}.`
-          : `Correct. ${question.symbol} is ${question.revealName} and sounds like ${question.soundLabel}.`,
-        "success"
-      );
+      choiceState.score += 10 + bonus;
+      const translation = choiceState.mode === "words" ? ` It means “${question.translation}.”` : "";
+      runtime.setChoiceFeedback(`Correct.${translation} Press Space for the next one.`, "success");
     } else {
       choiceState.streak = 0;
       choiceState.score = Math.max(0, choiceState.score - 2);
-      runtime.setChoiceFeedback(
-        `Not quite. ${question.symbol} is ${question.revealName} and matches ${question.soundLabel}.`,
-        "warning"
-      );
+      const entry = runtime.getChoiceEntries().find((candidate) => candidate.id === question.entryId);
+      const retry = runtime.makeChoiceQuestion(entry, `${Date.now()}-retry`);
+      const earliest = choiceState.questionIndex + 2;
+      const insertionIndex = Math.min(choiceState.questions.length, earliest + Math.floor(Math.random() * Math.max(1, choiceState.questions.length - earliest + 1)));
+      choiceState.questions.splice(insertionIndex, 0, retry);
+      const translation = choiceState.mode === "words" ? ` It means “${question.translation}.”` : "";
+      runtime.setChoiceFeedback(`Not quite. The correct answer is ${question.answerLabel}.${translation} It has been shuffled back into the round.`, "warning");
     }
-
     runtime.stopChoiceClock();
     runtime.renderChoiceRound();
   };
 
-  runtime.advanceChoiceRound = () => {
-    if (!choiceState.active || !choiceState.awaitingAdvance || !choiceState.currentQuestion) {
-      return;
-    }
+  runtime.onChoiceOptionClick = (event) => {
+    event.stopPropagation();
+    runtime.answerChoiceOption(event.currentTarget.dataset.optionId);
+  };
+  runtime.selectChoiceOption = (index) => {
+    const option = choiceState.currentQuestion?.options[index];
+    if (option) runtime.answerChoiceOption(option.optionId);
+  };
 
+  runtime.advanceChoiceRound = () => {
+    if (!choiceState.active || !choiceState.awaitingAdvance) return;
     const nextIndex = choiceState.questionIndex + 1;
-    if (nextIndex >= choiceState.totalQuestions) {
-      choiceState.awaitingAdvance = false;
+    if (nextIndex >= choiceState.questions.length) {
       runtime.finishChoiceRound();
       return;
     }
-
-    choiceState.questionIndex = nextIndex;
-    choiceState.currentQuestion = choiceState.questions[nextIndex];
-    choiceState.clockStarted = false;
-    choiceState.selectedOptionId = "";
-    choiceState.pendingResult = "";
-    choiceState.awaitingAdvance = false;
-    choiceState.revealed = false;
-    choiceState.locked = false;
+    Object.assign(choiceState, { questionIndex: nextIndex, currentQuestion: choiceState.questions[nextIndex], selectedOptionId: "", pendingResult: "", awaitingAdvance: false, revealed: false, locked: false, clockStarted: false });
     runtime.updateChoiceStats();
     runtime.renderChoiceRound();
     runtime.beginChoiceClockIfNeeded();

@@ -80,6 +80,31 @@ Player tracker statlines repaint during passive live-game refreshes; a full page
 - Pitch events retain MLB's chronological event index/time ordering so ball, strike, in-play, and completed-play calls advance in sequence.
 - Administrative events such as game advisories, mound visits, reviews, and status changes remain in chronological source data but are excluded from the transient baseball-event flash, preventing an old advisory from repeatedly presenting as the newest play.
 
+### Lineup Power Grades
+
+Numeric lineup HR scores have been replaced by date-isolated power grades. The grade compares each hitter's SLG with the eligible MLB hitter population in four windows ending on the day before the selected dashboard date, converts each window to a league decile, and weights them as follows:
+
+- Season-to-date: 50%.
+- Last 30 days: 25%.
+- Last 14 days: 15%.
+- Last 3 days: 10%.
+
+The weighted 0-100 result maps to grades from A+ through F. Clicking a grade shows every window's decile and the exact as-of date, which makes historical hot stretches independently auditable without using the selected game or later games. Grade tooltips remain on one line. League snapshots are cached by explicit start/end date. The dashboard style picker has been removed and the established team-tone style is now fixed.
+
+Power grades are handedness-specific. A lineup hitter is ranked only against league SLG distributions for the opposing starter's throwing hand (`vs LHP` or `vs RHP`). Pitcher quality grades are split versus left-handed and right-handed batters and display both values as `L:{grade} R:{grade}`. HR-opponent averages use the handedness that applied to the actual HR matchup.
+
+Pitcher cards use one compact team-colored quality grade built from equal-weight league deciles for ERA, WHIP, and K/9 through the day before the selected game. Lower ERA and WHIP rank higher; higher K/9 ranks higher. All three verified MLB results are required, so incomplete rows display unavailable rather than receiving a manufactured grade. The pitching table places `HR Hitters Grades` directly below Average Stamina using `Power/Vision/Study`.
+
+MLB handed pitching aggregates can omit a target player's WHIP even when the league response contains other pitchers. The grade resolver therefore fetches the pitcher's own handed WHIP directly and injects it into the league distribution. When the handed population is sparse or the direct split is unavailable, it falls back to the overall eligible WHIP population rather than treating a missing record as an F.
+
+For current-day cards, a missing date-range handed WHIP also tries MLB's season situational split before falling back. Pitcher `vL`/`vR` chips use the pitcher's team color.
+
+`Vision` is a hidden handedness-specific OBP-decile grade representing overall difficulty of recording an out. `Study` is based strictly on handed at-bat volume relative to the most-used eligible league hitter, with near-full usage in the A range and lower grades as volume falls. The grade detail dialog presents a player portrait and colorful Power, Vision, and Study headings while retaining all isolated-window math.
+
+`HR Hitters Grades` scans every pregame season appearance in which the pitcher allowed a home run, resolves the individual HR events, and deduplicates the hitters. Grades are calculated through the day before each HR, not merely at the currently selected date. Hovering the aggregate opens a triangular Power/Vision/Study plot with internal guide lines and nonlinear placement toward a dominant vertex. The batting table's `Avg HR Pitcher Grade` opens a historical event plot whose axes are pitcher quality (ERA/WHIP/K9 composite), batter heat, and pitcher studyability. Batter heat is 70% the hitter's league-decile SLG during the three calendar days before the HR plus a 30-point bonus for homering in the previous game. Every pitcher-quality and heat result is calculated through the day before that specific HR, and incomplete points are omitted rather than assigned invented values. The compact pitcher directory contains only full name, throwing hand, and SP/RP/CP role. Left-handed players use circular points and right-handed players use square points on both graph types. Every point uses that player's team color; the opaque portrait tooltip carries the same color on its border, glow, portrait, and player name. Home runs occurring during the applicable player's last three games use a thick black point outline. Gold stars sit directly inside the corresponding graph points for every loaded hitter in today's opposing lineup and today's probable/current opposing pitcher. The star and shape are one interactive SVG target, so either surface opens the same player's portrait tooltip. Current matchup entries are added as contextual graph points when they are absent from the historical HR set, but are excluded from historical average calculations. Matchup discovery first resolves the open pitcher to the actual away/home pitching slot, then selects the opposite lineup. It falls back to the same RotoWire seed used by the dashboard and resolves name-only entries to MLB player IDs before plotting. All themed tooltips can be pinned until click-away by middle-clicking or holding the source/tooltip for three seconds; a perimeter trace shows hold progress, middle-click suppresses browser auto-scroll, and Escape dismisses the tooltip.
+
+Pitcher opponent-history cards show only the HR hitter's last name and handedness. Hovering that compact label shows the hitter portrait, full name, handedness, and Power/Vision/Study grades as they stood when the HR occurred.
+
 ### Predictions And Picks
 
 The dashboard includes prediction surfaces and manual pick controls:

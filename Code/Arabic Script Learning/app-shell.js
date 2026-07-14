@@ -70,6 +70,8 @@
     choiceTitle: document.getElementById("choice-title"),
     choiceStart: document.getElementById("choice-start"),
     choiceReset: document.getElementById("choice-reset"),
+    choiceTypeLetters: document.getElementById("choice-type-letters"),
+    choiceTypeWords: document.getElementById("choice-type-words"),
     choicePromptLabel: document.getElementById("choice-prompt-label"),
     choiceSymbol: document.getElementById("choice-symbol"),
     choiceReveal: document.getElementById("choice-reveal"),
@@ -134,6 +136,7 @@
   };
 
   runtime.choiceState = {
+    mode: "letters",
     active: false,
     elapsedMs: 0,
     score: 0,
@@ -141,6 +144,7 @@
     correct: 0,
     attempts: 0,
     totalQuestions: runtime.CHOICE_QUESTION_COUNT,
+    completedQuestions: 0,
     questionIndex: 0,
     questions: [],
     currentQuestion: null,

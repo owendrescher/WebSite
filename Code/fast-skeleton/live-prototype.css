@@ -6980,3 +6980,97 @@ body.dashboard-page .player-velo-bucket-summary-grid b.is-active {
   margin: 0;
   flex-basis: 28px;
 }
+
+.pitcher-power-grade {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) auto;
+  align-items: center;
+  gap: 4px 10px;
+  margin-bottom: 8px;
+  padding: 7px 9px;
+  border: 1px solid color-mix(in srgb, var(--accent) 46%, var(--line));
+  border-radius: 6px;
+  background: color-mix(in srgb, var(--panel-item) 88%, black 12%);
+}
+.pitcher-power-grade > b { color: var(--accent); font-size: 1.05rem; }
+.pitcher-power-grade > span { grid-column: 1 / -1; color: var(--muted); font-size: 0.65rem; white-space: nowrap; }
+
+.pitcher-name-power-grade {
+  display: inline-flex;
+  align-items: center;
+  gap: 4px;
+  margin-left: 5px;
+  vertical-align: middle;
+}
+.pitcher-name-power-grade > span { display: inline-flex; align-items: center; gap: 3px; height: 21px; padding: 0 6px; border: 1px solid color-mix(in srgb, var(--pitcher-grade-color, var(--accent)) 68%, var(--line)); border-radius: 999px; background: color-mix(in srgb, var(--pitcher-grade-color, var(--accent)) 14%, rgba(5,18,31,.86)); color: color-mix(in srgb, var(--pitcher-grade-color, var(--accent)) 72%, white 28%); }
+.pitcher-name-power-grade small { font-size: .48rem; letter-spacing: .06em; }
+.pitcher-name-power-grade b { font-size: .69rem; line-height: 1; }
+
+.prediction-detail-dialog .prediction-detail-head { position: relative; padding: 13px 54px 13px 15px; background: linear-gradient(180deg, rgba(255,255,255,.06), transparent 58%), var(--panel-head); }
+.prediction-detail-dialog .prediction-detail-head > [data-prediction-detail-close] { position: absolute; top: 11px; right: 12px; width: 34px; height: 34px; margin: 0; }
+.prediction-grade-hero { display: grid; grid-template-columns: 58px minmax(0, 1fr) auto; align-items: center; gap: 12px; width: 100%; }
+.prediction-grade-hero > img { width: 54px; height: 54px; border-radius: 8px; object-fit: cover; border: 1px solid var(--prediction-accent-color); background: rgba(255,255,255,.08); box-shadow: 0 0 12px color-mix(in srgb, var(--prediction-accent-color) 32%, transparent); }
+.prediction-grade-hero-copy h2 { margin: 0; color: var(--text); font-size: 1.15rem; }
+.prediction-grade-hero-copy p { margin: 5px 0 0; }
+.prediction-grade-trio { display: flex; gap: 7px; }
+.prediction-grade-trio span { display: grid; place-items: center; min-width: 58px; padding: 7px 8px; border: 1px solid currentColor; border-radius: 9px; background: rgba(3,13,24,.65); box-shadow: inset 0 1px rgba(255,255,255,.1), 0 7px 18px rgba(0,0,0,.22); }
+.prediction-grade-trio small { font-size: .49rem; letter-spacing: .1em; }
+.prediction-grade-trio b { font-size: 1.2rem; line-height: 1; }
+.prediction-grade-trio .is-power { color: #ff9f55; }
+.prediction-grade-trio .is-vision { color: #75d9ff; }
+.prediction-grade-trio .is-study { color: #b7ff8a; }
+.prediction-detail-dialog .prediction-source-row { background: linear-gradient(135deg, color-mix(in srgb, var(--prediction-accent-color) 10%, #071524), #071321); }
+.prediction-detail-dialog.is-grade-detail { --prediction-accent-color: var(--accent) !important; border-color: var(--line); }
+.prediction-detail-dialog.is-grade-detail .prediction-source-row { border-color: var(--line); background: linear-gradient(180deg, rgba(255,255,255,.035), transparent 58%), var(--panel-item); }
+.hr-grade-triangle-tooltip { width: min(420px, 82vw); }
+.hr-grade-triangle-tooltip > strong { display: block; margin-bottom: 4px; color: var(--accent); text-align: center; }
+.hr-grade-triangle-tooltip svg { display: block; width: 210px; height: 195px; margin: 0 auto; overflow: visible; }
+.hr-grade-guide-lines line, .hr-grade-guide-lines polygon { fill: none; stroke: rgba(117,217,255,.3); stroke-width: 1; stroke-dasharray: 3 3; }
+.hr-grade-point { cursor: crosshair; pointer-events: all; transition: r .12s ease, filter .12s ease; }
+.hr-grade-point-target { cursor: crosshair; pointer-events: all; }
+.hr-grade-point-target:hover .hr-grade-point { r: 7px; filter: drop-shadow(0 0 5px #fff); }
+.hr-grade-point-target.is-today-matchup:hover .hr-grade-point { r: 8px; }
+.hr-grade-today-star { fill: #ffd166; stroke: rgba(0,0,0,.92); stroke-width: .75px; paint-order: stroke; font: 900 12px var(--font-ui, sans-serif); text-anchor: middle; dominant-baseline: central; filter: drop-shadow(0 0 4px rgba(255,209,102,.95)); pointer-events: all; cursor: crosshair; }
+.hr-grade-point-readout { min-height: 18px; margin: -3px 0 5px; color: var(--accent); font-size: .68rem; font-weight: 900; text-align: center; }
+.hr-grade-triangle-tooltip svg text { fill: var(--text); font: 900 9px var(--font-ui, sans-serif); letter-spacing: .06em; }
+.hr-grade-triangle-names { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 3px 8px; max-height: 150px; overflow: auto; }
+.hr-grade-triangle-names span { overflow: hidden; color: var(--muted); font-size: .61rem; text-overflow: ellipsis; white-space: nowrap; }
+.hr-grade-triangle-names b { color: var(--text); }
+.hr-hitters-grade-trigger { cursor: help; color: var(--accent); text-decoration: underline dotted; text-underline-offset: 3px; }
+.theme-tooltip.is-interactive { pointer-events: auto; }
+.theme-tooltip.is-pinned { border-color: #ffd166; box-shadow: 0 0 0 1px rgba(255,209,102,.25), 0 18px 42px rgba(0,0,0,.55); }
+.theme-tooltip:has(.hr-grade-triangle-tooltip) { background: #071827 !important; background-image: none !important; backdrop-filter: none !important; opacity: 1; }
+.graph-point-tooltip { position: fixed; left: 0; top: 0; z-index: 25020; width: min(330px, calc(100vw - 20px)); padding: 9px; border: 2px solid var(--point-team-color, var(--accent)); border-radius: 9px; background: #071827 !important; background-image: none !important; box-shadow: 0 16px 36px rgba(0,0,0,.72), 0 0 18px color-mix(in srgb, var(--point-team-color, var(--accent)) 38%, transparent); opacity: 1; backdrop-filter: none; pointer-events: none; }
+.graph-point-person { display: grid; grid-template-columns: 58px minmax(0,1fr); gap: 10px; align-items: start; }
+.graph-point-person img { width: 56px; height: 56px; border: 2px solid var(--point-team-color, var(--accent)); border-radius: 8px; background: rgba(255,255,255,.06); object-fit: cover; }
+.graph-point-person > div { display: grid; gap: 3px; min-width: 0; }
+.graph-point-person strong { color: var(--point-team-color, var(--accent)); font-size: .83rem; line-height: 1.1; text-shadow: 0 0 8px color-mix(in srgb, var(--point-team-color, var(--accent)) 45%, transparent); }
+.graph-point-person span { color: var(--muted); font-size: .64rem; }
+.graph-point-person b { margin-top: 2px; color: var(--accent); font-size: .68rem; line-height: 1.25; }
+.graph-point-person small { color: var(--text); font-size: .61rem; line-height: 1.32; }
+.graph-point-person em { margin-top: 3px; color: #ffd166; font-size: .62rem; font-style: normal; font-weight: 900; }
+.theme-tooltip.is-pin-arming::after {
+  content: '';
+  position: absolute;
+  inset: 0;
+  z-index: 2;
+  border-radius: 9px;
+  padding: 3px;
+  pointer-events: none;
+  background: conic-gradient(from 135deg, #ffd166 var(--tooltip-pin-progress, 0turn), transparent 0);
+  -webkit-mask: linear-gradient(#000 0 0) content-box, linear-gradient(#000 0 0);
+  -webkit-mask-composite: xor;
+  mask-composite: exclude;
+  transform: scaleX(-1);
+  animation: tooltip-pin-perimeter 3s linear forwards;
+  filter: drop-shadow(0 0 4px rgba(255,209,102,.75));
+}
+@keyframes tooltip-pin-perimeter { to { --tooltip-pin-progress: 1turn; } }
+@property --tooltip-pin-progress { syntax: '<angle>'; inherits: false; initial-value: 0turn; }
+.hr-hitter-history-tooltip { display: grid; grid-template-columns: 54px minmax(0, 1fr); align-items: center; gap: 9px; min-width: 250px; }
+.hr-hitter-history-tooltip img { width: 52px; height: 52px; border-radius: 7px; object-fit: cover; border: 1px solid var(--accent); background: rgba(255,255,255,.06); }
+.hr-hitter-history-tooltip div { display: grid; gap: 2px; }
+.hr-hitter-history-tooltip strong { color: var(--text); font-size: .78rem; }
+.hr-hitter-history-tooltip span, .hr-hitter-history-tooltip small { color: var(--muted); font-size: .61rem; }
+.hr-hitter-history-tooltip b { color: var(--accent); font-size: .82rem; }
+@media (max-width: 720px) { .prediction-grade-hero { grid-template-columns: 54px 1fr; } .prediction-grade-hero > img { width: 50px; height: 50px; } .prediction-grade-trio { grid-column: 1 / -1; } }
