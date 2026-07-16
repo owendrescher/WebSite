@@ -605,6 +605,7 @@
     elements.choiceStart.addEventListener("click", runtime.startChoiceRound);
     elements.choiceReset.addEventListener("click", runtime.resetChoiceRound);
     elements.choiceTypeLetters.addEventListener("click", () => runtime.setChoiceMode("letters"));
+    elements.choiceTypeNames.addEventListener("click", () => runtime.setChoiceMode("names"));
     elements.choiceTypeWords.addEventListener("click", () => runtime.setChoiceMode("words"));
     elements.answerGrid.addEventListener("click", () => {
       if (!runtime.matchState.active) {

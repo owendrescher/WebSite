@@ -48,13 +48,14 @@
   runtime.makeChoiceQuestion = (entry, serial) => {
     const entries = runtime.getChoiceEntries();
     const isWord = choiceState.mode === "words";
+    const isName = choiceState.mode === "names";
     const distractors = runtime.shuffle(entries.filter((candidate) => candidate.id !== entry.id))
       .slice(0, Math.min(runtime.CHOICE_OPTION_COUNT - 1, entries.length - 1));
     const options = runtime.shuffle([entry, ...distractors]).map((candidate, optionIndex) => ({
       optionId: `${entry.id}-${serial}-option-${optionIndex}`,
       entryId: candidate.id,
-      label: isWord ? candidate.pronunciation : candidate.soundLabel,
-      hint: isWord ? "Choose this pronunciation" : candidate.soundHint,
+      label: isWord ? candidate.pronunciation : isName ? candidate.name : candidate.soundLabel,
+      hint: isWord ? "Choose this pronunciation" : isName ? (candidate.nativeName || "Letter name") : candidate.soundHint,
       isCorrect: candidate.id === entry.id
     }));
     return {
@@ -62,7 +63,7 @@
       entryId: entry.id,
       symbol: entry.symbol,
       revealName: isWord ? entry.pronunciation : entry.name,
-      answerLabel: isWord ? entry.pronunciation : entry.soundLabel,
+      answerLabel: isWord ? entry.pronunciation : isName ? entry.name : entry.soundLabel,
       translation: isWord ? entry.translation : "",
       options,
       revealed: false,
@@ -80,24 +81,29 @@
     const script = runtime.getActiveScript();
     const question = choiceState.currentQuestion;
     const isWord = choiceState.mode === "words";
+    const isName = choiceState.mode === "names";
     if (!script) return;
 
     const hasWords = Boolean(script.words?.length);
     elements.choiceTypeWords.disabled = !hasWords;
     elements.choiceTypeWords.title = hasWords ? "Practice word pronunciation" : "Word practice is not available for this script yet";
-    elements.choiceTypeLetters.classList.toggle("is-active", !isWord);
+    elements.choiceTypeLetters.classList.toggle("is-active", choiceState.mode === "letters");
+    elements.choiceTypeNames.classList.toggle("is-active", isName);
     elements.choiceTypeWords.classList.toggle("is-active", isWord);
-    elements.choiceTitle.textContent = `${script.name} ${isWord ? "Word Choice" : "Quick Choice"}`;
+    elements.choiceTitle.textContent = `${script.name} ${isWord ? "Word Choice" : isName ? "Letter Names" : "Quick Choice"}`;
     elements.choiceSymbol.style.fontFamily = script.glyphFont;
     elements.choiceSymbol.dir = script.textDirection;
+    elements.choiceContextSymbol.style.fontFamily = script.glyphFont;
     elements.choiceOptions.innerHTML = "";
 
     if (!choiceState.active || !question) {
       const count = runtime.getChoiceEntries().length;
       elements.choicePromptLabel.textContent = "Warm-up";
       elements.choiceSymbol.textContent = "?";
-      elements.choiceReveal.textContent = isWord ? "The English translation appears after a correct answer." : "The character name appears after each answer.";
-      elements.choiceCopy.textContent = `Start a round to work through all ${count} ${isWord ? "words" : script.unitPlural}. Missed answers return later in the round.`;
+      elements.choiceContextSymbol.textContent = "?";
+      elements.choiceSymbolPair.classList.remove("show-context");
+      elements.choiceReveal.textContent = isWord ? "The English translation appears after each answer." : isName ? "Choose the letter name rather than its sound." : "The character name appears after each answer.";
+      elements.choiceCopy.textContent = `Start a round to work through all ${count} ${isWord ? "words" : script.unitPlural}${isName ? " by name" : ""}. Missed answers return later in the round.`;
       const placeholder = document.createElement("div");
       placeholder.className = "choice-placeholder";
       placeholder.textContent = "Press this board to begin.";
@@ -107,16 +113,20 @@
 
     elements.choicePromptLabel.textContent = `${choiceState.completedQuestions} of ${choiceState.totalQuestions} mastered · Attempt ${choiceState.questionIndex + 1}`;
     elements.choiceSymbol.textContent = question.symbol;
+    const showArabicContext = script.id === "arabic" && !isWord;
+    elements.choiceSymbolPair.classList.toggle("show-context", showArabicContext);
+    elements.choiceContextSymbol.textContent = showArabicContext ? `${question.symbol}ا` : "";
+    elements.choiceContextSymbol.setAttribute("aria-label", showArabicContext ? `${question.revealName} before alif` : "");
     if (question.revealed) {
       const correct = choiceState.pendingResult === "correct";
       elements.choiceReveal.textContent = isWord
         ? `${question.revealName} — ${question.translation}`
-        : `${question.revealName}${isWord ? "" : ` — ${question.answerLabel}`}`;
+        : isName ? question.revealName : `${question.revealName} — ${question.answerLabel}`;
       elements.choiceCopy.textContent = correct
         ? `${isWord ? `Translation: ${question.translation}. ` : "Nice hit. "}Press Space to continue.`
-        : `The correct ${isWord ? "pronunciation" : "sound"} was ${question.answerLabel}.${isWord ? ` Translation: ${question.translation}.` : ""} Press Space to continue; this ${isWord ? "word" : "letter"} will return later.`;
+        : `The correct ${isWord ? "pronunciation" : isName ? "name" : "sound"} was ${question.answerLabel}.${isWord ? ` Translation: ${question.translation}.` : ""} Press Space to continue; this ${isWord ? "word" : "letter"} will return later.`;
     } else {
-      elements.choiceReveal.textContent = isWord ? "Which pronunciation matches this word?" : "Pick the sound first. The romanized name stays hidden until you answer.";
+      elements.choiceReveal.textContent = isWord ? "Which pronunciation matches this word?" : isName ? `What is this ${script.unitSingular} called?` : "Pick the sound first. The romanized name stays hidden until you answer.";
       elements.choiceCopy.textContent = "Click an answer or use 1–4: top-left, top-right, bottom-left, bottom-right.";
     }
 

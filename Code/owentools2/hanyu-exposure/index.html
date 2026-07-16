@@ -1,0 +1,59 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>Hanyu Exposure · OwenTools 2</title>
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+  <link href="https://fonts.googleapis.com/css2?family=Manrope:wght@400;600;700;800&family=Noto+Sans+SC:wght@400;700;900&family=Space+Grotesk:wght@500;700&display=swap" rel="stylesheet">
+  <link rel="stylesheet" href="styles.css">
+</head>
+<body>
+  <header>
+    <a class="back" href="../index.html" aria-label="Back to OwenTools 2">ot<span>2</span></a>
+    <div class="title"><strong>Hanyu Exposure</strong><small>frequency · form · context</small></div>
+    <div class="picker">
+      <label for="rank">Rank</label>
+      <input id="rank" type="number" min="1" max="1000" value="1" inputmode="numeric">
+      <button id="go" type="button">Go</button>
+      <button id="random" type="button">Random</button>
+    </div>
+  </header>
+
+  <main>
+    <section class="trace-side" aria-labelledby="trace-title">
+      <div class="section-heading">
+        <div><span class="eyebrow">Practice</span><h1 id="trace-title">Trace the character</h1></div>
+        <div class="trace-actions">
+          <button id="guide" type="button" aria-pressed="true">Guide on</button>
+          <button id="undo" type="button">Undo</button>
+          <button id="clear" type="button">Clear</button>
+        </div>
+      </div>
+      <div class="canvas-wrap">
+        <canvas id="trace-canvas" aria-label="Character tracing canvas"></canvas>
+        <div class="axis axis-x"></div><div class="axis axis-y"></div>
+      </div>
+      <p class="hint">Use a mouse, stylus, or finger. Stroke scoring and animated stroke order come next.</p>
+    </section>
+
+    <section class="exposure-side" aria-labelledby="character">
+      <div class="rank-line"><span id="rank-label">#1</span><span id="data-status">loading top 1,000…</span></div>
+      <div class="character" id="character">的</div>
+      <div class="pronunciation" id="pinyin">de</div>
+      <p class="meaning" id="meaning">possessive particle · of</p>
+      <div class="partners-block">
+        <span class="eyebrow">Common partners</span>
+        <div class="partners" id="partners"></div>
+        <p id="partner-note">Starter combinations are curated; frequency-based partner data will expand next.</p>
+      </div>
+      <div class="navigation">
+        <button id="previous" type="button">← Previous</button>
+        <button id="next" type="button">Next →</button>
+      </div>
+    </section>
+  </main>
+  <script src="app.js"></script>
+</body>
+</html>

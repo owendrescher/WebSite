@@ -1,0 +1,52 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>Cost of Capital — OwenTools 2</title>
+  <link rel="stylesheet" href="styles.css">
+  <link rel="stylesheet" href="map.css">
+</head>
+<body>
+  <header>
+    <a class="back" href="../index.html" aria-label="Back to OwenTools 2">←</a>
+    <div><p class="eyebrow">OWENTOOLS 2 / CLIMATE SKETCH</p><h1>Cost of <em>Capital</em></h1></div>
+    <span class="demo">ILLUSTRATIVE DEMO</span>
+  </header>
+
+  <main>
+    <section class="intro">
+      <p class="kicker">What happens to the places we built?</p>
+      <p class="lede">Explore a conceptual view of sea-level exposure and heat stress. This prototype uses invented thresholds to establish the interaction—not scientific projections.</p>
+    </section>
+
+    <section class="dashboard">
+      <div class="map-card">
+        <div class="card-head"><div><span class="label">SEA-LEVEL LENS</span><h2>Coastal exposure</h2></div><strong id="riseReadout">+0.0 m</strong></div>
+        <div class="map" id="map" aria-label="Conceptual world map with illustrative city markers">
+          <svg class="world" viewBox="0 0 1000 500" role="img" aria-label="Simplified world map"><defs><pattern id="grid" width="50" height="50" patternUnits="userSpaceOnUse"><path d="M50 0H0V50" fill="none" stroke="#fff" stroke-opacity=".22"/></pattern></defs><rect width="1000" height="500" fill="url(#grid)"/><g class="continents"><path d="M48 100 95 54l90-25 86 19 58 55-38 35-31 13-21 59-48 23-40-35-47-4-35-53z"/><path d="m253 244 57 21 34 62-13 84-42 72-30-48-12-72-33-55z"/><path d="m449 95 50-40 89 8 31 30 65-22 103 35 96 9 68 55-48 35-72-14-55 29-65-8-39-35-48 18-51-38-57 5-33-29z"/><path d="m493 184 80 10 53 55-13 91-49 99-51-54-26-88-38-52z"/><path d="m804 342 62-31 76 25 14 55-55 42-73-19-39-39z"/></g><g class="coast-risk"><path d="M48 100 95 54l90-25 86 19M253 244l57 21 34 62M449 95l50-40 89 8M804 342l62-31 76 25"/></g></svg><div class="flood-tint" id="floodTint"></div>
+          <button class="city" style="--x:19%;--y:38%;--threshold:1" data-name="Miami" data-at="1">Miami</button>
+          <button class="city" style="--x:47%;--y:33%;--threshold:2" data-name="Amsterdam" data-at="2">Amsterdam</button>
+          <button class="city" style="--x:71%;--y:49%;--threshold:3" data-name="Mumbai" data-at="3">Mumbai</button>
+          <button class="city" style="--x:83%;--y:62%;--threshold:4" data-name="Jakarta" data-at="4">Jakarta</button>
+          <button class="city" style="--x:88%;--y:77%;--threshold:5" data-name="Sydney" data-at="5">Sydney</button>
+          <button class="city" style="--x:12%;--y:42%;--threshold:3" data-name="New Orleans" data-at="3">New Orleans</button><button class="city" style="--x:57%;--y:44%;--threshold:6" data-name="Lagos" data-at="6">Lagos</button>
+          <div class="legend"><i></i> illustrative exposure marker</div>
+        </div>
+        <label class="control" for="rise"><span>Sea-level rise</span><input id="rise" type="range" min="0" max="10" step="0.5" value="0"><span>10 m</span></label>
+        <p id="seaNote" class="note">Move the control to explore an illustrative scenario.</p>
+      </div>
+
+      <aside class="heat-card">
+        <div class="card-head"><div><span class="label">HEAT LENS</span><h2>Habitability stress</h2></div><strong id="heatReadout">+1.5°C</strong></div>
+        <div class="thermo"><div id="heatFill"></div><span>EXTREME</span><span>HIGH</span><span>ELEVATED</span></div>
+        <article class="place"><div class="place-top"><span>28.6° N · 77.2° E</span><b id="riskPill">ELEVATED</b></div><h3>New Delhi</h3><p id="heatNote">Illustrative heat pressure is elevated. Future versions can connect temperature, humidity and adaptation data.</p></article>
+        <label class="control vertical-label" for="heat"><span>Warming scenario</span><input id="heat" type="range" min="1" max="5" step="0.5" value="1.5"><span>+5°C</span></label>
+        <div class="future"><span>NEXT DATA LAYERS</span><ul><li>Wet-bulb temperature</li><li>Population exposure</li><li>Adaptation capacity</li></ul></div>
+      </aside>
+    </section>
+  </main>
+  <footer><span>Prototype 01</span><p>Not for planning or risk assessment. All thresholds shown are illustrative.</p></footer>
+  <script src="app.js"></script>
+</body>
+</html>

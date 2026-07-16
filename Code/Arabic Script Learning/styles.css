@@ -809,6 +809,50 @@ h3 {
   text-align: center;
 }
 
+.choice-symbol-pair {
+  width: 100%;
+  min-height: 142px;
+  display: grid;
+  grid-template-columns: minmax(0, 1fr);
+  place-items: center;
+  direction: ltr;
+}
+
+.choice-symbol-pair.show-context {
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: 14px;
+}
+
+.choice-glyph-sample {
+  width: 100%;
+  min-height: 132px;
+  display: grid;
+  grid-template-rows: 1fr auto;
+  place-items: center;
+  padding: 8px 12px;
+  border-radius: 16px;
+}
+
+.choice-symbol-pair.show-context .choice-glyph-sample {
+  background: rgba(255, 255, 255, 0.5);
+  border: 1px solid rgba(53, 107, 140, 0.1);
+}
+
+.choice-context-sample {
+  display: none;
+}
+
+.choice-symbol-pair.show-context .choice-context-sample {
+  display: grid;
+}
+
+.choice-glyph-sample small {
+  color: var(--ink-soft);
+  font: 700 0.72rem/1.2 system-ui, sans-serif;
+  letter-spacing: 0.04em;
+  text-transform: uppercase;
+}
+
 .choice-symbol {
   min-height: 132px;
   display: grid;
@@ -1024,6 +1068,19 @@ h3 {
   align-items: center;
   background: rgba(53, 107, 140, 0.08);
   color: var(--teal);
+}
+
+.choice-symbol-pair.show-context .choice-symbol {
+  font-size: clamp(3.6rem, 7vw, 5.4rem);
+  min-height: 96px;
+}
+
+.choice-glyph-sample small {
+  display: none;
+}
+
+.choice-symbol-pair.show-context .choice-glyph-sample small {
+  display: block;
 }
 
 .trace-board-stats {

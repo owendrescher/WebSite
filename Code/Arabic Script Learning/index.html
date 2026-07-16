@@ -4,7 +4,7 @@
     <meta charset="UTF-8" />
     <meta name="viewport" content="width=device-width, initial-scale=1.0" />
     <title>Script Learning Studio</title>
-    <link rel="stylesheet" href="styles.css?v=20260714a" />
+    <link rel="stylesheet" href="styles.css?v=20260714b" />
     <style>
       .owentools-home-link {
         position: fixed;
@@ -236,7 +236,8 @@
 
               <div class="button-row compact">
                 <div class="choice-type-toggle" role="group" aria-label="Quick choice game type">
-                  <button id="choice-type-letters" class="button button-ghost is-active" type="button">Letters</button>
+                  <button id="choice-type-letters" class="button button-ghost is-active" type="button">Sounds</button>
+                  <button id="choice-type-names" class="button button-ghost" type="button">Names</button>
                   <button id="choice-type-words" class="button button-ghost" type="button">Words</button>
                 </div>
                 <button id="choice-home" class="button button-secondary" type="button">Change Mode</button>
@@ -250,7 +251,16 @@
             <div class="choice-layout">
               <div class="choice-stage-card">
                 <div class="choice-symbol-wrap">
-                  <div id="choice-symbol" class="choice-symbol" aria-live="polite">?</div>
+                  <div id="choice-symbol-pair" class="choice-symbol-pair" aria-live="polite">
+                    <div id="choice-context-sample" class="choice-glyph-sample choice-context-sample">
+                      <span id="choice-context-symbol" class="choice-symbol" dir="rtl">?</span>
+                      <small>Before alif</small>
+                    </div>
+                    <div class="choice-glyph-sample choice-isolated-sample">
+                      <span id="choice-symbol" class="choice-symbol">?</span>
+                      <small>By itself</small>
+                    </div>
+                  </div>
                   <p id="choice-reveal" class="choice-reveal">The character name appears after each answer.</p>
                 </div>
 
@@ -429,9 +439,9 @@
     <script src="arabic-data.js?v=20260714a"></script>
     <script src="korean-data.js?v=20260714a"></script>
     <script src="cyrillic-data.js?v=20260714a"></script>
-    <script src="app-shell.js?v=20260714a"></script>
+    <script src="app-shell.js?v=20260714c"></script>
     <script src="app-match.js?v=20260410a"></script>
-    <script src="app-choice.js?v=20260714b"></script>
-    <script src="app-trace.js?v=20260714a"></script>
+    <script src="app-choice.js?v=20260714d"></script>
+    <script src="app-trace.js?v=20260714b"></script>
   </body>
 </html>

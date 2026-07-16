@@ -1,0 +1,52 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>Crazy Slots — OwenTools 2</title>
+  <link rel="stylesheet" href="styles.css">
+</head>
+<body>
+  <header class="topbar">
+    <a class="back" href="../index.html" aria-label="Back to OwenTools 2">← <span>owentools</span><b>2</b></a>
+    <button class="sound" id="sound" type="button" aria-pressed="true">Sound on</button>
+  </header>
+
+  <main>
+    <section class="intro">
+      <p class="eyebrow">A tiny casino with questionable physics</p>
+      <h1>Crazy Slots</h1>
+      <p>Match three symbols. Pull the lever. Try not to overthink it.</p>
+    </section>
+
+    <section class="machine" aria-label="Slot machine">
+      <div class="marquee"><span>LUCKY-ish</span></div>
+      <div class="cabinet">
+        <div class="readout" id="message" aria-live="polite">Ready when you are.</div>
+        <div class="reel-window" aria-label="Slot reels">
+          <div class="reel" id="reel-0"><span>🍊</span></div>
+          <div class="reel" id="reel-1"><span>7</span></div>
+          <div class="reel" id="reel-2"><span>★</span></div>
+        </div>
+
+        <div class="controls">
+          <div class="stat"><small>Credits</small><strong id="credits">100</strong></div>
+          <div class="bet-control">
+            <small>Bet</small>
+            <div><button id="bet-down" type="button" aria-label="Decrease bet">−</button><strong id="bet">5</strong><button id="bet-up" type="button" aria-label="Increase bet">+</button></div>
+          </div>
+          <div class="stat"><small>Last win</small><strong id="win">0</strong></div>
+        </div>
+        <button class="spin" id="spin" type="button">Spin <kbd>Space</kbd></button>
+      </div>
+
+      <button class="lever" id="lever" type="button" aria-label="Pull lever to spin">
+        <span class="knob"></span><span class="arm"></span><span class="base"></span>
+      </button>
+    </section>
+
+    <p class="paytable"><b>3× 7</b> pays 20× · <b>3 matching</b> pays 8× · <b>2 matching</b> pays 2×</p>
+  </main>
+  <script src="app.js"></script>
+</body>
+</html>

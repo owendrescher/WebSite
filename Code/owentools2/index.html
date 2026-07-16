@@ -3,15 +3,15 @@
   <head>
     <meta charset="UTF-8" />
     <meta name="viewport" content="width=device-width, initial-scale=1.0" />
-    <title>owentools</title>
-    <link rel="icon" type="image/png" href="favicon.png?v=2" />
+    <title>owentools 2</title>
+    <link rel="icon" type="image/png" href="../favicon.png?v=2" />
     <link rel="preconnect" href="https://fonts.googleapis.com" />
     <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
     <link
       href="https://fonts.googleapis.com/css2?family=Manrope:wght@400;500;600;700;800&family=Space+Grotesk:wght@500;700&family=Syne:wght@500;700;800&display=swap"
       rel="stylesheet"
     />
-    <link rel="stylesheet" href="styles.css?v=20260512d" />
+    <link rel="stylesheet" href="styles.css?v=1" />
   </head>
   <body>
     <div class="ambient ambient-left"></div>
@@ -19,7 +19,7 @@
     <div class="grid-noise"></div>
 
     <main class="fullscreen-shell">
-      <section class="launcher-grid" id="launcher-grid" aria-label="owentools launcher">
+      <section class="landing" id="landing" aria-label="OwenTools 2 launcher">
         <a class="tool-panel slot-a reveal" data-tool-index="0"></a>
         <a class="tool-panel slot-b reveal" data-tool-index="1"></a>
         <a class="tool-panel slot-c reveal" data-tool-index="2"></a>
@@ -35,23 +35,13 @@
         <a class="tool-panel slot-l reveal" data-tool-index="12"></a>
         <a class="tool-panel slot-m reveal" data-tool-index="13"></a>
 
-        <section class="tool-core" aria-label="Launcher intro">
-          <h1>owentools<a class="owentools-two-secret" href="owentools2/index.html" aria-label="Open OwenTools 2"></a></h1>
-          <p class="core-copy">Open a tool.</p>
-          <div id="core-extra-links" class="core-extra-links" hidden></div>
+        <section class="tool-core" aria-label="OwenTools 2">
+          <h1><a class="owentools-one-secret" href="../index.html" aria-label="Return to OwenTools 1"></a>owentools<span class="owentools-two">2</span></h1>
+          <p>Open a tool.</p>
         </section>
       </section>
     </main>
 
-    <script src="shared/supabase-config.js?v=20260510f"></script>
-    <script>
-      window.OWENTOOLS_SYNC = {
-        toolId: "launcher",
-        label: "owentools",
-        loginOnly: true
-      };
-    </script>
-    <script src="shared/owentools-sync.js?v=20260511a"></script>
-    <script src="app.js?v=20260602a"></script>
+    <script src="app.js?v=1"></script>
   </body>
 </html>

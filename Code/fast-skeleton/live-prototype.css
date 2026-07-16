@@ -7028,6 +7028,7 @@ body.dashboard-page .player-velo-bucket-summary-grid b.is-active {
 .hr-grade-guide-lines line, .hr-grade-guide-lines polygon { fill: none; stroke: rgba(117,217,255,.3); stroke-width: 1; stroke-dasharray: 3 3; }
 .hr-grade-point { cursor: crosshair; pointer-events: all; transition: r .12s ease, filter .12s ease; }
 .hr-grade-point-target { cursor: crosshair; pointer-events: all; }
+.hr-grade-study-range { pointer-events: none; }
 .hr-grade-point-target:hover .hr-grade-point { r: 7px; filter: drop-shadow(0 0 5px #fff); }
 .hr-grade-point-target.is-today-matchup:hover .hr-grade-point { r: 8px; }
 .hr-grade-today-star { fill: #ffd166; stroke: rgba(0,0,0,.92); stroke-width: .75px; paint-order: stroke; font: 900 12px var(--font-ui, sans-serif); text-anchor: middle; dominant-baseline: central; filter: drop-shadow(0 0 4px rgba(255,209,102,.95)); pointer-events: all; cursor: crosshair; }
