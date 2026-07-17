@@ -140,6 +140,7 @@ The site uses several data layers:
 
 - MLB StatsAPI for schedule, live game feed, player stats, game logs, standings, rosters, and probable pitcher data.
 - RotoWire/projected lineup fallbacks when official lineups are incomplete.
+- Static RotoWire defaults were refreshed on 2026-07-17 from the batting-order table endpoint for all 30 teams and both opposing-pitcher hands (60 lineups, 540 slots), with no preserved fallback hands required.
 - Local cached schedule/game data for fast rendering.
 - Player profile and stat caches to avoid repeated network work.
 - Supabase-backed immutable save history for cross-device Save and Load.
@@ -264,6 +265,11 @@ The dashboard exposes `window.MLBDashboardManualSyncBridge`. Before Save, the sh
 - The player-tracker header shows the total tracked-player count immediately before `SWAP`.
 - HR-hitter triangles use Power / Contact / Strikeout Proclivity. Power and contact reward the highest league deciles; strikeout proclivity is inverse-ranked, so the lowest strikeout rate earns decile 10 and an A+ grade.
 - Batter-card pitcher triangles use Power Allowed / K/9 / Hitter Heat at the time of the home run. Higher K/9 earns the higher decile. Left-clicking a tight cluster cycles the nearby HR markers and their portrait tooltip.
+- Hovering either triangle's hitter or pitcher marker now reveals a year-wide WAR-decile bar plus the three absolute trait bars to the left of the triangle. Every fill follows the same blue-to-yellow-to-red scale; A- and higher grades receive an energized highlight, while F grades receive a cold, icy treatment. Historical points use league results through the day before the event, and the year-wide bar uses full-season rather than handedness-split results. A feed-supplied WAR value is preferred; when unavailable, a workload-adjusted season value proxy is ranked against the same league population.
+- Player cards now embed the interactive HR-history triangle in the former Last App area for both hitters and pitchers. Point portraits, grades, cycling, middle-click pinning, and long-hover pinning stay in the point-detail tooltip; the open player's year-wide decile bars live in the card header. Pitcher overall rank moved beneath the identity metadata, while the redundant pitcher Rank and BB table rows were removed.
+- Embedded triangles omit the redundant graph title, and historical home-run markers render 50% larger while preserving their existing relative size ratios. Current-matchup context markers retain their smaller scale. The separate hitter-card average pitcher-quality row and standalone pitcher-name Q badge were removed.
+- Pitcher rank now sits inline with the team/number/position metadata beneath the name. The pitcher arsenal strip uses reduced outer spacing, card padding, row gaps, and minimum height while retaining the existing typography and coloring.
+- Triangle position shows the relative dominance of the three axes, while marker size and fill intensity preserve absolute quality. Balanced A/A/A and F/F/F profiles both remain centered, but the elite profile is large/bright and the poor profile is small/dim; every portrait tooltip also states the overall average grade.
 - The short hitter heat component uses each player's last three games actually played through the prior day, not three calendar days. Exact game-log dates are aggregated before the player is placed into the recent league comparison population, avoiding All-Star-break empty-window grades and selected-day leakage.
 
 ## Current Relevant Files

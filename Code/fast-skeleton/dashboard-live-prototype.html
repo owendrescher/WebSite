@@ -19,7 +19,7 @@
     <link rel="apple-touch-icon" href="baseball.png" />
     <link rel="stylesheet" href="styles.css?v=20260713tooltipWrap1" />
     <link rel="stylesheet" href="dashboard.css?v=20260711bullpen14d1" />
-    <link rel="stylesheet" href="live-prototype.css?v=20260717triangleCycle18" />
+    <link rel="stylesheet" href="live-prototype.css?v=20260717cardSpacing24" />
   </head>
   <body class="dashboard-page" data-dashboard-page="scoreboard">
 
@@ -466,8 +466,10 @@
                 <div class="player-stat-title">
                   <strong id="playerStatName">PLAYER</strong>
                   <span id="playerStatMeta">TEAM | POS</span>
+                  <span id="playerStatRank" class="player-stat-header-rank" hidden></span>
                 </div>
                 <div id="playerStatLeaderBadges" class="player-stat-leader-badges" hidden></div>
+                <div id="playerStatGradeBars" class="player-stat-header-grade-bars" hidden></div>
                 <div class="player-stat-tabs" role="tablist" aria-label="Player card views">
                 <button type="button" class="player-stat-tab active" data-player-stat-tab="stats" aria-selected="true">Stats</button>
                 <button type="button" class="player-stat-tab" data-player-stat-tab="outcomes" aria-selected="false">Outcomes</button>
@@ -688,9 +690,9 @@
       };
     </script>
     <script src="../shared/owentools-sync.js?v=20260711saveLoad3"></script>
-    <script src="rotowire-default-lineups.js?v=20260712rotowireFallback2"></script>
+    <script src="rotowire-default-lineups.js?v=20260717rotowireRefresh3"></script>
     <script src="mlb-contracts-data.js?v=20260708liveSearchFix1"></script>
     <script>window.MLB_DASHBOARD_BUILD_ID="20260711-tooltip-cleanup2";</script>
-    <script src="live-dashboard-prototype.js?v=20260717triangleCycle20"></script>
+    <script src="live-dashboard-prototype.js?v=20260717embeddedTriangles25"></script>
   </body>
 </html>
