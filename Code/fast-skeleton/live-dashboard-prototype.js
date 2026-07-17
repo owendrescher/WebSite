@@ -4775,8 +4775,9 @@ async function getSeasonHeadToHeadRecord(awayAbbrev = '', homeAbbrev = '', targe
         (sameTeamAbbrev(item.away, away) && sameTeamAbbrev(item.home, home))
         || (sameTeamAbbrev(item.away, home) && sameTeamAbbrev(item.home, away))
       ));
+    const hydratedGames = await mapWithConcurrency(games, 3, hydrateSeriesGameStarters);
     const wins = { away: 0, home: 0 };
-    games.forEach((item) => {
+    hydratedGames.forEach((item) => {
       if (!item.winnerTeam) return;
       if (sameTeamAbbrev(item.winnerTeam, away)) wins.away += 1;
       if (sameTeamAbbrev(item.winnerTeam, home)) wins.home += 1;
@@ -4788,6 +4789,7 @@ async function getSeasonHeadToHeadRecord(awayAbbrev = '', homeAbbrev = '', targe
       awayWins: wins.away,
       homeWins: wins.home,
       text: seriesRecordText(wins.away, wins.home, leader),
+      games: hydratedGames,
     };
   })().catch((error) => {
     teamSeasonHeadToHeadCache.delete(cacheKey);
@@ -4988,13 +4990,26 @@ function seriesFallbackHtml(fallback = null) {
   const leader = h2h.awayWins > h2h.homeWins ? fallback.away : h2h.homeWins > h2h.awayWins ? fallback.home : '';
   const recordColor = leader ? getTeamColor(leader) : '#8aa0c4';
   const recordText = h2h.text || '0-0 Season';
+  const recordTooltip = seasonSeriesRecordTooltipHtml(h2h);
   return `
     <span class="lineup-series-fallback">
       ${seriesFallbackGameHtml(fallback.awayLast, fallback.away, 'away')}
-      <span class="lineup-series-season-record" style="--series-record:${escapeHtml(recordColor)}" title="${escapeHtml(`${displayTeamAbbrev(fallback.away)} vs ${displayTeamAbbrev(fallback.home)} before today`)}">${escapeHtml(recordText)}</span>
+      <span class="lineup-series-season-record" style="--series-record:${escapeHtml(recordColor)}" data-theme-tooltip-title="${escapeHtml(`${displayTeamAbbrev(fallback.away)} vs ${displayTeamAbbrev(fallback.home)} before today`)}"${recordTooltip ? ` data-theme-tooltip-html="${escapeHtml(recordTooltip)}"` : ''}>${escapeHtml(recordText)}</span>
       ${seriesFallbackGameHtml(fallback.homeLast, fallback.home, 'home')}
     </span>
   `;
+}
+
+function seasonSeriesRecordTooltipHtml(h2h = {}) {
+  const games = listify(h2h?.games).filter((game) => game?.hasScore);
+  if (!games.length) return '';
+  return `<div class="lineup-season-series-tooltip">${games.map((game) => {
+    const awayColor = game.awayColor || getTeamColor(game.away) || '#7bd0ff';
+    const homeColor = game.homeColor || getTeamColor(game.home) || '#7bd0ff';
+    const awayPitcher = lastName(game?.starters?.away?.fullName || game?.starters?.away?.name || 'SP');
+    const homePitcher = lastName(game?.starters?.home?.fullName || game?.starters?.home?.name || 'SP');
+    return `<span><b style="color:${escapeHtml(awayColor)}">${escapeHtml(awayPitcher)}</b> <strong>${escapeHtml(String(game.awayScore))}-${escapeHtml(String(game.homeScore))}</strong> <b style="color:${escapeHtml(homeColor)}">${escapeHtml(homePitcher)}</b></span>`;
+  }).join('')}</div>`;
 }
 
 function lineupSeriesStripHtml(series = null) {
@@ -20674,6 +20689,12 @@ async function batterSeriesStarterContextMap(playerId, groups = []) {
     const pitcherSide = batterSide === 'home' ? 'away' : batterSide === 'away' ? 'home' : '';
     const starter = starterPitcherFacedBySideFromFeed(feed, batterSide) || starterPitcherFromFeed(feed, pitcherSide);
     if (!starter) return [gamePk, null];
+    const awayStarter = starterPitcherFromFeed(feed, 'away');
+    const homeStarter = starterPitcherFromFeed(feed, 'home');
+    const awayScore = statNumber(feed?.liveData?.linescore?.teams?.away?.runs);
+    const homeScore = statNumber(feed?.liveData?.linescore?.teams?.home?.runs);
+    const awayTeam = canonicalTeamAbbrev(feed?.gameData?.teams?.away?.abbreviation || feed?.gameData?.teams?.away?.teamCode || '');
+    const homeTeam = canonicalTeamAbbrev(feed?.gameData?.teams?.home?.abbreviation || feed?.gameData?.teams?.home?.teamCode || '');
     const pitcherLines = batterPitcherStatlinesFromFeed(feed, id);
     let hrInStarterGame = false;
     let hrOffStarter = false;
@@ -20683,7 +20704,19 @@ async function batterSeriesStarterContextMap(playerId, groups = []) {
       hrInStarterGame = true;
       if (Number(play?.matchup?.pitcher?.id) === Number(starter.id)) hrOffStarter = true;
     }
-    return [gamePk, { ...starter, hrInStarterGame, hrOffStarter, pitcherLines }];
+    return [gamePk, {
+      ...starter,
+      gamePk,
+      hrInStarterGame,
+      hrOffStarter,
+      pitcherLines,
+      awayStarter,
+      homeStarter,
+      awayScore,
+      homeScore,
+      awayTeam,
+      homeTeam,
+    }];
   });
   return new Map(pairs.filter((pair) => pair?.[1]));
 }
@@ -20707,7 +20740,11 @@ function battingSeriesStarterDetails(group = {}, starterContext = new Map()) {
 function batterSeriesPitcherTooltipHtml(starter = {}) {
   const directLine = listify(starter.pitcherLines).find((line) => Number(line?.id) === Number(starter.id));
   const statline = directLine ? batterPitcherStatlineText(directLine) : '';
-  return `<div class="hr-hitter-history-tooltip"><img src="${escapeHtml(playerHeadshotUrl(starter.id))}" alt="${escapeHtml(starter.name || 'Pitcher')} portrait"/><div><strong>${escapeHtml(starter.name || 'Pitcher')}</strong><span>${escapeHtml(`${starter.hand ? `${starter.hand}HP · ` : ''}SP`)}</span>${statline ? `<b>${escapeHtml(statline)}</b><small>Batter results against this starter in the series game</small>` : '<small>Series starting pitcher</small>'}</div></div>`;
+  const bullpenLines = listify(starter.pitcherLines).filter((line) => Number(line?.id) !== Number(starter.id));
+  const bullpenHtml = bullpenLines.length
+    ? `<div class="batter-series-bullpen-results"><small>BULLPEN RESULTS</small>${bullpenLines.map((line) => `<span><b>${escapeHtml(line.name || 'Reliever')}${line.hand ? ` (${escapeHtml(line.hand)})` : ''}</b> ${escapeHtml(batterPitcherStatlineText(line))}</span>`).join('')}</div>`
+    : '<small>No recorded plate appearance against the bullpen</small>';
+  return `<div class="hr-hitter-history-tooltip batter-series-pitcher-tooltip"><img src="${escapeHtml(playerHeadshotUrl(starter.id))}" alt="${escapeHtml(starter.name || 'Pitcher')} portrait"/><div><strong>${escapeHtml(starter.name || 'Pitcher')}</strong><span>${escapeHtml(`${starter.hand ? `${starter.hand}HP · ` : ''}SP`)}</span>${statline ? `<b>${escapeHtml(statline)}</b><small>Batter results against this starter</small>` : '<small>Series starting pitcher</small>'}${bullpenHtml}</div></div>`;
 }
 
 function battingSeriesStarterHtml(starters = []) {
@@ -20734,7 +20771,7 @@ async function getBatterSeriesHistoryDetails(playerId, game = null) {
   if (!Number.isFinite(id) || id <= 0) return null;
   const selectedDate = playerStatTargetDate(game);
   const liveKey = gameIsLiveForRecentHistory(game) ? String(game?.gamePk || 'live') : 'default';
-  const cacheKey = `${id}:${selectedDate}:${liveKey}:batter-series:v5`;
+  const cacheKey = `${id}:${selectedDate}:${liveKey}:batter-series:v6`;
   if (batterSeriesHistoryCache.has(cacheKey)) return batterSeriesHistoryCache.get(cacheKey);
   const promise = (async () => {
     const splits = await playerStatGameLogSplits(id, 'hitting', game);
@@ -31245,10 +31282,16 @@ function hrHittersTriangleTooltipHtml(batters = []) {
     const color = getTeamColor(entry.teamAbbrev || '') || ['#ff9f55', '#75d9ff', '#b7ff8a'][index % 3];
     const pointLabel = `${entry.label}: Power ${entry.powerGrade} · Contact ${entry.contactGrade} · Pitcher heat ${entry.pitcherHeatGrade} · Study uncertainty ${entry.studyGrade}`;
     const pointHtml = `<div class="graph-point-person" style="--point-team-color:${escapeHtml(color)}"><img src="${escapeHtml(entry.portraitUrl || playerHeadshotUrl(entry.id))}" alt=""/><div><strong>${escapeHtml(entry.fullName || entry.label || 'Hitter')}</strong><span>${escapeHtml(entry.hand ? `${entry.hand} batter` : 'Hand unavailable')}</span><b>Power ${escapeHtml(entry.powerGrade || '--')} · Contact ${escapeHtml(entry.contactGrade || '--')}</b><small>Pitcher heat ${escapeHtml(entry.pitcherHeatGrade || '--')} · Study uncertainty ${escapeHtml(entry.studyGrade || '--')}</small><small>Grades through ${escapeHtml(entry.gradeAsOfDate || '--')}</small>${entry.isTodayOpponent ? '<em>★ Hitting against this pitcher today</em>' : ''}</div></div>`;
-    return `<g class="hr-grade-point-target${entry.isTodayOpponent ? ' is-today-matchup' : ''}${entry.isRecentThreeGames ? ' is-recent-three-games' : ''}" data-point-label="${escapeHtml(pointLabel)}" data-point-team-color="${escapeHtml(color)}" data-point-html="${escapeHtml(pointHtml)}">${triangleStudyRangeHtml(x, y, color, entry.studyGradeScore)}${trianglePointShapeHtml(entry.hand, x, y, color, entry.isTodayOpponent, entry.isRecentThreeGames)}${entry.isTodayOpponent ? `<text class="hr-grade-today-star" x="${x.toFixed(1)}" y="${y.toFixed(1)}">★</text>` : ''}</g>`;
+    const todayPointShape = String(entry.hand || '').toUpperCase().startsWith('R')
+      ? `<rect class="hr-grade-point hr-grade-today-opponent-dot" x="${(x - 1.25).toFixed(2)}" y="${(y - 1.25).toFixed(2)}" width="2.5" height="2.5" rx=".35" fill="${escapeHtml(color)}" stroke="#fff" stroke-width=".5"/>`
+      : `<circle class="hr-grade-point hr-grade-today-opponent-dot" cx="${x.toFixed(1)}" cy="${y.toFixed(1)}" r="1.25" fill="${escapeHtml(color)}" stroke="#fff" stroke-width=".5"/>`;
+    const pointShape = entry.isTodayOpponent
+      ? `<circle cx="${x.toFixed(1)}" cy="${y.toFixed(1)}" r="7" fill="transparent" pointer-events="all"/>${todayPointShape}`
+      : trianglePointShapeHtml(entry.hand, x, y, color, false, entry.isRecentThreeGames);
+    return `<g class="hr-grade-point-target${entry.isTodayOpponent ? ' is-today-matchup' : ''}${entry.isRecentThreeGames ? ' is-recent-three-games' : ''}" data-point-label="${escapeHtml(pointLabel)}" data-point-team-color="${escapeHtml(color)}" data-point-html="${escapeHtml(pointHtml)}">${entry.isTodayOpponent ? '' : triangleStudyRangeHtml(x, y, color, entry.studyGradeScore)}${pointShape}</g>`;
   }).join('');
   const names = unique.map((entry) => `<span>${escapeHtml(entry.label || 'Hitter')} <b>${escapeHtml(`${entry.powerGrade}/${entry.contactGrade || '--'}/${entry.pitcherHeatGrade || '--'}`)}</b></span>`).join('');
-  return `<div class="hr-grade-triangle-tooltip"><strong>HR hitters · Power / Contact / Pitcher Heat</strong><svg viewBox="0 0 200 190" role="img" aria-label="Power Contact Pitcher Heat triangle"><polygon points="100,12 16,176 184,176" fill="rgba(7,20,34,.78)" stroke="#75d9ff" stroke-width="2"/><g class="hr-grade-guide-lines"><line x1="100" y1="12" x2="100" y2="176"/><line x1="16" y1="176" x2="142" y2="94"/><line x1="184" y1="176" x2="58" y2="94"/><polygon points="100,66 44,176 156,176"/><polygon points="100,121 72,176 128,176"/></g><text x="100" y="10" text-anchor="middle">POWER</text><text x="10" y="188">CONTACT</text><text x="190" y="188" text-anchor="end">PITCHER HEAT</text>${dots}</svg><div class="hr-grade-point-readout">Hover a point for the hitter</div><div class="hr-grade-triangle-names">${names || '<span>No HR hitters available</span>'}</div></div>`;
+  return `<div class="hr-grade-triangle-tooltip"><strong>HR hitters · Power / Contact / Pitcher Heat</strong><svg viewBox="0 0 200 190" role="img" aria-label="Power Contact Pitcher Heat triangle"><polygon points="100,12 16,176 184,176" fill="rgba(7,20,34,.78)" stroke="#75d9ff" stroke-width="2"/><g class="hr-grade-guide-lines"><line x1="100" y1="12" x2="100" y2="176"/><line x1="16" y1="176" x2="142" y2="94"/><line x1="184" y1="176" x2="58" y2="94"/><polygon points="100,66 44,176 156,176"/><polygon points="100,121 72,176 128,176"/></g><text x="100" y="10" text-anchor="middle">POWER</text><text x="10" y="188">CONTACT</text><text x="190" y="188" text-anchor="end">PITCHER HEAT</text>${dots}</svg><div class="hr-grade-point-readout"><b class="today-opponent-dot-key"></b> Colored dots are today's opposing lineup · hover for details</div><div class="hr-grade-triangle-names">${names || '<span>No HR hitters available</span>'}</div></div>`;
 }
 
 function hrPitchersTriangleTooltipHtml(pitchers = []) {
@@ -42736,7 +42779,7 @@ async function getBatterHomeRunsByPitcherRole(playerId, game = null) {
   const selectedDate = typeof playerStatTargetDate === 'function'
     ? playerStatTargetDate(game)
     : (dateInput.value || formatDate(new Date()));
-  const cacheKey = `${id}:${selectedDate}:${String(game?.gamePk || 'none')}:hr-vs-sp-rp`;
+  const cacheKey = `${id}:${selectedDate}:${String(game?.gamePk || 'none')}:hr-vs-sp-rp-v2`;
   if (batterHomeRunPitcherRoleCache.has(cacheKey)) return batterHomeRunPitcherRoleCache.get(cacheKey);
   const promise = (async () => {
     const splits = await playerStatGameLogSplits(id, 'hitting', game);
@@ -42815,6 +42858,23 @@ async function getBatterHomeRunsByPitcherRole(playerId, game = null) {
         item.heatScore = heat.score;
         item.heatGrade = heat.grade;
         item.heatDetails = `${heat.previousGameHr ? 'HR in previous game' : 'No HR in previous game'} · prior 3-day SLG ${Number.isFinite(heat.slg) ? heat.slg.toFixed(3) : '--'} (${heat.slgDecile}/10)`;
+      }
+      if (item.isTodayPitcher) {
+        if (!Number.isFinite(item.powerAllowedScore)) {
+          item.powerAllowedScore = 50;
+          item.powerAllowedGrade = lineupPowerGradeLetter(50);
+          item.allowedDetails = 'Current opposing starter · power-allowed sample unavailable';
+        }
+        if (!Number.isFinite(item.contactAllowedScore)) {
+          item.contactAllowedScore = 50;
+          item.contactAllowedGrade = lineupPowerGradeLetter(50);
+          item.allowedDetails = 'Current opposing starter · allowed-contact sample unavailable';
+        }
+        if (!Number.isFinite(item.heatScore)) {
+          item.heatScore = 50;
+          item.heatGrade = lineupPowerGradeLetter(50);
+          item.heatDetails = 'Current batter heat sample unavailable';
+        }
       }
       item.studyScore = Math.round(((Number(allRow?.atBats) || 0) / maxUsage) * 100);
       item.studyGrade = lineupPowerGradeLetter(item.studyScore);
