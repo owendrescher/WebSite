@@ -259,6 +259,13 @@ The dashboard exposes `window.MLBDashboardManualSyncBridge`. Before Save, the sh
 - Add new manual fields to snapshot creation, normalization, counts, and application together.
 - Do not include large schedule or game cache data in snapshots.
 
+## Tracker And Hitter Grade Notes
+
+- The player-tracker header shows the total tracked-player count immediately before `SWAP`.
+- HR-hitter triangles use Power / Contact / Strikeout Proclivity. Power and contact reward the highest league deciles; strikeout proclivity is inverse-ranked, so the lowest strikeout rate earns decile 10 and an A+ grade.
+- Batter-card pitcher triangles use Power Allowed / K/9 / Hitter Heat at the time of the home run. Higher K/9 earns the higher decile. Left-clicking a tight cluster cycles the nearby HR markers and their portrait tooltip.
+- The short hitter heat component uses each player's last three games actually played through the prior day, not three calendar days. Exact game-log dates are aggregated before the player is placed into the recent league comparison population, avoiding All-Star-break empty-window grades and selected-day leakage.
+
 ## Current Relevant Files
 
 - `dashboard-live-prototype.html`: production dashboard entrypoint and Save/Load configuration.

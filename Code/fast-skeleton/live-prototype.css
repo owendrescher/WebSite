@@ -6908,6 +6908,20 @@ body.dashboard-page .player-velo-bucket-summary-grid b.is-active {
   display: none !important;
 }
 
+.player-tracker-total-count {
+  display: inline-grid;
+  place-items: center;
+  min-width: 20px;
+  height: 18px;
+  padding: 0 4px;
+  border: 1px solid color-mix(in srgb, var(--accent) 48%, var(--line));
+  border-radius: 5px;
+  background: rgba(5, 16, 28, 0.72);
+  color: var(--text);
+  font: 900 .62rem/1 var(--font-ui, sans-serif);
+  font-variant-numeric: tabular-nums;
+}
+
 #betDisplay.is-compact .player-track-item {
   display: flex;
   width: 100%;
@@ -7022,6 +7036,8 @@ body.dashboard-page .player-velo-bucket-summary-grid b.is-active {
 .hr-grade-study-range { pointer-events: none; }
 .hr-grade-point-target:hover .hr-grade-point { r: 7px; filter: drop-shadow(0 0 5px #fff); }
 .hr-grade-point-target.is-today-matchup:hover .hr-grade-point { r: 8px; }
+.hr-grade-point-target.is-today-matchup:hover .hr-grade-today-opponent-dot { r: 1.25px; }
+.hr-grade-point-target.is-cycle-selected .hr-grade-point { filter: drop-shadow(0 0 7px #fff) drop-shadow(0 0 4px var(--accent)); }
 .hr-grade-today-star { fill: #ffd166; stroke: rgba(0,0,0,.92); stroke-width: .75px; paint-order: stroke; font: 900 12px var(--font-ui, sans-serif); text-anchor: middle; dominant-baseline: central; filter: drop-shadow(0 0 4px rgba(255,209,102,.95)); pointer-events: all; cursor: crosshair; }
 .hr-grade-point-readout { min-height: 18px; margin: -3px 0 5px; color: var(--accent); font-size: .68rem; font-weight: 900; text-align: center; }
 .hr-grade-triangle-tooltip svg text { fill: var(--text); font: 900 9px var(--font-ui, sans-serif); letter-spacing: .06em; }

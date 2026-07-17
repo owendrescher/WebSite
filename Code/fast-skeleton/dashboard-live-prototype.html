@@ -19,7 +19,7 @@
     <link rel="apple-touch-icon" href="baseball.png" />
     <link rel="stylesheet" href="styles.css?v=20260713tooltipWrap1" />
     <link rel="stylesheet" href="dashboard.css?v=20260711bullpen14d1" />
-    <link rel="stylesheet" href="live-prototype.css?v=20260717seasonSeries16" />
+    <link rel="stylesheet" href="live-prototype.css?v=20260717triangleCycle18" />
   </head>
   <body class="dashboard-page" data-dashboard-page="scoreboard">
 
@@ -505,6 +505,7 @@
               <button id="betLogTabBtn" class="panel-tab-btn" type="button" hidden>BET LOG</button>
             </div>
             <div class="panel-header-actions">
+              <span id="playerTrackerTotalCount" class="player-tracker-total-count" title="Total tracked players" aria-label="Total tracked players: 0">0</span>
               <button class="hint panel-sort-toggle rail-swap-btn" type="button" data-rail-swap aria-label="Swap player tracker and home run feed order">SWAP</button>
               <button id="playerTrackerCollapseBtn" class="hint panel-sort-toggle" type="button" aria-pressed="false">compact</button>
               <span class="hint">DAY: <span id="betDayLabel"></span></span>
@@ -690,6 +691,6 @@
     <script src="rotowire-default-lineups.js?v=20260712rotowireFallback2"></script>
     <script src="mlb-contracts-data.js?v=20260708liveSearchFix1"></script>
     <script>window.MLB_DASHBOARD_BUILD_ID="20260711-tooltip-cleanup2";</script>
-    <script src="live-dashboard-prototype.js?v=20260717seasonSeries18"></script>
+    <script src="live-dashboard-prototype.js?v=20260717triangleCycle20"></script>
   </body>
 </html>
