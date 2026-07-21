@@ -44,6 +44,7 @@
 
   const META_KEY = `owentools-sync-meta:${pageConfig.toolId}`;
   const AUTH_STORAGE_KEY = "owentools-auth-session";
+  const AUTH_STORAGE_BACKUP_KEY = "owentools-auth-session-backup";
   const EMAIL_STORAGE_KEY = "owentools-sync-email";
   const POSITION_KEY = "owentools-sync-position";
   const HARD_DENY_PATTERNS = [
@@ -63,6 +64,7 @@
   const originalRemoveItem = Storage.prototype.removeItem;
   const authSessionMemory = new Map();
   const restoredValueMemory = new Map();
+  let explicitSignOutInProgress = false;
 
   function matchesAny(key, patterns) {
     if (!patterns || !patterns.length) return false;
@@ -116,12 +118,21 @@
         } catch {
           // fall through
         }
+        if (key === AUTH_STORAGE_KEY) {
+          try {
+            const backupValue = window.localStorage.getItem(AUTH_STORAGE_BACKUP_KEY);
+            if (backupValue != null) return backupValue;
+          } catch {
+            // fall through
+          }
+        }
         return authSessionMemory.get(key) || null;
       },
       setItem(key, value) {
         authSessionMemory.set(key, String(value));
         try {
           originalSetItem.call(window.localStorage, key, value);
+          if (key === AUTH_STORAGE_KEY) originalSetItem.call(window.localStorage, AUTH_STORAGE_BACKUP_KEY, value);
           return;
         } catch {
           cleanupLocalDeniedKeys();
@@ -149,6 +160,10 @@
           window.sessionStorage.removeItem(key);
         } catch {
           // ignore
+        }
+        if (key === AUTH_STORAGE_KEY && explicitSignOutInProgress) {
+          try { originalRemoveItem.call(window.localStorage, AUTH_STORAGE_BACKUP_KEY); } catch {}
+          try { window.sessionStorage.removeItem(AUTH_STORAGE_BACKUP_KEY); } catch {}
         }
       }
     };
@@ -1135,7 +1150,13 @@
     });
 
     signOut.addEventListener("click", async () => {
-      if (client) await client.auth.signOut();
+      explicitSignOutInProgress = true;
+      try {
+        if (client) await client.auth.signOut();
+        try { originalRemoveItem.call(window.localStorage, AUTH_STORAGE_BACKUP_KEY); } catch {}
+      } finally {
+        explicitSignOutInProgress = false;
+      }
     });
 
     pullButton?.addEventListener("click", async () => {

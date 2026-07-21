@@ -1,0 +1,37 @@
+name: Update RotoWire lineups
+
+on:
+  schedule:
+    - cron: "*/30 * * * *"
+  workflow_dispatch:
+
+permissions:
+  contents: write
+
+concurrency:
+  group: update-rotowire-lineups
+  cancel-in-progress: true
+
+jobs:
+  update:
+    runs-on: windows-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Refresh RotoWire defaults
+        shell: pwsh
+        working-directory: Code/fast-skeleton
+        run: ./update-rotowire-default-lineups.ps1
+
+      - name: Commit changed lineups
+        shell: pwsh
+        run: |
+          if (git diff --quiet -- Code/fast-skeleton/rotowire-current-defaults.json Code/fast-skeleton/rotowire-default-lineups.js Code/fast-skeleton/rotowire-update-proof.json) {
+            Write-Host "RotoWire lineups are unchanged."
+            exit 0
+          }
+          git config user.name "github-actions[bot]"
+          git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
+          git add Code/fast-skeleton/rotowire-current-defaults.json Code/fast-skeleton/rotowire-default-lineups.js Code/fast-skeleton/rotowire-update-proof.json
+          git commit -m "Update RotoWire lineup defaults"
+          git push

@@ -80,16 +80,10 @@ foreach ($team in $teams) {
   }
 }
 
-$compressed = $payload | ConvertTo-Json -Depth 5 -Compress
-$previousCompressed = if ($null -ne $previousRaw) { $previousRaw | ConvertTo-Json -Depth 5 -Compress } else { "" }
-if ($compressed -eq $previousCompressed) {
-  Write-Output (@{ changed = $false; teams = $payload.Keys.Count; lineups = $payload.Keys.Count * 2; slots = $payload.Keys.Count * 18 } | ConvertTo-Json)
-  return
-}
-
 $json = $payload | ConvertTo-Json -Depth 5
 Set-Content -LiteralPath $SourcePath -Value $json -Encoding UTF8
 
+$compressed = $payload | ConvertTo-Json -Depth 5 -Compress
 $generatedAt = (Get-Date).ToUniversalTime().ToString("o")
 $js = @(
   "// Generated from current RotoWire recent batting orders by opposing pitcher hand.",
@@ -108,7 +102,6 @@ $proof = [ordered]@{
 Set-Content -LiteralPath $ProofPath -Value ($proof | ConvertTo-Json -Depth 6) -Encoding UTF8
 
 Write-Output (@{
-  changed = $true
   generatedAt = $generatedAt
   teams = $payload.Keys.Count
   lineups = $payload.Keys.Count * 2

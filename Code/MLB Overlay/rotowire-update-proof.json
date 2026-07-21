@@ -1,5 +1,5 @@
 ﻿{
-    "generatedAt":  "2026-07-21T14:14:35.0182513Z",
+    "generatedAt":  "2026-07-17T17:54:59.2589350Z",
     "note":  "Static RotoWire fallback refreshed from RotoWire batting-order table endpoint. Each hand uses the latest actual lineup against that opposing pitcher hand; previous seed preserved only if a hand could not be resolved.",
     "sourcePattern":  "https://www.rotowire.com/baseball/tables/batting-order-data.php?team={TEAM}",
     "teams":  {
@@ -47,7 +47,7 @@
                           },
                   "CLE":  {
                               "url":  "https://www.rotowire.com/baseball/tables/batting-order-data.php?team=CLE",
-                              "rows":  159,
+                              "rows":  160,
                               "rhp":  "latest actual lineup vs RHP",
                               "lhp":  "latest actual lineup vs LHP"
                           },
@@ -89,7 +89,7 @@
                           },
                   "LAD":  {
                               "url":  "https://www.rotowire.com/baseball/tables/batting-order-data.php?team=LAD",
-                              "rows":  161,
+                              "rows":  162,
                               "rhp":  "latest actual lineup vs RHP",
                               "lhp":  "latest actual lineup vs LHP"
                           },
@@ -119,7 +119,7 @@
                           },
                   "NYY":  {
                               "url":  "https://www.rotowire.com/baseball/tables/batting-order-data.php?team=NYY",
-                              "rows":  160,
+                              "rows":  161,
                               "rhp":  "latest actual lineup vs RHP",
                               "lhp":  "latest actual lineup vs LHP"
                           },
@@ -131,7 +131,7 @@
                           },
                   "PIT":  {
                               "url":  "https://www.rotowire.com/baseball/tables/batting-order-data.php?team=PIT",
-                              "rows":  161,
+                              "rows":  162,
                               "rhp":  "latest actual lineup vs RHP",
                               "lhp":  "latest actual lineup vs LHP"
                           },

@@ -3,6 +3,7 @@
   <head>
     <meta charset="utf-8" />
     <meta name="viewport" content="width=device-width, initial-scale=1" />
+    <base href="../fast-skeleton/" />
     <meta name="color-scheme" content="dark" />
     <title>MLB Game Center Live Prototype</title>
     <meta name="description" content="Live MLB scoreboard, lineup cards, hot player tracking, team form, pitcher trends, home run feed, and baseball betting stat tools for every MLB team." />
@@ -19,7 +20,7 @@
     <link rel="apple-touch-icon" href="baseball.png" />
     <link rel="stylesheet" href="styles.css?v=20260713tooltipWrap1" />
     <link rel="stylesheet" href="dashboard.css?v=20260711bullpen14d1" />
-    <link rel="stylesheet" href="live-prototype.css?v=20260717cardSpacing24" />
+    <link rel="stylesheet" href="live-prototype.css?v=20260721hrStacks9" />
   </head>
   <body class="dashboard-page" data-dashboard-page="scoreboard">
 
@@ -239,6 +240,9 @@
                   </section>
                 </div>
                 <div class="lineup-pitching-grid" data-lineup-panel="pitching" hidden>
+                  <div class="lineup-matchup-strip lineup-pitching-matchup-strip">
+                    <div class="lineup-state-scoreboard" aria-label="Game score and over under picks"></div>
+                  </div>
                   <section class="lineup-pitching-panel away-pitching">
                     <div class="lineup-pitching-header">Pitching | <span class="lineup-pitching-team-code"></span></div>
                     <div class="current-pitcher-card"></div>
@@ -692,10 +696,7 @@
     <script src="../shared/owentools-sync.js?v=20260721durableSession1"></script>
     <script src="rotowire-default-lineups.js?v=20260721rotowireCurrent2"></script>
     <script src="mlb-contracts-data.js?v=20260708liveSearchFix1"></script>
-    <script>
-      window.MLB_DASHBOARD_BUILD_ID="20260711-tooltip-cleanup2-dev";
-      window.MLB_STATS_PROFILER_FORCE=true;
-    </script>
-    <script src="live-dashboard-prototype.js?v=20260721lightCardExact3"></script>
+    <script>window.MLB_DASHBOARD_BUILD_ID="20260711-tooltip-cleanup2";</script>
+    <script src="live-dashboard-prototype.js?v=20260721hrStacks8"></script>
   </body>
 </html>

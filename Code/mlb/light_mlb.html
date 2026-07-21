@@ -3,8 +3,9 @@
   <head>
     <meta charset="utf-8" />
     <meta name="viewport" content="width=device-width, initial-scale=1" />
+    <base href="../fast-skeleton/" />
     <meta name="color-scheme" content="dark" />
-    <title>MLB Game Center Live Prototype</title>
+    <title>MLB Game Center Light</title>
     <meta name="description" content="Live MLB scoreboard, lineup cards, hot player tracking, team form, pitcher trends, home run feed, and baseball betting stat tools for every MLB team." />
     <meta name="keywords" content="MLB, baseball, MLB betting, baseball betting, betting stats, live MLB scoreboard, MLB lineups, MLB lineup cards, MLB probable pitchers, MLB hot players, player props, team betting, team baseball betting, hits, batting average, home runs, RBI, OPS, stolen bases, strikeouts, ERA, WHIP, wins, saves, innings pitched, doubles, triples, runs, total bases, extra base hits, walks, BB, runs for, runs against, last seven games, Arizona Diamondbacks, Atlanta Braves, Baltimore Orioles, Boston Red Sox, Chicago Cubs, Chicago White Sox, Cincinnati Reds, Cleveland Guardians, Colorado Rockies, Detroit Tigers, Houston Astros, Kansas City Royals, Los Angeles Angels, Los Angeles Dodgers, Miami Marlins, Milwaukee Brewers, Minnesota Twins, New York Mets, New York Yankees, Athletics, Philadelphia Phillies, Pittsburgh Pirates, San Diego Padres, Seattle Mariners, San Francisco Giants, St Louis Cardinals, Tampa Bay Rays, Texas Rangers, Toronto Blue Jays, Washington Nationals, Arizona Diamondbacks betting, Atlanta Braves betting, Baltimore Orioles betting, Boston Red Sox betting, Chicago Cubs betting, Chicago White Sox betting, Cincinnati Reds betting, Cleveland Guardians betting, Colorado Rockies betting, Detroit Tigers betting, Houston Astros betting, Kansas City Royals betting, Los Angeles Angels betting, Los Angeles Dodgers betting, Miami Marlins betting, Milwaukee Brewers betting, Minnesota Twins betting, New York Mets betting, New York Yankees betting, Athletics betting, Philadelphia Phillies betting, Pittsburgh Pirates betting, San Diego Padres betting, Seattle Mariners betting, San Francisco Giants betting, St Louis Cardinals betting, Tampa Bay Rays betting, Texas Rangers betting, Toronto Blue Jays betting, Washington Nationals betting, Arizona Diamondbacks baseball betting, Atlanta Braves baseball betting, Baltimore Orioles baseball betting, Boston Red Sox baseball betting, Chicago Cubs baseball betting, Chicago White Sox baseball betting, Cincinnati Reds baseball betting, Cleveland Guardians baseball betting, Colorado Rockies baseball betting, Detroit Tigers baseball betting, Houston Astros baseball betting, Kansas City Royals baseball betting, Los Angeles Angels baseball betting, Los Angeles Dodgers baseball betting, Miami Marlins baseball betting, Milwaukee Brewers baseball betting, Minnesota Twins baseball betting, New York Mets baseball betting, New York Yankees baseball betting, Athletics baseball betting, Philadelphia Phillies baseball betting, Pittsburgh Pirates baseball betting, San Diego Padres baseball betting, Seattle Mariners baseball betting, San Francisco Giants baseball betting, St Louis Cardinals baseball betting, Tampa Bay Rays baseball betting, Texas Rangers baseball betting, Toronto Blue Jays baseball betting, Washington Nationals baseball betting" />
     <meta name="news_keywords" content="Arizona-Diamondbacks-baseball-betting, Atlanta-Braves-baseball-betting, Baltimore-Orioles-baseball-betting, Boston-Red-Sox-baseball-betting, Chicago-Cubs-baseball-betting, Chicago-White-Sox-baseball-betting, Cincinnati-Reds-baseball-betting, Cleveland-Guardians-baseball-betting, Colorado-Rockies-baseball-betting, Detroit-Tigers-baseball-betting, Houston-Astros-baseball-betting, Kansas-City-Royals-baseball-betting, Los-Angeles-Angels-baseball-betting, Los-Angeles-Dodgers-baseball-betting, Miami-Marlins-baseball-betting, Milwaukee-Brewers-baseball-betting, Minnesota-Twins-baseball-betting, New-York-Mets-baseball-betting, New-York-Yankees-baseball-betting, Athletics-baseball-betting, Philadelphia-Phillies-baseball-betting, Pittsburgh-Pirates-baseball-betting, San-Diego-Padres-baseball-betting, Seattle-Mariners-baseball-betting, San-Francisco-Giants-baseball-betting, St-Louis-Cardinals-baseball-betting, Tampa-Bay-Rays-baseball-betting, Texas-Rangers-baseball-betting, Toronto-Blue-Jays-baseball-betting, Washington-Nationals-baseball-betting" />
@@ -19,9 +20,9 @@
     <link rel="apple-touch-icon" href="baseball.png" />
     <link rel="stylesheet" href="styles.css?v=20260713tooltipWrap1" />
     <link rel="stylesheet" href="dashboard.css?v=20260711bullpen14d1" />
-    <link rel="stylesheet" href="live-prototype.css?v=20260717cardSpacing24" />
+    <link rel="stylesheet" href="live-prototype.css?v=20260721hrStacks9" />
   </head>
-  <body class="dashboard-page" data-dashboard-page="scoreboard">
+  <body class="dashboard-page light-mlb-page" data-dashboard-page="scoreboard">
 
     <dialog id="gamePickDialog" class="bet-dialog">
       <form id="gamePickDialogForm" class="bet-dialog-form">
@@ -239,6 +240,9 @@
                   </section>
                 </div>
                 <div class="lineup-pitching-grid" data-lineup-panel="pitching" hidden>
+                  <div class="lineup-matchup-strip lineup-pitching-matchup-strip">
+                    <div class="lineup-state-scoreboard" aria-label="Game score and over under picks"></div>
+                  </div>
                   <section class="lineup-pitching-panel away-pitching">
                     <div class="lineup-pitching-header">Pitching | <span class="lineup-pitching-team-code"></span></div>
                     <div class="current-pitcher-card"></div>
@@ -673,6 +677,7 @@
     </template>
 
     <script src="../shared/supabase-config.js?v=20260521heatmap"></script>
+    <script>window.MLB_DASHBOARD_LITE={triangles:false,pitchInfo:false,velocity:false,lineupPower:false};</script>
     <script>
       window.OWENTOOLS_SYNC = {
         toolId: "baseball-dashboard",
@@ -692,10 +697,7 @@
     <script src="../shared/owentools-sync.js?v=20260721durableSession1"></script>
     <script src="rotowire-default-lineups.js?v=20260721rotowireCurrent2"></script>
     <script src="mlb-contracts-data.js?v=20260708liveSearchFix1"></script>
-    <script>
-      window.MLB_DASHBOARD_BUILD_ID="20260711-tooltip-cleanup2-dev";
-      window.MLB_STATS_PROFILER_FORCE=true;
-    </script>
-    <script src="live-dashboard-prototype.js?v=20260721lightCardExact3"></script>
+    <script>window.MLB_DASHBOARD_BUILD_ID="20260711-tooltip-cleanup2";</script>
+    <script src="live-dashboard-prototype.js?v=20260721hrStacks8"></script>
   </body>
 </html>
