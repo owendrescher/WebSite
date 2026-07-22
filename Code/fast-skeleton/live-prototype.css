@@ -6908,6 +6908,170 @@ body.dashboard-page .player-velo-bucket-summary-grid b.is-active {
   display: none !important;
 }
 
+#betDisplay .player-track-item.is-tracker-up-inning,
+#betDisplay .player-track-item.is-tracker-live {
+  animation: none !important;
+}
+
+#betDisplay .player-track-item.is-expectation-hit::after {
+  display: none !important;
+  animation: none !important;
+}
+
+#betDisplay .player-track-name-row {
+  display: block;
+  min-width: 0;
+  max-height: 22px;
+  overflow: hidden;
+  line-height: .95;
+  white-space: normal;
+}
+
+#betDisplay .player-track-name-row > strong {
+  display: inline;
+}
+
+#betDisplay .player-track-matchup {
+  display: inline;
+  margin-left: 4px;
+  color: color-mix(in srgb, var(--text) 58%, var(--muted) 42%);
+  font: 750 .42rem/.8 var(--font-ui, sans-serif);
+  text-transform: none;
+  vertical-align: super;
+  white-space: normal;
+}
+
+#betDisplay .player-track-pitcher-link,
+#betDisplay .player-track-pitcher-name {
+  display: inline;
+  padding: 0;
+  border: 0;
+  background: none;
+  color: var(--tracker-pitcher-color, var(--text));
+  font: inherit;
+  line-height: inherit;
+  text-shadow: 0 1px 1px #000, 1px 0 1px #000;
+}
+
+#betDisplay .player-track-pitcher-link {
+  cursor: pointer;
+  text-decoration: underline;
+  text-decoration-color: color-mix(in srgb, var(--tracker-pitcher-color, var(--text)) 65%, transparent);
+  text-underline-offset: 1px;
+}
+
+#betDisplay .player-track-pitcher-link:hover,
+#betDisplay .player-track-pitcher-link:focus-visible {
+  color: color-mix(in srgb, var(--tracker-pitcher-color, var(--text)) 78%, white 22%);
+}
+
+#betDisplay .player-track-confidence-control {
+  display: inline-grid;
+  grid-template-columns: 12px;
+  grid-template-rows: 28px;
+  place-items: center;
+  flex: 0 0 14px;
+  gap: 0;
+  margin-left: auto;
+  cursor: ns-resize;
+}
+
+#betDisplay .player-track-confidence-control input[type='range'] {
+  width: 10px;
+  height: 28px;
+  margin: 0;
+  padding: 0;
+  appearance: none;
+  -webkit-appearance: none;
+  writing-mode: vertical-lr;
+  direction: rtl;
+  border: 1px solid rgba(255,255,255,.2);
+  border-radius: 999px;
+  outline: none;
+  background:
+    linear-gradient(to top, #3d8dff 0%, #66d9ff 35%, #ffd166 68%, #ff7a2f 100%);
+  box-shadow: inset 0 0 0 1px rgba(0,0,0,.45), 0 0 7px rgba(102,217,255,.12);
+  cursor: ns-resize;
+}
+
+#betDisplay .player-track-confidence-control input[type='range']::-webkit-slider-thumb {
+  width: 14px;
+  height: 5px;
+  appearance: none;
+  -webkit-appearance: none;
+  border: 1px solid #fff;
+  border-radius: 2px;
+  background: #071827;
+  box-shadow: 0 0 5px rgba(255,255,255,.7);
+}
+
+#betDisplay .player-track-confidence-control input[type='range']::-moz-range-thumb {
+  width: 12px;
+  height: 4px;
+  border: 1px solid #fff;
+  border-radius: 2px;
+  background: #071827;
+}
+
+#betDisplay .player-track-confidence {
+  margin-left: 0;
+}
+
+#betDisplay .player-track-item {
+  height: 66px;
+  min-height: 66px;
+  max-height: 66px;
+  padding-block: 4px;
+  contain: none !important;
+  content-visibility: visible !important;
+}
+
+#betDisplay .player-track-drag {
+  touch-action: none;
+  user-select: none;
+  -webkit-user-drag: none;
+}
+
+#betDisplay .panel-list.is-scrolling .player-track-item.is-tracker-up-inning {
+  box-shadow:
+    inset 0 0 0 1px rgba(var(--tracker-team-rgb, 102, 217, 255), 0.3),
+    0 0 18px rgba(var(--tracker-team-rgb, 102, 217, 255), 0.24) !important;
+}
+
+#betDisplay .panel-list.is-scrolling .player-track-item.is-tracker-live {
+  box-shadow:
+    inset 0 0 0 1px rgba(255,255,255,0.18),
+    0 0 22px rgba(var(--tracker-team-rgb, 102, 217, 255), 0.32),
+    0 0 6px rgba(var(--tracker-team-rgb, 102, 217, 255), 0.26) !important;
+}
+
+#betDisplay .panel-list.is-scrolling .player-track-item.is-expectation-hit {
+  box-shadow:
+    inset 0 0 0 1px rgba(255, 221, 118, 0.42),
+    0 0 18px rgba(255, 202, 83, 0.2) !important;
+}
+
+#betDisplay .panel-list.is-scrolling .player-track-item::before {
+  box-shadow: 0 0 14px rgba(var(--tracker-team-rgb, 102, 217, 255), 0.34) !important;
+}
+
+#betDisplay .player-track-copy {
+  align-content: center;
+  gap: 1px;
+  min-height: 0;
+  max-height: 56px;
+}
+
+#betDisplay .player-track-meta {
+  min-height: 28px;
+  gap: 5px;
+}
+
+#betDisplay .player-track-line {
+  font-size: .62rem;
+  line-height: 1;
+}
+
 .player-tracker-total-count {
   display: inline-grid;
   place-items: center;
@@ -7109,6 +7273,14 @@ body.light-mlb-page .light-pitcher-era-tone.is-lite-fire {
     linear-gradient(90deg, rgba(255, 91, 20, .58), rgba(255, 151, 39, .14) 76%, transparent) !important;
   box-shadow: inset 3px 0 #ffd34f, inset 0 0 17px rgba(255, 91, 20, .40), 0 0 8px rgba(255, 108, 24, .34);
   animation: light-mlb-fire-pulse 1.05s ease-in-out infinite alternate;
+}
+
+/* A tracked-row highlight and the fire pulse both repaint the same row. Keep the
+   fire treatment, but freeze it while that player is tracked so it cannot blink. */
+body.light-mlb-page .lineup-list li.lineup-row-tracked.is-lite-fire,
+body.light-mlb-page .lineup-list li.lineup-row-tracked.is-lite-fire::before,
+body.light-mlb-page .lineup-list li.lineup-row-tracked.is-lite-fire::after {
+  animation: none !important;
 }
 
 @keyframes light-mlb-ice-pulse {

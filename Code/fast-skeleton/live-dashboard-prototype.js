@@ -23015,6 +23015,11 @@ function normalizePlayerConfidence(value) {
   return Number.isFinite(n) ? clamp(n, 1, 5) : 3;
 }
 
+function normalizeTrackerConfidence(value) {
+  const n = Math.round(Number(value));
+  return Number.isFinite(n) ? clamp(n, 0, 100) : 50;
+}
+
 const PLAYER_EXPECTATION_OPTIONS = [
   ['H', 'H'],
   ['XBH', 'XBH'],
@@ -23043,6 +23048,7 @@ function normalizeTrackedPlayerEntries(players = []) {
       position: entry?.position || '',
       addedAt: Number(entry?.addedAt) || Date.now() + deduped.length,
       expectation: normalizePlayerExpectation(entry?.expectation || entry?.expected || ''),
+      confidence: normalizeTrackerConfidence(entry?.confidence),
     });
   }
   return deduped;
@@ -23419,12 +23425,14 @@ function renderPlayerTrackerSummary(counts = { tracked: 0, dueThisInning: 0, liv
 function currentPlayerTrackerSortLabel() {
   if (playerTrackerSortMode === 'game') return 'game time';
   if (playerTrackerSortMode === 'tb') return 'TB';
+  if (playerTrackerSortMode === 'confidence') return 'confidence';
   return 'time added';
 }
 
 function nextPlayerTrackerSortMode() {
   if (playerTrackerSortMode === 'added') return 'game';
   if (playerTrackerSortMode === 'game') return 'tb';
+  if (playerTrackerSortMode === 'tb') return 'confidence';
   return 'added';
 }
 
@@ -23432,12 +23440,13 @@ function trackedPlayerSortValue(entry, games = latestRenderedGames) {
   const { profile, game } = resolveTrackedPlayerProfile(entry, games);
   if (playerTrackerSortMode === 'game') return gameStartTimeMs(game) ?? Number.MAX_SAFE_INTEGER;
   if (playerTrackerSortMode === 'tb') return statNumber(profile?.gameBatting?.tb ?? profile?.gameBatting?.totalBases);
+  if (playerTrackerSortMode === 'confidence') return normalizeTrackerConfidence(entry?.confidence);
   return Number(entry?.addedAt) || 0;
 }
 
 function sortTrackedPlayersForDisplay(tracked = [], games = latestRenderedGames) {
   return tracked.map((entry, index) => ({ entry, index })).sort((a, b) => {
-    if (playerTrackerSortMode === 'tb') {
+    if (playerTrackerSortMode === 'tb' || playerTrackerSortMode === 'confidence') {
       return trackedPlayerSortValue(b.entry, games) - trackedPlayerSortValue(a.entry, games)
         || a.index - b.index;
     }
@@ -23468,6 +23477,31 @@ function trackedPlayerNavContext(playerId, games = latestRenderedGames) {
     entries,
     playerId: Number(playerId),
     game: current.game || null,
+  };
+}
+
+function trackedPlayerOpponentPitcher(profile, game) {
+  if (!profile || !game) return null;
+  const pitcher = currentMatchupPitcher(profile, game);
+  if (!pitcher) return null;
+  const fullName = cleanSummary(pitcher?.fullName || pitcher?.name || '');
+  if (!fullName) return null;
+  const playerTeam = canonicalTeamAbbrev(profile.teamAbbrev || '');
+  const opponentSide = sameTeamAbbrev(playerTeam, game.away) ? 'home'
+    : sameTeamAbbrev(playerTeam, game.home) ? 'away'
+      : '';
+  const teamAbbrev = canonicalTeamAbbrev(
+    pitcher?.teamAbbrev
+    || pitcher?.team?.abbreviation
+    || (opponentSide ? game?.[opponentSide] : ''),
+  );
+  const id = Number(pitcher?.id ?? pitcher?.person?.id ?? pitcher?.playerId);
+  return {
+    id: Number.isFinite(id) && id > 0 ? id : null,
+    name: lastName(fullName) || fullName,
+    hand: pitcherThrowHandValue(pitcher),
+    teamAbbrev,
+    teamColor: pitcher?.teamColor || getTeamColor(teamAbbrev) || '#a9c5dc',
   };
 }
 
@@ -23511,6 +23545,8 @@ function renderPlayerTrackerList(games = latestRenderedGames) {
         row.game?.activeBatterId || '',
         row.game?.battingSide || '',
         row.game?.outs ?? '',
+        trackedPlayerOpponentPitcher(row.profile, row.game)?.name || '',
+        trackedPlayerOpponentPitcher(row.profile, row.game)?.hand || '',
         stats.hits,
         stats.homeRuns,
         stats.totalBases,
@@ -23541,6 +23577,13 @@ function renderPlayerTrackerList(games = latestRenderedGames) {
     const teamColor = profile?.teamColor || game?.awayColor || game?.homeColor || '#66d9ff';
     const todayLine = trackedPlayerTodayLine(profile);
     const playerName = profile?.fullName || entry.playerName || 'Unknown';
+    const confidence = normalizeTrackerConfidence(entry?.confidence);
+    const opponentPitcher = trackedPlayerOpponentPitcher(profile, game);
+    const opponentPitcherHtml = opponentPitcher
+      ? `<sup class="player-track-matchup">vs. ${opponentPitcher.id
+        ? `<button type="button" class="player-track-pitcher-link" data-tracker-pitcher-id="${opponentPitcher.id}" style="--tracker-pitcher-color:${escapeHtml(opponentPitcher.teamColor)}" aria-label="Open ${escapeHtml(opponentPitcher.name)} player card">${escapeHtml(opponentPitcher.name)}</button>`
+        : `<span class="player-track-pitcher-name" style="--tracker-pitcher-color:${escapeHtml(opponentPitcher.teamColor)}">${escapeHtml(opponentPitcher.name)}</span>`}${opponentPitcher.hand ? ` (${escapeHtml(opponentPitcher.hand)})` : ''}</sup>`
+      : '';
     const expectationOptions = PLAYER_EXPECTATION_OPTIONS
       .map(([value, label]) => `<option value="${value}"${expectation === value ? ' selected' : ''}>${label}</option>`)
       .join('');
@@ -23558,19 +23601,22 @@ function renderPlayerTrackerList(games = latestRenderedGames) {
     el.dataset.playerId = String(playerId);
     el.dataset.gamePk = String(game?.gamePk || '');
     el.dataset.todayLine = todayLine;
-    el.draggable = true;
+    el.draggable = false;
     el.style.setProperty('--tracker-team-color', teamColor);
     el.style.setProperty('--tracker-team-rgb', hexToRgb(teamColor));
     el.innerHTML = `
-      <button class="player-track-drag" type="button" draggable="true" data-player-track-drag="${playerId}" aria-label="Drag to reorder tracked player">||</button>
-      <img class="player-track-face" src="${playerHeadshotUrl(playerId)}" alt="${escapeHtml(playerName)} headshot" />
+      <button class="player-track-drag" type="button" draggable="false" data-player-track-drag="${playerId}" aria-label="Hold and drag to reorder tracked player">||</button>
+      <img class="player-track-face" draggable="false" src="${playerHeadshotUrl(playerId)}" alt="${escapeHtml(playerName)} headshot" />
       <div class="player-track-copy">
         <div class="player-track-compact-line"><strong>${escapeHtml(lastName(playerName))}</strong><span>${escapeHtml(todayLine)}</span></div>
-        <strong>${escapeHtml(playerName)}</strong>
+        <div class="player-track-name-row"><strong>${escapeHtml(playerName)}</strong>${opponentPitcherHtml}</div>
         <div class="player-track-meta">
           <span>${escapeHtml([displayTeamAbbrev(teamAbbrev), position].filter(Boolean).join(' | '))}</span>
           ${statusChip}
-          <label class="player-track-confidence" title="Tracked expectation">
+          <label class="player-track-confidence-control">
+            <input type="range" min="0" max="100" step="1" value="${confidence}" data-tracked-confidence-id="${playerId}" aria-label="Confidence for ${escapeHtml(playerName)}" style="--tracker-confidence:${confidence}%">
+          </label>
+          <label class="player-track-confidence">
             <span>EXP</span>
             <select class="player-track-expectation" data-tracked-expectation-id="${playerId}" aria-label="Expectation for ${escapeHtml(playerName)}">
               ${expectationOptions}
@@ -24076,6 +24122,21 @@ function initBetInput() {
   });
 
   playerTrackerListEl?.addEventListener('click', (e) => {
+    const pitcherLink = e.target.closest('[data-tracker-pitcher-id]');
+    if (pitcherLink) {
+      e.preventDefault();
+      e.stopPropagation();
+      const pitcherId = Number(pitcherLink.dataset.trackerPitcherId);
+      const trackedItem = pitcherLink.closest('.player-track-item[data-game-pk]');
+      const gamePk = String(trackedItem?.dataset.gamePk || '');
+      const game = latestRenderedGames.find((g) => String(g.gamePk) === gamePk)
+        || getCachedGames().find((g) => String(g.gamePk) === gamePk)
+        || null;
+      if (Number.isFinite(pitcherId) && pitcherId > 0) {
+        openPlayerStatOverlay(pitcherId, game, { forceRole: 'pitcher' });
+      }
+      return;
+    }
     const removeTrackedBtn = e.target.closest('[data-tracked-player-id]');
     if (removeTrackedBtn) {
       const playerId = String(removeTrackedBtn.dataset.trackedPlayerId || '');
@@ -24092,6 +24153,16 @@ function initBetInput() {
     if (Number.isFinite(playerId)) openPlayerStatOverlay(playerId, game || navContext?.game || null, navContext ? { navContext } : {});
   });
   playerTrackerListEl?.addEventListener('change', (e) => {
+    const confidenceInput = e.target.closest('[data-tracked-confidence-id]');
+    if (confidenceInput) {
+      const playerId = String(confidenceInput.dataset.trackedConfidenceId || '');
+      const confidence = normalizeTrackerConfidence(confidenceInput.value);
+      saveTrackedPlayers(getTrackedPlayers().map((entry) => (
+        String(entry.playerId) === playerId ? { ...entry, confidence } : entry
+      )));
+      renderPlayerTrackerList(latestRenderedGames);
+      return;
+    }
     const expectationSelect = e.target.closest('[data-tracked-expectation-id]');
     if (!expectationSelect) return;
     const playerId = String(expectationSelect.dataset.trackedExpectationId || '');
@@ -24102,7 +24173,61 @@ function initBetInput() {
     )));
     renderPlayerTrackerList(latestRenderedGames);
   });
+  playerTrackerListEl?.addEventListener('input', (e) => {
+    const confidenceInput = e.target.closest('[data-tracked-confidence-id]');
+    if (!confidenceInput) return;
+    const confidence = normalizeTrackerConfidence(confidenceInput.value);
+    confidenceInput.style.setProperty('--tracker-confidence', `${confidence}%`);
+    confidenceInput.setAttribute('aria-valuetext', `${confidence}% confidence`);
+  });
+  let trackerPointerDrag = null;
+  const clearTrackerPointerDrag = () => {
+    playerTrackerListEl?.querySelectorAll('.player-track-item').forEach((item) => {
+      item.classList.remove('is-dragging', 'is-drop-before', 'is-drop-after');
+    });
+    trackerPointerDrag = null;
+  };
+  playerTrackerListEl?.addEventListener('pointerdown', (e) => {
+    const handle = e.target.closest('[data-player-track-drag]');
+    if (!handle || e.button !== 0) return;
+    const item = handle.closest('.player-track-item[data-player-id]');
+    if (!item) return;
+    e.preventDefault();
+    e.stopPropagation();
+    handle.setPointerCapture?.(e.pointerId);
+    item.classList.add('is-dragging');
+    trackerPointerDrag = { pointerId: e.pointerId, playerId: item.dataset.playerId || '', overId: '', after: false };
+  });
+  playerTrackerListEl?.addEventListener('pointermove', (e) => {
+    if (!trackerPointerDrag || e.pointerId !== trackerPointerDrag.pointerId) return;
+    e.preventDefault();
+    const overItem = document.elementFromPoint(e.clientX, e.clientY)?.closest?.('.player-track-item[data-player-id]');
+    playerTrackerListEl.querySelectorAll('.player-track-item').forEach((item) => item.classList.remove('is-drop-before', 'is-drop-after'));
+    if (!overItem || overItem.dataset.playerId === trackerPointerDrag.playerId) return;
+    const rect = overItem.getBoundingClientRect();
+    const after = e.clientY >= rect.top + (rect.height / 2);
+    trackerPointerDrag.overId = overItem.dataset.playerId || '';
+    trackerPointerDrag.after = after;
+    overItem.classList.add(after ? 'is-drop-after' : 'is-drop-before');
+  });
+  const finishTrackerPointerDrag = (e) => {
+    if (!trackerPointerDrag || e.pointerId !== trackerPointerDrag.pointerId) return;
+    const { playerId, overId, after } = trackerPointerDrag;
+    clearTrackerPointerDrag();
+    if (!playerId || !overId) return;
+    const tracked = getTrackedPlayers();
+    const overIndex = tracked.findIndex((entry) => String(entry.playerId) === String(overId));
+    const beforeEntry = after ? tracked[overIndex + 1] : tracked[overIndex];
+    moveTrackedPlayer(playerId, beforeEntry?.playerId || '');
+  };
+  playerTrackerListEl?.addEventListener('pointerup', finishTrackerPointerDrag);
+  playerTrackerListEl?.addEventListener('pointercancel', clearTrackerPointerDrag);
   playerTrackerListEl?.addEventListener('dragstart', (e) => {
+    const handle = e.target.closest('[data-player-track-drag]');
+    if (!handle) {
+      e.preventDefault();
+      return;
+    }
     const item = e.target.closest('.player-track-item[data-player-id]');
     if (!item) return;
     item.classList.add('is-dragging');
@@ -37625,6 +37750,10 @@ function initTrackerRailControls() {
   const write = (key, value) => {
     try { localStorage.setItem(key, value ? '1' : '0'); } catch {}
   };
+  const applyPanelOrder = (hrFirst) => {
+    playerPanel.style.order = hrFirst ? '3' : '2';
+    hrPanel.style.order = hrFirst ? '2' : '3';
+  };
   const setCompact = (panel, button, compact, key) => {
     panel.classList.toggle('is-compact', compact);
     if (button) {
@@ -37635,14 +37764,18 @@ function initTrackerRailControls() {
   };
   setCompact(playerPanel, playerTrackerCollapseBtnEl, read('dashboard-player-tracker-compact:v1'), 'dashboard-player-tracker-compact:v1');
   setCompact(hrPanel, hrCollapseBtnEl, read('dashboard-hr-feed-compact:v1'), 'dashboard-hr-feed-compact:v1');
-  if (read('dashboard-rail-hr-first:v1')) rail.insertBefore(hrPanel, playerPanel);
+  const initialHrFirst = read('dashboard-rail-hr-first:v1');
+  if (initialHrFirst) rail.insertBefore(hrPanel, playerPanel);
+  applyPanelOrder(initialHrFirst);
   playerTrackerCollapseBtnEl?.addEventListener('click', () => setCompact(playerPanel, playerTrackerCollapseBtnEl, !playerPanel.classList.contains('is-compact'), 'dashboard-player-tracker-compact:v1'));
   hrCollapseBtnEl?.addEventListener('click', () => setCompact(hrPanel, hrCollapseBtnEl, !hrPanel.classList.contains('is-compact'), 'dashboard-hr-feed-compact:v1'));
   rail.querySelectorAll('[data-rail-swap]').forEach((button) => button.addEventListener('click', () => {
     const hrFirst = hrPanel.compareDocumentPosition(playerPanel) & Node.DOCUMENT_POSITION_FOLLOWING;
     if (hrFirst) rail.insertBefore(playerPanel, hrPanel);
     else rail.insertBefore(hrPanel, playerPanel);
-    write('dashboard-rail-hr-first:v1', !hrFirst);
+    const nextHrFirst = !hrFirst;
+    applyPanelOrder(nextHrFirst);
+    write('dashboard-rail-hr-first:v1', nextHrFirst);
   }));
 }
 
@@ -51173,6 +51306,9 @@ function initThemedTooltips() {
   let pinnedTouchTooltip = false;
   let interactiveTooltipHover = false;
   let hoverPinTimer = 0;
+  let hoverShowTimer = 0;
+  let pendingHoverTarget = null;
+  let pendingHoverEvent = null;
   let suppressPassiveTooltipClickTarget = null;
   let suppressPassiveTooltipClickUntil = 0;
   const SUPPRESS_TOOLTIP_SELECTOR = [
@@ -51185,6 +51321,7 @@ function initThemedTooltips() {
     '.pitch-last-start-use',
     '.player-batted-ball-profile-table',
     '.player-batted-ball-stacked-cell',
+    '.player-track-confidence-control',
     '.score-mini-no-tooltip',
     '.dashboard-scoreboard > .topbar',
     '.dashboard-scoreboard > .games',
@@ -51309,6 +51446,32 @@ function initThemedTooltips() {
     pendingHideTimer = 0;
   }
 
+  function clearPendingHoverShow() {
+    if (hoverShowTimer) window.clearTimeout(hoverShowTimer);
+    hoverShowTimer = 0;
+    pendingHoverTarget = null;
+    pendingHoverEvent = null;
+  }
+
+  function scheduleHoverTooltip(el, event = null) {
+    if (!el || pinnedTouchTooltip) return;
+    if (activeEl === el && !tooltipEl.hidden) return;
+    if (pendingHoverTarget === el) {
+      pendingHoverEvent = event || pendingHoverEvent;
+      return;
+    }
+    clearPendingHoverShow();
+    pendingHoverTarget = el;
+    pendingHoverEvent = event;
+    hoverShowTimer = window.setTimeout(() => {
+      const target = pendingHoverTarget;
+      const pointerEvent = pendingHoverEvent;
+      clearPendingHoverShow();
+      if (!target?.isConnected || !target.matches?.(':hover')) return;
+      showTooltip(target, pointerEvent);
+    }, 1500);
+  }
+
   function clearTouchTooltipHide() {
     if (!touchTooltipHideTimer) return;
     window.clearTimeout(touchTooltipHideTimer);
@@ -51364,6 +51527,7 @@ function initThemedTooltips() {
     const title = readableTitle(el);
     if (!title) return;
     clearPendingHide();
+    clearPendingHoverShow();
     if (activeEl && activeEl !== el && sameTooltipArea(activeEl, el)) {
       activeEl = el;
       return;
@@ -51384,6 +51548,7 @@ function initThemedTooltips() {
     const target = activeEl;
     if (el && target !== el) return;
     clearPendingHide();
+    clearPendingHoverShow();
     clearTouchTooltipHide();
     clearHoverPin();
     pinnedTouchTooltip = false;
@@ -51419,7 +51584,7 @@ function initThemedTooltips() {
     if (pinnedTouchTooltip) return;
     const target = titleTarget(event.target);
     if (!target) return;
-    showTooltip(target, event);
+    scheduleHoverTooltip(target, event);
   }, true);
 
   document.addEventListener('hrstacktooltipchange', (event) => {
@@ -51435,11 +51600,12 @@ function initThemedTooltips() {
     if (pinnedTouchTooltip) return;
     const target = titleTarget(event.target);
     if (!activeEl) {
-      if (target) showTooltip(target, event);
+      if (target) scheduleHoverTooltip(target, event);
+      else clearPendingHoverShow();
       return;
     }
     if (!activeTooltipStillValid()) {
-      if (target) showTooltip(target, event);
+      if (target) scheduleHoverTooltip(target, event);
       return;
     }
     if (target && target !== activeEl) {
@@ -51447,7 +51613,8 @@ function initThemedTooltips() {
         activeEl = target;
         return;
       }
-      showTooltip(target, event);
+      hideTooltip(activeEl);
+      scheduleHoverTooltip(target, event);
       return;
     }
     if (!target && !activeEl.contains(event.target) && !tooltipEl.contains(event.target) && !interactiveTooltipHover) hideTooltip(activeEl);
@@ -51457,6 +51624,7 @@ function initThemedTooltips() {
 
   document.addEventListener('pointerout', (event) => {
     if (pinnedTouchTooltip) return;
+    if (pendingHoverTarget && (!event.relatedTarget || !pendingHoverTarget.contains?.(event.relatedTarget))) clearPendingHoverShow();
     if (!activeEl) return;
     clearHoverPin();
     if (event.relatedTarget && activeEl.contains(event.relatedTarget)) return;
