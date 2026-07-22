@@ -1,292 +1,849 @@
-# Baseball Dashboard Write-Up
+# OwenTools MLB Dashboard: Complete As-Built Reference
 
-## Purpose
+Last audited against the shared MLB implementation on 2026-07-22.
 
-This site is a live MLB dashboard for tracking daily games, probable starters, lineups, predictions, player props, and manual betting/tracking notes. The main experience is the scoreboard: each game card gives a compact game state, team context, pitcher and hitter context, manual pick controls, and links into deeper lineup and player analysis.
+This document describes the current production behavior, every major visible statistic and indicator, the source and fallback chain behind the data, formatting rules, persistence, refresh behavior, and the code location responsible for each system. Function names are used as stable locators because line numbers move frequently.
 
-The tool is meant to support live decision-making before and during games. It combines cached schedule/game data, MLB StatsAPI data, RotoWire fallback lineup data, local user state, and cross-device sync.
+## 1. Production entrypoints and file map
 
-## Main Screens And Workflows
+| File | Responsibility |
+| --- | --- |
+| `../mlb/heavy_mlb.html` | Full production MLB page. Loads every analytical system. |
+| `../mlb/light_mlb.html` | Lightweight production page. Uses the shared application but disables triangles, pitch-type information, velocity sections, and lineup power calculations. |
+| `dashboard-live-prototype.html` | Shared/development scoreboard entrypoint and the canonical markup source. |
+| `live-dashboard-prototype.js` | Almost all application state, API access, caching, normalization, rendering, interaction, calculations, polling, tooltips, player cards, predictions, and manual-state bridging. |
+| `live-prototype.css` | MLB-specific scoreboard, lineup, tracker, feed, player-card, graph, animation, responsive, and interaction styling. |
+| `dashboard.css` | Older/base dashboard layout, team cards, panels, controls, and shared visual primitives. MLB-specific overrides generally live in `live-prototype.css`. |
+| `styles.css` | Global OwenTools typography, colors, buttons, dialogs, and shared shell styling. |
+| `rotowire-default-lineups.js` | Published RotoWire lineup seeds, organized by club and opposing pitcher hand. |
+| `rotowire-current-defaults.json` | Refreshable current lineup seed payload. |
+| `update-rotowire-default-lineups.js` / `.ps1` | Maintenance scripts for refreshing published RotoWire defaults. |
+| `mlb-contracts-data.js` and contract CSV | Contract lookup fallback/data bundle. |
+| `../shared/owentools-sync.js` | Authentication, durable session handling, Supabase Save/Load, immutable save history, and shared sync widget. |
+| `../shared/supabase-config.js` | Supabase connection configuration. |
 
-### Scoreboard
+Both production pages set a `<base href="../fast-skeleton/">`, so their CSS, JavaScript, audio, images, lineup seeds, and contract assets resolve from `Code/fast-skeleton` while the public URLs remain under `Code/mlb`.
 
-The scoreboard is the primary screen. Each game card shows:
+### Heavy versus light feature gate
 
-- Away and home teams with logos, records, streak badges, and scores.
-- Pregame probable pitcher lines with handedness, ERA, and pitch-count tags when available.
-- Live count/state strip once a game starts.
-- Manual game pick state, including selected teams and live hit/miss or leading/trailing styling.
-- Tossup/near-lock/lock states for pregame games.
-- Over/under lean controls.
-- Pregame yellow HR-risk sheen when at least one displayed starter has allowed 3 or more HR over his last 3 starts.
-- Team-colored underline/highlight on the offending pitcher line when the HR-risk sheen is active.
+`light_mlb.html` defines:
 
-The yellow HR-risk sheen is pregame-only. It should disappear once the game reaches scheduled/game-start state.
+```js
+window.MLB_DASHBOARD_LITE = {
+  triangles: false,
+  pitchInfo: false,
+  velocity: false,
+  lineupPower: false
+};
+```
 
-### Lineup View
+`live-dashboard-prototype.js` freezes this into `MLB_DASHBOARD_LITE` at startup. Heavy MLB does not define the object, so all four features default on. This distinction is important: the light page must not fetch or calculate hidden pitch, velocity, triangle, or power-grade work merely to hide it with CSS.
 
-The lineup overlay opens from a scoreboard card and gives a deeper game-level view:
+## 2. Overall application architecture
 
-- Projected or confirmed batting orders.
-- Batter handedness, position, today status, recent stat badges, streak markers, hot/cold indicators, HR indicators, and matchup flags.
-- Opposing pitcher context and pitcher markers.
-- Team bullpen cards with overall and last-14-calendar-day IP, ERA, WHIP, HR/9, and K/9 plus MLB ranks for both windows. Values use `overall/14D - overall rank/14D rank`.
-- Lineup HR score buttons and prediction detail links.
-- Manual game pick and over/under controls mirrored from the scoreboard.
-- Tracked player styling in the lineup row when a player is added to the player tracker.
+The page uses a fast-shell/hydration model:
 
-The lineup view tries confirmed lineups first, then fallback/projected sources when needed.
+1. The selected date and locally cached cards restore immediately.
+2. The schedule supplies the game shell, teams, status, probable pitchers, and records.
+3. Live feeds and box scores enrich scores, innings, bases, counts, play events, lineups, player lookups, pitchers, and today statlines.
+4. Official lineups are preferred. RotoWire and recent same-handed lineups fill incomplete pregame batting orders.
+5. Player, team, recent-form, Statcast/Savant, contract, ranking, prediction, and graph information hydrates lazily or in background lanes.
+6. `finalizeRenderedGames()` deduplicates the cards, repaints only changed fingerprints, refreshes dependent panels, and schedules lower-priority work.
+7. Live games continue passive refreshes without destroying user interaction state.
 
-### Player Cards
+Core orchestration is in `loadGames()`, `finalizeRenderedGames()`, `upsertCard()`, `updateScoreboardLiveCard()`, `scheduleScoreboardIdlePrewarm()`, and the passive-refresh functions near the end of `live-dashboard-prototype.js`.
 
-Player cards provide individual player analysis.
+## 3. Top bar and global controls
 
-For hitters, the card includes:
+Markup is in the three HTML entrypoints under `.topbar`. Control behavior is initialized near the beginning of `live-dashboard-prototype.js`.
 
-- Season and recent batting stats.
-- Recent game windows.
-- Handedness splits.
-- HR and extra-base indicators.
-- Matchup and heatmap-style context.
+### Date control
 
-For pitchers, the card includes:
+- Accepts flexible typed dates and normalizes them to `YYYY-MM-DD`.
+- Opens a custom month picker on focus/click.
+- Previous/next arrows move one day.
+- Middle-click returns to today.
+- The selected date persists as `dashboard-date:v1`.
+- Changing dates clears date-scoped rendered state, restores that date's manual state, and loads the selected slate.
 
-- Season and recent pitching stats.
-- Last 3 starts or appearances, depending on role.
-- Pitcher rank context.
-- Opponent strength context.
-- Average Stamina, shown as average IP and average pitches per appearance/start.
-- Ext. W-L, which counts whether the pitcher's club won games he started, independent of pitcher decision W-L.
-- Last-start/HR risk details and pitcher heatmap sections.
+Code: `parseFlexibleDateInput()`, `renderDatePicker()`, `setDateInputValue()`, `refreshForSelectedDate()`, and the `dateInput` event handlers.
 
-Pitcher names themselves do not carry hover tooltips. Indicator badges and analytical cells may still provide their own focused explanations.
+### Help and player search
 
-### Player Tracker
+- `?` opens the controls/site-capability help.
+- The magnifying glass opens global player search.
+- Search supports team, skill/group, position, age, and handedness filters.
+- Results use headshots, identity data, and open the same player-stat overlay used by lineups and trackers.
 
-The tracker lets you mark players to monitor across games. Tracked players are saved locally and synced. When a tracked player appears in the lineup view, the corresponding lineup slot gets a visual effect so the player is easier to spot.
+Code: `initGlobalPlayerSearch()`, global search render/fetch helpers, and `.global-player-search-*` CSS.
 
-Tracked player state is date-scoped and backed up through multiple manual-state stores.
+### Today-only Hide menu
 
-The Player Tracker and Home Run Feed can be swapped vertically with either **SWAP** control. Each panel also has a persisted **compact** mode. Both compact feeds use the same 48px row height. Compact player rows show a small inline portrait with a slight inset so the face remains prominent, the player's last name in its existing team/status color, live daily statline, and a right-aligned remove button. Compact home-run rows show the team logo, a team-colored player last name, season HR number, footage, and inning. The Home Run Rating display is fixed to letter grades and no longer exposes a style toggle. The former tracker count indicators and bulk Clear Tracker button are intentionally hidden; players are removed individually. These display preferences are local UI settings and are not part of manual save snapshots.
+The Hide button appears immediately after player search only when the selected date is today. Hovering or pressing it opens three line-separated checkbox-style choices:
 
-The player-card recent-days selector is intentionally trim and has an accessibility label without a hover tooltip.
+- Past games: completed/final games.
+- Ongoing games: live, in-progress, warmup, delayed, review, or manager-challenge states.
+- Future games: all remaining not-started games.
 
-Player tracker statlines repaint during passive live-game refreshes; a full page refresh is not required.
+An illuminated dot means that category is hidden. The selection persists in `mlb-game-visibility:v1`. Hiding a category hides its scoreboard cards and also removes tracked-player rows belonging to those games. On every other date, the entire control is absent and all categories display normally.
 
-### Live Refresh And Event Ordering
+Code: `visibilityStateForGame()`, `gameAllowedByVisibility()`, `gamesAllowedByVisibility()`, `syncGameVisibilityControl()`, and `.game-visibility-*` CSS.
 
-- Active games poll approximately every 3 seconds while the page is visible.
-- Passive refreshes repaint scoreboards, the player tracker, and the home-run feed.
-- Pitch events retain MLB's chronological event index/time ordering so ball, strike, in-play, and completed-play calls advance in sequence.
-- Administrative events such as game advisories, mound visits, reviews, and status changes remain in chronological source data but are excluded from the transient baseball-event flash, preventing an old advisory from repeatedly presenting as the newest play.
+### Docking, sizing, columns, and pages
 
-### Lineup Power Grades
+- Scoreboard can dock and resize within the workspace.
+- Column count is normalized to the available width.
+- Panels can move, resize, snap to neighbors, avoid overlap, and restore saved positions.
+- Page tabs expose Scoreboard, Leaders, Team Stats, and Playoff Picture; additional internal views support predictions/hot-player surfaces.
 
-Numeric lineup HR scores have been replaced by date-isolated power grades. The grade compares each hitter's SLG with the eligible MLB hitter population in four windows ending on the day before the selected dashboard date, converts each window to a league decile, and weights them as follows:
+Code: `applyOverlayDock()`, `applyOverlaySize()`, `applyScoreboardColumns()`, `initMovables()`, panel geometry helpers, and `normalizeOverlayPage()`.
 
-- Season-to-date: 50%.
+Persisted keys include `panel-layout:v2`, `overlay-dock:v1`, `overlay-size:v2`, `scoreboard-columns:v2`, `overlay-page:v1`, and `scoreboard-width:v1`.
+
+## 4. Scoreboard game cards
+
+Each `.game-card` is created from `#gameTemplate`. Rendering is primarily in `upsertCard()`, the card-render helpers around it, and `updateScoreboardLiveCard()`.
+
+### Header and team information
+
+Cards can show:
+
+- Away/home abbreviation and logo.
+- Season record.
+- Team streak.
+- Last-five/last-seven recent record where hydrated.
+- Team score or pregame dash.
+- Scheduled start time in Eastern Time.
+- Game status, inning half/number, delay/final state, doubleheader/game number, and series context.
+- Team-strength/record badges and selected manual state.
+
+Recent records are audited from MLB regular-season final games. Games without a resolvable winner, postponed games, and ties are excluded. The same audited game set is used for its AVG/SLG/OPS/ERA aggregates.
+
+Code: `getTeamStreakMap()`, `getTeamLastSevenRecord()`, `getLineupTeamRecentStats()`, `recentTeamScheduleSummary()`, and `formatRecentTeamSummary()`.
+
+### Pitcher line
+
+The displayed starter/current pitcher line can include:
+
+- Name and throwing hand.
+- SP/RP/CP role.
+- IP.
+- ERA.
+- WHIP.
+- HR/9.
+- K/9.
+- Pitch count when applicable.
+- Risk/status markers, probable/starter confidence, opener context, and recent usage/readiness indicators.
+
+Probable selection verifies team association and protects doubleheaders from assigning one pitcher to both games. Live/current pitchers supersede probable pitchers after play starts. TBD fallbacks may use recent rotation memory but remain labeled as fallback/TBD rather than presented as confirmed.
+
+Code: `previewProbableForSide()`, `resolveOfficialPregameProbablePitchers()`, `resolveDuplicateProbablePitchersAsTbd()`, `fillPotentialStartersForTbdProbables()`, `formatPitcherLine()`, `pitchCountTag()`, and `pitcherDisplayUsageRole()`.
+
+### Live game strip
+
+During live play the card displays:
+
+- Line score / R and H.
+- Current inning and half.
+- Balls, strikes, and outs.
+- Base occupancy diamond.
+- Current pitcher and current/upcoming hitters.
+- Play/event text.
+
+Live event ordering uses MLB play/event indices and timestamps. Administrative events remain in source history but are excluded from the transient baseball-action flash so old advisories do not repeatedly look like the newest pitch.
+
+### Manual game controls
+
+- Clicking/selecting a team creates a pending game pick.
+- Picks receive leading/trailing styling live and hit/miss styling when final.
+- Clear Picks removes pending selections.
+- Pregame confidence cycles Tossup (yellow), Near Lock (unlocked/intermediate), and Lock (gray lock).
+- Over/under markers are stored per game and mirrored into the lineup overlay.
+
+Code: the pending-pick functions near `restorePendingGamePicks()`, `syncAllCardGamePickStates()`, tossup functions using `TOSSUP_SCOREBOARD_STORAGE_KEY`, and over/under functions using `OVER_UNDER_SCOREBOARD_STORAGE_KEY`.
+
+### Pregame risk styling
+
+A pregame starter allowing at least three home runs across the applicable last-three-start window can activate the yellow HR-risk card sheen and a team-colored emphasis on the relevant pitcher. The effect stops being a pregame warning after the game begins.
+
+## 5. Lineup overlay
+
+Opening a card presents a full game overlay. State is date-scoped with `lineup-open:v2:{date}`, `lineup-view:v1:{date}`, and the shared lineup-stat-window preference.
+
+Views:
+
+- Lineups.
+- Pitching.
+- Roster.
+- Live.
+
+Navigation arrows move through games. Split-peer behavior can place another lineup beside the first. The overlay retains mirrored game-pick, tossup/lock, and over/under controls.
+
+### Team header and series strip
+
+The overlay includes team identity, color, logo, record/recent form, handedness matchup summaries, opener context, series results, and starters from recent series games. Season head-to-head and current-series fallbacks are resolved from MLB schedules.
+
+Code: `renderLineupSeriesStrip()`, `getTeamSeriesResults()`, `getSeasonHeadToHeadRecord()`, `lineupSeriesStripHtml()`, and lineup team status helpers.
+
+### Batter rows: visible content
+
+Each batting-order row can show:
+
+- Batting-order slot.
+- Player name with a 2px black outline for contrast.
+- Batting hand.
+- Position.
+- Today's batting line and outcome shorthand.
+- Selected recent-window hits-at-bats.
+- AVG.
+- OPS.
+- XBH.
+- HR.
+- HR/XBH and other situational badges.
+- Hot/cold icons, streak/context icons, next/up-now state, and tracked-player highlighting.
+
+The compact recent format is `H-AB | AVG | OPS | XBH | HR`, produced by `lineupDashboardStatsHtml()`. Today's line is built from actual game batting totals in `lineupGameBattingStats()` and `battingTodaySummaryFromGameStats()`.
+
+### Light-page OPS color scale
+
+On the light page, every lineup player receives a recent-OPS tone:
+
+- The continuous scale spans `.000` OPS through `.900+`.
+- Low values trend blue.
+- Middle values fade toward the neutral row treatment.
+- High values trend orange.
+- The lowest extreme receives an ice treatment.
+- `.900+` receives the fire treatment.
+- A tracked player who is also in the fire state keeps a static fire appearance; the pulse is deliberately disabled for that combined state to prevent blinking between highlighted states.
+
+Code: light tone helpers near `applyLightPerformanceTone()`, lineup-row rendering near the end of the file, `.light-lineup-ops-tone`, `.is-lite-ice`, `.is-lite-fire`, and the `.lineup-row-tracked.is-lite-fire` override.
+
+### Pitcher light-page ERA scale
+
+Pitcher rows use an inverse last-three-appearance/start ERA scale:
+
+- `0.00` is orange/hot.
+- `7.00+` is blue/cold.
+- Values between are continuously blended.
+
+Code: `.light-pitcher-era-tone` and the same light performance-tone functions.
+
+### Recent home-run card stacks
+
+Batter and pitcher rows can carry compact vertical stacks for home runs in the player's last three games played:
+
+- Most recent game uses the strongest/gold treatment.
+- Second-most-recent uses an intermediate treatment.
+- Third-most-recent is gray.
+- Multiple HR in one game create multiple cards.
+- Cards overlap vertically but leave enough of each top edge visible to show the exact stack count.
+- The stack remains centered within its row and does not change row height.
+- At five or more cards, it may use a second compact row without widening the assigned indicator area.
+- Left-handed participants use rounded corners; right-handed participants use sharp corners.
+- Batter tooltip includes game/date/opponent, opposing pitcher, pitcher hand, and pitch type when available.
+- Pitcher HR-allowed tooltip mirrors the batter interaction and includes the batter name/hand plus pitch type.
+- Left-click cycles the active card and immediately updates the tooltip to that HR.
+- Hover tooltips are transient; middle-click pins a tooltip until dismissed.
+
+Code: the recent-HR hydration/render helpers, HR stack event handlers, `fetchPlayerLastHomeRuns()`-family logic, and `.lineup-recent-hr-*` / HR stack CSS.
+
+### Pitching and bullpen views
+
+The pitching view separates current pitcher, starters, and bullpen. Pitcher rows can show:
+
+- Role and throwing hand.
+- IP, ERA, WHIP, HR/9, and K/9.
+- Season and recent/current-game workload.
+- Availability/readiness inferred from recent usage.
+- Potential closer/opener context.
+- HR-allowed history stack.
+
+Bullpen summary uses two windows in each metric: overall and last 14 calendar days, with corresponding league ranks. Displayed metrics are IP, ERA, WHIP, HR/9, and K/9. Formatting is `overall/14D` plus `overall rank/14D rank`.
+
+Code: `renderBullpenSummary()`, `hydrateBullpenSummaryRanks()`, `formatBullpenOverallRecentValue()`, bullpen aggregation/ranking helpers, and reliever usage functions (`relieverRecentUsageMemory()`, `buildRelieverUsagePredictions()`).
+
+## 6. Player tracker
+
+The tracker stores date-scoped player selections and remains live during passive refreshes.
+
+### Row content
+
+A full tracker row shows:
+
+- Drag handle (`||`).
+- Player headshot with team-logo fallback.
+- Full player name.
+- Superscript `vs. Pitcher (R/L)` matchup on the same wrapped name line.
+- Opposing pitcher surname in that pitcher's team color.
+- Pressing the pitcher surname opens the pitcher card with pitcher role forced.
+- Team and position.
+- Live/up-now/due status.
+- Current-day batting line.
+- Vertical confidence gradient control.
+- Expectation selector.
+- Individual remove button.
+
+The confidence control intentionally shows only the color/vibe, not a numeric label and not a confidence tooltip. Dragging it changes confidence without starting player reorder. Reorder begins only from the `||` handle and works with pointer input on desktop and phone.
+
+Code: `renderPlayerTrackerList()`, `trackedPlayerOpponentPitcher()`, tracker pointer events, `normalizeTrackerConfidence()`, and `.player-track-*` CSS.
+
+### Sorting and layout
+
+Tracker sort modes include time added and confidence. SWAP exchanges the vertical position of Player Tracker and Home Run Feed. On narrow/mobile screens the explicit CSS order changes too, so the feed can truly sit above the tracker rather than only changing a desktop grid. Compact mode is persisted and preserves the important identity/live-line content in a shorter row.
+
+Tracker/fire repaint protection:
+
+- Render fingerprints prevent needless DOM replacement.
+- Passive refresh updates statlines.
+- Pulse/shimmer does not alternate the tracker row.
+- The lineup's combined tracked + fire state is static.
+
+### Tracker persistence
+
+Primary key: `player-tracker:v1:{date}`. Recovery also uses `player-tracker-backup:v1`, manual-state backup/mirror/durable stores, and explicit Supabase Save snapshots. Tracked records include player identity, team/position, expectation, confidence, and ordering information.
+
+## 7. Home Run Feed and audio
+
+The feed lists home runs for the selected date with:
+
+- Batter/team identity and logo.
+- Solo/two-run/three-run/grand-slam description.
+- Season HR number.
+- Distance when available.
+- Time and inning/half.
+- Opposing pitcher and HR-allowed number.
+- Score/result context.
+- Pitch type and velocity when present.
+- Team-colored styling and rating/grade treatment.
+
+Feed ordering can use latest-first behavior. Compact mode shares the shortened panel style. SWAP is shared with the tracker.
+
+New live HR events can play `homerun.mp3`. Already-played event identities persist under the date-scoped `home-run-audio-played:v1` key so polling or refreshing does not replay the same event.
+
+Code: home-run extraction/normalization around the `hrs` storage helpers, `updateHomeRunFeedIfChanged()`, `syncHomeRunAudioAlerts()`, and HR rating functions.
+
+## 8. Player cards: shared structure
+
+Player cards open from lineup names, tracker rows, tracker pitcher links, search, leaders, roster/pitching lists, graph points, and relevant feed/stat surfaces.
+
+Header:
+
+- Full name and handedness.
+- Team, uniform number, and position/role.
+- Headshot and team styling.
+- Hitter/pitcher indicators.
+- Navigation to prior/next player in the invoking context.
+- Tabs for Stats, Outcomes, and Contract.
+- Heavy-only power/quality and graph-related adornments when enabled.
+
+Player profile loading and rendering are in `openPlayerStatOverlay()`, the `fetchPlayer*`/player-stat render helpers, and player-stat event delegation.
+
+### Hitter Stats tab
+
+The main season/recent comparison table can show:
+
+- G.
+- AB.
+- H.
+- AVG.
+- OBP.
+- SLG.
+- OPS.
+- HR.
+- AB/HR.
+- HR versus starter/reliever context where available.
+
+Season values appear beside the selected recent window. The recent-days selector is intentionally compact and accessible without a native hover title.
+
+Handed split table:
+
+- Split (`vs RHP` / `vs LHP`).
+- H-AB.
+- AVG.
+- SLG.
+- XBH.
+- HR.
+
+Historical/recent series cards show the last five series with opponent, series record, AVG, games started, HR, ISO, and opposing pitchers. Pitcher labels can expose portrait/handedness/stat context in their focused tooltip.
+
+### Light player-card replacement metrics
+
+The light page completely removes the old pitch section, velocity bucket, and PWR grade work. The former right-side area instead contains:
+
+- **Average HR Distance** in feet, presented as the visually emphasized metric.
+- **Overall Ratings**: Overall, vs RHP, and vs LHP. Each rating uses an outlined numeral, tier color, glow, gradient background, and proportional bar.
+- **Average Bat Speed**: season and last seven days.
+
+These use the same borders, typography, spacing, and panel background as the rest of the player card; average HR distance receives the stronger decorative treatment. Rating colors move from blue below average through neutral and orange to red/gold at All-Star/elite levels. Rendering is in `lightBatterMetricHtml()`, with Statcast data assembled by `getLightBatterMetrics()` and rating data supplied by `getHitterOverallRatings()`.
+
+### Heavy hitter-only analytical content
+
+When enabled, hitter cards may also display:
+
+- Pitch-type performance: Type, AVG, SLG, EV; or pitcher-allowed comparison columns.
+- Velocity buckets: H-AB, AVG, SLG, XBH, HR.
+- Batted-ball profile: Pull%, center%, opposite/push%, air-ball%, ground-ball%, and PA per 300+ foot air ball.
+- Handed matchup/archetype rows.
+- HR-history triangle and league-decile grade bars.
+- Heatmap/outcome detail.
+
+Pitch/velocity work is gated by `MLB_DASHBOARD_LITE.pitchInfo` and `.velocity`; graph work is gated by `.triangles`.
+
+### Pitcher Stats tab
+
+The season/recent pitcher table can show:
+
+- G and/or GS/role context.
+- W-L.
+- Extended W-L: whether the pitcher's club won starts, regardless of official pitcher decision.
+- IP.
+- ERA.
+- WHIP.
+- K and K/9.
+- HR and HR/9.
+- Average Stamina: average innings and average pitches per start/appearance.
+- Relevant league rank formatting.
+- Heavy-only hitter-grade/quality analysis.
+
+Opponent-handed split table:
+
+- Split.
+- Opp AVG.
+- Opp SLG.
+- HR.
+- HR/9.
+- K.
+
+Last-three starts/appearances, last opponents, team results, pitch counts, workload, and HR-allowed events feed the supporting panels and graphs.
+
+Code: `pitcherStatRows()`, `pitcherOpponentHandHtml()`, `pitcherAverageStaminaText()`, extended-record fetchers, and pitcher history helpers.
+
+### Outcomes tab
+
+The hierarchical outcome viewer navigates:
+
+1. Games.
+2. Plate appearances/outcomes.
+3. Individual pitches.
+4. Field/outcome detail.
+
+It uses MLB live-feed plays and keeps game/play/pitch identity so back navigation and selected outcome remain stable. Relevant descriptions, count, pitch result/type/velocity, hit result, and field position are shown when supplied.
+
+Code: player outcome loaders/renderers and `[data-player-outcome-*]` event handlers.
+
+### Heatmaps
+
+Hitter/pitcher heatmap surfaces can show:
+
+- Split.
+- PA.
+- AVG allowed (AVGA).
+- Isolated power allowed (ISOA).
+- HR allowed (HRA).
+- HR/9.
+- Selected batter/pitcher identities.
+- Hitter/pitcher season context such as AVG, OPS, WHIP, K/9, and HR/9.
+
+Remote season heatmap CSV is configured as `PLAYER_HEATMAP_REMOTE_CSV_URL`; MLB/Savant and current-game context supplement it. Code is in player/pitcher heatmap fetch, row normalization, and render functions around `renderPlayerStatHeatMap()`.
+
+### Contract tab
+
+Contract rows are loaded from the bundled/global contract dataset or CSV. The tab handles no-match/loading/unavailable states and formats labeled contract tables with explanatory tooltips.
+
+Code: `loadPlayerContractRows()`, `renderPlayerContractTab()`, `contractTooltip()`, and `mlb-contracts-data.js`.
+
+## 9. Heavy-only power grades, triangles, and analytical markers
+
+This entire section is disabled on the light page.
+
+### Lineup hitter power grade
+
+Hitter SLG is compared with eligible MLB hitters through the day before the selected date. Windows and weights:
+
+- Season: 50%.
 - Last 30 days: 25%.
 - Last 14 days: 15%.
 - Last 3 days: 10%.
 
-The weighted 0-100 result maps to grades from A+ through F. Clicking a grade shows every window's decile and the exact as-of date, which makes historical hot stretches independently auditable without using the selected game or later games. Grade tooltips remain on one line. League snapshots are cached by explicit start/end date. The dashboard style picker has been removed and the established team-tone style is now fixed.
+Each window becomes a league decile, the weighted score maps A+ through F, and the comparison uses the opposing starter's throwing-hand split. Date isolation prevents later games or the selected game from leaking into a historical grade.
 
-Power grades are handedness-specific. A lineup hitter is ranked only against league SLG distributions for the opposing starter's throwing hand (`vs LHP` or `vs RHP`). Pitcher quality grades are split versus left-handed and right-handed batters and display both values as `L:{grade} R:{grade}`. HR-opponent averages use the handedness that applied to the actual HR matchup.
+### Pitcher quality
 
-Pitcher cards use one compact team-colored quality grade built from equal-weight league deciles for ERA, WHIP, and K/9 through the day before the selected game. Lower ERA and WHIP rank higher; higher K/9 ranks higher. All three verified MLB results are required, so incomplete rows display unavailable rather than receiving a manufactured grade. The pitching table places `HR Hitters Grades` directly below Average Stamina using `Power/Vision/Study`.
+Pitcher quality combines league deciles for ERA, WHIP, and K/9, requiring complete verified inputs. Lower ERA/WHIP and higher K/9 are better. Handed variants can use direct player split data when aggregate MLB results omit the pitcher.
 
-MLB handed pitching aggregates can omit a target player's WHIP even when the league response contains other pitchers. The grade resolver therefore fetches the pitcher's own handed WHIP directly and injects it into the league distribution. When the handed population is sparse or the direct split is unavailable, it falls back to the overall eligible WHIP population rather than treating a missing record as an F.
+### Power / Vision / Study
 
-For current-day cards, a missing date-range handed WHIP also tries MLB's season situational split before falling back. Pitcher `vL`/`vR` chips use the pitcher's team color.
+- Power: handed SLG/power quality.
+- Vision: handed OBP/out-avoidance quality.
+- Study: handed usage/sample volume, not performance.
 
-`Vision` is a hidden handedness-specific OBP-decile grade representing overall difficulty of recording an out. `Study` is based strictly on handed at-bat volume relative to the most-used eligible league hitter, with near-full usage in the A range and lower grades as volume falls. The grade detail dialog presents a player portrait and colorful Power, Vision, and Study headings while retaining all isolated-window math.
+Study controls uncertainty radius in triangle plots. It is not a performance vertex.
 
-`HR Hitters Grades` scans every pregame season appearance in which the pitcher allowed a home run, resolves the individual HR events, and deduplicates the hitters. Grades are calculated through the day before each HR, not merely at the currently selected date. Hovering the aggregate opens a triangular Power/Vision/Study plot with internal guide lines and nonlinear placement toward a dominant vertex. The batting table's `Avg HR Pitcher Grade` opens a historical event plot whose axes are pitcher quality (ERA/WHIP/K9 composite), batter heat, and pitcher studyability. Batter heat is 70% the hitter's league-decile SLG during the three calendar days before the HR plus a 30-point bonus for homering in the previous game. Every pitcher-quality and heat result is calculated through the day before that specific HR, and incomplete points are omitted rather than assigned invented values. The compact pitcher directory contains only full name, throwing hand, and SP/RP/CP role. Left-handed players use circular points and right-handed players use square points on both graph types. Every point uses that player's team color; the opaque portrait tooltip carries the same color on its border, glow, portrait, and player name. Home runs occurring during the applicable player's last three games use a thick black point outline. Gold stars sit directly inside the corresponding graph points for every loaded hitter in today's opposing lineup and today's probable/current opposing pitcher. The star and shape are one interactive SVG target, so either surface opens the same player's portrait tooltip. Current matchup entries are added as contextual graph points when they are absent from the historical HR set, but are excluded from historical average calculations. Matchup discovery first resolves the open pitcher to the actual away/home pitching slot, then selects the opposite lineup. It falls back to the same RotoWire seed used by the dashboard and resolves name-only entries to MLB player IDs before plotting. All themed tooltips can be pinned until click-away by middle-clicking or holding the source/tooltip for three seconds; a perimeter trace shows hold progress, middle-click suppresses browser auto-scroll, and Escape dismisses the tooltip.
+### HR-history triangles
 
-The triangle axes now model the interaction directly. On batter cards, opposing pitchers are positioned by isolated power allowed (`SLG allowed - AVG allowed`), contact allowed (opponent AVG), and the batter's pre-HR heat. On pitcher cards, HR hitters are positioned by handed power, handed contact AVG, and the pitcher's pre-HR heat. Pitcher heat weights the immediately preceding appearance 60%, the second 25%, and the third 15%, combining runs, baserunners, and strikeout rate. Study is no longer a vertex or performance grade: it controls a translucent team-colored uncertainty radius, which expands as the relevant hitter or pitcher has less studyable usage history.
+Historical batter and pitcher HR events are calculated using information available through the day before each event. Current opponent/lineup entries may be added as context points but do not alter historical averages.
 
-Triangle placement uses F as the zero baseline and normalizes each letter-grade band's distance above F. This uses the complete triangle: A+/F/F lands at the top vertex, F/A+/F at the lower-left vertex, and F/F/A+ at the lower-right vertex. F/F/F has no dominant component and therefore falls back to the centroid. Raw metric values remain available in the point portrait tooltip. Pitcher names inside batter series-history cards retain a portrait/handedness/series-statline tooltip; the separate main player-name header remains tooltip-free.
+- Position shows the relative balance of three traits.
+- Marker size and brightness show absolute quality.
+- Left-handed players use circular points; right-handed players use square points.
+- Team color fills each point.
+- Thick black outlines identify events in the player's last three games.
+- Gold stars identify today's relevant opposing lineup/pitcher.
+- Tight clusters cycle on left click.
+- Hover shows portrait, identity, raw metrics, grades, and year-wide/trait bars.
+- Middle-click or long hold pins the tooltip; Escape/click-away dismisses it.
 
-Lineup L5/L7/L10/L15 team records are derived from a strict MLB regular-season schedule audit through the day before the selected matchup. Each result resolves the requested club primarily by MLB team ID, then requires an explicit `isWinner` boolean or a non-tied final score. Postponed, tied, and unresolved games are excluded rather than treated as losses. The exact audited game IDs are reused for the accompanying AVG, SLG, OPS, and ERA box-score aggregates so the record and statistics always describe the same window. Local-cache fallback follows the same requested window and never silently substitutes L7 for L5. The recent-form cache is versioned when this resolution logic changes. A July 16, 2026 verification produced BOS L5 5-0 and TB L5 3-2 from MLB's July 8-12 finals.
+Key code families include lineup HR score snapshot functions, league decile fetchers, `pitcherQuality*`, HR grade history functions, `hrGradeTriangle*`, and `renderPlayerStatGradeBars()`.
 
-Pitcher opponent-history cards show only the HR hitter's last name and handedness. Hovering that compact label shows the hitter portrait, full name, handedness, and Power/Vision/Study grades as they stood when the HR occurred.
+## 9A. Player Overall Rating system
 
-### Predictions And Picks
+The shared rating engine answers how good a player is now relative to MLB on a 1-100 nonlinear scale. It is distinct from the heavy-only letter-grade/triangle system and can be used by the light page.
 
-The dashboard includes prediction surfaces and manual pick controls:
+Hitter outputs:
 
-- Manual game picks are stored separately from prediction output.
-- Picked teams get visual live result states such as leading/trailing or hit/miss.
-- Prediction pages and detail panels explain model-derived team/player views.
-- Manual game picks are included in each explicit save snapshot.
+- Overall.
+- Versus RHP.
+- Versus LHP.
 
-### Tossup, Near-Lock, And Lock States
+The established hitter component compares SLG (28%), AVG (16%), OPS/overall production (24%), HR per plate appearance (18%), and XBH per plate appearance (14%) against the corresponding MLB population. Every input becomes a league percentile before it is combined; there are no fixed stat cutoffs.
 
-Pregame games support a three-step manual confidence ladder:
+Current hitter heat compares the same offensive profile against cached league populations for the last three-game/recent window, 14 days, and 30 days, weighted 50%/30%/20%. Final handed ratings are 75% established ability and 25% heat.
 
-1. Tossup: yellow state.
-2. Near-lock: unlocked emoji and intermediate color.
-3. Lock: gray lock state.
+Handed season samples regress toward the hitter's overall established ability with reliability `PA / (PA + 110)`. This prevents a few plate appearances against one pitcher hand from producing an extreme rating. Overall combines the finished handed ratings as approximately 73% versus RHP and 27% versus LHP.
 
-This uses the existing tossup and locked tossup storage sets, and both are captured in every save snapshot.
+The percentile-to-rating curve is nonlinear around league-average 50. Its upper half uses a more open power curve than its lower half, allowing good and very-good players to separate into the 70s and 80s instead of clustering below 70, while 50 remains anchored to league average. The climb compresses again near the ceiling and ordinary computed ratings remain capped below 100, so leading MLB does not automatically produce a perfect score. Ratings map to descriptive bands: 90+ Elite, 80s All-Star, 60-79 above average, around 50 league average, and lower values below average.
 
-### Over/Under Controls
+Light lineup batter rows place a compact rating pill immediately to the right of position. A vertical divider separates current `OVR` from the handed matchup rating (`vR` or `vL`, selected from the opposing pitcher's hand). Each current number has a smaller superscript containing the corresponding league-relative last-14-day form rating. This is a recent-performance rating, not the player's rating frozen at a historical date. Lineup pills share cached league-window rows for the whole lineup rather than issuing redundant stat requests. The 17px pill fits within the existing first line and does not establish row height.
 
-Pregame score strips support under/over markers. These are mirrored into lineup views and synced with the rest of manual game state.
+For hitters, the player-card header strip begins with numeric `OVR`; its superscript is the league-relative last-14-day Overall. YEAR WAR and the existing trait bars follow. Pitchers instead receive a larger highlighted Overall badge in the dedicated header slot between player identity and the trait strip. Its main number is season/current Overall and its superscript is last-three-outing Overall. The last-three calculation aggregates the pitcher's actual three most recent starts/appearances using ERA, WHIP, K/9, HR/9, and workload, then compares that line with the recent MLB pitching population. The light hitter card's Overall, vs RHP, and vs LHP tiles use the same current-number plus L14-superscript convention.
 
-## Data Sources
+Pitcher recent-HR-allowed cards use this engine for the batter who homered. The card tooltip formats the matchup line as `{batter name} ({hand}) ({Overall}{L14 Overall superscript} OVR) ({rating versus pitcher hand} vP)`. A right-handed pitcher selects the hitter's `vsRHP`; a left-handed pitcher selects `vsLHP`. The event retains game/opponent context and pitch type/detail. Cycling a stack switches the tooltip and all ratings to the newly selected HR.
 
-The site uses several data layers:
+Batter recent-HR cards perform the inverse lookup. They calculate the opposing pitcher's Overall/vs RHB/vs LHB profile from opponent SLG, opponent AVG, HR/9, K/9, WHIP, and ERA league percentiles. The batter's side selects `vsRHB` or `vsLHB`, with the same 75% established / 25% heat blend and small-sample regression. Their matchup line is `{pitcher name} ({hand}) ({Overall}{L3 Overall superscript} OVR) ({rating versus batter hand} vP)`. Both HR directions use a three-line immediate tooltip: event timing/context, rated opponent line, then pitch detail. These HR-card tooltips intentionally bypass the normal 1.5-second sitewide hover delay.
 
-- MLB StatsAPI for schedule, live game feed, player stats, game logs, standings, rosters, and probable pitcher data.
-- RotoWire/projected lineup fallbacks when official lineups are incomplete.
-- Static RotoWire defaults were refreshed on 2026-07-17 from the batting-order table endpoint for all 30 teams and both opposing-pitcher hands (60 lineups, 540 slots), with no preserved fallback hands required.
-- Local cached schedule/game data for fast rendering.
-- Player profile and stat caches to avoid repeated network work.
-- Supabase-backed immutable save history for cross-device Save and Load.
+Code: `getHitterOverallRatings()`, `getHitterOverallRatingsFromLeagueRows()`, `getHitterRecentRatings()`, `getPitcherOverallRatings()`, `getPitcherLastThreeOverallRating()`, hitter/pitcher rating normalization and percentile helpers, `playerRatingFromPercentile()`, `lineupOverallRatingPillHtml()`, `hydrateLineupOverallRatingPills()`, `hydratePlayerHeaderGradeBars()`, `lightBatterMetricHtml()`, the `playerOverallRatingCache`, `getPitcherRecentHomeRunHistory()`, `getLineupRecentBattingStats()`, and `homeRunHistoryCardHtml()`.
 
-The app favors quick first paint, then hydrates heavier details in the background.
+## 10. Leaders, Team Stats, Playoff Picture, Hot, and Predictions
 
-## Local Storage And Manual State
+### Leaders
 
-The app stores both volatile data and user-authored manual state. Local dated keys drive the active UI and provide recovery copies. Cross-device persistence uses immutable Supabase save rows rather than continuously synchronizing or merging localStorage.
+Leader definitions include hitting and pitching categories. Visible examples include AVG/OPS and pitching ERA/WHIP/K/9; category definitions live in the leader configuration near the top of `live-dashboard-prototype.js`. Filters include date range, team, position, qualifier, and opponent context. Rows open player cards.
 
-Important manual keys include:
+### Team Stats
 
-- `manual-save:v2:{date}:{timestamp}:{id}` (Supabase save-history row)
-- `manual-state-current:v1:{date}`
-- `manual-state-backup:v1:{date}`
-- `manual-state-mirror:v1`
-- `manual-state-durable:v1`
+Team-stat tables use sortable headers and MLB team aggregates/standings. Rendering, sorting, and formatters are in the `teamStats*` function family.
+
+### Playoff Picture
+
+Displays AL/NL seeded teams and In The Hunt tables. Fields include seed, team, role/path, record, winning percentage, games back, and L10. Data comes from MLB standings.
+
+### Hot-player surfaces
+
+Hot/cold player cards use recent hitting metrics including H-AB, AVG, SLG/OPS, XBH, HR, and contextual matchup values. They reuse the lineup thresholds and open player cards.
+
+### Predictions
+
+Prediction/detail surfaces can use:
+
+- Batter L5 and L10 AVG/SLG/OPS.
+- Batter season AVG/SLG/OPS.
+- XBH, HR, RBI and recent form.
+- Team L5 AVG/SLG/OPS.
+- Starter season ERA, WHIP, HR/9, and K/9.
+- Starter recent ERA/WHIP and HR/9/K/9.
+- Opponent lineup heat/coldness.
+- Bullpen and team context.
+- Moneyline-style comparison reasons and component points.
+
+Prediction snapshots and hitting prediction caches are date-scoped. Manual picks remain independent from model output.
+
+Code: `predictionPointPart()`, prediction metric/build/render functions, moneyline comparison helpers, `prediction-snapshots:v1`, and `hitting-predictions-cache:v1`.
+
+## 11. Data sources and exact pull responsibilities
+
+### MLB StatsAPI (`statsapi.mlb.com/api/v1`)
+
+Used for:
+
+- Schedule, status, teams, probable pitchers, doubleheaders, scores, and game identifiers.
+- Standings, records, playoff picture, and team streak/recent schedule audits.
+- Box scores and player pools.
+- Player biography/profile and handedness.
+- Season, date-range, game-log, handed, situational, and opponent splits.
+- Team hitting/pitching aggregates.
+- Rosters.
+- Player search/name-to-ID resolution.
+- Prior games, series history, and starter usage.
+
+Base constant: `MLB_API_BASE`. Calls are distributed across `getJson()` users; endpoint construction is readily searchable by `new URL(`${MLB_API_BASE}``.
+
+### MLB live feed (`statsapi.mlb.com/api/v1.1`)
+
+`/game/{gamePk}/feed/live` supplies live scores, inning/count/bases, plays, pitches, substitutions, current batter/pitcher, official lineups, boxscore-like player state, and home-run event detail. Base constant: `MLB_API_BASE_LIVE`; primary cached loader: `getLiveGameFeed()`.
+
+### Baseball Savant / Statcast
+
+Used for pitch-type results, exit velocity, pitch velocity buckets, batted-ball direction/profile, average bat speed, HR distance, pitch details, and specialized analytical inputs. URLs use `statcast_search/csv`, `savant-player/{id}`, and the custom leaderboard. Savant work is cached and aggressively gated on the light page.
+
+### RotoWire
+
+Used only as a lineup projection/fallback layer when official MLB lineups are unavailable or incomplete. Resolution order considers:
+
+1. Official/current lineup.
+2. Fresh RotoWire today batting-order extraction.
+3. Dynamic published seed for team and opponent hand.
+4. Static hand-specific seed.
+5. Recent same-handed official lineup / prior completed lineup.
+
+The app fetches `rotowire-current-defaults.json` with `cache: no-store`, timestamps refresh attempts, invalidates date-specific in-memory promises, and keeps a short TTL for batting-order pages. Parsed names are validated, deduplicated, assigned slots 1-9, resolved to MLB IDs, and locked to the correct team side.
+
+Code: `refreshPublishedRotowireSeeds()`, `refreshVisibleRotowireLineups()`, `fetchRotowireProjectedBattingOrder()`, `parseRotowireTodayBattingOrder()`, `seededRotowireDefaultBattingOrder()`, and `fetchMlbStartingLineupFallback()`.
+
+### Supabase
+
+- Authentication/session persistence via shared sync helper.
+- Immutable manual Save history.
+- Remote heatmap CSV storage.
+
+Login status is owned by the shared durable session helper and should survive ordinary page refreshes. The dashboard must not clear auth/session keys during date or scoreboard resets.
+
+## 12. Caching, refresh, and performance
+
+- Schedule/game cards cache under date-scoped `games:*` and archive keys.
+- Home runs cache under `hrs:{date}`.
+- Analytics indexes cache by day and aggregate recent player/matchup data.
+- Player profiles, game logs, handed splits, Savant data, rankings, team form, and predictions use in-memory promise/result caches.
+- Network helpers apply timeout, no-cache parameters where required, TTL decisions, and failure fallbacks.
+- Cards use render and live-state fingerprints so unchanged DOM is retained.
+- Lineup prewarm has lanes and concurrency limits; player-stat work does not compete indiscriminately with lineup-source work.
+- Heavy analytical work is delayed/backgrounded.
+- Active/live games poll at a short interval (approximately three seconds while visible); non-live data refreshes less aggressively.
+- Visibility and interaction holds prevent passive updates from replacing UI while the user is actively manipulating an overlay.
+
+Performance diagnostics are exposed through the stats-profiler functions near the top of the JavaScript (`statsProfilerRecord()`, summary/export/panel helpers).
+
+## 13. Persistence and manual state
+
+### UI preference keys
+
+- `dashboard-date:v1`
+- `panel-layout:v2`
+- `overlay-dock:v1`
+- `overlay-size:v2`
+- `scoreboard-columns:v2`
+- `overlay-theme:v1`
+- `overlay-page:v1`
+- `lineup-open:v2:{date}`
+- `lineup-view:v1:{date}`
+- `lineup-stat-window:v1`
+- `player-stat-recent-window:v1:{date}`
+- `player-stat-season-recent-days:v1`
+- `prediction-sort:v1:{date}`
+- `mlb-game-visibility:v1`
+
+### User-authored/manual keys
+
+- `bets:v2:all`
 - `player-tracker:v1:{date}`
 - `player-tracker-backup:v1`
 - `pending-game-picks:v1:{date}`
 - `tossup-scoreboards:v1:{date}`
 - `locked-tossup-scoreboards:v1:{date}`
 - `over-under-scoreboards:v1:{date}`
-- `rotowire-dynamic-lineup-source:v1`
-- `lineup-stat-window:v1`
-- `player-stat-season-recent-days:v1`
+- `manual-state-current:v1:{date}`
+- `manual-state-backup:v1:{date}`
+- `manual-state-mirror:v1`
+- `manual-state-durable:v1`
+- `manual-state-last-push:v1`
 
-Heavy schedule/cache keys such as `games:`, `games-archive:`, `analytics-day:`, and `hrs:` should not be synced.
+Local manual state remains in memory/storage until direct user input or an explicit loaded Save replaces it. Passive scoreboard data must never erase picks, over/under markers, tracked players, expectations, confidence, order, or login state.
 
-## Save And Load
+### Data/cache keys not intended for manual Save payloads
 
-### What A Save Contains
+- `games:*`
+- game archives.
+- analytics-day indexes.
+- `hrs:*`.
+- prediction caches/snapshots.
+- pitcher start memory.
+- home-run audio played IDs.
+- RotoWire dynamic lineup source.
 
-Each save is a complete snapshot for one selected dashboard date:
+## 14. Save, Load, and durable login
 
-- Tracked players.
-- Game picks.
-- Tossup/near-lock/lock states.
+Each HTML entrypoint defines `window.OWENTOOLS_SYNC` with tool ID `baseball-dashboard`, manual-only operation, and immutable save history. It then loads Supabase config and `../shared/owentools-sync.js`.
+
+### Save payload
+
+An explicit Save snapshot contains the selected dashboard date and normalized copies of:
+
+- Tracked players, including expectation/confidence/order fields.
+- Pending game picks.
+- Tossup/near-lock/lock state.
 - Over/under markers.
-- The dashboard date associated with the snapshot.
 
-Large schedule, game, analytics, and home-run-feed caches are never included.
+It does not upload schedule cards, feeds, analytics, or other large caches.
 
-### How Save/Load Is Wired
+### Save behavior
 
-The HTML page defines `window.OWENTOOLS_SYNC` before loading the shared sync helper:
+1. `window.MLBDashboardManualSyncBridge` serializes current in-memory state.
+2. A unique `manual-save:v2:{date}:{timestamp}:{id}` row is inserted.
+3. Prior saves remain immutable and are not deleted or overwritten.
+4. Save history refreshes for the current date.
 
-```js
-window.OWENTOOLS_SYNC = {
-  toolId: "baseball-dashboard",
-  label: "Baseball dashboard",
-  manualOnly: true,
-  saveHistory: true,
-  saveHistoryPrefix: "manual-save:v2:",
-  include: [
-    "manual-save:v2:",
-    "manual-state-last-push:v1",
-    "rotowire-dynamic-lineup-source:v1",
-    "lineup-stat-window:v1",
-    "player-stat-season-recent-days:v1"
-  ]
-};
-```
+### Load behavior
 
-Then it loads:
+- Quick Load selects the newest save for the selected date.
+- The split Load/history control lists every save for that date.
+- Loading replaces current manual state; it does not merge with newer local values.
+- Local recovery stores are updated.
+- Picks, locks, over/under markers, and tracker repaint immediately.
+- Loading does not mutate the saved row.
 
-```html
-<script src="../shared/owentools-sync.js?..."></script>
-```
+### Authentication
 
-The dashboard exposes `window.MLBDashboardManualSyncBridge`. Before Save, the shared helper asks the dashboard to create a snapshot from current in-memory state. The serialized snapshot is inserted directly into Supabase; localStorage is not used as the transport layer.
+Supabase login/session persistence is managed by the shared helper. Ordinary refresh, live polling, date changes, and local manual-state restoration must leave the session intact. If login begins resetting, inspect `../shared/owentools-sync.js`, its storage/session options, and any code that clears broad localStorage ranges.
 
-### Save Flow
+## 15. Tooltip and interaction rules
 
-1. The user selects a dashboard date and changes manual state.
-2. The user clicks **Save**.
-3. The dashboard serializes the current tracker, picks, tossup/lock states, and over/under selections.
-4. The helper inserts a new unique `manual-save:v2:{date}:{timestamp}:{id}` row.
-5. No previous row is updated or deleted.
-6. The widget reports the save time and refreshes the history for that date.
+- Sitewide hover tooltips wait 1.5 seconds before appearing, except recent-HR stack cards, which appear immediately.
+- Confidence has no tooltip.
+- Elements deliberately marked tooltip-free, including certain main pitcher/player name labels, do not receive generic inferred tooltips.
+- Leaving before the delay cancels display.
+- Middle-click pins supported analytical/HR tooltips.
+- Long hold can pin supported graph/analytical tooltips and displays perimeter progress.
+- Escape and click-away dismiss pinned tooltips.
+- Middle-click suppresses browser autoscroll where it is used for tooltip pinning.
+- Recent-HR left click cycles the selected event and updates its tooltip.
 
-### Load Controls
+Code: global tooltip scheduler/manager functions, pin/hold helpers, HR stack handlers, and graph tooltip handlers.
 
-- **Quick Load** restores the newest save for the currently selected dashboard date. The smaller italic line beneath the label shows its save time.
-- The right half of the split Load control opens every save for the currently selected date.
-- Each history entry shows its timestamp, dashboard date, and counts for picks, tracked players, tossups, and over/under selections.
-- Changing the dashboard date changes which saves are shown. Saves from other dates are not mixed into the list.
+## 16. Formatting and visual system
 
-### Load Flow
+### Team identity
 
-1. The helper queries immutable `manual-save:v2:` rows for the signed-in user.
-2. It filters them to the currently selected dashboard date and sorts newest first.
-3. Quick Load chooses the first row; a history click chooses that exact row.
-4. The serialized value is passed directly to the dashboard bridge.
-5. The dashboard replaces its current in-memory manual state with the saved snapshot.
-6. It updates local recovery keys and repaints the tracker, picks, tossup/lock, and over/under UI.
-7. Loading never changes or deletes the saved row.
+- `getTeamColor()` and `getLogoPath()` provide canonical team styling.
+- `canonicalTeamAbbrev()` resolves abbreviation variants.
+- Team color drives card edges, names, pills, tracker pitcher links, graph points, portraits, and modal accents.
+- Player names in lineup rows use a 2px black stroke plus black directional shadow for legibility over hot/cold backgrounds.
 
-### Save/Load Health Checklist
+### Numeric formatting
 
-1. Confirm the widget is signed in.
-2. Confirm the page build and shared-helper query strings are current.
-3. Confirm `saveHistory` is enabled and `manual-save:v2:` is included.
-4. Select the intended dashboard date before saving.
-5. Make a pick, Save, remove the pick, then Quick Load. The pick should return.
-6. Repeat with a tracked player, tossup/lock state, and over/under selection.
-7. Open the Load list and confirm only saves for the selected date appear.
-8. Confirm an older history entry restores that exact snapshot without removing newer saves.
+- AVG/OBP/SLG commonly omit the leading zero (`.269`).
+- OPS retains the leading zero where context requires (`0.801`) and may use three decimals.
+- ERA, WHIP, HR/9, and K/9 generally use two decimals.
+- Innings preserve baseball thirds (`6.1`, `6.2`) via outs conversion, not decimal-tenths arithmetic.
+- Ranks use ordinal formatting and can be paired overall/recent.
+- Missing values use `---`, `--`, or context-specific loading text rather than fabricated zeroes.
+- H-AB is always hits-at-bats, not a record.
+- XBH is extra-base hits.
 
-### Safe Rules For Future Changes
+Core formatters: `formatRateValue()`, `inningsToOuts()`, `outsToInnings()`, `rankOrdinal()`, `statNumber()`, and `statRate()`.
 
-- Never turn save-history rows back into one mutable overwrite key.
-- Never merge a loaded snapshot with newer local state; Load means replace with the chosen save.
-- Never delete an older save as a side effect of Save or Load.
-- Keep the date inside both the snapshot and new save-row key.
-- Keep local backup/durable/mirror stores only as recovery layers, not as the Supabase upload payload.
-- Add new manual fields to snapshot creation, normalization, counts, and application together.
-- Do not include large schedule or game cache data in snapshots.
+### Handedness
 
-## Tracker And Hitter Grade Notes
+- Batter `L/R/S` and pitcher `L/R` are normalized by `handednessCode()`.
+- Recent-HR cards use rounded corners for left-handed participants and sharp corners for right-handed participants.
+- Heavy graph shapes use circle for left and square for right.
+- RotoWire seed selection uses the opposing pitcher's throwing hand.
 
-- The player-tracker header shows the total tracked-player count immediately before `SWAP`.
-- HR-hitter triangles use Power / Contact / Strikeout Proclivity. Power and contact reward the highest league deciles; strikeout proclivity is inverse-ranked, so the lowest strikeout rate earns decile 10 and an A+ grade.
-- Batter-card pitcher triangles use Power Allowed / K/9 / Hitter Heat at the time of the home run. Higher K/9 earns the higher decile. Left-clicking a tight cluster cycles the nearby HR markers and their portrait tooltip.
-- Hovering either triangle's hitter or pitcher marker now reveals a year-wide WAR-decile bar plus the three absolute trait bars to the left of the triangle. Every fill follows the same blue-to-yellow-to-red scale; A- and higher grades receive an energized highlight, while F grades receive a cold, icy treatment. Historical points use league results through the day before the event, and the year-wide bar uses full-season rather than handedness-split results. A feed-supplied WAR value is preferred; when unavailable, a workload-adjusted season value proxy is ranked against the same league population.
-- Player cards now embed the interactive HR-history triangle in the former Last App area for both hitters and pitchers. Point portraits, grades, cycling, middle-click pinning, and long-hover pinning stay in the point-detail tooltip; the open player's year-wide decile bars live in the card header. Pitcher overall rank moved beneath the identity metadata, while the redundant pitcher Rank and BB table rows were removed.
-- Embedded triangles omit the redundant graph title, and historical home-run markers render 50% larger while preserving their existing relative size ratios. Current-matchup context markers retain their smaller scale. The separate hitter-card average pitcher-quality row and standalone pitcher-name Q badge were removed.
-- Pitcher rank now sits inline with the team/number/position metadata beneath the name. The pitcher arsenal strip uses reduced outer spacing, card padding, row gaps, and minimum height while retaining the existing typography and coloring.
-- Triangle position shows the relative dominance of the three axes, while marker size and fill intensity preserve absolute quality. Balanced A/A/A and F/F/F profiles both remain centered, but the elite profile is large/bright and the poor profile is small/dim; every portrait tooltip also states the overall average grade.
-- The short hitter heat component uses each player's last three games actually played through the prior day, not three calendar days. Exact game-log dates are aggregated before the player is placed into the recent league comparison population, avoiding All-Star-break empty-window grades and selected-day leakage.
+### Hot/cold treatment
 
-## Current Relevant Files
+- Light hitter scale is blue → neutral → orange across `.000` to `.900+` recent OPS.
+- Light pitcher scale is orange → neutral → blue across `0.00` to `7.00+` recent ERA.
+- Ice/fire extremes add texture/glow.
+- Tracked + fire is frozen to eliminate alternating repaint flicker.
+- Current/up-now/tracked states add borders and inset indicators without changing row height.
 
-- `dashboard-live-prototype.html`: production dashboard entrypoint and Save/Load configuration.
-- `dashboard-live-prototype-dev.html`: development dashboard entrypoint and Save/Load configuration.
-- `live-dashboard-prototype.js`: main app logic, rendering, state, hydration, and save bridge.
-- `live-prototype.css`: scoreboard, lineup, player-card, and dashboard styling.
-- `../shared/owentools-sync.js`: shared Supabase authentication and immutable save-history helper.
-- `../shared/supabase-config.js`: Supabase URL/key configuration.
+### Responsive behavior
 
-## Practical Maintenance Notes
+- Topbar controls wrap at narrow widths.
+- Mobile tabs remain reachable independently of desktop tabs.
+- Scoreboard columns reduce with available space.
+- Lineup rows change grid areas while preserving slot/name/stats/today/position.
+- Tracker/feed SWAP sets mobile order explicitly.
+- Tracker confidence remains a touch-friendly vertical range.
+- Tracker reorder uses pointer capture only from the handle.
+- HR stacks and their second row remain inside fixed indicator width/row height.
+- Player cards and live lineup areas become internally scrollable rather than expanding beyond the viewport.
 
-- When changing scoreboard UI, avoid touching save keys or manual-state storage unless the change explicitly requires it.
-- When adding a new manual control, decide whether it belongs in save snapshots before implementing it.
-- Prefer date-scoped keys for game-day state.
-- Keep visible UI refresh separate from localStorage writes: write state first, then repaint.
-- Use cache-busting query strings when changing JS/CSS used by the HTML entrypoints.
-- If a loaded value appears only after refresh, inspect the snapshot application and repaint path.
-- If Save works but Load does not, inspect the immutable row value, dashboard bridge, and selected-date filter.
+### CSS ownership
+
+Search `live-prototype.css` by these stable prefixes:
+
+- `.game-visibility-*`: today-only hide menu.
+- `.game-card`, `.score-state-*`: scoreboard.
+- `.lineup-*`: lineup overlay and rows.
+- `.light-lineup-ops-tone`, `.light-pitcher-era-tone`: light scales.
+- `.player-track-*`: tracker.
+- `.home-run-*` / `.hr-*`: feed and HR indicators.
+- `.player-stat-*`: player modal/tables/tabs.
+- `.light-player-*`: light replacement metrics.
+- `.hr-grade-*`, `.graph-point-*`: heavy triangles and tooltips.
+- `.global-player-search-*`: search overlay.
+
+## 17. Code locator index
+
+| System | Primary JavaScript locators |
+| --- | --- |
+| Startup/DOM | Top-level element constants and initialization block |
+| Date picker | `parseFlexibleDateInput`, `renderDatePicker`, `refreshForSelectedDate` |
+| Hide menu | `visibilityStateForGame`, `syncGameVisibilityControl` |
+| Network/cache | `getJson`, `getText`, request TTL/timeout helpers |
+| Schedule/card lifecycle | `loadGames`, `finalizeRenderedGames`, `upsertCard`, `updateScoreboardLiveCard` |
+| Live feed/boxscore | `getLiveGameFeed`, `getGameBoxscore`, live normalization helpers |
+| Teams/standings | `getTeamStreakMap`, `getTeamLastSevenRecord`, team stats/standings functions |
+| Probable pitchers | `resolveOfficialPregameProbablePitchers`, duplicate/TBD fallback helpers |
+| RotoWire | `refreshPublishedRotowireSeeds`, `fetchRotowireProjectedBattingOrder`, parse/seed helpers |
+| Lineup normalization | `normalizeLineupEntryForSide`, `normalizeLineupCollectionForSide`, duplication repair |
+| Lineup rendering | lineup render functions near the final third of the file |
+| Recent HR stacks | recent-HR fetch/hydrate/render/cycle helpers and delegated events |
+| Bullpen | bullpen summary/rank helpers and reliever usage functions |
+| Manual picks | pending-pick restore/save/sync functions |
+| Tossup/lock | tossup storage and cycling functions |
+| Over/under | over-under storage/restore/sync functions |
+| Tracker | `renderPlayerTrackerList`, `trackedPlayerOpponentPitcher`, tracker events |
+| HR feed/audio | HR extraction/render/update/audio functions |
+| Player cards | `openPlayerStatOverlay`, player profile/stat fetch/render families |
+| Light metrics | `lightBatterMetricHtml`, `getLightBatterMetrics`, `lightBatterMetricsFromRows` |
+| Outcomes | player-outcome loader/render/event family |
+| Heatmaps | player/pitcher heatmap loader/normalizer/render family |
+| Contracts | contract load/render family |
+| Grades/triangles | lineup HR snapshot, league decile, pitcher quality, HR triangle families |
+| Predictions | prediction build/score/detail/render families |
+| Save bridge | manual snapshot normalize/create/apply and `MLBDashboardManualSyncBridge` |
+| Tooltips | global delayed tooltip scheduler plus pin/hold helpers |
+
+## 18. Maintenance rules
+
+1. Update both production HTML cache-busting query strings whenever shared CSS or JavaScript changes.
+2. Preserve the light feature gate: do not perform disabled heavy calculations in the background.
+3. A new manual field must be added to normalization, local save, backup/mirror/durable state, snapshot creation, snapshot counts, and snapshot application together.
+4. Load means replace, never merge.
+5. Never overwrite or delete immutable Save rows as a side effect of Save/Load.
+6. Do not clear login/session state during scoreboard resets.
+7. Keep official team/game identity attached to probable pitchers, players, and lineup entries; name-only matching is fallback, not authority.
+8. Treat innings as outs internally.
+9. Do not manufacture grades or stats when required inputs are missing.
+10. Keep historical calculations date-isolated through the day before the event/game.
+11. Keep live passive repaint separate from user-authored state writes.
+12. When adding a filter, apply it consistently to the scoreboard and dependent tracker/feed panels.
+13. Tooltips should use the shared 1.5-second scheduler unless explicitly exempt or direct-click driven.
+14. New row indicators must not change established lineup row height.
+15. Validate desktop and phone pointer behavior, especially drag handles, vertical ranges, SWAP, card stacks, and pinned tooltips.
+
+## 19. Verification checklist
+
+- Open both `heavy_mlb.html` and `light_mlb.html`; verify the latter performs no pitch/velocity/triangle/power work.
+- Change away from today; verify Hide disappears entirely.
+- On today, hide each game state and verify its tracker rows disappear too.
+- Refresh; verify hide selections, tracker confidence/order/expectation, picks, over/under, and login persist.
+- Track a `.900+` OPS player; verify the lineup fire state stays static rather than blinking.
+- Press the tracker opponent pitcher; verify the pitcher card opens and name uses opponent team color.
+- Check a multi-HR player and pitcher; verify every card edge is visible, centered, cycles correctly, and row height does not change.
+- Verify HR tooltips contain opponent identity/hand and pitch type when source data exists.
+- Verify sitewide hover tooltips wait 1.5 seconds and confidence shows none.
+- Save, change manual state, Quick Load, and confirm exact replacement.
+- Open an older save and confirm newer saves remain.
+- Compare final-game recent records against the exact audited MLB games.
+- Run syntax/format checks and `git diff --check` before publishing.

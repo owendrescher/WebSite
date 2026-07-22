@@ -20,7 +20,7 @@
     <link rel="apple-touch-icon" href="baseball.png" />
     <link rel="stylesheet" href="styles.css?v=20260713tooltipWrap1" />
     <link rel="stylesheet" href="dashboard.css?v=20260711bullpen14d1" />
-    <link rel="stylesheet" href="live-prototype.css?v=20260722trackedFirePitcher1" />
+    <link rel="stylesheet" href="live-prototype.css?v=20260722ratingSize7" />
   </head>
   <body class="dashboard-page light-mlb-page" data-dashboard-page="scoreboard">
 
@@ -98,6 +98,14 @@
               <button id="overlayDockToggleBtn" class="toolbar-btn dashboard-hidden" type="button">Scoreboard: Right</button>
               <button id="scoreboardColumnsBtn" class="toolbar-btn help-btn" type="button" aria-label="Open site controls help" title="Controls and site capabilities">?</button>
               <button id="globalPlayerSearchBtn" class="toolbar-btn player-search-btn" type="button" aria-label="Search players" title="Search players">&#128269;</button>
+              <div id="gameVisibilityControl" class="game-visibility-control" hidden>
+                <button id="gameVisibilityBtn" class="toolbar-btn game-visibility-btn" type="button" aria-label="Hide games by status" aria-expanded="false">Hide</button>
+                <div id="gameVisibilityMenu" class="game-visibility-menu" role="menu" hidden>
+                  <button type="button" role="menuitemcheckbox" data-hide-game-state="past"><span class="visibility-dot"></span>Past games</button>
+                  <button type="button" role="menuitemcheckbox" data-hide-game-state="ongoing"><span class="visibility-dot"></span>Ongoing games</button>
+                  <button type="button" role="menuitemcheckbox" data-hide-game-state="future"><span class="visibility-dot"></span>Future games</button>
+                </div>
+              </div>
               <button id="clearPendingPicksBtn" class="toolbar-btn clear-picks-btn" type="button" aria-label="Clear selected bet teams" title="Clear selected bet teams">Clear Picks</button>
               <div class="dashboard-page-tabs" role="tablist" aria-label="Dashboard pages">
                 <button type="button" data-page-nav="scoreboard" aria-selected="true">Scoreboard</button>
@@ -472,6 +480,7 @@
                   <span id="playerStatMeta">TEAM | POS</span>
                   <span id="playerStatRank" class="player-stat-header-rank" hidden></span>
                 </div>
+                <div id="playerStatOverallBadge" class="player-stat-overall-badge" hidden></div>
                 <div id="playerStatLeaderBadges" class="player-stat-leader-badges" hidden></div>
                 <div id="playerStatGradeBars" class="player-stat-header-grade-bars" hidden></div>
                 <div class="player-stat-tabs" role="tablist" aria-label="Player card views">
@@ -698,6 +707,6 @@
     <script src="rotowire-default-lineups.js?v=20260721rotowireCurrent2"></script>
     <script src="mlb-contracts-data.js?v=20260708liveSearchFix1"></script>
     <script>window.MLB_DASHBOARD_BUILD_ID="20260711-tooltip-cleanup2";</script>
-    <script src="live-dashboard-prototype.js?v=20260722trackedFirePitcher1"></script>
+    <script src="live-dashboard-prototype.js?v=20260722ratingsCurve6"></script>
   </body>
 </html>
