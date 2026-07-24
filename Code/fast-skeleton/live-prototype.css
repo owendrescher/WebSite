@@ -7826,6 +7826,140 @@ body.dashboard-page .player-stat-header-grade-bars .triangle-grade-bar > div { f
 body.dashboard-page .player-stat-header-grade-bars .triangle-grade-bar > div b { font-size: .55rem; }
 body.dashboard-page .player-stat-header-grade-bars .triangle-grade-bar > div b sup { margin-left: 1px; color: #ffe08a; font-size: .39rem; vertical-align: super; }
 body.dashboard-page .player-stat-header-grade-bars .triangle-grade-bar > i { height: 5px; }
+.team-detail-identity-column { display: grid; align-content: start; gap: 8px; min-width: 0; }
+.team-detail-ratings {
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: 5px;
+  min-width: 0;
+}
+.team-detail-rating-card {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) auto;
+  grid-template-rows: auto 5px;
+  align-items: center;
+  gap: 3px 6px;
+  min-width: 0;
+  padding: 6px 7px;
+  border: 1px solid color-mix(in srgb, var(--team-color, var(--accent)) 48%, var(--line));
+  border-radius: 8px;
+  background:
+    linear-gradient(110deg, color-mix(in srgb, var(--team-color, var(--accent)) 22%, transparent), transparent 67%),
+    rgba(2, 13, 23, .78);
+  box-shadow: inset 0 1px 0 rgba(255,255,255,.07);
+}
+.team-detail-rating-card > span {
+  overflow: hidden;
+  color: color-mix(in srgb, var(--team-color, var(--accent)) 42%, white 58%) !important;
+  font: 950 .56rem/1 var(--font-display) !important;
+  letter-spacing: .07em;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+.team-detail-rating-card > strong {
+  color: #f7fbff;
+  font: 1000 1.05rem/.9 var(--font-display);
+  letter-spacing: 0;
+  text-shadow: 1px 1px 0 #000, 0 0 8px color-mix(in srgb, var(--team-color, var(--accent)) 48%, transparent);
+}
+.team-detail-rating-card > strong sup {
+  margin-left: 2px;
+  color: #ffd36d;
+  font: 950 .47rem/.8 var(--font-ui);
+  vertical-align: super;
+}
+.team-detail-rating-card > i {
+  grid-column: 1 / -1;
+  display: block;
+  height: 5px;
+  overflow: hidden;
+  border: 1px solid rgba(190,220,237,.25);
+  border-radius: 999px;
+  background: #030b12;
+}
+.team-detail-rating-card > i > em {
+  display: block;
+  width: var(--team-rating, 50%);
+  height: 100%;
+  border-radius: inherit;
+  background: linear-gradient(90deg, #31aaff, #ffe274 58%, #ff762e);
+  box-shadow: 0 0 6px color-mix(in srgb, var(--team-color, var(--accent)) 58%, transparent);
+}
+.team-detail-ratings > small {
+  grid-column: 1 / -1;
+  color: var(--muted);
+  font: 850 .47rem/1 var(--font-ui);
+  letter-spacing: .08em;
+  text-align: right;
+}
+.team-detail-ratings > small b { color: #ffd36d; font-size: .43rem; vertical-align: super; }
+.team-detail-lineup-list li.team-detail-rating-tone,
+.team-detail-pitcher-list .bullpen-item.team-detail-rating-tone {
+  border-color: rgba(var(--team-detail-heat-rgb, 72,181,255), var(--team-detail-heat-border, 0)) !important;
+  background:
+    linear-gradient(90deg,
+      rgba(var(--team-detail-heat-rgb, 72,181,255), var(--team-detail-heat-main, 0)),
+      rgba(var(--team-detail-heat-rgb, 72,181,255), var(--team-detail-heat-soft, 0)) 68%,
+      transparent) !important;
+  box-shadow: inset 3px 0 0 rgba(var(--team-detail-heat-rgb, 72,181,255), var(--team-detail-heat-strength, 0));
+}
+.team-detail-lineup-list li {
+  grid-template-columns: 20px minmax(0, 1fr) 34px 66px !important;
+  grid-template-areas:
+    "slot name pos rating"
+    "slot today today rating" !important;
+}
+.team-detail-row-rating {
+  grid-area: rating;
+  align-self: stretch;
+  justify-self: end;
+  width: 66px;
+  min-width: 66px;
+  display: grid !important;
+  grid-template-columns: 23px minmax(0, 1fr);
+  place-items: center;
+  gap: 0;
+  margin: -5px 0;
+  padding: 0;
+  border-left: 1px solid rgba(190,220,237,.28);
+  border-radius: 0 7px 7px 0;
+  background: linear-gradient(110deg, rgba(49,170,255,.13), rgba(255,118,46,.16));
+  font-variant-numeric: tabular-nums;
+}
+.team-detail-row-rating small {
+  color: #9cb7c7 !important;
+  font: 950 .43rem/1 var(--font-ui) !important;
+  letter-spacing: .03em;
+}
+.team-detail-row-rating b {
+  color: #f7fbff;
+  font: 1000 .84rem/.9 var(--font-display);
+  text-shadow: 1px 1px 0 #000;
+}
+.team-detail-row-rating b sup {
+  margin-left: 1px;
+  color: #ffd36d;
+  font: 950 .39rem/.8 var(--font-ui);
+  vertical-align: super;
+}
+.team-detail-pitcher-list .pitcher-priority-line {
+  align-items: stretch;
+}
+.team-detail-pitcher-list .pitcher-priority-meta {
+  align-self: center;
+  min-width: 0;
+}
+.team-detail-pitcher-list .team-detail-row-rating {
+  flex: 0 0 66px;
+  margin: -3px -6px -3px auto;
+}
+@media (max-width: 700px) {
+  .team-detail-ratings { grid-template-columns: repeat(4, minmax(0, 1fr)); }
+  .team-detail-rating-card { grid-template-columns: minmax(0, 1fr); padding: 5px; text-align: center; }
+  .team-detail-rating-card > strong { font-size: .88rem; }
+  .team-detail-lineup-list li { grid-template-columns: 20px minmax(0, 1fr) 30px 58px !important; }
+  .team-detail-row-rating { width: 58px; min-width: 58px; grid-template-columns: 20px minmax(0, 1fr); }
+}
 .embedded-graph-point-tooltip.is-pinned { pointer-events: auto; border-color: #ffd166; }
 body.dashboard-page #playerStatExtra .pitcher-starts-below-table { padding-top: 3px; }
 body.dashboard-page #playerStatExtra .visible-player-card-pitch-shell { margin-top: 2px; padding: 0; }

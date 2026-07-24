@@ -27820,8 +27820,9 @@ function teamDetailSplitText(split = null) {
 
 function teamDetailLineupItemHtml(entry = {}) {
   const color = entry.color || getTeamColor(entry.teamAbbrev);
+  const rating = entry.teamDetailRating || null;
   return `
-    <li class="${teamDetailBatterTrendClass(entry)}" data-player-id="${escapeHtml(String(entry.id || ''))}" role="button" tabindex="0" style="--team-color:${escapeHtml(color)}">
+    <li class="${teamDetailBatterTrendClass(entry)} team-detail-rating-tone" data-player-id="${escapeHtml(String(entry.id || ''))}" role="button" tabindex="0" style="--team-color:${escapeHtml(color)};${teamDetailRatingToneStyle(rating)}">
       <span class="lineup-slot">${escapeHtml(String(entry.slot || ''))}</span>
       <span class="lineup-name">
         <span class="lineup-name-text">${escapeHtml(lastName(entry.fullName || entry.name || 'Unknown'))}</span>
@@ -27829,13 +27830,15 @@ function teamDetailLineupItemHtml(entry = {}) {
       </span>
       <span class="lineup-pos">${escapeHtml(entry.position || '')}</span>
       <span class="lineup-today">${escapeHtml(teamDetailSplitText(entry.split))}</span>
+      ${teamDetailRowRatingHtml(rating, entry.splitHand === 'L' ? 'vL' : 'vR')}
     </li>
   `;
 }
 
 function teamDetailBatterTrendClass(entry = {}) {
-  if (entry.teamDetailTrend === 'hot') return 'lineup-row-hot';
-  if (entry.teamDetailTrend === 'cold') return 'lineup-row-cold';
+  const rawRating = entry?.teamDetailRating?.recent ?? entry?.teamDetailRating?.current;
+  const rating = rawRating != null && rawRating !== '' ? Number(rawRating) : NaN;
+  if (Number.isFinite(rating)) return rating >= 70 ? 'lineup-row-hot' : rating <= 35 ? 'lineup-row-cold' : '';
   const split = entry?.split || null;
   const ops = Number.parseFloat(String(split?.ops || '').replace(/^\./, '0.'));
   const avg = Number.parseFloat(String(split?.avg || '').replace(/^\./, '0.'));
@@ -27870,16 +27873,32 @@ async function hydrateTeamDetailBatterTrends(team = '', hitters = [], selectedDa
   }));
 }
 
-function teamDetailPitcherItemHtml(arm = {}, color = '') {
+function teamDetailPitcherItemHtml(arm = {}, color = '', rating = null) {
   const isBullpenDay = Boolean(arm.isBullpenDay);
   return `
-    <li class="bullpen-item${teamDetailPitcherTrendClass(arm)}${isBullpenDay ? ' is-bullpen-day' : ''}" data-player-id="${escapeHtml(String(arm.id || ''))}"${isBullpenDay ? '' : ' role="button" tabindex="0"'}>
+    <li class="bullpen-item${teamDetailPitcherTrendClass(arm, rating)}${isBullpenDay ? ' is-bullpen-day' : ''}${isBullpenDay ? '' : ' team-detail-rating-tone'}" style="${isBullpenDay ? '' : teamDetailRatingToneStyle(rating)}" data-player-id="${escapeHtml(String(arm.id || ''))}"${isBullpenDay ? '' : ' role="button" tabindex="0"'}>
       <div class="bullpen-main pitcher-priority-line">
         <span class="bullpen-name pitcher-priority-name" style="color:${escapeHtml(color)}">${isBullpenDay ? 'Bullpen Day' : teamDetailPitcherNameHtml(arm)}</span>
         <span class="bullpen-meta pitcher-priority-meta">${teamDetailPitcherMetaLine(arm)}</span>
+        ${isBullpenDay ? '' : teamDetailRowRatingHtml(rating, 'OVR')}
       </div>
     </li>
   `;
+}
+
+function teamDetailRowRatingHtml(rating = null, label = 'OVR') {
+  const current = rating?.current != null && Number.isFinite(Number(rating.current)) ? Math.round(Number(rating.current)) : null;
+  const recent = rating?.recent != null && Number.isFinite(Number(rating.recent)) ? Math.round(Number(rating.recent)) : null;
+  return `<span class="team-detail-row-rating"><small>${escapeHtml(label)}</small><b>${current ?? '--'}${recent != null ? `<sup>${recent}</sup>` : ''}</b></span>`;
+}
+
+function teamDetailRatingToneStyle(rating = null) {
+  const rawScore = rating?.recent ?? rating?.current;
+  const score = rawScore != null && rawScore !== '' ? Number(rawScore) : NaN;
+  if (!Number.isFinite(score)) return '--team-detail-heat-strength:0;--team-detail-heat-border:0;--team-detail-heat-main:0;--team-detail-heat-soft:0;';
+  const strength = Math.min(1, Math.abs(score - 50) / 50);
+  const rgb = score >= 50 ? '255,122,45' : '72,181,255';
+  return `--team-detail-heat-rgb:${rgb};--team-detail-heat-strength:${strength.toFixed(3)};--team-detail-heat-border:${(strength * .7).toFixed(3)};--team-detail-heat-main:${(strength * .28).toFixed(3)};--team-detail-heat-soft:${(strength * .08).toFixed(3)};`;
 }
 
 function teamDetailPitcherNameHtml(arm = {}) {
@@ -27896,7 +27915,10 @@ function teamDetailPitcherMetaLine(arm = {}) {
   ].join(' | ');
 }
 
-function teamDetailPitcherTrendClass(arm = {}) {
+function teamDetailPitcherTrendClass(arm = {}, rating = null) {
+  const rawScore = rating?.recent ?? rating?.current;
+  const score = rawScore != null && rawScore !== '' ? Number(rawScore) : NaN;
+  if (Number.isFinite(score)) return score >= 70 ? ' lineup-row-hot' : score <= 35 ? ' lineup-row-cold' : '';
   const er = Number(arm?.lastStartEarnedRuns ?? arm?.metrics?.last?.earnedRuns ?? arm?.last?.earnedRuns);
   if (!Number.isFinite(er)) return '';
   if (er <= 1) return ' lineup-row-cold';
@@ -28031,6 +28053,208 @@ function teamDetailHeaderStatsHtml(data = {}) {
   `;
 }
 
+function teamDetailRatingCardHtml(label = '', rating = null) {
+  const current = rating?.current != null && Number.isFinite(Number(rating.current)) ? Math.round(Number(rating.current)) : null;
+  const recent = rating?.recent != null && Number.isFinite(Number(rating.recent)) ? Math.round(Number(rating.recent)) : null;
+  const tone = current != null ? Math.max(1, Math.min(99, current)) : 50;
+  return `<div class="team-detail-rating-card" style="--team-rating:${tone}%">
+    <span>${escapeHtml(label)}</span>
+    <strong>${current ?? '--'}${recent != null ? `<sup>${recent}</sup>` : ''}</strong>
+    <i><em></em></i>
+  </div>`;
+}
+
+function teamDetailRatingsHtml(ratings = {}) {
+  return `<section class="team-detail-ratings" aria-label="Team player ratings">
+    ${teamDetailRatingCardHtml('BAT vLHP', ratings.vsLHP)}
+    ${teamDetailRatingCardHtml('BAT vRHP', ratings.vsRHP)}
+    ${teamDetailRatingCardHtml('STARTING', ratings.starting)}
+    ${teamDetailRatingCardHtml('BULLPEN', ratings.bullpen)}
+    <small>TEAM OVR <b>SUP</b> LAST 14D</small>
+  </section>`;
+}
+
+function averageTeamDetailRating(values = []) {
+  const ratings = listify(values).map(Number).filter(Number.isFinite);
+  return ratings.length ? Math.round(ratings.reduce((sum, value) => sum + value, 0) / ratings.length) : null;
+}
+
+async function getTeamDetailRatings(hitters = [], groups = {}, selectedDate = dateInput.value || formatDate(new Date())) {
+  const lhpLineup = teamDetailLineupForHand(hitters, 'L');
+  const rhpLineup = teamDetailLineupForHand(hitters, 'R');
+  const hitterIds = [...new Set([...lhpLineup, ...rhpLineup].map((entry) => Number(entry?.id)).filter((id) => id > 0))];
+  const pitcherEntries = [...listify(groups?.starters), ...listify(groups?.relievers)].filter((entry) => Number(entry?.id) > 0);
+  const hitterRatings = new Map(await mapWithConcurrency(hitterIds, 5, async (id) => {
+    const [current, leagueFallback, recent] = await Promise.all([
+      getHitterOverallRatings(id, selectedDate).catch(() => null),
+      getHitterOverallRatingsFromLeagueRows(id, selectedDate).catch(() => null),
+      getHitterRecentRatings(id, selectedDate, 14).catch(() => null),
+    ]);
+    const mergedCurrent = {
+      overall: current?.overall ?? leagueFallback?.overall ?? null,
+      vsRHP: current?.vsRHP ?? leagueFallback?.vsRHP ?? current?.overall ?? leagueFallback?.overall ?? null,
+      vsLHP: current?.vsLHP ?? leagueFallback?.vsLHP ?? current?.overall ?? leagueFallback?.overall ?? null,
+    };
+    return [id, { current: mergedCurrent, recent }];
+  }));
+  const pitcherRatings = new Map(await mapWithConcurrency(pitcherEntries, 5, async (entry) => {
+    const id = Number(entry.id);
+    const [current, recent] = await Promise.all([
+      getPitcherOverallRatings(id, selectedDate).catch(() => null),
+      getPitcherRecentWindowOverallRating(id, selectedDate, 14).catch(() => null),
+    ]);
+    return [id, { current: current?.overall, recent }];
+  }));
+  const hitterAverage = (lineup, split) => ({
+    current: averageTeamDetailRating(lineup.map((entry) => hitterRatings.get(Number(entry.id))?.current?.[split])),
+    recent: averageTeamDetailRating(lineup.map((entry) => hitterRatings.get(Number(entry.id))?.recent?.[split])),
+  });
+  const pitcherAverage = (entries) => ({
+    current: averageTeamDetailRating(listify(entries).map((entry) => pitcherRatings.get(Number(entry.id))?.current)),
+    recent: averageTeamDetailRating(listify(entries).map((entry) => pitcherRatings.get(Number(entry.id))?.recent)),
+  });
+  const raw = {
+    vsLHP: hitterAverage(lhpLineup, 'vsLHP'),
+    vsRHP: hitterAverage(rhpLineup, 'vsRHP'),
+    starting: pitcherAverage(groups?.starters),
+    bullpen: pitcherAverage(groups?.relievers),
+  };
+  const league = await getTeamDetailLeagueRatingDistributions(selectedDate).catch(() => ({}));
+  const relative = (rating, key) => ({
+    current: teamDetailLeagueDecileScore(rating?.current, league?.[key]?.current) ?? rating?.current ?? null,
+    recent: teamDetailLeagueDecileScore(rating?.recent, league?.[key]?.recent) ?? rating?.recent ?? null,
+  });
+  return {
+    vsLHP: relative(raw.vsLHP, 'vsLHP'),
+    vsRHP: relative(raw.vsRHP, 'vsRHP'),
+    starting: relative(raw.starting, 'starting'),
+    bullpen: relative(raw.bullpen, 'bullpen'),
+    players: {
+      hitters: Object.fromEntries([...hitterRatings].map(([id, value]) => [String(id), value])),
+      pitchers: Object.fromEntries([...pitcherRatings].map(([id, value]) => [String(id), value])),
+    },
+  };
+}
+
+function teamDetailLeagueDecileScore(value, distribution = []) {
+  const numeric = Number(value);
+  const values = listify(distribution).map(Number).filter(Number.isFinite);
+  if (!Number.isFinite(numeric) || values.length < 5) return null;
+  const percentile = hitterRatingPercentile(values.map((score) => ({ score })), numeric, 'score');
+  if (!Number.isFinite(percentile)) return null;
+  return Math.max(10, Math.min(100, Math.ceil(percentile * 10) * 10));
+}
+
+function teamDetailLeagueUnitAverages(rows = [], unit = 'hitting') {
+  const population = unit === 'hitting'
+    ? listify(rows).map(hitterRatingNormalizeLeagueRow)
+    : listify(rows).map(pitcherRatingNormalizeLeagueRow);
+  const metrics = unit === 'hitting'
+    ? [['slg', .28, false], ['avg', .16, false], ['ops', .24, false], ['hrRate', .18, false], ['xbhRate', .14, false]]
+    : [['slg', .22, true], ['avg', .13, true], ['hr9', .17, true], ['k9', .18, false], ['whip', .16, true], ['era', .14, true]];
+  const sortedMetrics = new Map(metrics.concat(unit === 'pitching' ? [['outs', 0, false]] : []).map(([key]) => [
+    key,
+    population.map((row) => Number(row?.[key])).filter(Number.isFinite).sort((a, b) => a - b),
+  ]));
+  const percentile = (value, key) => {
+    const values = sortedMetrics.get(key) || [];
+    const numeric = Number(value);
+    if (!Number.isFinite(numeric) || !values.length) return null;
+    let lower = 0;
+    while (lower < values.length && values[lower] < numeric) lower += 1;
+    let upper = lower;
+    while (upper < values.length && values[upper] === numeric) upper += 1;
+    return (lower + ((upper - lower) * .5)) / values.length;
+  };
+  const abilityForRow = (row) => {
+    let weighted = 0;
+    let weight = 0;
+    metrics.forEach(([key, metricWeight, lowerIsBetter]) => {
+      let value = percentile(row?.[key], key);
+      if (!Number.isFinite(value)) return;
+      if (lowerIsBetter) value = 1 - value;
+      weighted += value * metricWeight;
+      weight += metricWeight;
+    });
+    if (weight <= 0) return .5;
+    const quality = weighted / weight;
+    if (unit === 'hitting') return quality;
+    const outs = Math.max(0, Number(row?.outs) || 0);
+    const gamesStarted = Math.max(0, Number(row?.gamesStarted) || 0);
+    const gamesPlayed = Math.max(gamesStarted, Number(row?.gamesPlayed) || 0);
+    const starterShare = gamesPlayed > 0 ? Math.min(1, gamesStarted / gamesPlayed) : 0;
+    const workloadReliability = outs / (outs + 90);
+    const stabilizedQuality = .5 + ((quality - .5) * (.62 + (.38 * workloadReliability)));
+    const workloadPercentile = percentile(outs, 'outs');
+    const positiveQuality = Math.max(0, quality - .5);
+    return Math.max(0, Math.min(1,
+      stabilizedQuality
+      + (positiveQuality * starterShare * workloadReliability * .16)
+      + (Number.isFinite(workloadPercentile) ? positiveQuality * (workloadPercentile - .5) * .08 : 0)));
+  };
+  const grouped = new Map();
+  population.forEach((row) => {
+    const team = canonicalTeamAbbrev(row?.teamAbbrev || '');
+    if (!team) return;
+    const score = playerRatingFromPercentile(abilityForRow(row));
+    if (!grouped.has(team)) grouped.set(team, []);
+    grouped.get(team).push({ row, score });
+  });
+  const result = { hitting: [], starting: [], bullpen: [] };
+  grouped.forEach((players) => {
+    if (unit === 'hitting') {
+      const topNine = [...players].sort((a, b) => b.score - a.score).slice(0, 9);
+      const average = averageTeamDetailRating(topNine.map((entry) => entry.score));
+      if (average != null) result.hitting.push(average);
+      return;
+    }
+    const starters = players
+      .filter(({ row }) => Number(row.gamesStarted) > 0 && (Number(row.gamesStarted) >= 2 || Number(row.gamesStarted) >= Math.max(1, Number(row.gamesPlayed) * .35)))
+      .sort((a, b) => Number(b.row.outs) - Number(a.row.outs))
+      .slice(0, 5);
+    const starterIds = new Set(starters.map(({ row }) => Number(row.id)));
+    const bullpen = players.filter(({ row }) => !starterIds.has(Number(row.id)));
+    const starterAverage = averageTeamDetailRating(starters.map((entry) => entry.score));
+    const bullpenAverage = averageTeamDetailRating(bullpen.map((entry) => entry.score));
+    if (starterAverage != null) result.starting.push(starterAverage);
+    if (bullpenAverage != null) result.bullpen.push(bullpenAverage);
+  });
+  return result;
+}
+
+async function getTeamDetailLeagueRatingDistributions(selectedDate = dateInput.value || formatDate(new Date())) {
+  const through = calendarDateOnly(selectedDate || dateInput.value || formatDate(new Date()));
+  const key = `team-detail-league-ratings:${through}:v1`;
+  if (teamStatsCache.has(key)) return teamStatsCache.get(key);
+  const promise = (async () => {
+    const [seasonL, recentL, seasonR, recentR, seasonPitching, recentPitching] = await Promise.all([
+      lineupPowerGradeLeagueWindow(through, 0, 'L'),
+      lineupPowerGradeLeagueWindow(through, 14, 'L'),
+      lineupPowerGradeLeagueWindow(through, 0, 'R'),
+      lineupPowerGradeLeagueWindow(through, 14, 'R'),
+      pitcherPowerGradeLeagueWindow(through, 0, ''),
+      pitcherPowerGradeLeagueWindow(through, 14, ''),
+    ]);
+    const currentL = teamDetailLeagueUnitAverages(seasonL, 'hitting');
+    const formL = teamDetailLeagueUnitAverages(recentL, 'hitting');
+    const currentR = teamDetailLeagueUnitAverages(seasonR, 'hitting');
+    const formR = teamDetailLeagueUnitAverages(recentR, 'hitting');
+    const currentPitching = teamDetailLeagueUnitAverages(seasonPitching, 'pitching');
+    const formPitching = teamDetailLeagueUnitAverages(recentPitching, 'pitching');
+    return {
+      vsLHP: { current: currentL.hitting, recent: formL.hitting },
+      vsRHP: { current: currentR.hitting, recent: formR.hitting },
+      starting: { current: currentPitching.starting, recent: formPitching.starting },
+      bullpen: { current: currentPitching.bullpen, recent: formPitching.bullpen },
+    };
+  })().catch((error) => {
+    teamStatsCache.delete(key);
+    throw error;
+  });
+  teamStatsCache.set(key, promise);
+  return promise;
+}
+
 function teamDetailSeasonLine(data = {}) {
   return [
     data.record || '',
@@ -28052,25 +28276,40 @@ function teamDetailRecentLine(data = {}) {
 function renderTeamDetailShell(data = {}) {
   const team = canonicalTeamAbbrev(data.abbrev || '');
   const color = data.color || getTeamColor(team);
-  const lhpLineup = teamDetailLineupForHand(data.hitters, 'L');
-  const rhpLineup = teamDetailLineupForHand(data.hitters, 'R');
+  const hitterRatings = data.ratings?.players?.hitters || {};
+  const pitcherRatings = data.ratings?.players?.pitchers || {};
+  const attachHitterRating = (entry, split) => {
+    const playerRatings = hitterRatings[String(entry?.id || '')] || {};
+    return {
+      ...entry,
+      teamDetailRating: {
+        current: playerRatings.current?.[split],
+        recent: playerRatings.recent?.[split],
+      },
+    };
+  };
+  const lhpLineup = teamDetailLineupForHand(data.hitters, 'L').map((entry) => attachHitterRating(entry, 'vsLHP'));
+  const rhpLineup = teamDetailLineupForHand(data.hitters, 'R').map((entry) => attachHitterRating(entry, 'vsRHP'));
   const starters = listify(data.starters).slice(0, 5);
   const bullpen = listify(data.bullpen);
   return `
     <section class="team-detail-card" style="--team-color:${escapeHtml(color)};--team-logo-bg:url('${escapeHtml(data.logo || getLogoPath(team) || 'placeholder.png')}')">
       <div class="team-detail-hero">
-        <div class="team-detail-identity">
-          <img src="${escapeHtml(data.logo || getLogoPath(team) || 'placeholder.png')}" alt="" />
-          <div class="team-detail-hero-main">
-            <strong>${escapeHtml(data.name || displayTeamAbbrev(team) || team)}</strong>
-            <span>${escapeHtml(teamDetailSeasonLine(data) || [data.record || '', data.division || ''].filter(Boolean).join(' | '))}</span>
-            <span class="team-detail-recent-line">${escapeHtml(teamDetailRecentLine(data) || 'Last 15G loading')}</span>
+        <div class="team-detail-identity-column">
+          <div class="team-detail-identity">
+            <img src="${escapeHtml(data.logo || getLogoPath(team) || 'placeholder.png')}" alt="" />
+            <div class="team-detail-hero-main">
+              <strong>${escapeHtml(data.name || displayTeamAbbrev(team) || team)}</strong>
+              <span>${escapeHtml(teamDetailSeasonLine(data) || [data.record || '', data.division || ''].filter(Boolean).join(' | '))}</span>
+              <span class="team-detail-recent-line">${escapeHtml(teamDetailRecentLine(data) || 'Last 15G loading')}</span>
+            </div>
           </div>
+          ${teamDetailRatingsHtml(data.ratings)}
         </div>
         <div class="team-detail-hero-rotation">
           <h3>Starting 5</h3>
           <ol class="team-detail-pitcher-list team-detail-starter-list bullpen-list">
-            ${starters.length ? starters.map((arm) => teamDetailPitcherItemHtml(arm, color)).join('') : '<div class="lineup-empty">Rotation loading...</div>'}
+            ${starters.length ? starters.map((arm) => teamDetailPitcherItemHtml(arm, color, pitcherRatings[String(arm?.id || '')])).join('') : '<div class="lineup-empty">Rotation loading...</div>'}
           </ol>
         </div>
         ${teamDetailHeaderStatsHtml(data)}
@@ -28090,7 +28329,7 @@ function renderTeamDetailShell(data = {}) {
       <section class="team-detail-section team-detail-bullpen">
         <h3>Bullpen Arms</h3>
         <ol class="team-detail-pitcher-list bullpen-list">
-          ${bullpen.length ? bullpen.map((arm) => teamDetailPitcherItemHtml(arm, color)).join('') : '<div class="lineup-empty">Bullpen loading...</div>'}
+          ${bullpen.length ? bullpen.map((arm) => teamDetailPitcherItemHtml(arm, color, pitcherRatings[String(arm?.id || '')])).join('') : '<div class="lineup-empty">Bullpen loading...</div>'}
         </ol>
       </section>
     </section>
@@ -28100,7 +28339,7 @@ function renderTeamDetailShell(data = {}) {
 async function fetchTeamDetailData(teamAbbrev = '') {
   const team = canonicalTeamAbbrev(teamAbbrev);
   const selectedDate = dateInput?.value || formatDate(new Date());
-  const cacheKey = `${team}:${selectedDate}:v5`;
+  const cacheKey = `${team}:${selectedDate}:v6`;
   if (teamDetailCache.has(cacheKey)) return teamDetailCache.get(cacheKey);
   const promise = (async () => {
     const gameContext = teamDetailGameContext(team);
@@ -28146,6 +28385,7 @@ async function fetchTeamDetailData(teamAbbrev = '') {
     );
     const groups = splitTeamDetailPitchingStaff(staffProfiles);
     const starters = await hydrateTeamDetailStarterTrends(teamDetailStartingFive(groups), selectedDate).catch(() => teamDetailStartingFive(groups));
+    const ratings = await getTeamDetailRatings(hitters, groups, selectedDate).catch(() => ({}));
     const divisionRecord = standing.divisionRecord || await getTeamDivisionRecord(team, selectedDate).catch(() => '');
     const playerLookup = {};
     [...hitters, ...staffProfiles].forEach((profile) => {
@@ -28171,6 +28411,7 @@ async function fetchTeamDetailData(teamAbbrev = '') {
       hitters,
       starters,
       bullpen: groups.relievers,
+      ratings,
       playerLookup,
     };
   })().catch((error) => {
@@ -31595,17 +31836,14 @@ async function getHitterOverallRatings(playerId, endDate = dateInput.value || fo
   const id = Number(playerId);
   const through = calendarDateOnly(endDate || dateInput.value || formatDate(new Date()));
   if (!(id > 0) || !through) return null;
-  const key = `${id}:${through}:overall-rating-v1`;
+  const key = `${id}:${through}:overall-rating-v2`;
   if (playerOverallRatingCache.has(key)) return playerOverallRatingCache.get(key);
   const promise = (async () => {
     const season = seasonForDate(through);
-    const [seasonAllRows, seasonVsRRows, seasonVsLRows, heat3Rows, heat14Rows, heat30Rows, handed, seasonStat] = await Promise.all([
+    const [seasonAllRows, seasonVsRRows, seasonVsLRows, handed, seasonStat] = await Promise.all([
       lineupPowerGradeLeagueWindow(through, 0, ''),
       lineupPowerGradeLeagueWindow(through, 0, 'R'),
       lineupPowerGradeLeagueWindow(through, 0, 'L'),
-      lineupPowerGradeLeagueWindow(through, 3, ''),
-      lineupPowerGradeLeagueWindow(through, 14, ''),
-      lineupPowerGradeLeagueWindow(through, 30, ''),
       getPlayerHandedBattingSplits(id, season).catch(() => ({ vsLeft: null, vsRight: null })),
       getPlayerSeasonStatSplit(id, 'hitting', season).catch(() => null),
     ]);
@@ -31613,7 +31851,6 @@ async function getHitterOverallRatings(playerId, endDate = dateInput.value || fo
       || (seasonStat ? hitterRatingStatRow(id, seasonStat) : null);
     const vsRTarget = handed?.vsRight ? hitterRatingStatRow(id, handed.vsRight) : null;
     const vsLTarget = handed?.vsLeft ? hitterRatingStatRow(id, handed.vsLeft) : null;
-    const exactLastThreeTarget = await lineupLastThreePlayedRow(id, through, '').catch(() => null);
     const establishedOverall = hitterAbilityPercentile(seasonAllRows, allTarget);
     const splitEstablished = (rows, target) => {
       const raw = hitterAbilityPercentile(rows, target || allTarget);
@@ -31621,18 +31858,11 @@ async function getHitterOverallRatings(playerId, endDate = dateInput.value || fo
       const reliability = sample / (sample + 110);
       return (raw * reliability) + (establishedOverall * (1 - reliability));
     };
-    const heatFor = (rows, explicitTarget = null) => {
-      const target = explicitTarget || listify(rows).map(hitterRatingNormalizeLeagueRow).find((row) => Number(row.id) === id) || null;
-      return hitterAbilityPercentile(rows, target);
-    };
-    const heat = (heatFor(heat3Rows, exactLastThreeTarget ? hitterRatingNormalizeLeagueRow(exactLastThreeTarget) : null) * .50)
-      + (heatFor(heat14Rows) * .30) + (heatFor(heat30Rows) * .20);
-    const finalPercentile = (established) => (established * .75) + (heat * .25);
-    const vsRHP = playerRatingFromPercentile(finalPercentile(splitEstablished(seasonVsRRows, vsRTarget)));
-    const vsLHP = playerRatingFromPercentile(finalPercentile(splitEstablished(seasonVsLRows, vsLTarget)));
+    const vsRHP = playerRatingFromPercentile(splitEstablished(seasonVsRRows, vsRTarget));
+    const vsLHP = playerRatingFromPercentile(splitEstablished(seasonVsLRows, vsLTarget));
     const overall = Math.round((vsRHP * .73) + (vsLHP * .27));
     return {
-      playerId: id, overall, vsRHP, vsLHP, heat: playerRatingFromPercentile(heat),
+      playerId: id, overall, vsRHP, vsLHP,
       labels: { overall: playerRatingLabel(overall), vsRHP: playerRatingLabel(vsRHP), vsLHP: playerRatingLabel(vsLHP) },
       samples: { vsRHP: Number(vsRTarget?.plateAppearances || 0), vsLHP: Number(vsLTarget?.plateAppearances || 0) },
       through,
@@ -31649,13 +31879,12 @@ async function getHitterOverallRatingsFromLeagueRows(playerId, endDate = dateInp
   const id = Number(playerId);
   const through = calendarDateOnly(endDate || dateInput.value || formatDate(new Date()));
   if (!(id > 0) || !through) return null;
-  const key = `${id}:${through}:overall-rating-league-only-v1`;
+  const key = `${id}:${through}:overall-rating-league-only-v2`;
   if (playerOverallRatingCache.has(key)) return playerOverallRatingCache.get(key);
   const promise = (async () => {
-    const [allRows, vsRRows, vsLRows, heat3Rows, heat14Rows, heat30Rows] = await Promise.all([
+    const [allRows, vsRRows, vsLRows] = await Promise.all([
       lineupPowerGradeLeagueWindow(through, 0, ''), lineupPowerGradeLeagueWindow(through, 0, 'R'),
-      lineupPowerGradeLeagueWindow(through, 0, 'L'), lineupPowerGradeLeagueWindow(through, 3, ''),
-      lineupPowerGradeLeagueWindow(through, 14, ''), lineupPowerGradeLeagueWindow(through, 30, ''),
+      lineupPowerGradeLeagueWindow(through, 0, 'L'),
     ]);
     const targetIn = (rows) => listify(rows).map(hitterRatingNormalizeLeagueRow).find((row) => Number(row.id) === id) || null;
     const allTarget = targetIn(allRows);
@@ -31667,15 +31896,10 @@ async function getHitterOverallRatingsFromLeagueRows(playerId, endDate = dateInp
       const reliability = (Number(target.plateAppearances || target.atBats) || 0) / ((Number(target.plateAppearances || target.atBats) || 0) + 110);
       return (hitterAbilityPercentile(rows, target) * reliability) + (establishedOverall * (1 - reliability));
     };
-    const heatFor = (rows) => {
-      const target = targetIn(rows);
-      return target ? hitterAbilityPercentile(rows, target) : .5;
-    };
-    const heat = (heatFor(heat3Rows) * .50) + (heatFor(heat14Rows) * .30) + (heatFor(heat30Rows) * .20);
-    const finish = (established) => playerRatingFromPercentile((established * .75) + (heat * .25));
+    const finish = (established) => playerRatingFromPercentile(established);
     const vsRHP = finish(splitEstablished(vsRRows));
     const vsLHP = finish(splitEstablished(vsLRows));
-    return { playerId: id, overall: Math.round((vsRHP * .73) + (vsLHP * .27)), vsRHP, vsLHP, heat: playerRatingFromPercentile(heat), through };
+    return { playerId: id, overall: Math.round((vsRHP * .73) + (vsLHP * .27)), vsRHP, vsLHP, through };
   })().catch((error) => {
     playerOverallRatingCache.delete(key);
     throw error;
@@ -31691,6 +31915,9 @@ function pitcherRatingNormalizeLeagueRow(row = {}) {
   return {
     ...row,
     id: Number(row?.id),
+    outs,
+    gamesStarted: statNumber(row?.gamesStarted ?? stat?.gamesStarted ?? stat?.starts),
+    gamesPlayed: statNumber(row?.gamesPlayed ?? stat?.gamesPlayed ?? stat?.gamesPitched ?? stat?.appearances),
     atBats: statNumber(row?.atBats ?? stat?.battersFaced ?? stat?.atBats),
     era: predictionRateValue(row?.era ?? stat?.era),
     whip: predictionRateValue(row?.whip ?? stat?.whip),
@@ -31717,24 +31944,33 @@ function pitcherAbilityPercentile(rows = [], target = null) {
     weighted += percentile * metricWeight;
     weight += metricWeight;
   }
-  return weight > 0 ? weighted / weight : .5;
+  if (weight <= 0) return .5;
+  const quality = weighted / weight;
+  const outs = Math.max(0, Number(target?.outs) || 0);
+  const gamesStarted = Math.max(0, Number(target?.gamesStarted) || 0);
+  const gamesPlayed = Math.max(gamesStarted, Number(target?.gamesPlayed) || 0);
+  const starterShare = gamesPlayed > 0 ? Math.min(1, gamesStarted / gamesPlayed) : 0;
+  const workloadReliability = outs / (outs + 90);
+  const stabilizedQuality = .5 + ((quality - .5) * (.62 + (.38 * workloadReliability)));
+  const workloadPercentile = hitterRatingPercentile(population, outs, 'outs');
+  const positiveQuality = Math.max(0, quality - .5);
+  const starterValue = positiveQuality * starterShare * workloadReliability * .16;
+  const workloadValue = Number.isFinite(workloadPercentile) ? positiveQuality * (workloadPercentile - .5) * .08 : 0;
+  return Math.max(0, Math.min(1, stabilizedQuality + starterValue + workloadValue));
 }
 
 async function getPitcherOverallRatings(playerId, endDate = dateInput.value || formatDate(new Date())) {
   const id = Number(playerId);
   const through = calendarDateOnly(endDate || dateInput.value || formatDate(new Date()));
   if (!(id > 0) || !through) return null;
-  const key = `${id}:${through}:pitcher-overall-rating-v1`;
+  const key = `${id}:${through}:pitcher-overall-rating-v3`;
   if (playerOverallRatingCache.has(key)) return playerOverallRatingCache.get(key);
   const promise = (async () => {
     const season = seasonForDate(through);
-    const [allRows, vsRRows, vsLRows, heat3Rows, heat14Rows, heat30Rows, vsRStat, vsLStat, seasonStat] = await Promise.all([
+    const [allRows, vsRRows, vsLRows, vsRStat, vsLStat, seasonStat] = await Promise.all([
       pitcherPowerGradeLeagueWindow(through, 0, ''),
       pitcherPowerGradeLeagueWindow(through, 0, 'R'),
       pitcherPowerGradeLeagueWindow(through, 0, 'L'),
-      pitcherPowerGradeLeagueWindow(through, 3, ''),
-      pitcherPowerGradeLeagueWindow(through, 14, ''),
-      pitcherPowerGradeLeagueWindow(through, 30, ''),
       getPitcherOpponentHandSplit(id, 'vr', season).catch(() => null),
       getPitcherOpponentHandSplit(id, 'vl', season).catch(() => null),
       getPlayerSeasonStatSplit(id, 'pitching', season).catch(() => null),
@@ -31750,16 +31986,10 @@ async function getPitcherOverallRatings(playerId, endDate = dateInput.value || f
       const reliability = sample / (sample + 130);
       return (raw * reliability) + (establishedOverall * (1 - reliability));
     };
-    const heatFor = (rows) => {
-      const target = listify(rows).map(pitcherRatingNormalizeLeagueRow).find((row) => Number(row.id) === id) || null;
-      return pitcherAbilityPercentile(rows, target);
-    };
-    const heat = (heatFor(heat3Rows) * .50) + (heatFor(heat14Rows) * .30) + (heatFor(heat30Rows) * .20);
-    const finalPercentile = (established) => (established * .75) + (heat * .25);
-    const vsRHB = playerRatingFromPercentile(finalPercentile(splitEstablished(vsRRows, vsRTarget)));
-    const vsLHB = playerRatingFromPercentile(finalPercentile(splitEstablished(vsLRows, vsLTarget)));
+    const vsRHB = playerRatingFromPercentile(splitEstablished(vsRRows, vsRTarget));
+    const vsLHB = playerRatingFromPercentile(splitEstablished(vsLRows, vsLTarget));
     const overall = Math.round((vsRHB * .58) + (vsLHB * .42));
-    return { playerId: id, overall, vsRHB, vsLHB, heat: playerRatingFromPercentile(heat), through };
+    return { playerId: id, overall, vsRHB, vsLHB, through };
   })().catch((error) => {
     playerOverallRatingCache.delete(key);
     throw error;
@@ -31844,6 +32074,26 @@ async function getPitcherLastThreeOverallRating(profile = null, game = null, end
   const population = await pitcherPowerGradeLeagueWindow(through, 14, '');
   return playerRatingFromPercentile(pitcherAbilityPercentile(population, target));
 }
+
+async function getPitcherRecentWindowOverallRating(playerId, endDate = dateInput.value || formatDate(new Date()), days = 14) {
+  const id = Number(playerId);
+  const through = calendarDateOnly(endDate || dateInput.value || formatDate(new Date()));
+  if (!(id > 0) || !through) return null;
+  const key = `${id}:${through}:pitcher-recent-window:${days}:v1`;
+  if (playerOverallRatingCache.has(key)) return playerOverallRatingCache.get(key);
+  const promise = (async () => {
+    const rows = await pitcherPowerGradeLeagueWindow(through, days, '');
+    const population = listify(rows).map(pitcherRatingNormalizeLeagueRow);
+    const target = population.find((row) => Number(row.id) === id) || null;
+    return target ? playerRatingFromPercentile(pitcherAbilityPercentile(population, target)) : null;
+  })().catch((error) => {
+    playerOverallRatingCache.delete(key);
+    throw error;
+  });
+  playerOverallRatingCache.set(key, promise);
+  return promise;
+}
+
 const pitcherPowerGradeLeagueCache = new Map();
 
 function lineupPowerGradeLetter(score = 0) {
@@ -32393,7 +32643,7 @@ async function lineupPowerGradeLeagueWindow(endDate, days = 0, pitcherHand = '')
   const hand = String(pitcherHand || '').toUpperCase().startsWith('L') ? 'L' : String(pitcherHand || '').toUpperCase().startsWith('R') ? 'R' : '';
   const lastThreeGames = days === 3;
   const startDate = lastThreeGames ? addDaysToDateValue(endDate, -20) : days > 0 ? addDaysToDateValue(endDate, -(days - 1)) : `${season}-03-01`;
-  const cacheKey = `${lastThreeGames ? 'last3population' : startDate}:${endDate}:v3:${hand || 'all'}`;
+  const cacheKey = `${lastThreeGames ? 'last3population' : startDate}:${endDate}:v4:${hand || 'all'}`;
   if (!lineupPowerGradeLeagueCache.has(cacheKey)) {
     const promise = (async () => {
       const url = new URL(`${MLB_API_BASE}/stats`);
@@ -32421,7 +32671,7 @@ async function lineupPowerGradeLeagueWindow(endDate, days = 0, pitcherHand = '')
           || atBats + statNumber(stat.baseOnBalls ?? stat.walks) + statNumber(stat.hitByPitch) + statNumber(stat.sacFlies);
         const strikeOuts = statNumber(stat.strikeOuts ?? stat.strikeouts);
         const kRate = plateAppearances > 0 ? strikeOuts / plateAppearances : null;
-        const row = { id, atBats, plateAppearances, strikeOuts, kRate, slg, obp, avg, stat };
+        const row = { id, atBats, plateAppearances, strikeOuts, kRate, slg, obp, avg, teamAbbrev: canonicalTeamAbbrev(split?.team?.abbreviation || ''), stat };
         row.warValue = hitterSeasonWarValue(stat, row);
         return row;
       }).filter((row) => Number.isFinite(row.id) && row.id > 0 && row.atBats >= minimumAtBats && Number.isFinite(row.slg));

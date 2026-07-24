@@ -507,7 +507,7 @@ Hitter outputs:
 
 The established hitter component compares SLG (28%), AVG (16%), OPS/overall production (24%), HR per plate appearance (18%), and XBH per plate appearance (14%) against the corresponding MLB population. Every input becomes a league percentile before it is combined; there are no fixed stat cutoffs.
 
-Current hitter heat compares the same offensive profile against cached league populations for the last three-game/recent window, 14 days, and 30 days, weighted 50%/30%/20%. Final handed ratings are 75% established ability and 25% heat.
+Season hitter Overall and handedness ratings now contain established season ability only. Current form is deliberately excluded because it is displayed independently as the last-14-day superscript. This keeps the main number stable and interpretable while the superscript shows how differently the player is performing now.
 
 Handed season samples regress toward the hitter's overall established ability with reliability `PA / (PA + 110)`. This prevents a few plate appearances against one pitcher hand from producing an extreme rating. Overall combines the finished handed ratings as approximately 73% versus RHP and 27% versus LHP.
 
@@ -519,7 +519,9 @@ For hitters, the player-card header strip begins with numeric `OVR`; its supersc
 
 Pitcher recent-HR-allowed cards use this engine for the batter who homered. The card tooltip formats the matchup line as `{batter name} ({hand}) ({Overall}{L14 Overall superscript} OVR) ({rating versus pitcher hand} vP)`. A right-handed pitcher selects the hitter's `vsRHP`; a left-handed pitcher selects `vsLHP`. The event retains game/opponent context and pitch type/detail. Cycling a stack switches the tooltip and all ratings to the newly selected HR.
 
-Batter recent-HR cards perform the inverse lookup. They calculate the opposing pitcher's Overall/vs RHB/vs LHB profile from opponent SLG, opponent AVG, HR/9, K/9, WHIP, and ERA league percentiles. The batter's side selects `vsRHB` or `vsLHB`, with the same 75% established / 25% heat blend and small-sample regression. Their matchup line is `{pitcher name} ({hand}) ({Overall}{L3 Overall superscript} OVR) ({rating versus batter hand} vP)`. Both HR directions use a three-line immediate tooltip: event timing/context, rated opponent line, then pitch detail. These HR-card tooltips intentionally bypass the normal 1.5-second sitewide hover delay.
+Batter recent-HR cards perform the inverse lookup. They calculate the opposing pitcher's season Overall/vs RHB/vs LHB profile from opponent SLG, opponent AVG, HR/9, K/9, WHIP, and ERA league percentiles. The batter's side selects `vsRHB` or `vsLHB`, with small-sample regression toward established Overall but no recent-form blend. Their matchup line is `{pitcher name} ({hand}) ({Overall}{L3 Overall superscript} OVR) ({rating versus batter hand} vP)`. Both HR directions use a three-line immediate tooltip: event timing/context, rated opponent line, then pitch detail. These HR-card tooltips intentionally bypass the normal 1.5-second sitewide hover delay.
+
+Pitcher quality is not treated as rate statistics in isolation. After opponent SLG, opponent AVG, HR/9, K/9, WHIP, and ERA are combined, the result is stabilized by innings/workload. A large starter sample therefore provides more confidence than the same ERA in a short sample. Strong starter performance also receives a bounded value adjustment based on games-started share and workload percentile. The adjustment only magnifies above-average quality; innings cannot turn poor run prevention into a strong rating. This makes a 2.00 ERA across a substantial rotation workload more significant than 2.00 in a brief sample or relief-only role while still allowing elite closers to rate well.
 
 Code: `getHitterOverallRatings()`, `getHitterOverallRatingsFromLeagueRows()`, `getHitterRecentRatings()`, `getPitcherOverallRatings()`, `getPitcherLastThreeOverallRating()`, hitter/pitcher rating normalization and percentile helpers, `playerRatingFromPercentile()`, `lineupOverallRatingPillHtml()`, `hydrateLineupOverallRatingPills()`, `hydratePlayerHeaderGradeBars()`, `lightBatterMetricHtml()`, the `playerOverallRatingCache`, `getPitcherRecentHomeRunHistory()`, `getLineupRecentBattingStats()`, and `homeRunHistoryCardHtml()`.
 
@@ -531,7 +533,20 @@ Leader definitions include hitting and pitching categories. Visible examples inc
 
 ### Team Stats
 
-Team-stat tables use sortable headers and MLB team aggregates/standings. Rendering, sorting, and formatters are in the `teamStats*` function family.
+Team-stat tables use sortable headers and MLB team aggregates/standings. Opening a team exposes a four-score rating panel in the identity side of the team header:
+
+- `BAT vLHP`: average vs-LHP rating of the nine hitters selected for the displayed left-handed-pitcher lineup.
+- `BAT vRHP`: average vs-RHP rating of the nine hitters selected for the displayed right-handed-pitcher lineup.
+- `STARTING`: average Overall of the classified starting rotation.
+- `BULLPEN`: average Overall of the classified relief group.
+
+Each unit first calculates its underlying player-rating average, but that raw average is not displayed directly. The dashboard builds the equivalent unit averages for all MLB teams, locates the selected club within that league distribution, and displays its decile as a 10–100 team score. The superscript independently ranks the unit's last-14-day average against every team's corresponding last-14-day unit. This prevents the unavoidable lower end of a full roster from compressing nearly every team around the same mediocre raw average. The panel still uses the shared player rating engines rather than translating team AVG or ERA through fixed thresholds.
+
+Every player row in the team detail also ends with a current/recent rating pill. Batter rows use the handed score appropriate to their panel: `vL` in Lineup vs LHP and `vR` in Lineup vs RHP. Starting-pitcher and bullpen rows use pitcher Overall. The smaller superscript is that player's last-14-day rating. Batter score resolution uses the detailed handed profile first, then the shared league-window handed score, player Overall, and finally recent rating as progressively broader fallbacks. A missing split endpoint therefore does not produce `--` when other valid player data exists. These pills occupy a fixed right-edge column so names, positions, and stat lines remain aligned.
+
+Team-detail heat coloring is derived from the same recent rating shown in the superscript. A score near league-average 50 is visually neutral. Scores below 50 move continuously toward blue, scores above 50 move continuously toward orange, and the strength of the tint is proportional to the distance from 50. The prior fixed batter OPS/AVG and pitcher earned-run thresholds remain only as a fallback when rating data is unavailable.
+
+Rendering, sorting, and formatters are in the `teamStats*` function family. Team-detail rating code is in `getTeamDetailRatings()`, `getTeamDetailLeagueRatingDistributions()`, `teamDetailLeagueUnitAverages()`, `teamDetailLeagueDecileScore()`, `teamDetailRatingsHtml()`, `teamDetailRatingCardHtml()`, `teamDetailRowRatingHtml()`, `teamDetailRatingToneStyle()`, and `getPitcherRecentWindowOverallRating()`.
 
 ### Playoff Picture
 
