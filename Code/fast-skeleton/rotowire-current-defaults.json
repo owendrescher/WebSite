@@ -63,12 +63,12 @@
       "Drake Baldwin",
       "Ozzie Albies",
       "Matt Olson",
-      "Austin Riley",
       "Michael Harris",
       "Mauricio Dubon",
-      "Joey Bart",
-      "Jim Jarvis",
-      "Eli White"
+      "Austin Riley",
+      "Dominic Smith",
+      "Mike Yastrzemski",
+      "Jim Jarvis"
     ]
   },
   "BAL": {
@@ -242,13 +242,13 @@
   "DET": {
     "RHP": [
       "Kevin McGonigle",
-      "Dillon Dingler",
+      "Gleyber Torres",
       "Colt Keith",
       "Riley Greene",
-      "Spencer Torkelson",
+      "Dillon Dingler",
       "Kerry Carpenter",
+      "Spencer Torkelson",
       "Zach McKinstry",
-      "Hao-Yu Lee",
       "James Outman"
     ],
     "LHP": [
@@ -295,8 +295,8 @@
       "Salvador Perez",
       "Michael Massey",
       "Isaac Collins",
-      "Starling Marte",
       "Josh Rojas",
+      "Nick Loftin",
       "Andrew Velazquez"
     ],
     "LHP": [
@@ -409,15 +409,15 @@
   },
   "MIN": {
     "RHP": [
-      "Trevor Larnach",
       "Brooks Lee",
-      "Kody Clemens",
+      "Byron Buxton",
+      "Ryan Jeffers",
       "Josh Bell",
+      "Kody Clemens",
       "Royce Lewis",
-      "Victor Caratini",
-      "Alan Roden",
+      "Austin Martin",
       "Luke Keaschall",
-      "Alex Jackson"
+      "Ryan Kreidler"
     ],
     "LHP": [
       "Austin Martin",
@@ -544,11 +544,11 @@
       "Luis Rengifo",
       "Manny Machado",
       "Ty France",
-      "Jackson Merrill",
-      "Luis Campusano",
       "Xander Bogaerts",
-      "Jake Cronenworth",
-      "Jase Bowen"
+      "Gavin Sheets",
+      "Freddy Fermin",
+      "Jase Bowen",
+      "Jake Cronenworth"
     ]
   },
   "SEA": {
@@ -602,14 +602,14 @@
   "STL": {
     "RHP": [
       "JJ Wetherholt",
-      "Ivan Herrera",
-      "Alec Burleson",
       "Jordan Walker",
+      "Alec Burleson",
       "Lars Nootbaar",
       "Masyn Winn",
+      "Jose Fermin",
       "Nathan Church",
       "Blaze Jordan",
-      "Bryan Torres"
+      "Jimmy Crooks"
     ],
     "LHP": [
       "JJ Wetherholt",
@@ -628,10 +628,10 @@
       "Yandy Diaz",
       "Jonathan Aranda",
       "Junior Caminero",
-      "Cedric Mullins",
-      "Chandler Simpson",
       "Victor Mesa",
-      "Taylor Walls",
+      "Jonny DeLuca",
+      "Chandler Simpson",
+      "Ben Williamson",
       "Richie Palacios",
       "Hunter Feduccia"
     ],
