@@ -283,7 +283,7 @@ A full tracker row shows:
 - Expectation selector.
 - Individual remove button.
 
-The confidence control intentionally shows only the color/vibe, not a numeric label and not a confidence tooltip. Dragging it changes confidence without starting player reorder. Reorder begins only from the `||` handle and works with pointer input on desktop and phone.
+The confidence control uses a four-pixel vertical white-to-red gradient with a large white, two-pixel black-outlined value immediately to its left. The display runs from `0.0` through exactly `10.0` in `0.5` increments; persistence continues using the equivalent normalized 0–100 value in five-point increments. It has no hover tooltip. Dragging it changes confidence without starting player reorder. Reorder begins only from the `||` handle and works with pointer input on desktop and phone.
 
 Code: `renderPlayerTrackerList()`, `trackedPlayerOpponentPitcher()`, tracker pointer events, `normalizeTrackerConfidence()`, and `.player-track-*` CSS.
 
@@ -513,7 +513,9 @@ Handed season samples regress toward the hitter's overall established ability wi
 
 The percentile-to-rating curve is nonlinear around league-average 50. Its upper half uses a more open power curve than its lower half, allowing good and very-good players to separate into the 70s and 80s instead of clustering below 70, while 50 remains anchored to league average. The climb compresses again near the ceiling and ordinary computed ratings remain capped below 100, so leading MLB does not automatically produce a perfect score. Ratings map to descriptive bands: 90+ Elite, 80s All-Star, 60-79 above average, around 50 league average, and lower values below average.
 
-Light lineup batter rows place a compact rating pill immediately to the right of position. A vertical divider separates current `OVR` from the handed matchup rating (`vR` or `vL`, selected from the opposing pitcher's hand). Each current number has a smaller superscript containing the corresponding league-relative last-14-day form rating. This is a recent-performance rating, not the player's rating frozen at a historical date. Lineup pills share cached league-window rows for the whole lineup rather than issuing redundant stat requests. The 17px pill fits within the existing first line and does not establish row height.
+Light lineup batter rows place a full-row-height rating cell at the far right without increasing the row's outer height. A vertical divider separates current `OVR` from the handed matchup rating (`vR` or `vL`, selected from the opposing pitcher's hand). Each current number has a smaller superscript containing the corresponding league-relative last-14-day form rating. This is a recent-performance rating, not the player's rating frozen at a historical date. Lineup pills share cached league-window rows for the whole lineup rather than issuing redundant stat requests.
+
+The light lineup pitcher header includes a team-colored Overall bubble containing season Overall and a last-three-game superscript. Its hover detail exposes season Overall versus LHB and RHB plus season home runs allowed to each side; each home-run total carries a superscript calculated from the pitcher's last three games. The pitcher Overall badge in the player card uses the same active team-color treatment.
 
 For hitters, the player-card header strip begins with numeric `OVR`; its superscript is the league-relative last-14-day Overall. YEAR WAR and the existing trait bars follow. Pitchers instead receive a larger highlighted Overall badge in the dedicated header slot between player identity and the trait strip. Its main number is season/current Overall and its superscript is last-three-outing Overall. The last-three calculation aggregates the pitcher's actual three most recent starts/appearances using ERA, WHIP, K/9, HR/9, and workload, then compares that line with the recent MLB pitching population. The light hitter card's Overall, vs RHP, and vs LHP tiles use the same current-number plus L14-superscript convention.
 
@@ -546,7 +548,15 @@ Every player row in the team detail also ends with a current/recent rating pill.
 
 Team-detail heat coloring is derived from the same recent rating shown in the superscript. A score near league-average 50 is visually neutral. Scores below 50 move continuously toward blue, scores above 50 move continuously toward orange, and the strength of the tint is proportional to the distance from 50. The prior fixed batter OPS/AVG and pitcher earned-run thresholds remain only as a fallback when rating data is unavailable.
 
-Rendering, sorting, and formatters are in the `teamStats*` function family. Team-detail rating code is in `getTeamDetailRatings()`, `getTeamDetailLeagueRatingDistributions()`, `teamDetailLeagueUnitAverages()`, `teamDetailLeagueDecileScore()`, `teamDetailRatingsHtml()`, `teamDetailRatingCardHtml()`, `teamDetailRowRatingHtml()`, `teamDetailRatingToneStyle()`, and `getPitcherRecentWindowOverallRating()`.
+When the selected date is today and the team has a scoreboard matchup, the team-detail header identifies the opposing probable starter as `{last name} ({L/R}) {ERA} ERA {innings pitched} IP`. The text uses the opponent's primary team color with a 3px black outline. The large `LHP` and `RHP` lineup watermarks also use the opponent color and black outline, tying the two split lineups visually to that matchup. The matching pitcher in the selected team's Starting 5 receives a baseball marker. Historical team cards do not claim that a pitcher is “starting today.”
+
+The opposing-pitcher heading is prefixed with scheduled Eastern first-pitch time: `{time} EST vs. {last name} ({L/R}) {ERA} ERA {innings pitched} IP`.
+
+In pitcher player cards, hovering a logo in Last 5 Opponents opens a vertical team-offense tooltip styled like the team page with the opponent logo, team color, outlined shell, and row dividers. It selects only the split matching that pitcher's throwing hand and shows separate rows for split (`VS LHP` or `VS RHP`), current handed team Overall, L14 handed Overall, L14 league rank, record, PA, AVG, SLG, OPS, and HR. The two Overall values use the same league-unit deciles as the team page. The underlying appearance card itself continues to show IP, pitches, hits, walks, strikeouts, home runs, earned runs, and HR-batter details.
+
+All visible Overall numerals and their recent superscripts use hard-edged typography. Glow shadows, blur filters, and translucent glyph treatment are disabled without changing any font size or component dimensions.
+
+Rendering, sorting, and formatters are in the `teamStats*` function family. Team matchup resolution is in `teamDetailGameContext()`, `teamDetailMatchupSides()`, and `teamDetailOpponentPitcherText()`. Team-detail rating code is in `getTeamDetailRatings()`, `getTeamDetailLeagueRatingDistributions()`, `teamDetailLeagueUnitAverages()`, `teamDetailLeagueDecileScore()`, `teamDetailRatingsHtml()`, `teamDetailRatingCardHtml()`, `teamDetailRowRatingHtml()`, `teamDetailRatingToneStyle()`, and `getPitcherRecentWindowOverallRating()`.
 
 ### Playoff Picture
 
@@ -857,7 +867,7 @@ Search `live-prototype.css` by these stable prefixes:
 - Press the tracker opponent pitcher; verify the pitcher card opens and name uses opponent team color.
 - Check a multi-HR player and pitcher; verify every card edge is visible, centered, cycles correctly, and row height does not change.
 - Verify HR tooltips contain opponent identity/hand and pitch type when source data exists.
-- Verify sitewide hover tooltips wait 1.5 seconds and confidence shows none.
+- Verify sitewide hover tooltips wait 1.5 seconds, confidence shows no tooltip, and its centered readout moves only in `0.5` steps from `0.0` to `10.0`.
 - Save, change manual state, Quick Load, and confirm exact replacement.
 - Open an older save and confirm newer saves remain.
 - Compare final-game recent records against the exact audited MLB games.

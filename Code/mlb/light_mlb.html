@@ -20,7 +20,7 @@
     <link rel="apple-touch-icon" href="baseball.png" />
     <link rel="stylesheet" href="styles.css?v=20260713tooltipWrap1" />
     <link rel="stylesheet" href="dashboard.css?v=20260711bullpen14d1" />
-    <link rel="stylesheet" href="live-prototype.css?v=20260724seasonPure11" />
+    <link rel="stylesheet" href="live-prototype.css?v=20260724pitcherRating16" />
   </head>
   <body class="dashboard-page light-mlb-page" data-dashboard-page="scoreboard">
 
@@ -403,6 +403,7 @@
                   <span id="teamDetailTitle" class="lineup-modal-matchup team-detail-title"></span>
                   <span id="teamDetailRecord" class="team-detail-record"></span>
                 </div>
+                <span id="teamDetailOpponentPitcher" class="team-detail-opponent-pitcher" hidden></span>
                 <button id="teamDetailCloseBtn" class="lineup-close-btn" type="button" aria-label="Close team card">x</button>
               </header>
               <div id="teamDetailBody" class="lineup-modal-body team-detail-body">
@@ -707,6 +708,6 @@
     <script src="rotowire-default-lineups.js?v=20260721rotowireCurrent2"></script>
     <script src="mlb-contracts-data.js?v=20260708liveSearchFix1"></script>
     <script>window.MLB_DASHBOARD_BUILD_ID="20260711-tooltip-cleanup2";</script>
-    <script src="live-dashboard-prototype.js?v=20260724seasonPure11"></script>
+    <script src="live-dashboard-prototype.js?v=20260724pitcherRating16"></script>
   </body>
 </html>
