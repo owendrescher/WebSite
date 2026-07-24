@@ -1,15 +1,15 @@
 {
   "ARI": {
     "RHP": [
-      "Ketel Marte",
-      "Geraldo Perdomo",
       "Corbin Carroll",
+      "Geraldo Perdomo",
       "Gabriel Moreno",
       "Max Kepler",
-      "Nolan Arenado",
+      "Adrian Del Castillo",
       "Tim Tawa",
       "Ildemaro Vargas",
-      "Jorge Barrosa"
+      "Tyler Locklear",
+      "Ryan Waldschmidt"
     ],
     "LHP": [
       "Ketel Marte",
@@ -174,8 +174,8 @@
       "Chase DeLauter",
       "Brayan Rocchio",
       "Travis Bazzana",
+      "Rhys Hoskins",
       "Kyle Manzardo",
-      "Daniel Schneemann",
       "Patrick Bailey",
       "Petey Halpin"
     ],
@@ -673,15 +673,15 @@
   },
   "TOR": {
     "RHP": [
-      "Ernie Clement",
-      "Nathan Lukes",
-      "Vladimir Guerrero",
-      "George Springer",
       "Yohendrick Pinango",
+      "Vladimir Guerrero",
+      "Ernie Clement",
+      "George Springer",
       "Alejandro Kirk",
-      "Daulton Varsho",
-      "Sean Keys",
-      "Andres Gimenez"
+      "Kazuma Okamoto",
+      "Davis Schneider",
+      "Luis Urias",
+      "Myles Straw"
     ],
     "LHP": [
       "Ernie Clement",
