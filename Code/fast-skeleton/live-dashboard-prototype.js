@@ -5050,8 +5050,17 @@ function seriesStarterRowHtml(item = {}, side = '') {
   const team = side === 'away' ? item.away : item.home;
   const color = side === 'away' ? item.awayColor : item.homeColor;
   const label = side === 'away' ? 'A' : 'H';
+  const statline = starter?.statline || null;
+  const tooltipHtml = starter ? `
+    <div class="lineup-series-pitcher-tooltip" style="--series-pitcher:${escapeHtml(color || getTeamColor(team) || '#7bd0ff')}">
+      <strong>${escapeHtml(starter.fullName || starter.name || 'Starting pitcher')}</strong>
+      <span><b>IP</b><em>${escapeHtml(statline?.ip ?? '--')}</em></span>
+      <span><b>H</b><em>${escapeHtml(String(statline?.hits ?? '--'))}</em></span>
+      <span><b>ER</b><em>${escapeHtml(String(statline?.earnedRuns ?? '--'))}</em></span>
+      <span><b>HR</b><em>${escapeHtml(String(statline?.homeRuns ?? '--'))}</em></span>
+    </div>` : '';
   return `
-    <span class="lineup-series-pitcher lineup-series-${escapeHtml(side)}-pitcher" style="--series-pitcher:${escapeHtml(color || getTeamColor(team) || '#7bd0ff')}">
+    <span class="lineup-series-pitcher lineup-series-${escapeHtml(side)}-pitcher" style="--series-pitcher:${escapeHtml(color || getTeamColor(team) || '#7bd0ff')}"${starter ? ` data-theme-tooltip-title="${escapeHtml(starter.fullName || starter.name || 'Starting pitcher')}" data-theme-tooltip-html="${escapeHtml(tooltipHtml)}" aria-label="${escapeHtml(seriesStarterPitcherTitle(starter))}"` : ''}>
       <span>${escapeHtml(label)}</span>
       <b>${escapeHtml(starter?.name || 'SP')}</b>
     </span>
@@ -5464,6 +5473,29 @@ async function enrichProjectedLineupEntriesForTeam(game, teamAbbrev, entries = [
 
   if (Object.keys(lookupPatch).length) persistPlayerLookupForGame(game, lookupPatch);
   return side ? normalizeLineupCollectionForSide(game, side, enriched) : enriched;
+}
+
+async function rotowireLineupMatchesActiveTeam(game, teamAbbrev, lineup = []) {
+  const team = canonicalTeamAbbrev(teamAbbrev);
+  if (!team || !isUsableLineupCandidate(lineup)) return false;
+  const roster = await fetchTeamActiveRoster(team, game).catch(() => []);
+  // A blocked/unavailable roster endpoint should not suppress an otherwise complete
+  // RotoWire response. When the roster is available, require a strong team match so a
+  // structurally valid mirror page for the wrong club cannot replace the correct seed.
+  if (roster.length < 9) return true;
+  const rosterIds = new Set(roster.map((player) => Number(player?.id)).filter((id) => id > 0));
+  const rosterNames = new Set(roster.flatMap((player) => [
+    normalizeNameKey(player?.fullName || player?.name || ''),
+    normalizeNameKey(lastName(player?.fullName || player?.name || '')),
+  ]).filter(Boolean));
+  const matches = lineup.reduce((count, entry) => {
+    const id = Number(entry?.id);
+    if (id > 0 && rosterIds.has(id)) return count + 1;
+    const full = normalizeNameKey(entry?.fullName || entry?.name || '');
+    const last = normalizeNameKey(lastName(entry?.fullName || entry?.name || ''));
+    return count + (rosterNames.has(full) || rosterNames.has(last) ? 1 : 0);
+  }, 0);
+  return matches >= 7;
 }
 
 function fetchMlbStartingLineupFromPage(game, team, sourceUrl) {
@@ -6014,8 +6046,11 @@ function fetchRotowireProjectedBattingOrder(game, side, options = {}) {
       const parsed = await bestRotowireLineupFromUrls(urls, team, hand);
       if (isUsableLineupCandidate(parsed)) {
         const sourceType = parsed.some((entry) => /rotowire-today|confirmed|starting/i.test(String(entry?.source || ''))) ? 'today' : 'default';
-        rememberRotowireDynamicLineupSource(team, hand, date, parsed, sourceType);
-        return enrichProjectedLineupEntriesForTeam(game, team, parsed);
+        const enriched = await enrichProjectedLineupEntriesForTeam(game, team, parsed);
+        if (await rotowireLineupMatchesActiveTeam(game, team, enriched)) {
+          rememberRotowireDynamicLineupSource(team, hand, date, enriched, sourceType);
+          return enriched;
+        }
       }
     }
     for (const hand of handOptions) {
@@ -20246,6 +20281,8 @@ async function getLineupRecentBattingStats(playerId, game = null, gameLimit = 5)
             overallRating: ratings?.overall != null && Number.isFinite(Number(ratings.overall)) ? Number(ratings.overall) : null,
             recentOverall: recentOverall != null && Number.isFinite(Number(recentOverall)) ? Number(recentOverall) : null,
             vPRating: vPRating != null && vPRating !== '' && Number.isFinite(Number(vPRating)) ? Number(vPRating) : null,
+            recentVPRating: recentOverall != null && Number.isFinite(Number(recentOverall)) ? Number(recentOverall) : null,
+            vPHand: detail.batterHand || '',
           };
         });
       };
@@ -21203,10 +21240,11 @@ function pitcherOpponentHandTooltipHtml(item = {}) {
   const hand = handednessCode(item?.pitcherHand || '') || '?';
   const batting = item?.handBatting || {};
   const record = item?.handRecord || {};
+  const currentOverall = item?.handOverall != null && Number.isFinite(Number(item.handOverall)) ? Math.round(Number(item.handOverall)) : '--';
+  const recentOverall = item?.handRecentOverall != null && Number.isFinite(Number(item.handRecentOverall)) ? Math.round(Number(item.handRecentOverall)) : '--';
   const rows = [
     ['SPLIT', `VS ${hand}HP`],
-    ['OVERALL', item?.handOverall != null ? Math.round(Number(item.handOverall)) : '--'],
-    ['L14 OVR', item?.handRecentOverall != null ? Math.round(Number(item.handRecentOverall)) : '--'],
+    ['OVERALL', `${currentOverall}<sup>${recentOverall}</sup>`, true],
     ['L14 RANK', Number(item?.handRecentRank) > 0 ? `#${item.handRecentRank}/${item.handRecentRankTotal || 30}` : '--'],
     ['RECORD', recordBucketText(record)],
     ['PA', statNumber(batting.plateAppearances)],
@@ -21215,7 +21253,7 @@ function pitcherOpponentHandTooltipHtml(item = {}) {
     ['OPS', cleanSummary(batting.ops) || '---'],
     ['HR', statNumber(batting.homeRuns)],
   ];
-  return `<div class="pitcher-opponent-hand-tooltip" style="--opp-color:${escapeHtml(item?.color || '#7bd0ff')}"><header><img src="${escapeHtml(item?.logo || 'placeholder.png')}" alt=""/><strong>${escapeHtml(displayTeamAbbrev(item?.opponent) || item?.opponent || 'OPPONENT')}</strong><small>OFFENSE VS ${hand}HP</small></header>${rows.map(([label, value]) => `<span><b>${escapeHtml(label)}</b><em>${escapeHtml(value)}</em></span>`).join('')}</div>`;
+  return `<div class="pitcher-opponent-hand-tooltip" style="--opp-color:${escapeHtml(item?.color || '#7bd0ff')}"><header><img src="${escapeHtml(item?.logo || 'placeholder.png')}" alt=""/><strong>${escapeHtml(displayTeamAbbrev(item?.opponent) || item?.opponent || 'OPPONENT')}</strong><small>OFFENSE VS ${hand}HP</small></header>${rows.map(([label, value, rich]) => `<span><b>${escapeHtml(label)}</b><em>${rich ? value : escapeHtml(value)}</em></span>`).join('')}</div>`;
 }
 
 function teamDetailLeagueRank(value, distribution = []) {
@@ -32059,8 +32097,10 @@ async function getHitterOverallRatingsFromLeagueRows(playerId, endDate = dateInp
 
 function pitcherRatingNormalizeLeagueRow(row = {}) {
   const stat = row?.stat || {};
-  const outs = inningsToOuts(stat?.inningsPitched);
-  const homeRuns = statNumber(stat?.homeRuns ?? stat?.homeRunsAllowed);
+  const outs = Number.isFinite(Number(row?.outs)) && Number(row.outs) > 0
+    ? Number(row.outs)
+    : inningsToOuts(row?.inningsPitched ?? stat?.inningsPitched);
+  const homeRuns = statNumber(row?.homeRuns ?? row?.homeRunsAllowed ?? stat?.homeRuns ?? stat?.homeRunsAllowed);
   return {
     ...row,
     id: Number(row?.id),
@@ -32073,24 +32113,74 @@ function pitcherRatingNormalizeLeagueRow(row = {}) {
     k9: predictionRateValue(row?.k9 ?? stat?.strikeoutsPer9Inn ?? stat?.strikeoutsPer9),
     slg: Number.isFinite(Number(row?.slg)) ? Number(row.slg) : pitcherOpponentSlugging(stat),
     avg: predictionRateValue(row?.avg ?? stat?.avg),
-    hr9: outs > 0 ? (homeRuns * 27) / outs : predictionRateValue(stat?.homeRunsPer9),
+    hr9: Number.isFinite(Number(row?.hr9))
+      ? Number(row.hr9)
+      : outs > 0
+        ? (homeRuns * 27) / outs
+        : predictionRateValue(stat?.homeRunsPer9),
   };
 }
 
-function pitcherAbilityPercentile(rows = [], target = null) {
+function sortedValuePercentile(values = [], value = null) {
+  const target = Number(value);
+  if (!values.length || !Number.isFinite(target)) return null;
+  let below = 0;
+  while (below < values.length && values[below] < target) below += 1;
+  let aboveEqual = below;
+  while (aboveEqual < values.length && values[aboveEqual] === target) aboveEqual += 1;
+  return (below + ((aboveEqual - below) * .5)) / values.length;
+}
+
+function pitcherComparisonFacetContext(population = []) {
+  const context = new Map();
+  for (const key of ['era', 'whip', 'slg', 'avg', 'hr9', 'k9', 'outs']) {
+    context.set(key, population.map((row) => Number(row?.[key])).filter(Number.isFinite).sort((a, b) => a - b));
+  }
+  return context;
+}
+
+function pitcherFacetPercentile(population = [], target = null, key = '', lowerIsBetter = false, context = null) {
+  const values = context?.get?.(key);
+  let percentile = values
+    ? sortedValuePercentile(values, target?.[key])
+    : hitterRatingPercentile(population, target?.[key], key);
+  if (!Number.isFinite(percentile)) return null;
+  return lowerIsBetter ? 1 - percentile : percentile;
+}
+
+function pitcherLeaderRelativeFacet(population = [], target = null, key = '', lowerIsBetter = false, context = null) {
+  const values = context?.get?.(key)
+    || population.map((row) => Number(row?.[key])).filter(Number.isFinite).sort((a, b) => a - b);
+  const value = Number(target?.[key]);
+  if (!values.length || !Number.isFinite(value)) return null;
+  const best = lowerIsBetter ? values[0] : values[values.length - 1];
+  const median = values[Math.floor((values.length - 1) / 2)];
+  if (value === best) return 1;
+  const bestGap = Math.abs(median - best);
+  if (!(bestGap > 0)) return pitcherFacetPercentile(population, target, key, lowerIsBetter, context);
+  if ((lowerIsBetter && value <= median) || (!lowerIsBetter && value >= median)) {
+    return Math.max(.5, Math.min(1, .5 + (.5 * (Math.abs(median - value) / bestGap))));
+  }
+  const percentile = pitcherFacetPercentile(population, target, key, lowerIsBetter, context);
+  return Number.isFinite(percentile) ? Math.max(0, Math.min(.5, percentile)) : .5;
+}
+
+function pitcherRawComparisonQuality(population = [], target = null, context = null) {
   if (!target) return .5;
-  const population = listify(rows).map(pitcherRatingNormalizeLeagueRow);
   const metrics = [
-    ['slg', .22, true], ['avg', .13, true], ['hr9', .17, true],
-    ['k9', .18, false], ['whip', .16, true], ['era', .14, true],
+    ['era', .23, true], ['whip', .19, true], ['slg', .16, true],
+    ['avg', .10, true], ['hr9', .14, true], ['k9', .18, false],
   ];
   let weighted = 0;
   let weight = 0;
   for (const [key, metricWeight, lowerIsBetter] of metrics) {
-    let percentile = hitterRatingPercentile(population, target?.[key], key);
-    if (!Number.isFinite(percentile)) continue;
-    if (lowerIsBetter) percentile = 1 - percentile;
-    weighted += percentile * metricWeight;
+    const leaderComparison = pitcherLeaderRelativeFacet(population, target, key, lowerIsBetter, context);
+    const rankComparison = pitcherFacetPercentile(population, target, key, lowerIsBetter, context);
+    if (!Number.isFinite(leaderComparison) && !Number.isFinite(rankComparison)) continue;
+    const facet = Number.isFinite(leaderComparison) && Number.isFinite(rankComparison)
+      ? (leaderComparison * .68) + (rankComparison * .32)
+      : (leaderComparison ?? rankComparison);
+    weighted += facet * metricWeight;
     weight += metricWeight;
   }
   if (weight <= 0) return .5;
@@ -32099,20 +32189,62 @@ function pitcherAbilityPercentile(rows = [], target = null) {
   const gamesStarted = Math.max(0, Number(target?.gamesStarted) || 0);
   const gamesPlayed = Math.max(gamesStarted, Number(target?.gamesPlayed) || 0);
   const starterShare = gamesPlayed > 0 ? Math.min(1, gamesStarted / gamesPlayed) : 0;
-  const workloadReliability = outs / (outs + 90);
-  const stabilizedQuality = .5 + ((quality - .5) * (.62 + (.38 * workloadReliability)));
-  const workloadPercentile = hitterRatingPercentile(population, outs, 'outs');
+  const workloadReliability = outs / (outs + 45);
+  const workloadPercentile = context?.get?.('outs')
+    ? sortedValuePercentile(context.get('outs'), outs)
+    : hitterRatingPercentile(population, outs, 'outs');
   const positiveQuality = Math.max(0, quality - .5);
-  const starterValue = positiveQuality * starterShare * workloadReliability * .16;
-  const workloadValue = Number.isFinite(workloadPercentile) ? positiveQuality * (workloadPercentile - .5) * .08 : 0;
+  const sampleStability = .78 + (.22 * workloadReliability);
+  const stabilizedQuality = .5 + ((quality - .5) * sampleStability);
+  const starterValue = positiveQuality * starterShare * workloadReliability * .12;
+  const workloadValue = Number.isFinite(workloadPercentile)
+    ? positiveQuality * Math.max(-.25, workloadPercentile - .5) * .07
+    : 0;
   return Math.max(0, Math.min(1, stabilizedQuality + starterValue + workloadValue));
+}
+
+const pitcherComparisonPopulationCache = new WeakMap();
+
+function pitcherAbilityPercentile(rows = [], target = null) {
+  if (!target) return .5;
+  const sourceRows = listify(rows);
+  let prepared = Array.isArray(rows) ? pitcherComparisonPopulationCache.get(rows) : null;
+  if (!prepared) {
+    const population = sourceRows.map(pitcherRatingNormalizeLeagueRow);
+    const context = pitcherComparisonFacetContext(population);
+    const qualities = population.map((row) => pitcherRawComparisonQuality(population, row, context)).sort((a, b) => a - b);
+    prepared = { population, context, qualities };
+    if (Array.isArray(rows)) pitcherComparisonPopulationCache.set(rows, prepared);
+  }
+  const { population, context, qualities: comparisonQualities } = prepared;
+  if (!population.length) return .5;
+  const targetQuality = pitcherRawComparisonQuality(population, target, context);
+  const rankPercentile = sortedValuePercentile(comparisonQualities, targetQuality);
+  if (!Number.isFinite(rankPercentile)) return targetQuality;
+  // Overall placement is the primary scale. Facet distance from the league leaders
+  // breaks ties and distinguishes merely top-decile seasons from Cy Young-level ones.
+  const blended = (rankPercentile * .76) + (targetQuality * .24);
+  const centered = (blended - .5) * 2;
+  const expanded = .5 + (Math.sign(centered) * Math.pow(Math.abs(centered), .88) * .54);
+  return Math.max(0, Math.min(1, expanded));
+}
+
+function pitcherRatingFromPercentile(percentile) {
+  const value = Math.max(0, Math.min(1, Number(percentile) || .5));
+  // Make the elite end explicitly rank-based: a top-five-percent comparison
+  // profile is Cy Young caliber and must live at 95+, while the best composite
+  // pitcher approaches 99 without receiving an automatic 100.
+  if (value >= .95) return Math.min(99, 95 + Math.round(((value - .95) / .05) * 4));
+  if (value >= .90) return 90 + Math.round(((value - .90) / .05) * 5);
+  if (value >= .80) return 80 + Math.round(((value - .80) / .10) * 10);
+  return playerRatingFromPercentile(value);
 }
 
 async function getPitcherOverallRatings(playerId, endDate = dateInput.value || formatDate(new Date())) {
   const id = Number(playerId);
   const through = calendarDateOnly(endDate || dateInput.value || formatDate(new Date()));
   if (!(id > 0) || !through) return null;
-  const key = `${id}:${through}:pitcher-overall-rating-v3`;
+  const key = `${id}:${through}:pitcher-overall-rating-v4-leader-relative`;
   if (playerOverallRatingCache.has(key)) return playerOverallRatingCache.get(key);
   const promise = (async () => {
     const season = seasonForDate(through);
@@ -32135,9 +32267,10 @@ async function getPitcherOverallRatings(playerId, endDate = dateInput.value || f
       const reliability = sample / (sample + 130);
       return (raw * reliability) + (establishedOverall * (1 - reliability));
     };
-    const vsRHB = playerRatingFromPercentile(splitEstablished(vsRRows, vsRTarget));
-    const vsLHB = playerRatingFromPercentile(splitEstablished(vsLRows, vsLTarget));
-    const overall = Math.round((vsRHB * .58) + (vsLHB * .42));
+    const vsRHB = pitcherRatingFromPercentile(splitEstablished(vsRRows, vsRTarget));
+    const vsLHB = pitcherRatingFromPercentile(splitEstablished(vsLRows, vsLTarget));
+    const establishedRating = pitcherRatingFromPercentile(establishedOverall);
+    const overall = Math.max(establishedRating, Math.round((vsRHB * .58) + (vsLHB * .42)));
     return { playerId: id, overall, vsRHB, vsLHB, through };
   })().catch((error) => {
     playerOverallRatingCache.delete(key);
@@ -32221,7 +32354,7 @@ async function getPitcherLastThreeOverallRating(profile = null, game = null, end
     slg: null, avg: null,
   };
   const population = await pitcherPowerGradeLeagueWindow(through, 14, '');
-  return playerRatingFromPercentile(pitcherAbilityPercentile(population, target));
+  return pitcherRatingFromPercentile(pitcherAbilityPercentile(population, target));
 }
 
 async function getPitcherRecentWindowOverallRating(playerId, endDate = dateInput.value || formatDate(new Date()), days = 14) {
@@ -32234,7 +32367,7 @@ async function getPitcherRecentWindowOverallRating(playerId, endDate = dateInput
     const rows = await pitcherPowerGradeLeagueWindow(through, days, '');
     const population = listify(rows).map(pitcherRatingNormalizeLeagueRow);
     const target = population.find((row) => Number(row.id) === id) || null;
-    return target ? playerRatingFromPercentile(pitcherAbilityPercentile(population, target)) : null;
+    return target ? pitcherRatingFromPercentile(pitcherAbilityPercentile(population, target)) : null;
   })().catch((error) => {
     playerOverallRatingCache.delete(key);
     throw error;
@@ -32931,12 +33064,15 @@ async function getPitcherRecentHomeRunHistory(playerId) {
         const ratingSet = batterRatings.get(Number(detail?.id)) || {};
         const ratings = ratingSet.ratings || null;
         const vPRating = pitcherHand === 'L' ? ratings?.vsLHP : pitcherHand === 'R' ? ratings?.vsRHP : ratings?.overall;
+        const recentVPRating = pitcherHand === 'L' ? ratingSet.recent?.vsLHP : pitcherHand === 'R' ? ratingSet.recent?.vsRHP : ratingSet.recent?.overall;
         return {
           ...detail,
           pitcherHand,
           overallRating: ratings?.overall != null && Number.isFinite(Number(ratings.overall)) ? Number(ratings.overall) : null,
           recentOverall: ratingSet.recent?.overall != null && Number.isFinite(Number(ratingSet.recent.overall)) ? Number(ratingSet.recent.overall) : null,
           vPRating: vPRating != null && vPRating !== '' && Number.isFinite(Number(vPRating)) ? Number(vPRating) : null,
+          recentVPRating: recentVPRating != null && recentVPRating !== '' && Number.isFinite(Number(recentVPRating)) ? Number(recentVPRating) : null,
+          vPHand: pitcherHand,
         };
       }),
       count: statNumber(split?.stat?.homeRuns),
@@ -38644,8 +38780,16 @@ function initTrackerRailControls() {
     try { localStorage.setItem(key, value ? '1' : '0'); } catch {}
   };
   const applyPanelOrder = (hrFirst) => {
+    rail.classList.toggle('is-hr-first', Boolean(hrFirst));
+    rail.dataset.railOrder = hrFirst ? 'hr-first' : 'tracker-first';
     playerPanel.style.order = hrFirst ? '3' : '2';
     hrPanel.style.order = hrFirst ? '2' : '3';
+    if (hrFirst) rail.insertBefore(hrPanel, playerPanel);
+    else rail.insertBefore(playerPanel, hrPanel);
+    rail.querySelectorAll('[data-rail-swap]').forEach((button) => {
+      button.setAttribute('aria-pressed', hrFirst ? 'true' : 'false');
+      button.dataset.hrFirst = hrFirst ? '1' : '0';
+    });
   };
   const setCompact = (panel, button, compact, key) => {
     panel.classList.toggle('is-compact', compact);
@@ -38657,18 +38801,14 @@ function initTrackerRailControls() {
   };
   setCompact(playerPanel, playerTrackerCollapseBtnEl, read('dashboard-player-tracker-compact:v1'), 'dashboard-player-tracker-compact:v1');
   setCompact(hrPanel, hrCollapseBtnEl, read('dashboard-hr-feed-compact:v1'), 'dashboard-hr-feed-compact:v1');
-  const initialHrFirst = read('dashboard-rail-hr-first:v1');
-  if (initialHrFirst) rail.insertBefore(hrPanel, playerPanel);
-  applyPanelOrder(initialHrFirst);
+  let hrFirstState = read('dashboard-rail-hr-first:v1');
+  applyPanelOrder(hrFirstState);
   playerTrackerCollapseBtnEl?.addEventListener('click', () => setCompact(playerPanel, playerTrackerCollapseBtnEl, !playerPanel.classList.contains('is-compact'), 'dashboard-player-tracker-compact:v1'));
   hrCollapseBtnEl?.addEventListener('click', () => setCompact(hrPanel, hrCollapseBtnEl, !hrPanel.classList.contains('is-compact'), 'dashboard-hr-feed-compact:v1'));
   rail.querySelectorAll('[data-rail-swap]').forEach((button) => button.addEventListener('click', () => {
-    const hrFirst = hrPanel.compareDocumentPosition(playerPanel) & Node.DOCUMENT_POSITION_FOLLOWING;
-    if (hrFirst) rail.insertBefore(playerPanel, hrPanel);
-    else rail.insertBefore(hrPanel, playerPanel);
-    const nextHrFirst = !hrFirst;
-    applyPanelOrder(nextHrFirst);
-    write('dashboard-rail-hr-first:v1', nextHrFirst);
+    hrFirstState = !hrFirstState;
+    applyPanelOrder(hrFirstState);
+    write('dashboard-rail-hr-first:v1', hrFirstState);
   }));
 }
 
@@ -50699,9 +50839,13 @@ function homeRunHistoryCardHtml(detail = {}, appearanceIndex = 0, mode = 'hit', 
   const overallRating = detail?.overallRating != null && detail?.overallRating !== '' ? Number(detail.overallRating) : NaN;
   const recentOverall = detail?.recentOverall != null && detail?.recentOverall !== '' ? Number(detail.recentOverall) : NaN;
   const vPRating = detail?.vPRating != null && detail?.vPRating !== '' ? Number(detail.vPRating) : NaN;
+  const recentVPRating = detail?.recentVPRating != null && detail?.recentVPRating !== '' ? Number(detail.recentVPRating) : NaN;
+  const vPHand = handednessCode(detail?.vPHand || (mode === 'allowed' ? detail?.pitcherHand : detail?.batterHand));
   const superscript = (value) => String(Math.round(value)).replace(/[0-9-]/g, (digit) => ({ '0': '⁰', '1': '¹', '2': '²', '3': '³', '4': '⁴', '5': '⁵', '6': '⁶', '7': '⁷', '8': '⁸', '9': '⁹', '-': '⁻' }[digit] || digit));
   const overallText = Number.isFinite(overallRating) ? ` (${Math.round(overallRating)}${Number.isFinite(recentOverall) ? superscript(recentOverall) : ''} OVR)` : '';
-  const vPText = Number.isFinite(vPRating) ? ` (${Math.round(vPRating)} vP)` : '';
+  const vPText = Number.isFinite(vPRating)
+    ? ` (${Math.round(vPRating)}${Number.isFinite(recentVPRating) ? superscript(recentVPRating) : ''} v${vPHand || '?'})`
+    : '';
   const ratedOpponentText = `${opponentText}${hand ? ` (${hand})` : ''}${overallText}${vPText}`;
   const pitchText = cleanSummary(detail?.pitchInfo || 'Pitch unavailable');
   const context = [detail?.date, detail?.opponent ? `vs ${detail.opponent}` : ''].filter(Boolean).join(' ');
@@ -50766,14 +50910,15 @@ function lineupOverallRatingPillHtml(current = null, previous = null, pitcherHan
 function pitcherLineupOverallPillHtml(ratings = null, recentOverall = null, details = null) {
   const score = (value) => Number.isFinite(Number(value)) ? Math.round(Number(value)) : '--';
   const count = (value) => Number.isFinite(Number(value)) ? Math.max(0, Math.round(Number(value))) : '--';
+  const recentSup = Number.isFinite(Number(recentOverall)) ? `<sup>${score(recentOverall)}</sup>` : '<sup>--</sup>';
   const tooltip = `
     <div class="lineup-pitcher-rating-tooltip">
       <strong>Pitcher Overall</strong>
-      <span><b>VS LHB</b><em>${score(ratings?.vsLHB)}</em></span>
+      <span><b>VS LHB</b><em>${score(ratings?.vsLHB)}${recentSup}</em></span>
       <span><b>HR VS LHB</b><em>${count(details?.vsLeft?.homeRuns)}<sup>${count(details?.recentHands?.vsLeft?.homeRuns)}</sup></em></span>
-      <span><b>VS RHB</b><em>${score(ratings?.vsRHB)}</em></span>
+      <span><b>VS RHB</b><em>${score(ratings?.vsRHB)}${recentSup}</em></span>
       <span><b>HR VS RHB</b><em>${count(details?.vsRight?.homeRuns)}<sup>${count(details?.recentHands?.vsRight?.homeRuns)}</sup></em></span>
-      <small>Superscript HR totals are from the last three games.</small>
+      <small>Rating superscripts are last-three-game Overall; HR superscripts are last-three-game totals.</small>
     </div>`;
   return `<span class="lineup-pitcher-overall-pill" data-theme-tooltip-title="Pitcher ratings" data-theme-tooltip-html="${escapeHtml(tooltip)}" aria-label="Pitcher overall ${score(ratings?.overall)}, last three games ${score(recentOverall)}">
     <small>OVR</small><b>${score(ratings?.overall)}</b>${Number.isFinite(Number(recentOverall)) ? `<sup>${score(recentOverall)}</sup>` : '<sup>--</sup>'}
