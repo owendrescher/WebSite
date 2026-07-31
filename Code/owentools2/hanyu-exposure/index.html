@@ -8,11 +8,12 @@
   <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
   <link href="https://fonts.googleapis.com/css2?family=Manrope:wght@400;600;700;800&family=Noto+Sans+SC:wght@400;700;900&family=Space+Grotesk:wght@500;700&display=swap" rel="stylesheet">
   <link rel="stylesheet" href="styles.css">
+  <link rel="stylesheet" href="upgrade.css">
 </head>
 <body>
   <header>
     <a class="back" href="../index.html" aria-label="Back to OwenTools 2">ot<span>2</span></a>
-    <div class="title"><strong>Hanyu Exposure</strong><small>frequency · form · context</small></div>
+    <div class="title"><strong>Hanyu Exposure</strong><small>frequency · grammar · exact strokes</small></div>
     <div class="picker">
       <label for="rank">Rank</label>
       <input id="rank" type="number" min="1" max="1000" value="1" inputmode="numeric">
@@ -24,7 +25,7 @@
   <main>
     <section class="trace-side" aria-labelledby="trace-title">
       <div class="section-heading">
-        <div><span class="eyebrow">Practice</span><h1 id="trace-title">Trace the character</h1></div>
+        <div><span class="eyebrow">Practice</span><h1 id="trace-title">Learn the exact stroke order</h1></div>
         <div class="trace-actions">
           <button id="guide" type="button" aria-pressed="true">Guide on</button>
           <button id="undo" type="button">Undo</button>
@@ -32,10 +33,11 @@
         </div>
       </div>
       <div class="canvas-wrap">
-        <canvas id="trace-canvas" aria-label="Character tracing canvas"></canvas>
+        <div id="hanzi-target" aria-label="Animated character stroke-order practice"></div>
         <div class="axis axis-x"></div><div class="axis axis-y"></div>
       </div>
-      <p class="hint">Use a mouse, stylus, or finger. Stroke scoring and animated stroke order come next.</p>
+      <div class="stroke-controls"><button id="animate" type="button">▶ Animate exact order</button><button id="quiz" type="button">Start stroke quiz</button><span id="stroke-status" role="status">Loading stroke data…</span></div>
+      <p class="hint">Exact paths and order use the open Make Me a Hanzi dataset.</p>
     </section>
 
     <section class="exposure-side" aria-labelledby="character">
@@ -43,6 +45,7 @@
       <div class="character" id="character">的</div>
       <div class="pronunciation" id="pinyin">de</div>
       <p class="meaning" id="meaning">possessive particle · of</p>
+      <div class="language-grid"><article><span class="eyebrow">Grammar job</span><strong id="part-of-speech"></strong><p id="grammar"></p></article><article><span class="eyebrow">Usage pattern</span><strong id="pattern-label"></strong><p id="example"></p></article><article><span class="eyebrow">Character facts</span><strong id="stroke-count">— strokes</strong><p><span id="radical"></span> · <span id="hsk"></span></p></article><article><span class="eyebrow">Memory note</span><strong id="memory"></strong><p id="warning"></p></article></div>
       <div class="partners-block">
         <span class="eyebrow">Common partners</span>
         <div class="partners" id="partners"></div>
@@ -54,6 +57,7 @@
       </div>
     </section>
   </main>
-  <script src="app.js"></script>
+  <script src="../vendor/hanzi-writer.min.js"></script>
+  <script src="app-v2.js"></script>
 </body>
 </html>

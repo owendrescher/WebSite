@@ -6,6 +6,9 @@
   <title>Cost of Capital — OwenTools 2</title>
   <link rel="stylesheet" href="styles.css">
   <link rel="stylesheet" href="map.css">
+  <link rel="stylesheet" href="upgrade.css">
+  <link rel="stylesheet" href="map-v3.css">
+  <link rel="stylesheet" href="../vendor/leaflet/leaflet.css">
 </head>
 <body>
   <header>
@@ -21,6 +24,7 @@
     </section>
 
     <section class="dashboard">
+      <div class="scenario-bar"><button data-scenario="current">Current</button><button data-scenario="moderate">Moderate</button><button data-scenario="extreme">Extreme</button><button id="compare">Compare scenarios</button><button id="download-scenario">Export summary</button></div>
       <div class="map-card">
         <div class="card-head"><div><span class="label">SEA-LEVEL LENS</span><h2>Coastal exposure</h2></div><strong id="riseReadout">+0.0 m</strong></div>
         <div class="map" id="map" aria-label="Conceptual world map with illustrative city markers">
@@ -47,6 +51,7 @@
     </section>
   </main>
   <footer><span>Prototype 01</span><p>Not for planning or risk assessment. All thresholds shown are illustrative.</p></footer>
-  <script src="app.js"></script>
+  <script src="../vendor/leaflet/leaflet.js"></script>
+  <script src="app-v3.js"></script>
 </body>
 </html>

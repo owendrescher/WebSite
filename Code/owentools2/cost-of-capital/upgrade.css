@@ -1,0 +1,1 @@
+.scenario-bar{grid-column:1/-1;display:flex;gap:8px;flex-wrap:wrap}.scenario-bar button{border:1px solid var(--line);background:#fffaf3;padding:9px 12px;cursor:pointer}.scenario-bar button.active{background:var(--orange);color:#fff}.comparison .map-card{box-shadow:inset 0 0 0 5px #1f6f7855}.comparison .heat-card{box-shadow:inset 0 0 0 5px #b62e1655}

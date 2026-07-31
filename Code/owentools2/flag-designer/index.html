@@ -5,6 +5,7 @@
   <meta name="viewport" content="width=device-width, initial-scale=1">
   <title>Flag Designer — OwenTools 2</title>
   <link rel="stylesheet" href="styles.css">
+  <link rel="stylesheet" href="upgrade.css">
 </head>
 <body>
   <header class="topbar">
@@ -61,7 +62,7 @@
       </aside>
 
       <div class="workspace">
-        <div class="preview-head"><span>LIVE PREVIEW</span><span id="dimensions">900 × 600</span></div>
+        <div class="preview-head"><span>LIVE PREVIEW</span><span id="dimensions">900 × 600</span></div><div class="quick-tools"><button id="undo-design">Undo</button><button id="toggle-grid">Grid</button><button data-preset="tricolor">Tricolor preset</button><button data-preset="nordic">Nordic cross</button><button id="export-svg">Export SVG</button></div>
         <div class="canvas-wrap"><canvas id="flag" width="900" height="600" aria-label="Flag preview"></canvas></div>
         <p class="hint">Uploaded layers can be resized and repositioned. The top layer in the list appears in front.</p>
         <button id="export" class="export">Export PNG <span>↗</span></button>
@@ -69,5 +70,7 @@
     </section>
   </main>
   <script src="app.js"></script>
+  <script src="upgrade.js"></script>
+  <script src="sweep.js"></script>
 </body>
 </html>

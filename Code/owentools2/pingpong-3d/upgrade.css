@@ -1,0 +1,1 @@
+.telemetry{display:grid;grid-template-columns:repeat(3,1fr);gap:5px;margin:18px 0}.telemetry span{padding:8px;background:#160b08;color:#b9907c;font-size:9px}.telemetry b{display:block;color:#ff8a4b;font-size:15px;margin-top:4px}canvas{touch-action:none}

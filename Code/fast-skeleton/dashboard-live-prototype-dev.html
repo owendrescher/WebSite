@@ -19,7 +19,7 @@
     <link rel="apple-touch-icon" href="baseball.png" />
     <link rel="stylesheet" href="styles.css?v=20260713tooltipWrap1" />
     <link rel="stylesheet" href="dashboard.css?v=20260711bullpen14d1" />
-    <link rel="stylesheet" href="live-prototype.css?v=20260717cardSpacing24" />
+    <link rel="stylesheet" href="live-prototype.css?v=20260731bracketTitles2" />
   </head>
   <body class="dashboard-page" data-dashboard-page="scoreboard">
 
@@ -181,6 +181,7 @@
                 <div class="lineup-modal-title-wrap">
                   <span id="lineupModalMatchup" class="lineup-modal-matchup"></span>
                   <button type="button" class="lineup-recent-toggle" data-lineup-stat-window title="Toggle lineup stat window">L7</button>
+                  <button id="lineupBullpenToggle" type="button" class="lineup-recent-toggle lineup-bullpen-toggle" aria-pressed="false" title="Show both teams' bullpens">BP</button>
                   <span id="lineupSeriesStrip" class="lineup-series-strip" aria-live="polite"></span>
                 </div>
                 <div class="lineup-view-toggle" role="tablist" aria-label="Lineup card view">
@@ -690,12 +691,12 @@
       };
     </script>
     <script src="../shared/owentools-sync.js?v=20260721durableSession1"></script>
-    <script src="rotowire-default-lineups.js?v=20260721rotowireCurrent2"></script>
+    <script src="rotowire-default-lineups.js?v=20260730rotowireCurrent4"></script>
     <script src="mlb-contracts-data.js?v=20260708liveSearchFix1"></script>
     <script>
       window.MLB_DASHBOARD_BUILD_ID="20260711-tooltip-cleanup2-dev";
       window.MLB_STATS_PROFILER_FORCE=true;
     </script>
-    <script src="live-dashboard-prototype.js?v=20260721lightCardExact3"></script>
+    <script src="live-dashboard-prototype.js?v=20260731bracketTitles2"></script>
   </body>
 </html>

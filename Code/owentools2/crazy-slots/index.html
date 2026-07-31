@@ -5,6 +5,7 @@
   <meta name="viewport" content="width=device-width, initial-scale=1">
   <title>Crazy Slots — OwenTools 2</title>
   <link rel="stylesheet" href="styles.css">
+  <link rel="stylesheet" href="upgrade.css">
 </head>
 <body>
   <header class="topbar">
@@ -28,6 +29,8 @@
           <div class="reel" id="reel-1"><span>7</span></div>
           <div class="reel" id="reel-2"><span>★</span></div>
         </div>
+        <div class="feature-row"><button class="hold" data-reel="0">Hold 1</button><button class="hold" data-reel="1">Hold 2</button><button class="hold" data-reel="2">Hold 3</button></div>
+        <div class="meters"><span>Jackpot <b id="jackpot">500</b></span><span>Multiplier <b id="multiplier">×1</b></span><span>Free spins <b id="free-spins">0</b></span></div>
 
         <div class="controls">
           <div class="stat"><small>Credits</small><strong id="credits">100</strong></div>
@@ -45,8 +48,9 @@
       </button>
     </section>
 
-    <p class="paytable"><b>3× 7</b> pays 20× · <b>3 matching</b> pays 8× · <b>2 matching</b> pays 2×</p>
+    <p class="paytable"><b>3× 7</b> wins the progressive jackpot · <b>WILD</b> substitutes · <b>3 SCATTER</b> awards free spins · wins raise the multiplier</p>
   </main>
-  <script src="app.js"></script>
+  <script src="app-v3.js"></script>
+  <script src="replenish.js"></script>
 </body>
 </html>

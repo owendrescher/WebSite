@@ -1,0 +1,1 @@
+.quick-tools{display:flex;gap:7px;flex-wrap:wrap;margin:8px 0 12px}.quick-tools button{border:1px solid var(--line);background:#fffaf3;padding:7px 10px;cursor:pointer}.canvas-wrap.grid{background-image:linear-gradient(#f46b1620 1px,transparent 1px),linear-gradient(90deg,#f46b1620 1px,transparent 1px);background-size:10% 10%}

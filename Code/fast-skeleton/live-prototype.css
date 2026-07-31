@@ -2849,6 +2849,270 @@ body.dashboard-page .live-lab-metric strong {
   }
 }
 
+/* Last-play controls: keep the play lane clickable without advertising it as a tooltip. */
+body.light-mlb-page .lineup-live-details .play-col[data-play-by-play-trigger] {
+  cursor: pointer !important;
+}
+
+/* The position and rating are one compact end-cap; all remaining width belongs to stats. */
+body.light-mlb-page .lineup-list li:not(.lineup-row-substitution) {
+  grid-template-columns: 18px minmax(0, 1fr) 24px 72px !important;
+  grid-template-areas:
+    "slot name pos edge"
+    "slot today today edge" !important;
+  column-gap: 2px !important;
+}
+
+body.light-mlb-page .lineup-list li:not(.lineup-row-substitution) > .lineup-pos {
+  grid-area: pos !important;
+  width: 24px !important;
+  margin: 0 !important;
+  padding: 0 2px 0 0 !important;
+}
+
+body.light-mlb-page .lineup-list li:not(.lineup-row-substitution) > .lineup-rating-edge {
+  grid-area: edge !important;
+  width: 72px !important;
+  margin: 0 !important;
+}
+
+/* O/U always reads naturally: over/up on top, under/down beneath it. */
+.score-mini-over-under > .score-mini-ou-over,
+.lineup-ou-stack > .lineup-ou-over { grid-row: 1 !important; }
+.score-mini-over-under > .score-mini-ou-under,
+.lineup-ou-stack > .lineup-ou-under { grid-row: 2 !important; }
+
+/* Contain the bullpen identity rail and its logo within the profile grid. */
+body.dashboard-page .player-stat-overlay.is-bullpen-profile .player-stat-body {
+  grid-template-columns: 210px minmax(0, 1fr) !important;
+  align-items: start !important;
+}
+body.dashboard-page .player-stat-overlay.is-bullpen-profile .player-stat-left {
+  width: 210px !important;
+  min-width: 0 !important;
+  max-width: 210px !important;
+  box-sizing: border-box !important;
+  overflow: hidden !important;
+  contain: layout paint !important;
+}
+body.dashboard-page .player-stat-overlay.is-bullpen-profile .player-stat-headshot {
+  display: block !important;
+  width: 100% !important;
+  max-width: 100% !important;
+  height: 174px !important;
+  max-height: 174px !important;
+  box-sizing: border-box !important;
+  object-fit: contain !important;
+  object-position: center !important;
+}
+body.dashboard-page .player-stat-overlay.is-bullpen-profile .player-stat-right,
+body.dashboard-page .player-stat-overlay.is-bullpen-profile #playerStatExtra,
+body.dashboard-page .player-stat-overlay.is-bullpen-profile #playerStatSeason {
+  min-width: 0 !important;
+  max-width: 100% !important;
+  overflow-x: hidden !important;
+}
+
+/* Playoff-field cushion above the current final wild-card club. */
+.playoff-bracket-team span:last-child,
+.playoff-team-cell > span {
+  grid-template-columns: minmax(0, auto) auto !important;
+  align-items: baseline !important;
+  justify-content: start !important;
+  column-gap: 5px !important;
+}
+.playoff-bracket-team span:last-child > small,
+.playoff-team-cell > span > small {
+  grid-column: 1 / -1 !important;
+}
+.playoff-cutoff-cushion {
+  display: inline-block !important;
+  color: #a8ffc2 !important;
+  font: 950 0.52rem/1 var(--font-ui) !important;
+  font-style: normal !important;
+  letter-spacing: 0 !important;
+  white-space: nowrap !important;
+  text-shadow: 0 1px 2px #000 !important;
+}
+
+.playoff-bracket-team span:last-child,
+.playoff-team-cell > span {
+  grid-template-columns: repeat(4, max-content) !important;
+  max-width: 100% !important;
+}
+.playoff-division-leader-mark {
+  position: relative !important;
+  display: inline-flex !important;
+  align-items: center !important;
+  gap: 3px !important;
+  color: #ffd978 !important;
+  font: 950 0.44rem/1 var(--font-ui) !important;
+  font-style: normal !important;
+  white-space: nowrap !important;
+}
+.playoff-division-leader-mark::before {
+  content: '' !important;
+  width: 6px !important;
+  height: 6px !important;
+  border: 1px solid #fff0a8 !important;
+  background: #d99b16 !important;
+  box-shadow: 0 0 5px rgba(255, 211, 88, .55) !important;
+  transform: rotate(45deg) !important;
+}
+.playoff-division-lead {
+  color: #ffd978 !important;
+  font: 950 0.52rem/1 var(--font-ui) !important;
+  font-style: normal !important;
+  text-decoration: underline !important;
+  text-decoration-thickness: 1px !important;
+  text-underline-offset: 2px !important;
+  white-space: nowrap !important;
+  text-shadow: 0 1px 2px #000 !important;
+}
+.playoff-combined-hunt-table th:nth-child(5),
+.playoff-combined-hunt-table td:nth-child(5) {
+  border-right: 2px solid rgba(106, 178, 255, 0.42) !important;
+}
+.playoff-combined-hunt-table th:nth-child(4),
+.playoff-combined-hunt-table td:nth-child(4) {
+  border-right-width: 1px !important;
+}
+.playoff-combined-hunt-table {
+  min-width: 1040px !important;
+}
+
+/* League bracket mastheads. */
+.playoff-league-card > h3 {
+  position: relative !important;
+  display: flex !important;
+  align-items: center !important;
+  justify-content: center !important;
+  width: 100% !important;
+  max-width: 100% !important;
+  box-sizing: border-box !important;
+  flex: 0 0 auto !important;
+  min-height: 34px !important;
+  margin: 0 0 7px !important;
+  padding: 5px 44px !important;
+  overflow: hidden !important;
+  border: 1px solid rgba(138, 199, 255, .48) !important;
+  border-radius: 7px !important;
+  background:
+    linear-gradient(115deg, transparent 0 18%, rgba(255,255,255,.10) 18% 20%, transparent 20% 80%, rgba(255,255,255,.08) 80% 82%, transparent 82%),
+    linear-gradient(90deg, rgba(20, 91, 171, .74), rgba(6, 29, 62, .96), rgba(20, 91, 171, .74)) !important;
+  color: #eef8ff !important;
+  font: 950 1rem/1 var(--display-font, var(--font-ui)) !important;
+  letter-spacing: .16em !important;
+  text-align: center !important;
+  text-transform: uppercase !important;
+  text-shadow: 0 2px 0 #00101f, 0 0 12px rgba(94, 190, 255, .66) !important;
+  box-shadow: inset 0 1px 0 rgba(255,255,255,.16), 0 3px 10px rgba(0,0,0,.28) !important;
+}
+.playoff-league-card {
+  min-width: 0 !important;
+}
+.playoff-league-card-al > h3,
+.playoff-league-card-nl > h3 {
+  left: auto !important;
+  right: auto !important;
+  transform: none !important;
+}
+.playoff-league-card > h3::before,
+.playoff-league-card > h3::after {
+  content: '' !important;
+  position: absolute !important;
+  top: 50% !important;
+  width: 27px !important;
+  height: 2px !important;
+  background: linear-gradient(90deg, transparent, #9bddff) !important;
+  box-shadow: 0 0 7px rgba(95, 198, 255, .75) !important;
+}
+.playoff-league-card > h3::before { left: 10px !important; }
+.playoff-league-card > h3::after { right: 10px !important; transform: rotate(180deg) !important; }
+.playoff-league-card-nl > h3 {
+  border-color: rgba(255, 126, 139, .52) !important;
+  background:
+    linear-gradient(115deg, transparent 0 18%, rgba(255,255,255,.09) 18% 20%, transparent 20% 80%, rgba(255,255,255,.08) 80% 82%, transparent 82%),
+    linear-gradient(90deg, rgba(161, 24, 47, .76), rgba(55, 7, 25, .96), rgba(161, 24, 47, .76)) !important;
+  text-shadow: 0 2px 0 #21000a, 0 0 12px rgba(255, 91, 116, .62) !important;
+}
+.playoff-league-card-nl > h3::before,
+.playoff-league-card-nl > h3::after {
+  background: linear-gradient(90deg, transparent, #ff9aaa) !important;
+  box-shadow: 0 0 7px rgba(255, 94, 121, .72) !important;
+}
+
+@media (max-width: 720px) {
+  body.dashboard-page .player-stat-overlay.is-bullpen-profile .player-stat-body {
+    grid-template-columns: minmax(0, 1fr) !important;
+  }
+  body.dashboard-page .player-stat-overlay.is-bullpen-profile .player-stat-left {
+    width: 100% !important;
+    max-width: 100% !important;
+  }
+}
+
+/* Pregame O/U selectors: two tiny fixed-height arrows in a vertical stack. */
+.score-mini-over-under,
+.lineup-ou-stack {
+  display: inline-grid !important;
+  grid-template-rows: repeat(2, 7px) !important;
+  place-items: center !important;
+  align-self: center !important;
+  width: 12px !important;
+  min-width: 12px !important;
+  height: 14px !important;
+  min-height: 14px !important;
+  max-height: 14px !important;
+  gap: 0 !important;
+  overflow: visible !important;
+  vertical-align: middle !important;
+}
+
+.score-mini-ou-btn,
+.lineup-ou-stack .lineup-ou-btn {
+  position: relative !important;
+  display: block !important;
+  width: 11px !important;
+  min-width: 11px !important;
+  height: 7px !important;
+  min-height: 7px !important;
+  max-height: 7px !important;
+  margin: 0 !important;
+  padding: 0 !important;
+  border-radius: 2px !important;
+  font-size: 0 !important;
+  line-height: 0 !important;
+}
+
+.score-mini-ou-btn::before,
+.lineup-ou-stack .lineup-ou-btn::before {
+  content: '' !important;
+  position: absolute !important;
+  left: 50% !important;
+  top: 50% !important;
+  width: 0 !important;
+  height: 0 !important;
+  transform: translate(-50%, -50%) !important;
+  border-left: 3px solid transparent !important;
+  border-right: 3px solid transparent !important;
+}
+
+.score-mini-ou-over::before,
+.lineup-ou-over::before {
+  border-bottom: 4px solid currentColor !important;
+}
+
+.score-mini-ou-under::before,
+.lineup-ou-under::before {
+  border-top: 4px solid currentColor !important;
+}
+
+.lineup-state-scoreboard .lineup-ou-stack {
+  flex: 0 0 12px !important;
+  margin: 0 -2px !important;
+}
+
 @media (min-width: 721px) {
   body.dashboard-page.lineup-split-view .lineup-overlay.is-live-view .lineup-modal-body,
   body.dashboard-page.lineup-embed-page .lineup-overlay.is-live-view .lineup-modal-body {
@@ -7387,7 +7651,24 @@ body.light-mlb-page .lineup-hr-score-chip {
 }
 
 body.light-mlb-page .lineup-list li:not(.lineup-row-substitution) {
-  grid-template-columns: 18px minmax(0, 1fr) 34px 72px;
+  grid-template-columns: 18px minmax(0, 1fr) 24px 72px;
+  column-gap: 3px;
+}
+
+body.light-mlb-page .lineup-list li:not(.lineup-row-substitution) > .lineup-pos {
+  justify-self: end !important;
+  align-self: center !important;
+  width: 24px;
+  padding: 0 !important;
+  text-align: right !important;
+}
+
+body.light-mlb-page .lineup-list li:not(.lineup-row-substitution) > .lineup-rating-edge {
+  margin-left: 0 !important;
+}
+
+body.light-mlb-page .lineup-live-details .play-col {
+  cursor: default !important;
 }
 
 body.light-mlb-page .lineup-rating-edge {
@@ -7760,6 +8041,21 @@ body.light-mlb-page .lineup-hr-history-card.is-active {
   z-index: 30;
   transform: none;
   filter: drop-shadow(0 3px 3px rgba(0, 0, 0, .75));
+}
+
+body.light-mlb-page .lineup-hr-history-card.is-bullpen-window-card {
+  border-color: var(--bp-hr-border) !important;
+  background: linear-gradient(180deg, var(--bp-hr-top), var(--bp-hr-bottom)) !important;
+  color: var(--bp-hr-text) !important;
+  text-shadow: 0 1px 1px #000;
+  box-shadow: 0 1px 4px rgba(0,0,0,.44);
+  filter: none;
+  opacity: 1;
+}
+
+body.light-mlb-page .lineup-pitcher-overall-pill.is-insufficient-sample b {
+  font-size: .55rem;
+  letter-spacing: -.04em;
 }
 
 body.light-mlb-page .lineup-hr-card-stack.is-allowed-stack {
@@ -8297,3 +8593,450 @@ body.dashboard-page #playerStatExtra .visible-pitch-card.pitcher { grid-auto-row
 .lineup-season-series-tooltip strong { color: var(--text); }
 .today-opponent-dot-key { display: inline-block; width: 3px; height: 3px; margin-right: 3px; border: 1px solid #fff; border-radius: 50%; background: var(--accent); vertical-align: 1px; }
 @media (max-width: 720px) { .prediction-grade-hero { grid-template-columns: 54px 1fr; } .prediction-grade-hero > img { width: 50px; height: 50px; } .prediction-grade-trio { grid-column: 1 / -1; } }
+
+/* Both-team bullpen toggle and compact lineup bullpen slots. */
+body.dashboard-page .lineup-bullpen-toggle {
+  display: inline-grid;
+  place-items: center;
+  min-width: 30px;
+  height: 24px;
+  padding: 0 7px;
+  border: 1px solid color-mix(in srgb, var(--accent) 65%, #527086);
+  border-radius: 6px;
+  background: linear-gradient(#17364c, #0a1d2b);
+  color: #dceaf4;
+  font: 950 .68rem/1 var(--font-display);
+  letter-spacing: .06em;
+  cursor: pointer;
+  box-shadow: 0 2px 0 #020a10, inset 0 1px rgba(255,255,255,.16);
+  transform: translateY(-1px);
+}
+body.dashboard-page .lineup-bullpen-toggle:hover { border-color: var(--accent); color: #fff; }
+body.dashboard-page .lineup-bullpen-toggle.is-pressed,
+body.dashboard-page .lineup-bullpen-toggle[aria-pressed='true'] {
+  color: #fff1b0;
+  background: #07141e;
+  border-color: #ffd166;
+  box-shadow: inset 0 2px 4px #000c, inset 0 0 0 1px #ffd16633;
+  transform: translateY(1px);
+}
+
+body.dashboard-page .lineup-team-pitcher.is-bullpen-mode {
+  display: grid;
+  grid-template-columns: auto minmax(0, 1fr);
+  align-items: center;
+  gap: 4px 8px;
+  padding: 7px 8px;
+  cursor: default;
+}
+body.dashboard-page .lineup-bullpen-slot-heading { grid-column: 1; font-size: .72rem; font-weight: 950; }
+body.dashboard-page .lineup-bullpen-slot-aggregate {
+  grid-column: 2;
+  min-width: 0;
+  overflow: hidden;
+  color: #b3c6d3;
+  font: 850 .57rem/1 var(--font-ui);
+  text-align: right;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+body.dashboard-page .lineup-bullpen-slot-list {
+  grid-column: 1 / -1;
+  display: grid;
+  max-height: 150px;
+  overflow-x: hidden;
+  overflow-y: auto;
+  border: 1px solid #29475c;
+  border-radius: 7px;
+  background: #06131d;
+  overscroll-behavior: contain;
+  scrollbar-width: thin;
+}
+body.dashboard-page .lineup-bullpen-slot-arm {
+  display: grid;
+  grid-template-columns: minmax(105px, .72fr) auto minmax(190px, 1fr) minmax(72px, auto);
+  align-items: center;
+  gap: 5px;
+  min-width: 0;
+  padding: 5px 7px;
+  border-bottom: 1px solid #223b4e;
+  cursor: pointer;
+}
+body.dashboard-page .lineup-bullpen-slot-arm:last-child { border-bottom: 0; }
+body.dashboard-page .lineup-bullpen-slot-arm:hover { background: color-mix(in srgb, var(--accent) 10%, #0a1b28); }
+body.dashboard-page .lineup-bullpen-slot-name {
+  display: block;
+  min-width: 0;
+  overflow: hidden;
+  font-size: .72rem;
+  font-weight: 900;
+}
+body.dashboard-page .lineup-bullpen-slot-name .pitcher-identity-row { width: 100%; }
+body.dashboard-page .lineup-bullpen-slot-name .pitcher-identity-name {
+  flex: 0 0 auto;
+  max-width: none;
+}
+body.dashboard-page .lineup-bullpen-slot-name .pitcher-identity-markers {
+  flex: 0 1 auto;
+  min-width: 0;
+  overflow: hidden;
+}
+body.dashboard-page .lineup-bullpen-slot-meta {
+  min-width: 0;
+  overflow: hidden;
+  color: #c7d7e2;
+  font: 800 .57rem/1 var(--font-ui);
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+body.dashboard-page .lineup-bullpen-slot-status {
+  min-width: 0;
+  overflow: hidden;
+  color: #7893a5;
+  font: 750 .52rem/1 var(--font-ui);
+  text-align: right;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+body.dashboard-page .lineup-bullpen-slot-arm .lineup-pitcher-overall-shell { flex: 0 0 auto; }
+
+@media (max-width: 720px) {
+  body.dashboard-page .lineup-bullpen-slot-list { max-height: 122px; }
+  body.dashboard-page .lineup-bullpen-slot-arm {
+    grid-template-columns: minmax(92px, .75fr) auto minmax(130px, 1fr);
+  }
+  body.dashboard-page .lineup-bullpen-slot-status { display: none; }
+  body.dashboard-page .lineup-bullpen-slot-aggregate { font-size: .5rem; }
+}
+
+/* Composite bullpen mode: one pitcher-sized card per team. */
+body.dashboard-page .lineup-modal-title-wrap {
+  grid-template-columns: minmax(0, auto) auto auto minmax(150px, 1fr);
+}
+body.dashboard-page .lineup-recent-toggle.lineup-bullpen-toggle {
+  display: inline-block;
+  min-width: 0;
+  height: auto;
+  padding: 8px 13px;
+  border: 1px solid color-mix(in srgb, var(--accent) 62%, white 10%);
+  border-radius: 10px;
+  background:
+    linear-gradient(180deg, rgba(255,255,255,0.12), transparent 56%),
+    color-mix(in srgb, var(--badge-bg) 76%, var(--panel-item) 24%);
+  color: #fff;
+  font-family: inherit;
+  font-size: .94rem;
+  font-weight: 900;
+  line-height: normal;
+  letter-spacing: normal;
+  justify-self: start;
+  box-shadow: 0 8px 18px rgba(0,0,0,.22), inset 0 1px 0 rgba(255,255,255,.12);
+  transform: none;
+}
+body.dashboard-page .lineup-recent-toggle.lineup-bullpen-toggle:hover,
+body.dashboard-page .lineup-recent-toggle.lineup-bullpen-toggle:focus-visible {
+  border-color: color-mix(in srgb, var(--accent) 84%, white 14%);
+  transform: translateY(-1px);
+}
+body.dashboard-page .lineup-recent-toggle.lineup-bullpen-toggle[aria-pressed='true'],
+body.dashboard-page .lineup-recent-toggle.lineup-bullpen-toggle.is-pressed {
+  background:
+    linear-gradient(180deg, rgba(255,255,255,.16), transparent 56%),
+    color-mix(in srgb, var(--accent) 48%, var(--badge-bg) 52%);
+  border-color: var(--badge-border);
+  color: #fff;
+  box-shadow: 0 8px 18px rgba(0,0,0,.22), inset 0 1px 0 rgba(255,255,255,.12);
+  transform: none;
+}
+body.dashboard-page .lineup-team-pitcher.is-bullpen-mode {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr);
+  align-items: baseline;
+  gap: 1px;
+  padding: 5px 7px;
+  cursor: default;
+}
+body.dashboard-page .lineup-team-pitcher.is-bullpen-mode .lineup-bullpen-composite {
+  cursor: pointer;
+}
+body.dashboard-page .lineup-team-pitcher.is-bullpen-mode .bullpen-composite-hr-stack {
+  display: inline-flex;
+  position: relative;
+  align-items: center;
+  min-width: 34px;
+  height: 27px;
+  overflow: visible;
+}
+body.dashboard-page .lineup-team-pitcher.is-bullpen-mode .lineup-team-pitcher-meta {
+  min-width: 0;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+body.dashboard-page .player-stat-overlay.is-bullpen-profile .player-stat-tabs {
+  visibility: hidden;
+}
+body.dashboard-page .player-stat-overlay.is-bullpen-profile .player-stat-overall-badge {
+  padding: 0;
+  border: 0;
+  background: none;
+  box-shadow: none;
+}
+body.dashboard-page .player-stat-overlay.is-bullpen-profile .player-stat-modal {
+  --bullpen-team-color: var(--accent);
+}
+body.dashboard-page .player-stat-overlay.is-bullpen-profile .player-stat-body {
+  grid-template-columns: 210px minmax(0, 1fr);
+}
+body.dashboard-page .player-stat-overlay.is-bullpen-profile .player-stat-headshot {
+  object-fit: contain;
+  height: 174px;
+  padding: 10px;
+  background: #eef4f7;
+}
+body.dashboard-page .player-stat-overlay.is-bullpen-profile .player-stat-right {
+  grid-template-columns: minmax(0, 1fr);
+  grid-auto-rows: max-content;
+  gap: 7px;
+}
+body.dashboard-page .player-stat-overlay.is-bullpen-profile #playerStatExtra {
+  order: -1;
+  min-height: 0;
+}
+body.dashboard-page .player-stat-overlay.is-bullpen-profile #playerStatSeason {
+  min-height: 0;
+}
+body.dashboard-page .player-stat-overlay.is-bullpen-profile #playerStatMatchup {
+  display: none;
+}
+.bullpen-profile-toolbar {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 10px;
+  margin-bottom: 8px;
+  padding: 7px 8px;
+  border: 1px solid #38566b;
+  border-radius: 7px;
+  background: #0a1b28;
+}
+.bullpen-profile-toolbar > div {
+  display: flex;
+  gap: 5px;
+}
+.bullpen-profile-toolbar button {
+  padding: 6px 8px;
+  border: 1px solid #47677e;
+  border-radius: 5px;
+  background: #0a1822;
+  color: #a9c1d1;
+  font: 900 .58rem/1 var(--font-ui);
+  cursor: pointer;
+}
+.bullpen-profile-toolbar button.is-active {
+  border-color: var(--accent);
+  background: #173a51;
+  color: #fff;
+  box-shadow: inset 0 2px 4px #0009;
+}
+.bullpen-profile-roster {
+  display: grid;
+  border: 1px solid #38566b;
+  border-radius: 8px;
+  overflow: hidden;
+}
+.bullpen-profile-arm {
+  display: grid;
+  grid-template-columns: minmax(180px, .8fr) 58px minmax(280px, 1.4fr) 76px;
+  align-items: center;
+  gap: 8px;
+  min-width: 0;
+  padding: 8px 10px;
+  border: 0;
+  border-bottom: 1px solid #294559;
+  background: #081722;
+  color: #dce9f1;
+  text-align: left;
+  cursor: pointer;
+}
+.bullpen-profile-arm:last-child { border-bottom: 0; }
+.bullpen-profile-arm:hover { background: #102a3c; }
+.bullpen-profile-arm-name {
+  display: inline-flex;
+  align-items: baseline;
+  min-width: 0;
+  gap: 5px;
+  color: inherit;
+}
+.bullpen-profile-arm-name b {
+  overflow: hidden;
+  font-size: .82rem;
+  font-weight: 950;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+.bullpen-profile-arm-name small {
+  color: #9bb4c5;
+  font-size: .62rem;
+  font-weight: 900;
+}
+.bullpen-profile-arm-name em {
+  padding: 2px 4px;
+  border: 1px solid #42657c;
+  border-radius: 4px;
+  color: #acd7ef;
+  font-size: .48rem;
+  font-style: normal;
+  font-weight: 950;
+}
+.bullpen-profile-arm-overall {
+  display: inline-flex;
+  align-items: baseline;
+  gap: 2px;
+  padding: 3px 7px;
+  border: 1px solid #6892ad;
+  border-radius: 7px;
+  background: linear-gradient(135deg, #183e56, #09131b);
+}
+.bullpen-profile-arm-overall-shell {
+  align-self: center !important;
+  min-width: 46px !important;
+  height: 34px;
+  margin: 0 !important;
+}
+.bullpen-profile-arm-overall-shell .lineup-pitcher-overall-pill {
+  width: 46px;
+  height: 34px;
+}
+.bullpen-profile-arm-overall small { font-size: .44rem; }
+.bullpen-profile-arm-overall b { font-size: .9rem; }
+.bullpen-profile-arm-overall sup { color: #ffd166; font-size: .52rem; }
+.bullpen-profile-arm-stats {
+  display: grid;
+  grid-template-columns: repeat(6, minmax(42px, 1fr));
+  min-width: 0;
+  gap: 3px;
+}
+.bullpen-profile-arm-stats > span {
+  display: grid;
+  justify-items: center;
+  gap: 2px;
+  min-width: 0;
+  padding: 5px 3px;
+  border: 1px solid #294b60;
+  border-radius: 5px;
+  background: #0b1d29;
+}
+.bullpen-profile-arm-stats small {
+  color: #7897aa;
+  font-size: .43rem;
+  font-weight: 950;
+}
+.bullpen-profile-arm-stats b {
+  color: #f0f7fb;
+  font-size: .61rem;
+  font-weight: 950;
+  white-space: nowrap;
+}
+.bullpen-profile-arm-used {
+  color: #8eacbf;
+  font-size: .58rem;
+  font-weight: 850;
+  text-align: right;
+}
+.bullpen-profile-note {
+  padding: 10px;
+  color: #9eb6c6;
+  font-size: .7rem;
+}
+.bullpen-profile-combined {
+  display: grid;
+  grid-template-columns: repeat(5, minmax(0, 1fr));
+  gap: 5px;
+}
+.bullpen-profile-combined span {
+  display: grid;
+  place-items: center;
+  gap: 2px;
+  padding: 7px 4px;
+  border: 1px solid #36596f;
+  border-radius: 6px;
+  background: linear-gradient(180deg, #17364a, #081721);
+}
+.bullpen-profile-combined small {
+  color: #91adbf;
+  font-size: .5rem;
+  font-weight: 950;
+}
+.bullpen-profile-combined b {
+  color: #f5fbff;
+  font-size: .88rem;
+}
+.bullpen-profile-rating-summary {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 9px;
+  padding-top: 6px;
+}
+.bullpen-profile-rating-summary > .lineup-pitcher-overall-shell {
+  align-self: center;
+  min-width: 46px;
+  height: 34px;
+  margin: 0;
+}
+.bullpen-profile-rating-summary > span:last-child {
+  display: grid;
+  justify-items: end;
+  gap: 1px;
+}
+.bullpen-profile-rating-summary > span:last-child b {
+  color: #fff;
+  font-size: 1.15rem;
+}
+.bullpen-profile-rating-summary > span:last-child small {
+  color: #829daf;
+  font-size: .48rem;
+  font-weight: 950;
+}
+@media (max-width: 720px) {
+  body.dashboard-page .player-stat-overlay.is-bullpen-profile .player-stat-body {
+    grid-template-columns: minmax(0, 1fr);
+  }
+  .bullpen-profile-toolbar { align-items: stretch; flex-direction: column; }
+  .bullpen-profile-toolbar > div { width: 100%; }
+  .bullpen-profile-toolbar button { flex: 1; }
+  .bullpen-profile-arm {
+    grid-template-columns: minmax(105px, 1fr) auto;
+  }
+  .bullpen-profile-arm-stats {
+    grid-column: 1 / -1;
+    grid-template-columns: repeat(3, minmax(48px, 1fr));
+  }
+  .bullpen-profile-arm-used { display: none; }
+  .bullpen-profile-combined { grid-template-columns: repeat(5, minmax(48px, 1fr)); }
+}
+
+/* Final light-lineup end-cap override: keep POS physically attached to OVR at every viewport. */
+body.light-mlb-page .lineup-list li:not(.lineup-row-substitution) {
+  grid-template-columns: 18px minmax(0, 1fr) 24px 72px !important;
+  grid-template-areas:
+    "slot name pos edge"
+    "slot today today edge" !important;
+  column-gap: 2px !important;
+}
+body.light-mlb-page .lineup-list li:not(.lineup-row-substitution) > .lineup-pos {
+  grid-area: pos !important;
+  justify-self: end !important;
+  align-self: center !important;
+  width: 24px !important;
+  margin: 0 !important;
+  padding: 0 2px 0 0 !important;
+}
+body.light-mlb-page .lineup-list li:not(.lineup-row-substitution) > .lineup-rating-edge {
+  grid-area: edge !important;
+  justify-self: end !important;
+  width: 72px !important;
+  margin: 0 !important;
+}
