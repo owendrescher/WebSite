@@ -38958,6 +38958,8 @@ function lineupStarterExitNoticeVisible(game, staff, current) {
 function renderLineupPitcherSummary(containerEl, color, staff, game = null) {
   if (!containerEl) return;
   containerEl.classList.remove('is-bullpen-mode');
+  delete containerEl.dataset.bullpenTeam;
+  containerEl._bullpenProfileData = null;
   const rawStarter = staff?.starter || staff?.current || null;
   const rawCurrent = staff?.current || rawStarter || null;
   const starter = isPlaceholderProbablePitcherText(rawStarter?.fullName || rawStarter?.name || '') ? null : rawStarter;
