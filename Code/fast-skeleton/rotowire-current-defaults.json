@@ -25,15 +25,15 @@
   },
   "ATH": {
     "RHP": [
+      "Nick Kurtz",
       "Jacob Wilson",
       "Tyler Soderstrom",
-      "Shea Langeliers",
-      "Carlos Cortes",
-      "Donovan Walton",
+      "Jonah Heim",
       "Tommy White",
-      "Jeff McNeil",
       "Lawrence Butler",
-      "Henry Bolte"
+      "Jeff McNeil",
+      "Carlos Cortes",
+      "Donovan Walton"
     ],
     "LHP": [
       "Jacob Wilson",
@@ -55,8 +55,8 @@
       "Michael Harris",
       "Ozzie Albies",
       "Mauricio Dubon",
+      "Dominic Smith",
       "Mike Yastrzemski",
-      "Austin Riley",
       "Jim Jarvis"
     ],
     "LHP": [
@@ -97,11 +97,11 @@
   },
   "BOS": {
     "RHP": [
-      "Masataka Yoshida",
-      "Curtis Mead",
-      "Willson Contreras",
-      "Wilyer Abreu",
+      "Anthony Seigler",
       "Ceddanne Rafaela",
+      "Wilyer Abreu",
+      "Willson Contreras",
+      "Masataka Yoshida",
       "Caleb Durbin",
       "Jarren Duran",
       "Andruw Monasterio",
@@ -126,10 +126,10 @@
       "Michael Busch",
       "Alex Bregman",
       "Ian Happ",
+      "Nico Hoerner",
       "Michael Conforto",
-      "Pedro Ramirez",
-      "Dansby Swanson",
-      "Miguel Amaya"
+      "Carson Kelly",
+      "Dansby Swanson"
     ],
     "LHP": [
       "Pete Crow-Armstrong",
@@ -148,12 +148,12 @@
       "Elly De La Cruz",
       "Sal Stewart",
       "JJ Bleday",
-      "Eugenio Suarez",
-      "Nathaniel Lowe",
       "Tyler Stephenson",
+      "Nathaniel Lowe",
+      "Eugenio Suarez",
       "Dane Myers",
-      "Edwin Arroyo",
-      "TJ Friedl"
+      "Noelvi Marte",
+      "Matt McLain"
     ],
     "LHP": [
       "Elly De La Cruz",
@@ -228,15 +228,15 @@
       "Drew Romo"
     ],
     "LHP": [
-      "Randal Grichuk",
+      "Chase Meidroth",
       "Munetaka Murakami",
       "Miguel Vargas",
+      "Randal Grichuk",
       "Colson Montgomery",
-      "Chase Meidroth",
-      "Braden Montgomery",
       "Everson Pereira",
-      "Edgar Quero",
-      "Luisangel Acuna"
+      "Braden Montgomery",
+      "Luisangel Acuna",
+      "Edgar Quero"
     ]
   },
   "DET": {
@@ -290,7 +290,7 @@
   "KC": {
     "RHP": [
       "Carter Jensen",
-      "Lane Thomas",
+      "John Rave",
       "Jac Caglianone",
       "Salvador Perez",
       "Michael Massey",
@@ -337,15 +337,15 @@
   },
   "LAD": {
     "RHP": [
-      "Shohei Ohtani",
+      "Tommy Edman",
       "Andy Pages",
       "Freddie Freeman",
       "Max Muncy",
-      "Tommy Edman",
       "Mookie Betts",
       "Kyle Tucker",
       "Teoscar Hernandez",
-      "Dalton Rushing"
+      "Dalton Rushing",
+      "Enrique Hernandez"
     ],
     "LHP": [
       "Shohei Ohtani",
@@ -361,11 +361,11 @@
   },
   "MIA": {
     "RHP": [
+      "Liam Hicks",
+      "Xavier Edwards",
       "Otto Lopez",
       "Kyle Stowers",
       "Heriberto Hernandez",
-      "Xavier Edwards",
-      "Liam Hicks",
       "Griffin Conine",
       "Jakob Marsee",
       "Graham Pauley",
@@ -421,13 +421,13 @@
     ],
     "LHP": [
       "Austin Martin",
-      "Byron Buxton",
       "Ryan Jeffers",
       "Royce Lewis",
+      "Josh Bell",
       "Kody Clemens",
       "Luke Keaschall",
-      "Alex Jackson",
       "Brooks Lee",
+      "Alex Jackson",
       "Ryan Kreidler"
     ]
   },
@@ -437,10 +437,10 @@
       "Francisco Lindor",
       "Bo Bichette",
       "Carson Benge",
-      "Jared Young",
-      "Jorge Polanco",
-      "Tyrone Taylor",
+      "Luis Robert",
       "Brett Baty",
+      "Marcus Semien",
+      "Jorge Polanco",
       "Francisco Alvarez"
     ],
     "LHP": [
@@ -463,8 +463,8 @@
       "Paul Goldschmidt",
       "Spencer Jones",
       "Jazz Chisholm",
+      "Anthony Volpe",
       "Ryan McMahon",
-      "Jose Caballero",
       "Austin Wells"
     ],
     "LHP": [
@@ -512,8 +512,8 @@
       "Ryan O'Hearn",
       "Nick Gonzales",
       "Endy Rodriguez",
-      "Marcell Ozuna",
-      "Jacob Gonzalez"
+      "Jacob Gonzalez",
+      "Jhostynxon Garcia"
     ],
     "LHP": [
       "Nick Gonzales",
@@ -544,23 +544,23 @@
       "Luis Rengifo",
       "Manny Machado",
       "Ty France",
+      "Jackson Merrill",
+      "Luis Campusano",
       "Xander Bogaerts",
-      "Gavin Sheets",
-      "Freddy Fermin",
-      "Jase Bowen",
-      "Jake Cronenworth"
+      "Jake Cronenworth",
+      "Jase Bowen"
     ]
   },
   "SEA": {
     "RHP": [
       "Cole Young",
-      "Julio Rodriguez",
-      "Dominic Canzone",
       "Randy Arozarena",
+      "Dominic Canzone",
+      "Julio Rodriguez",
       "Josh Naylor",
+      "Cal Raleigh",
       "Luke Raley",
-      "Mitch Garver",
-      "J.P. Crawford",
+      "Weston Wilson",
       "Colt Emerson"
     ],
     "LHP": [
@@ -589,8 +589,8 @@
     ],
     "LHP": [
       "Luis Arraez",
-      "Bryce Eldridge",
       "Heliot Ramos",
+      "Bryce Eldridge",
       "Rafael Devers",
       "Jung Hoo Lee",
       "Willy Adames",
@@ -607,9 +607,9 @@
       "Ivan Herrera",
       "Lars Nootbaar",
       "Masyn Winn",
-      "Nathan Church",
-      "Jose Fermin",
-      "Jimmy Crooks"
+      "Bryan Torres",
+      "Blaze Jordan",
+      "Nathan Church"
     ],
     "LHP": [
       "JJ Wetherholt",
@@ -629,9 +629,9 @@
       "Jonathan Aranda",
       "Junior Caminero",
       "Cedric Mullins",
-      "Chandler Simpson",
+      "Jonny DeLuca",
       "Victor Mesa",
-      "Richie Palacios",
+      "Ben Williamson",
       "Taylor Walls",
       "Hunter Feduccia"
     ],
@@ -661,14 +661,14 @@
     ],
     "LHP": [
       "Wyatt Langford",
-      "Justin Foscue",
-      "Jake Burger",
-      "Brandon Nimmo",
       "Ezequiel Duran",
+      "Brandon Nimmo",
+      "Jake Burger",
+      "Justin Foscue",
       "Cam Cauley",
-      "Elias Diaz",
-      "Alejandro Osuna",
-      "Nicky Lopez"
+      "Nicky Lopez",
+      "Austin Wynns",
+      "Alejandro Osuna"
     ]
   },
   "TOR": {
@@ -699,11 +699,11 @@
     "RHP": [
       "James Wood",
       "Luis Garcia",
-      "Brady House",
+      "Dylan Crews",
       "CJ Abrams",
-      "Harry Ford",
       "Daylen Lile",
-      "Jacob Young",
+      "Keibert Ruiz",
+      "Jose Tena",
       "Jorbit Vivas",
       "Nasim Nunez"
     ],

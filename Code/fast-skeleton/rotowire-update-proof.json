@@ -1,5 +1,5 @@
 {
-  "generatedAt": "2026-07-30T09:59:12.7475286Z",
+  "generatedAt": "2026-07-31T09:25:20.6229030Z",
   "note": "Static RotoWire fallback refreshed from RotoWire batting-order table endpoint. Each hand uses the latest actual lineup against that opposing pitcher hand; previous seed preserved only if a hand could not be resolved.",
   "sourcePattern": "https://www.rotowire.com/baseball/tables/batting-order-data.php?team={TEAM}",
   "teams": {
