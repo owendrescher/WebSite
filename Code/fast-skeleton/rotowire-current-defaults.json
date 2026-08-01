@@ -7,9 +7,9 @@
       "Ketel Marte",
       "Max Kepler",
       "Nolan Arenado",
+      "Adrian Del Castillo",
       "Tim Tawa",
-      "Ildemaro Vargas",
-      "Jorge Barrosa"
+      "Ryan Waldschmidt"
     ],
     "LHP": [
       "Corbin Carroll",
@@ -36,14 +36,14 @@
       "Donovan Walton"
     ],
     "LHP": [
-      "Jacob Wilson",
       "Nick Kurtz",
-      "Tommy White",
-      "Tyler Soderstrom",
+      "Jacob Wilson",
       "Jonah Heim",
-      "Colby Thomas",
-      "Henry Bolte",
+      "Tyler Soderstrom",
+      "Tommy White",
       "Lawrence Butler",
+      "Henry Bolte",
+      "Jeff McNeil",
       "Alika Williams"
     ]
   },
@@ -67,8 +67,8 @@
       "Michael Harris",
       "Mauricio Dubon",
       "Austin Riley",
-      "Eli White",
-      "Joey Bart"
+      "Joey Bart",
+      "Jim Jarvis"
     ]
   },
   "BAL": {
@@ -122,14 +122,14 @@
   "CHC": {
     "RHP": [
       "Pete Crow-Armstrong",
-      "Seiya Suzuki",
+      "Pedro Ramirez",
       "Michael Busch",
       "Alex Bregman",
       "Ian Happ",
       "Nico Hoerner",
       "Michael Conforto",
-      "Carson Kelly",
-      "Dansby Swanson"
+      "Dansby Swanson",
+      "Miguel Amaya"
     ],
     "LHP": [
       "Pete Crow-Armstrong",
@@ -197,10 +197,10 @@
       "Mickey Moniak",
       "Hunter Goodman",
       "TJ Rumfield",
-      "Cole Carrigg",
+      "Kyle Karros",
+      "Tyler Freeman",
       "Troy Johnston",
-      "Willi Castro",
-      "Edouard Julien",
+      "Brenton Doyle",
       "Ezequiel Tovar"
     ],
     "LHP": [
@@ -252,15 +252,15 @@
       "Javier Baez"
     ],
     "LHP": [
-      "Gleyber Torres",
       "Kevin McGonigle",
-      "Hao-Yu Lee",
+      "Gleyber Torres",
       "Dillon Dingler",
       "Riley Greene",
-      "Eduardo Valencia",
+      "Hao-Yu Lee",
       "Spencer Torkelson",
-      "Matt Vierling",
-      "Javier Baez"
+      "Max Clark",
+      "Javier Baez",
+      "Ben Malgeri"
     ]
   },
   "HOU": {
@@ -290,14 +290,14 @@
   "KC": {
     "RHP": [
       "Carter Jensen",
-      "John Rave",
+      "Lane Thomas",
       "Jac Caglianone",
       "Salvador Perez",
       "Michael Massey",
-      "Nick Loftin",
       "Isaac Collins",
+      "John Rave",
       "Josh Rojas",
-      "Tyler Tolbert"
+      "Andrew Velazquez"
     ],
     "LHP": [
       "Lane Thomas",
@@ -387,9 +387,9 @@
     "RHP": [
       "Brice Turang",
       "Jackson Chourio",
-      "Jake Bauers",
       "Christian Yelich",
-      "Gary Sanchez",
+      "William Contreras",
+      "Jake Bauers",
       "Garrett Mitchell",
       "Luis Lara",
       "David Hamilton",
@@ -410,14 +410,14 @@
   "MIN": {
     "RHP": [
       "Trevor Larnach",
-      "Brooks Lee",
+      "Ryan Jeffers",
       "Kody Clemens",
       "Josh Bell",
       "Royce Lewis",
-      "Victor Caratini",
       "Alan Roden",
+      "Brooks Lee",
       "Luke Keaschall",
-      "Ryan Kreidler"
+      "Tristan Gray"
     ],
     "LHP": [
       "Austin Martin",
@@ -438,8 +438,8 @@
       "Bo Bichette",
       "Carson Benge",
       "Luis Robert",
+      "Jared Young",
       "Brett Baty",
-      "Marcus Semien",
       "Jorge Polanco",
       "Francisco Alvarez"
     ],
@@ -482,14 +482,14 @@
   "PHI": {
     "RHP": [
       "Trea Turner",
-      "Bryson Stott",
+      "Kyle Schwarber",
       "Bryce Harper",
       "Alec Bohm",
-      "J.T. Realmuto",
       "Brandon Marsh",
-      "Bryan De La Cruz",
-      "Justin Crawford",
-      "Edmundo Sosa"
+      "J.T. Realmuto",
+      "Bryson Stott",
+      "Gabriel Rincones",
+      "Justin Crawford"
     ],
     "LHP": [
       "Trea Turner",
@@ -513,7 +513,7 @@
       "Nick Gonzales",
       "Endy Rodriguez",
       "Jacob Gonzalez",
-      "Jhostynxon Garcia"
+      "Henry Davis"
     ],
     "LHP": [
       "Nick Gonzales",
@@ -547,7 +547,7 @@
       "Jackson Merrill",
       "Luis Campusano",
       "Xander Bogaerts",
-      "Jake Cronenworth",
+      "Freddy Fermin",
       "Jase Bowen"
     ]
   },
@@ -607,9 +607,9 @@
       "Ivan Herrera",
       "Lars Nootbaar",
       "Masyn Winn",
-      "Bryan Torres",
-      "Blaze Jordan",
-      "Nathan Church"
+      "Nathan Church",
+      "Jose Fermin",
+      "Jimmy Crooks"
     ],
     "LHP": [
       "JJ Wetherholt",
