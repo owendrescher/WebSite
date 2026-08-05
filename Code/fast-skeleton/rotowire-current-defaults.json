@@ -6,7 +6,7 @@
       "Max Kepler",
       "Ketel Marte",
       "Nolan Arenado",
-      "Adrian Del Castillo",
+      "Lars Nootbaar",
       "Tim Tawa",
       "James McCann",
       "Ryan Waldschmidt"
@@ -54,8 +54,8 @@
       "Matt Olson",
       "Michael Harris",
       "Ozzie Albies",
-      "Mauricio Dubon",
       "Mike Yastrzemski",
+      "Dominic Smith",
       "Austin Riley",
       "Jim Jarvis"
     ],
@@ -76,12 +76,12 @@
       "Dylan Beavers",
       "Pete Alonso",
       "Gunnar Henderson",
-      "Taylor Ward",
-      "Jackson Holliday",
       "Christian Encarnacion-Strand",
-      "Leody Taveras",
+      "Jackson Holliday",
+      "Coby Mayo",
+      "Christian Franklin",
       "Colton Cowser",
-      "Jake Rogers"
+      "Carlos Narvaez"
     ],
     "LHP": [
       "Coby Mayo",
@@ -194,13 +194,13 @@
   "COL": {
     "RHP": [
       "Jake McCarthy",
-      "Mickey Moniak",
       "Cole Carrigg",
+      "Mickey Moniak",
+      "Hunter Goodman",
       "TJ Rumfield",
+      "Kyle Karros",
       "Willi Castro",
-      "Troy Johnston",
-      "Edouard Julien",
-      "Brett Sullivan",
+      "Jordan Beck",
       "Ezequiel Tovar"
     ],
     "LHP": [
@@ -233,10 +233,10 @@
       "Miguel Vargas",
       "Randal Grichuk",
       "Colson Montgomery",
-      "Everson Pereira",
+      "Joey Bart",
+      "Brenton Doyle",
       "Braden Montgomery",
-      "Luisangel Acuna",
-      "Edgar Quero"
+      "Luisangel Acuna"
     ]
   },
   "DET": {
@@ -327,12 +327,12 @@
       "Zach Neto",
       "Mike Trout",
       "Nolan Schanuel",
-      "Jorge Soler",
       "Vaughn Grissom",
-      "Jo Adell",
-      "Travis d'Arnaud",
       "Denzer Guzman",
-      "Jose Siri"
+      "Moises Ballesteros",
+      "Travis d'Arnaud",
+      "Jose Siri",
+      "Wade Meckler"
     ]
   },
   "LAD": {
@@ -387,13 +387,13 @@
     "RHP": [
       "Brice Turang",
       "Jackson Chourio",
-      "Christian Yelich",
-      "William Contreras",
-      "Jake Bauers",
-      "Andrew Vaughn",
       "Garrett Mitchell",
-      "David Hamilton",
-      "Joey Ortiz"
+      "William Contreras",
+      "Christian Yelich",
+      "Andrew Vaughn",
+      "Luis Lara",
+      "Cooper Pratt",
+      "David Hamilton"
     ],
     "LHP": [
       "Jackson Chourio",
@@ -460,11 +460,11 @@
       "Trent Grisham",
       "Ben Rice",
       "Luis Garcia",
+      "Heliot Ramos",
       "Spencer Jones",
-      "Jasson Dominguez",
       "Jazz Chisholm",
       "Ryan McMahon",
-      "Jose Caballero",
+      "George Lombard",
       "Austin Wells"
     ],
     "LHP": [
@@ -492,15 +492,15 @@
       "Bryan De La Cruz"
     ],
     "LHP": [
-      "Trea Turner",
       "Kyle Schwarber",
+      "Trea Turner",
       "Bryce Harper",
+      "Luis Arraez",
       "Alec Bohm",
-      "Bryan De La Cruz",
+      "J.T. Realmuto",
+      "Brandon Marsh",
       "Bryson Stott",
-      "Edmundo Sosa",
-      "Derek Hill",
-      "Garrett Stubbs"
+      "Justin Crawford"
     ]
   },
   "PIT": {
@@ -545,9 +545,9 @@
       "Manny Machado",
       "Ty France",
       "Jackson Merrill",
-      "Luis Campusano",
       "Xander Bogaerts",
       "Freddy Fermin",
+      "Jake Cronenworth",
       "Jase Bowen"
     ]
   },
@@ -628,11 +628,11 @@
       "Yandy Diaz",
       "Jonathan Aranda",
       "Junior Caminero",
-      "Cedric Mullins",
+      "Liam Hicks",
       "Victor Mesa",
       "Chandler Simpson",
+      "Cedric Mullins",
       "Richie Palacios",
-      "Kenny Piper",
       "Taylor Walls"
     ],
     "LHP": [
@@ -653,11 +653,11 @@
       "Wyatt Langford",
       "Corey Seager",
       "Brandon Nimmo",
-      "Evan Carter",
-      "Jake Burger",
       "Ezequiel Duran",
-      "Austin Wynns",
-      "Nicky Lopez"
+      "Evan Carter",
+      "Elias Diaz",
+      "Nicky Lopez",
+      "Justin Foscue"
     ],
     "LHP": [
       "Wyatt Langford",
