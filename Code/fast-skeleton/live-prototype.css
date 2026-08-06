@@ -9040,3 +9040,94 @@ body.light-mlb-page .lineup-list li:not(.lineup-row-substitution) > .lineup-rati
   width: 72px !important;
   margin: 0 !important;
 }
+
+/* Light dashboard phone layout. Keep this after the light-lineup end cap so the
+   compact card cannot inherit its desktop four-column placement rules. */
+@media (max-width: 600px) {
+  body.light-mlb-page .lineup-modal-header {
+    grid-template-columns: minmax(0, 1fr) auto auto !important;
+    grid-template-areas:
+      "matchup matchup close"
+      "tabs recent bullpen"
+      "series series series" !important;
+  }
+
+  body.light-mlb-page .lineup-view-toggle {
+    justify-content: flex-start !important;
+    overflow-x: auto !important;
+    scrollbar-width: none !important;
+  }
+
+  body.light-mlb-page .lineup-view-toggle::-webkit-scrollbar {
+    display: none !important;
+  }
+
+  body.light-mlb-page .lineup-recent-toggle:not(.lineup-bullpen-toggle) {
+    grid-area: recent !important;
+  }
+
+  body.light-mlb-page .lineup-bullpen-toggle {
+    grid-area: bullpen !important;
+  }
+
+  body.light-mlb-page .lineup-matchup-strip {
+    grid-template-columns: minmax(0, 1fr) auto minmax(0, 1fr) !important;
+    align-items: center !important;
+    gap: 5px !important;
+  }
+
+  body.light-mlb-page .lineup-matchup-strip .lineup-team-header-home {
+    justify-content: flex-end !important;
+    text-align: right !important;
+  }
+
+  body.light-mlb-page .lineup-list li:not(.lineup-row-substitution) {
+    min-height: 66px !important;
+    grid-template-columns: 18px minmax(0, 1fr) 26px 64px !important;
+    grid-template-areas:
+      "slot name pos edge"
+      "slot today today edge"
+      "slot stats stats stats" !important;
+    grid-template-rows: auto auto auto !important;
+    align-items: start !important;
+    gap: 2px 4px !important;
+  }
+
+  body.light-mlb-page .lineup-list li:not(.lineup-row-substitution) > .lineup-name {
+    flex-wrap: nowrap !important;
+    overflow: hidden !important;
+  }
+
+  body.light-mlb-page .lineup-list li:not(.lineup-row-substitution) .lineup-name-text {
+    overflow: hidden !important;
+    text-overflow: ellipsis !important;
+  }
+
+  body.light-mlb-page .lineup-list li:not(.lineup-row-substitution) > .lineup-pos {
+    width: 26px !important;
+    align-self: center !important;
+    padding: 0 !important;
+  }
+
+  body.light-mlb-page .lineup-list li:not(.lineup-row-substitution) > .lineup-rating-edge {
+    grid-row: auto !important;
+    align-self: stretch !important;
+    width: 64px !important;
+    max-width: 64px !important;
+  }
+
+  body.light-mlb-page .lineup-overall-rating-pill {
+    width: 64px !important;
+  }
+
+  body.light-mlb-page .lineup-list li:not(.lineup-row-substitution) > .lineup-row-recent-stats {
+    display: block !important;
+    grid-area: stats !important;
+    justify-self: stretch !important;
+    max-width: 100% !important;
+    overflow: hidden !important;
+    text-align: left !important;
+    text-overflow: ellipsis !important;
+    white-space: nowrap !important;
+  }
+}

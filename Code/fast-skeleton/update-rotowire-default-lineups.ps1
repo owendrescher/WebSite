@@ -12,25 +12,27 @@ $teams = @(
   "PHI","PIT","SD","SEA","SF","STL","TB","TEX","TOR","WSH"
 )
 
-function Get-LineupNames($row) {
-  $names = @()
-  foreach ($field in @("playerone","playertwo","playerthree","playerfour","playerfive","playersix","playerseven","playereight","playernine")) {
-    $name = [string]($row.$field)
-    if ([string]::IsNullOrWhiteSpace($name)) { return @() }
-    $names += $name.Trim()
-  }
-  if (($names | Select-Object -Unique).Count -ne 9) { return @() }
-  return $names
-}
+function Get-DefaultLineup([string]$html, [string]$hand) {
+  $escapedHand = [regex]::Escape($hand)
+  $section = [regex]::Match(
+    $html,
+    "Default\s+vs\.\s+$escapedHand\s*</div>\s*<ol[^>]*>(?<list>[\s\S]*?)</ol>",
+    [System.Text.RegularExpressions.RegexOptions]::IgnoreCase
+  )
+  if (-not $section.Success) { return @() }
 
-function Get-HandLineup($rows, $hand) {
-  foreach ($row in @($rows)) {
-    $rowHand = [string]($row.opposingPitcherHandness)
-    if ($rowHand -ne $hand) { continue }
-    $lineup = Get-LineupNames $row
-    if ($lineup.Count -eq 9) { return $lineup }
+  $names = @()
+  $links = [regex]::Matches(
+    $section.Groups['list'].Value,
+    '<a\s+[^>]*href="/baseball/player/[^\"]+"[^>]*>(?<name>[\s\S]*?)</a>',
+    [System.Text.RegularExpressions.RegexOptions]::IgnoreCase
+  )
+  foreach ($link in $links) {
+    $name = [System.Net.WebUtility]::HtmlDecode([regex]::Replace($link.Groups['name'].Value, '<[^>]+>', '')).Trim()
+    if (-not [string]::IsNullOrWhiteSpace($name)) { $names += $name }
   }
-  return @()
+  if ($names.Count -ne 9 -or ($names | Select-Object -Unique).Count -ne 9) { return @() }
+  return $names
 }
 
 $previous = @{}
@@ -47,11 +49,11 @@ if (Test-Path -LiteralPath $SourcePath) {
 $payload = [ordered]@{}
 $sources = [ordered]@{}
 foreach ($team in $teams) {
-  $url = "https://www.rotowire.com/baseball/tables/batting-order-data.php?team=$team"
+  $url = "https://www.rotowire.com/baseball/batting-orders.php?team=$team"
   try {
-    $rows = Invoke-RestMethod -Uri $url -TimeoutSec 20
-    $rhp = Get-HandLineup $rows "R"
-    $lhp = Get-HandLineup $rows "L"
+    $html = [string](Invoke-RestMethod -Uri $url -TimeoutSec 20)
+    $rhp = Get-DefaultLineup $html "RHP"
+    $lhp = Get-DefaultLineup $html "LHP"
     if ($rhp.Count -ne 9 -and $previous.ContainsKey($team)) { $rhp = @($previous[$team].RHP) }
     if ($lhp.Count -ne 9 -and $previous.ContainsKey($team)) { $lhp = @($previous[$team].LHP) }
     if ($rhp.Count -ne 9 -or $lhp.Count -ne 9) {
@@ -60,9 +62,8 @@ foreach ($team in $teams) {
     $payload[$team] = [ordered]@{ RHP = $rhp; LHP = $lhp }
     $sources[$team] = [ordered]@{
       url = $url
-      rows = @($rows).Count
-      rhp = "latest actual lineup vs RHP"
-      lhp = "latest actual lineup vs LHP"
+      rhp = "current RotoWire default vs RHP"
+      lhp = "current RotoWire default vs LHP"
     }
   } catch {
     if (-not $previous.ContainsKey($team)) { throw }
@@ -101,8 +102,8 @@ Set-Content -LiteralPath $OutputPath -Value $js -Encoding UTF8
 
 $proof = [ordered]@{
   generatedAt = $generatedAt
-  note = "Static RotoWire fallback refreshed from RotoWire batting-order table endpoint. Each hand uses the latest actual lineup against that opposing pitcher hand; previous seed preserved only if a hand could not be resolved."
-  sourcePattern = "https://www.rotowire.com/baseball/tables/batting-order-data.php?team={TEAM}"
+  note = "Static RotoWire fallback refreshed from each team's current Default vs. RHP and Default vs. LHP batting-order sections; previous seed preserved only if a hand could not be resolved."
+  sourcePattern = "https://www.rotowire.com/baseball/batting-orders.php?team={TEAM}"
   teams = $sources
 }
 Set-Content -LiteralPath $ProofPath -Value ($proof | ConvertTo-Json -Depth 6) -Encoding UTF8
