@@ -1,8 +1,8 @@
 {
   "ARI": {
     "RHP": [
-      "Corbin Carroll",
       "Geraldo Perdomo",
+      "Corbin Carroll",
       "Gabriel Moreno",
       "Ketel Marte",
       "Nolan Arenado",
@@ -37,13 +37,13 @@
     ],
     "LHP": [
       "Jacob Wilson",
+      "Tommy White",
       "Jonah Heim",
       "Tyler Soderstrom",
-      "Tommy White",
-      "Lawrence Butler",
-      "Alika Williams",
-      "Henry Bolte",
       "Max Muncy",
+      "Lawrence Butler",
+      "Henry Bolte",
+      "Alika Williams",
       "Jonathan Ornelas"
     ]
   },
@@ -79,8 +79,8 @@
       "Christian Encarnacion-Strand",
       "Jackson Holliday",
       "Coby Mayo",
-      "Colton Cowser",
       "Leody Taveras",
+      "Colton Cowser",
       "Carlos Narvaez"
     ],
     "LHP": [
@@ -151,8 +151,8 @@
       "Tyler Stephenson",
       "Eugenio Suarez",
       "Dane Myers",
-      "Noelvi Marte",
       "Hector Rodriguez",
+      "Noelvi Marte",
       "Matt McLain"
     ],
     "LHP": [
@@ -228,11 +228,11 @@
       "Drew Romo"
     ],
     "LHP": [
-      "Randal Grichuk",
+      "Chase Meidroth",
       "Munetaka Murakami",
       "Miguel Vargas",
+      "Randal Grichuk",
       "Colson Montgomery",
-      "Chase Meidroth",
       "Brenton Doyle",
       "Braden Montgomery",
       "Edgar Quero",
@@ -313,15 +313,15 @@
   },
   "LAA": {
     "RHP": [
-      "Zach Neto",
+      "Wade Meckler",
       "Mike Trout",
       "Nolan Schanuel",
+      "Zach Neto",
       "Vaughn Grissom",
       "Moises Ballesteros",
       "Denzer Guzman",
       "Josh Lowe",
-      "Travis d'Arnaud",
-      "Wade Meckler"
+      "Travis d'Arnaud"
     ],
     "LHP": [
       "Zach Neto",
@@ -342,16 +342,16 @@
       "Freddie Freeman",
       "Max Muncy",
       "Mookie Betts",
-      "Tommy Edman",
       "Kyle Tucker",
       "Teoscar Hernandez",
+      "Tommy Edman",
       "Ben Rortvedt"
     ],
     "LHP": [
       "Shohei Ohtani",
       "Andy Pages",
-      "Tommy Edman",
       "Freddie Freeman",
+      "Tommy Edman",
       "Mookie Betts",
       "Kyle Tucker",
       "Teoscar Hernandez",
@@ -374,12 +374,12 @@
     "LHP": [
       "Otto Lopez",
       "Heriberto Hernandez",
-      "Xavier Edwards",
-      "Kyle Stowers",
       "Agustin Ramirez",
+      "Xavier Edwards",
+      "Leo Jimenez",
+      "Kyle Stowers",
       "Javier Sanoja",
       "Esteury Ruiz",
-      "Jakob Marsee",
       "Joe Mack"
     ]
   },
@@ -417,7 +417,7 @@
       "Brooks Lee",
       "Alan Roden",
       "Luke Keaschall",
-      "Ryan Kreidler"
+      "Kaelen Culpepper"
     ],
     "LHP": [
       "Austin Martin",
@@ -428,7 +428,7 @@
       "Victor Caratini",
       "Luke Keaschall",
       "Brooks Lee",
-      "Ryan Kreidler"
+      "Kaelen Culpepper"
     ]
   },
   "NYM": {
@@ -449,8 +449,8 @@
       "Bo Bichette",
       "Luis Robert",
       "Francisco Alvarez",
-      "Marcus Semien",
       "Carson Benge",
+      "Marcus Semien",
       "Eric Wagaman",
       "Luis Torrens"
     ]
@@ -460,8 +460,8 @@
       "Trent Grisham",
       "Ben Rice",
       "Luis Garcia",
-      "Spencer Jones",
       "Heliot Ramos",
+      "Spencer Jones",
       "Jazz Chisholm",
       "Ryan McMahon",
       "George Lombard",
@@ -713,9 +713,9 @@
       "Brady House",
       "CJ Abrams",
       "Harry Ford",
-      "Jacob Young",
-      "Daylen Lile",
       "Andrew Pinckney",
+      "Daylen Lile",
+      "Jacob Young",
       "Nasim Nunez"
     ]
   }
