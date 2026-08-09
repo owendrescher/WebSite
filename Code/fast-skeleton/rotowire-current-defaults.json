@@ -73,13 +73,13 @@
   },
   "BAL": {
     "RHP": [
-      "Dylan Beavers",
-      "Pete Alonso",
       "Gunnar Henderson",
-      "Christian Encarnacion-Strand",
+      "Pete Alonso",
       "Jackson Holliday",
-      "Coby Mayo",
+      "Tyler O'Neill",
+      "Dylan Beavers",
       "Leody Taveras",
+      "Christian Encarnacion-Strand",
       "Colton Cowser",
       "Carlos Narvaez"
     ],
@@ -128,8 +128,8 @@
       "Ian Happ",
       "Nico Hoerner",
       "Carson Kelly",
-      "Pedro Ramirez",
-      "Dansby Swanson"
+      "Dansby Swanson",
+      "Tyrone Taylor"
     ],
     "LHP": [
       "Pete Crow-Armstrong",
@@ -195,12 +195,12 @@
     "RHP": [
       "Jake McCarthy",
       "Cole Carrigg",
-      "Mickey Moniak",
-      "Hunter Goodman",
       "TJ Rumfield",
+      "Hunter Goodman",
+      "Mickey Moniak",
       "Kyle Karros",
       "Willi Castro",
-      "Troy Johnston",
+      "Jordan Beck",
       "Ezequiel Tovar"
     ],
     "LHP": [
@@ -305,10 +305,10 @@
       "Jac Caglianone",
       "Salvador Perez",
       "Starling Marte",
-      "Isaac Collins",
-      "Kyle Isbel",
       "Nick Loftin",
-      "Tyler Tolbert"
+      "Isaac Collins",
+      "Tyler Tolbert",
+      "Kyle Isbel"
     ]
   },
   "LAA": {
@@ -602,9 +602,9 @@
   "STL": {
     "RHP": [
       "JJ Wetherholt",
-      "Jordan Walker",
-      "Alec Burleson",
       "Ivan Herrera",
+      "Alec Burleson",
+      "Jordan Walker",
       "Jimmy Crooks",
       "Masyn Winn",
       "Nathan Church",
