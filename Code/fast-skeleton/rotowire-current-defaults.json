@@ -25,26 +25,26 @@
   },
   "ATH": {
     "RHP": [
-      "Lawrence Butler",
-      "Jacob Wilson",
-      "Tyler Soderstrom",
-      "Jonah Heim",
       "Jeff McNeil",
-      "Tommy White",
-      "Donovan Walton",
+      "Tyler Soderstrom",
+      "Jacob Wilson",
       "Carlos Cortes",
-      "Henry Bolte"
+      "Lawrence Butler",
+      "Jonah Heim",
+      "Henry Bolte",
+      "Donovan Walton",
+      "Zack Gelof"
     ],
     "LHP": [
-      "Henry Bolte",
+      "Zack Gelof",
       "Jacob Wilson",
       "Jonah Heim",
       "Tyler Soderstrom",
       "Tommy White",
-      "Brian Serven",
+      "Henry Bolte",
       "Lawrence Butler",
-      "Max Muncy",
-      "Jonathan Ornelas"
+      "Brian Serven",
+      "Alika Williams"
     ]
   },
   "ATL": {
@@ -101,22 +101,22 @@
       "Ceddanne Rafaela",
       "Wilyer Abreu",
       "Willson Contreras",
+      "Adley Rutschman",
       "Masataka Yoshida",
       "Caleb Durbin",
-      "Andruw Monasterio",
       "Jarren Duran",
-      "Connor Wong"
+      "Andruw Monasterio"
     ],
     "LHP": [
       "Jahmai Jones",
-      "Caleb Durbin",
+      "Ceddanne Rafaela",
       "Willson Contreras",
       "Wilyer Abreu",
-      "Ceddanne Rafaela",
-      "Nick Sogard",
+      "Adley Rutschman",
+      "Caleb Durbin",
       "Andruw Monasterio",
       "Eli White",
-      "Jake Rogers"
+      "Nick Sogard"
     ]
   },
   "CHC": {
