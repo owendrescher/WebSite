@@ -4109,6 +4109,12 @@ function playerHeadshotUrl(playerId) {
   return `https://img.mlbstatic.com/mlb-photos/image/upload/v1/people/${id}/headshot/67/current`;
 }
 
+function playerTrackerHeadshotUrl(playerId) {
+  const id = Number(playerId);
+  if (!Number.isFinite(id)) return 'placeholder.png';
+  return `https://img.mlbstatic.com/mlb-photos/image/upload/w_64,h_64,c_fill,g_face,q_auto:eco,f_auto/v1/people/${id}/headshot/67/current`;
+}
+
 function statCardBadgeDataUri(teamAbbrev = 'MLB', teamColor = '#224b7a') {
   const safe = encodeURIComponent(displayTeamAbbrev(teamAbbrev).slice(0, 4));
   const color = String(teamColor || '#224b7a').replace(/"/g, '');
@@ -22008,14 +22014,17 @@ function lineupPitcherMarkerClusterHtml(pitcher = null, contextGame = null) {
 function lineupPitcherNameHtml(pitcher, contextGame = null) {
   const fullName = pitcher?.fullName || pitcher?.name || 'Unknown';
   const id = pitcher?.id || pitcher?.person?.id || pitcher?.playerId || '';
+  const hand = handednessCode(pitcherThrowHandValue(pitcher));
   const homeRunCards = pitcherLastStartHrMarkerHtml(id);
   const fingerprint = [
     id,
     fullName,
+    hand,
   ].join('~');
   return `
     <span class="pitcher-identity-row" data-pitcher-identity-row="1" data-pitcher-id="${escapeHtml(String(id))}" data-pitcher-identity-fingerprint="${escapeHtml(fingerprint)}">
       <span class="pitcher-name-text pitcher-identity-name">${escapeHtml(lastName(fullName) || fullName)}</span>
+      <span class="pitcher-identity-hand">${handednessHtml(hand)}</span>
       <span class="pitcher-identity-markers" aria-label="Recent home runs allowed">${homeRunCards}</span>
     </span>
   `;
@@ -24141,7 +24150,7 @@ function renderPlayerTrackerList(games = latestRenderedGames) {
     el.style.setProperty('--tracker-team-rgb', hexToRgb(teamColor));
     el.innerHTML = `
       <button class="player-track-drag" type="button" draggable="false" data-player-track-drag="${playerId}" aria-label="Hold and drag to reorder tracked player">||</button>
-      <img class="player-track-face" draggable="false" src="${playerHeadshotUrl(playerId)}" alt="${escapeHtml(playerName)} headshot" />
+      <img class="player-track-face" draggable="false" src="${playerTrackerHeadshotUrl(playerId)}" alt="${escapeHtml(playerName)} headshot" width="46" height="46" loading="lazy" decoding="async" />
       <div class="player-track-copy">
         <div class="player-track-compact-line"><strong>${escapeHtml(lastName(playerName))}</strong><span>${escapeHtml(todayLine)}</span></div>
         <div class="player-track-name-row"><strong>${escapeHtml(playerName)}</strong>${opponentPitcherHtml}</div>
@@ -39316,7 +39325,7 @@ function renderLineupPitcherSummary(containerEl, color, staff, game = null) {
     </span>
     ${detailLine}
   `;
-  const fingerprint = JSON.stringify([renderDate, displayPitcherForRender?.id || '', displayPitcherForRender?.fullName || displayPitcherForRender?.name || '', displayPitcherForRender?.isTbdFallbackStarter ? 'tbd-fallback' : '', pitcherHighVeloFingerprint(displayPitcherForRender), label, metaLine, detailLine, color || '']);
+  const fingerprint = JSON.stringify([renderDate, displayPitcherForRender?.id || '', displayPitcherForRender?.fullName || displayPitcherForRender?.name || '', handednessCode(pitcherThrowHandValue(displayPitcherForRender)), displayPitcherForRender?.isTbdFallbackStarter ? 'tbd-fallback' : '', pitcherHighVeloFingerprint(displayPitcherForRender), label, metaLine, detailLine, color || '']);
   if (containerEl.dataset.renderFingerprint === fingerprint) return;
   containerEl.dataset.renderFingerprint = fingerprint;
   containerEl.innerHTML = html;
