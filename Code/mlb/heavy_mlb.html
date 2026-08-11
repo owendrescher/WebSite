@@ -21,6 +21,128 @@
     <link rel="stylesheet" href="styles.css?v=20260713tooltipWrap1" />
     <link rel="stylesheet" href="dashboard.css?v=20260711bullpen14d1" />
     <link rel="stylesheet" href="live-prototype.css?v=20260727overallRecent18" />
+    <style>
+      @media (hover: none), (pointer: coarse), (max-width: 760px) {
+        body.dashboard-page .scoreboard { min-height: 132px !important; }
+        body.dashboard-page .score-row { min-height: 66px !important; box-sizing: border-box !important; }
+        body.dashboard-page .away-row { padding-bottom: 14px !important; }
+        body.dashboard-page .home-row { padding-top: 14px !important; }
+        body.dashboard-page .team-left,
+        body.dashboard-page[data-overlay-dock='top'] .team-left,
+        body.dashboard-page[data-overlay-dock='bottom'] .team-left,
+        body.dashboard-page .game-card.is-focused .team-left { grid-template-columns: 34px 48px minmax(0, 1fr) !important; }
+        body.dashboard-page .team-logo-stack { grid-row: 1 / 3 !important; }
+        body.dashboard-page .team-id { display: contents !important; }
+        body.dashboard-page .team { grid-column: 2 !important; grid-row: 1 !important; }
+        body.dashboard-page .meta-block { grid-column: 3 !important; grid-row: 1 !important; }
+        body.dashboard-page .team-record-line,
+        body.dashboard-page .team-record {
+          grid-column: 2 / 4 !important;
+          grid-row: 2 !important;
+          width: 100% !important;
+          max-width: 100% !important;
+          white-space: normal !important;
+          overflow: visible !important;
+          text-overflow: clip !important;
+        }
+        body.dashboard-page .team-logo-stack { grid-template-rows: 30px 10px !important; gap: 1px !important; }
+        body.dashboard-page .team-logo,
+        body.dashboard-page .game-card.is-focused .team-logo { width: 30px !important; height: 30px !important; }
+        body.dashboard-page .lineup-team-pitcher-name .pitcher-identity-row { display: flex !important; min-width: 0 !important; width: 100% !important; }
+        body.dashboard-page .lineup-team-pitcher-name .pitcher-identity-name { flex: 0 0 auto !important; min-width: max-content !important; white-space: nowrap !important; }
+        body.dashboard-page .lineup-team-pitcher-name .pitcher-identity-markers { display: inline-flex !important; }
+        body.dashboard-page .lineup-matchup-strip { grid-template-columns: minmax(0, 1fr) !important; gap: 8px !important; }
+        body.dashboard-page .lineup-matchup-strip .lineup-team-header,
+        body.dashboard-page .lineup-matchup-strip .lineup-team-header-home {
+          display: grid !important;
+          grid-template-columns: 34px minmax(0, 1fr) !important;
+          grid-template-areas: 'logo details' !important;
+          justify-content: stretch !important;
+          text-align: left !important;
+          gap: 8px !important;
+        }
+        body.dashboard-page .lineup-matchup-strip .lineup-logo { grid-area: logo !important; order: 0 !important; }
+        body.dashboard-page .lineup-matchup-strip .lineup-team-lines { grid-area: details !important; width: 100% !important; justify-items: start !important; }
+        body.dashboard-page .lineup-matchup-strip .lineup-team-info-line { flex-wrap: wrap !important; row-gap: 3px !important; }
+        body.dashboard-page .lineup-matchup-strip .lineup-team-last7 {
+          max-width: 100% !important;
+          min-width: 0 !important;
+          white-space: normal !important;
+          overflow: visible !important;
+          text-overflow: clip !important;
+        }
+      }
+    </style>
+    <style>
+      .game-card .scoreboard {
+        border-color: color-mix(in srgb, var(--away-secondary, var(--line)) 12%, var(--home-secondary, var(--line)) 12%, var(--line));
+      }
+      .game-card .away-row, .game-card .home-row { box-shadow: none; }
+      .game-card .away-logo { outline: 1px solid color-mix(in srgb, var(--away-secondary, transparent) 34%, transparent); }
+      .game-card .home-logo { outline: 1px solid color-mix(in srgb, var(--home-secondary, transparent) 34%, transparent); }
+      .game-card .score-state-strip {
+        border-color: color-mix(in srgb, var(--away-secondary, var(--line)) 16%, var(--home-secondary, var(--line)) 16%, var(--line));
+      }
+      #lineupOverlay .lineup-logo-pick-trigger:not(.is-pick-selected):not(.is-game-pick-leading):not(.is-game-pick-trailing):not(.is-game-pick-hit):not(.is-game-pick-miss) { outline:none!important; box-shadow:none; }
+      #lineupOverlay .away-lineup-logo:is(.is-pick-selected,.is-game-pick-leading,.is-game-pick-trailing,.is-game-pick-hit,.is-game-pick-miss) { outline:2px solid color-mix(in srgb,var(--away-secondary) 72%,transparent); }
+      #lineupOverlay .home-lineup-logo:is(.is-pick-selected,.is-game-pick-leading,.is-game-pick-trailing,.is-game-pick-hit,.is-game-pick-miss) { outline:2px solid color-mix(in srgb,var(--home-secondary) 72%,transparent); }
+      #lineupOverlay .lineup-series-game { border-color:color-mix(in srgb,var(--series-outline) 82%,#dcecff 18%); background:linear-gradient(180deg,color-mix(in srgb,var(--series-fill) 34%,#071724 66%),color-mix(in srgb,var(--series-fill) 18%,#07111c 82%)); }
+      #lineupOverlay .lineup-series-pitcher { border-color:color-mix(in srgb,var(--series-pitcher) 58%,#dcecff 42%); background:linear-gradient(180deg,color-mix(in srgb,var(--series-pitcher) 25%,#132638 75%),color-mix(in srgb,var(--series-pitcher) 12%,#07111c 88%)); }
+      #lineupOverlay .away-lineup-pitcher { border-left-color: var(--away-tertiary, var(--line)); }
+      #lineupOverlay .home-lineup-pitcher { border-left-color: var(--home-tertiary, var(--line)); }
+      #lineupOverlay .away-lineup { border-top: 2px solid color-mix(in srgb, var(--away-secondary) 62%, transparent); }
+      #lineupOverlay .home-lineup { border-top: 2px solid color-mix(in srgb, var(--home-secondary) 62%, transparent); }
+      #lineupOverlay .away-lineup .lineup-list li:nth-child(3n+1) { border-left-color: color-mix(in srgb, var(--away-tertiary) 58%, var(--line)); }
+      #lineupOverlay .home-lineup .lineup-list li:nth-child(3n+1) { border-left-color: color-mix(in srgb, var(--home-tertiary) 58%, var(--line)); }
+      #lineupOverlay .away-lineup-streak, #lineupOverlay .away-lineup-team { text-shadow: 0 0 10px color-mix(in srgb, var(--away-secondary) 40%, transparent); }
+      #lineupOverlay .home-lineup-streak, #lineupOverlay .home-lineup-team { text-shadow: 0 0 10px color-mix(in srgb, var(--home-secondary) 40%, transparent); }
+      #lineupOverlay .away-lineup .lineup-name, #lineupOverlay .away-lineup-pitcher .lineup-team-pitcher-name { color:var(--away-color)!important; }
+      #lineupOverlay .home-lineup .lineup-name, #lineupOverlay .home-lineup-pitcher .lineup-team-pitcher-name { color:var(--home-color)!important; }
+      body.dashboard-page .lineup-team-pitcher-name .pitcher-identity-row { min-width:0!important; width:auto!important; max-width:100%!important; }
+      body.dashboard-page .lineup-team-pitcher-name .pitcher-identity-name { flex:0 1 auto!important; min-width:0!important; max-width:none!important; overflow:visible!important; text-overflow:clip!important; white-space:nowrap!important; font-size:clamp(.62rem,.78vw,.88rem)!important; }
+      .lineup-series-pitcher-tooltip { min-width:max-content; max-width:min(92vw,520px); padding:3px 0; }
+      .lineup-series-pitcher-tooltip > .lineup-series-pitcher-line { display:block; padding:5px 9px; color:#f5fbff; font:850 .62rem/1.2 var(--font-ui); white-space:nowrap; }
+      .lineup-team-last7 { cursor:help; }
+      .lineup-l7-tooltip { display:grid; grid-template-columns:repeat(5,minmax(96px,1fr)); grid-auto-rows:minmax(0,auto); gap:5px; width:min(94vw,540px); max-height:min(78vh,390px); overflow-x:hidden; overflow-y:auto; padding:5px; border-top:2px solid var(--l7-team); }
+      .lineup-l7-game { display:grid; grid-template-rows:40px auto auto auto; justify-items:center; gap:3px; min-width:0; padding:4px; border:1px solid color-mix(in srgb,var(--l7-primary) 72%,var(--l7-tertiary) 28%); border-radius:7px; background:linear-gradient(180deg,color-mix(in srgb,var(--l7-secondary) 24%,#0a1a27 76%),#07111b); }
+      .lineup-l7-game:nth-child(n+16) { display:none; }
+      .lineup-l7-logo-wrap { position:relative; display:grid; place-items:center; width:40px; height:40px; }
+      .lineup-l7-logo-wrap img { width:36px; height:36px; object-fit:contain; filter:drop-shadow(0 1px 2px #000); }
+      .lineup-l7-logo-wrap b { position:absolute; right:-2px; bottom:-1px; display:grid; place-items:center; width:17px; height:17px; border:1px solid rgba(255,255,255,.78); border-radius:50%; color:#fff; font:1000 .58rem/1 var(--font-ui); text-shadow:0 1px 1px #000; }
+      .lineup-l7-logo-wrap b.is-win { background:#16864b; }
+      .lineup-l7-logo-wrap b.is-loss { background:#c33143; }
+      .lineup-l7-score { width:100%; padding-top:3px; border-top:1px solid color-mix(in srgb,var(--l7-secondary) 45%,transparent); color:#f5fbff; font:950 .58rem/1 var(--font-ui); text-align:center; }
+      .lineup-l7-starter { color:color-mix(in srgb,var(--l7-secondary) 52%,#fff 48%); font:900 .51rem/1.08 var(--font-ui); text-align:center; }
+      .lineup-l7-game small { width:100%; padding-top:3px; border-top:1px solid color-mix(in srgb,var(--l7-secondary) 28%,transparent); color:color-mix(in srgb,var(--l7-tertiary) 46%,#fff 54%); font:800 .45rem/1.15 var(--font-ui); text-align:center; overflow-wrap:anywhere; }
+      .lineup-l7-loading,.lineup-l7-empty { padding:7px 9px; color:var(--muted); font:800 .58rem var(--font-ui); }
+      @media(max-width:600px){.lineup-l7-tooltip{grid-template-columns:repeat(2,minmax(108px,1fr));width:min(92vw,270px)}}
+      .game-card .away, .game-card .away-record, #lineupOverlay .away-lineup-team, #lineupOverlay .away-lineup .lineup-name, #lineupOverlay .away-lineup-pitcher { -webkit-text-stroke:0; text-shadow:0 1px 2px rgba(0,0,0,.9); }
+      .game-card .home, .game-card .home-record, #lineupOverlay .home-lineup-team, #lineupOverlay .home-lineup .lineup-name, #lineupOverlay .home-lineup-pitcher { -webkit-text-stroke:0; text-shadow:0 1px 2px rgba(0,0,0,.9); }
+      #playerStatName { -webkit-text-stroke:0; text-shadow:0 1px 2px rgba(0,0,0,.9); }
+    </style>
+    <style>
+      .player-stat-modal { border-color: color-mix(in srgb, var(--player-team-secondary, var(--line)) 38%, var(--line)); }
+      .player-stat-header { box-shadow: inset 0 -2px 0 color-mix(in srgb, var(--player-team-tertiary, transparent) 58%, transparent); }
+      .player-stat-tab.active { border-color: color-mix(in srgb, var(--player-team-secondary, var(--accent)) 68%, var(--line)); }
+      .player-stat-headshot { outline: 2px solid color-mix(in srgb, var(--player-team-secondary, transparent) 62%, transparent); }
+      .player-stat-headshot-wrap { position:relative; width:100%; min-width:0; }
+      .player-stat-headshot-wrap .player-stat-headshot { display:block; width:100%; }
+      .player-stat-jersey { position:absolute; left:8px; bottom:7px; display:block; padding:0; border:0; background:transparent; color:var(--player-team-text,#f5f8ff); font:900 italic 1.72rem/.9 Impact,Haettenschweiler,"Arial Narrow Bold",sans-serif; letter-spacing:.015em; -webkit-text-stroke:2px var(--player-team-primary,#07111b); paint-order:stroke fill; text-shadow:0 2px 2px rgba(0,0,0,.75),0 0 7px color-mix(in srgb,var(--player-team-secondary) 45%,transparent); box-shadow:none; }
+      .player-stat-jersey[hidden] { display:none; }
+      .savant-matchup-arsenal { width:min(100%,320px); padding:3px; border:1px solid color-mix(in srgb, var(--player-team-secondary, var(--line)) 42%, var(--line)); border-radius:6px; background:color-mix(in srgb, var(--panel-item) 82%, transparent); }
+      .savant-arsenal-head { display:flex; align-items:center; justify-content:space-between; gap:3px; margin-bottom:2px; font:900 .5rem/1 var(--font-ui); letter-spacing:.04em; }
+      .savant-arsenal-head span { color:var(--muted); font-size:.37rem; }
+      .savant-arsenal-grid { display:grid; gap:2px; }
+      .savant-arsenal-column-head, .savant-arsenal-pitch { display:grid; grid-template-columns:34px 54px 51px 51px 22px 25px; gap:2px; align-items:center; }
+      .savant-arsenal-column-head { padding:0 3px; color:var(--muted); font:800 .36rem/1 var(--font-ui); text-transform:uppercase; }
+      .savant-arsenal-pitch { padding:2px 3px; min-height:22px; border:1px solid rgba(var(--arsenal-rgb),calc(.18 + var(--arsenal-strength) * .5)); border-radius:4px; background:linear-gradient(90deg,rgba(var(--arsenal-rgb),calc(.04 + var(--arsenal-strength) * .30)),rgba(var(--arsenal-rgb),.03)); }
+      .savant-arsenal-pitch strong { display:block; font:900 .57rem/1 var(--font-ui); }
+      .savant-arsenal-pitch span { display:block; margin-top:1px; color:var(--muted); font:700 .34rem/1 var(--font-ui); }
+      .savant-arsenal-pitch-name { cursor:help; }
+      .savant-arsenal-pitch-name strong { color:rgb(var(--arsenal-rgb)); font-size:.63rem; }
+      .savant-arsenal-empty { min-height:44px; display:grid; place-items:center; color:var(--muted); font:800 .5rem var(--font-ui); }
+      @media(max-width:600px){.savant-matchup-arsenal{width:min(100%,320px)}.savant-arsenal-column-head,.savant-arsenal-pitch{grid-template-columns:34px 54px 51px 51px 22px 25px}}
+    </style>
   </head>
   <body class="dashboard-page" data-dashboard-page="scoreboard">
 
@@ -493,7 +615,7 @@
               </header>
               <div class="player-stat-body">
                 <section class="player-stat-left">
-                  <img id="playerStatHeadshot" class="player-stat-headshot" src="placeholder.png" alt="Player headshot" />
+                  <div class="player-stat-headshot-wrap"><img id="playerStatHeadshot" class="player-stat-headshot" src="placeholder.png" alt="Player headshot" /><span id="playerStatJersey" class="player-stat-jersey" hidden></span></div>
                   <div id="playerStatBio" class="player-stat-bio"></div>
                   <div id="playerStatToday" class="player-stat-block"></div>
                 </section>
@@ -704,9 +826,10 @@
       };
     </script>
     <script src="../shared/owentools-sync.js?v=20260721durableSession1"></script>
-    <script src="rotowire-default-lineups.js?v=20260727rotowireCurrent3"></script>
+    <script src="rotowire-default-lineups.js?v=20260811rotowire"></script>
     <script src="mlb-contracts-data.js?v=20260708liveSearchFix1"></script>
     <script>window.MLB_DASHBOARD_BUILD_ID="20260711-tooltip-cleanup2";</script>
-    <script src="live-dashboard-prototype.js?v=20260727overallRecent18"></script>
+    <script src="../mlb/data/savant/savant_aggregates_2026.js?v=20260811hand1"></script>
+    <script src="../mlb/live-dashboard-prototype.js?v=20260811jerseyNumber15"></script>
   </body>
 </html>

@@ -16,6 +16,96 @@
   --display: "Bahnschrift SemiCondensed", "Arial Narrow", "Segoe UI", sans-serif;
 }
 
+/* Coverage lab */
+.matchup-toolbar, .coverage-actions { display:flex; flex-wrap:wrap; gap:10px; align-items:center; }
+.matchup-toolbar label { display:grid; gap:4px; color:var(--muted); font-size:.74rem; text-transform:uppercase; letter-spacing:.08em; }
+.matchup-summary { display:grid; grid-template-columns:repeat(4,minmax(0,1fr)); gap:10px; margin:0 0 14px; }
+.matchup-summary span { padding:12px; border:1px solid var(--line); border-radius:10px; background:rgba(6,18,31,.72); color:var(--muted); }
+.matchup-summary b { display:block; color:var(--text); font-size:1.35rem; }
+.coverage-board { display:grid; gap:16px; }
+.projected-grid { display:grid; grid-template-columns:repeat(2,minmax(0,1fr)); gap:14px; }
+.coverage-side, .coverage-history, .coverage-data-card { border:1px solid var(--line); border-radius:12px; background:rgba(5,16,28,.82); padding:14px; }
+.coverage-side > header, .coverage-history > header, .coverage-data-card > header { display:flex; justify-content:space-between; gap:10px; align-items:center; margin-bottom:10px; }
+.status-pill { border:1px solid currentColor; border-radius:999px; padding:3px 7px; font-size:.68rem; text-transform:uppercase; letter-spacing:.06em; white-space:nowrap; }
+.status-pill.projected { color:#f7c96b; }
+.status-pill.verified { color:#74e0b2; }
+.source-note { color:var(--muted); font-size:.78rem; line-height:1.45; }
+.alignment-list { display:grid; gap:7px; }
+.alignment-row { display:grid; grid-template-columns:minmax(0,1fr) 28px minmax(0,1fr); align-items:center; padding:9px; border:1px solid rgba(151,183,211,.16); border-radius:8px; }
+.alignment-row > b { text-align:center; color:var(--muted); font-size:.7rem; text-transform:uppercase; }
+.alignment-row div { display:grid; gap:2px; }
+.alignment-row div:last-child { text-align:right; }
+.alignment-row span, .coverage-table small { display:block; color:var(--muted); font-size:.68rem; text-transform:uppercase; }
+.coverage-history { overflow:hidden; }
+.coverage-table th:not(:first-child), .coverage-table td:not(:first-child) { text-align:right; }
+.coverage-table td:nth-child(2), .coverage-table th:nth-child(2), .coverage-table td:nth-child(3), .coverage-table th:nth-child(3) { text-align:left; }
+.coverage-data-card { margin-top:16px; }
+.file-button { display:inline-flex; cursor:pointer; border-radius:8px; padding:8px 12px; background:var(--accent); color:#04101b; font-weight:700; }
+.file-button input { position:absolute; width:1px; height:1px; opacity:0; }
+.soft-btn.danger { color:#ff9a9a; }
+.matchup-source-strip { padding:9px 12px; border-left:3px solid var(--accent); background:rgba(98,215,255,.08); color:var(--muted); font-size:.76rem; }
+.position-label { display:inline-flex !important; width:max-content; min-width:31px; justify-content:center; padding:2px 5px; border:1px solid rgba(98,215,255,.48); border-radius:4px; color:#86e5ff !important; background:rgba(98,215,255,.1); font-weight:900; }
+.player-name-button { appearance:none; border:0; padding:0; background:transparent; color:inherit; font:inherit; font-weight:inherit; text-align:left; text-decoration:none; cursor:pointer; }
+.player-name-button:hover, .player-name-button:focus-visible { color:var(--accent); text-decoration:underline; text-underline-offset:3px; }
+.coverage-side { position:relative; isolation:isolate; overflow:hidden; border-top:3px solid var(--offense-color,var(--accent)); background:linear-gradient(115deg,color-mix(in srgb,var(--offense-color,var(--accent)) 13%,#05101c 87%),color-mix(in srgb,var(--defense-color,var(--accent)) 10%,#05101c 90%)); }
+.coverage-side::before, .coverage-side::after { content:""; position:absolute; z-index:-1; inset:auto; width:150px; height:150px; background:var(--offense-logo) center/contain no-repeat; opacity:.075; filter:grayscale(.15); }
+.coverage-side::before { left:-30px; bottom:-45px; }
+.coverage-side::after { right:-30px; top:-35px; background-image:var(--defense-logo); }
+.depth-team { position:relative; isolation:isolate; overflow:hidden; background:linear-gradient(100deg,color-mix(in srgb,var(--team-accent) 12%,#06111e 88%),#04101a); }
+.depth-team::after { content:""; position:absolute; z-index:-1; right:-35px; bottom:-55px; width:220px; height:220px; background:var(--depth-logo) center/contain no-repeat; opacity:.07; }
+.alignment-row small { color:var(--warn); font-size:.65rem; }
+
+.player-dialog { width:min(920px,94vw); max-height:90vh; padding:0; border:1px solid var(--line2); border-radius:14px; background:#06111e; color:var(--text); overflow:auto; }
+.player-dialog::backdrop { background:rgba(0,4,9,.8); backdrop-filter:blur(5px); }
+.nfl-player-card { position:relative; min-height:360px; background:radial-gradient(circle at 88% 12%,color-mix(in srgb,var(--player-team) 30%,transparent),transparent 34%),linear-gradient(145deg,color-mix(in srgb,var(--player-team) 13%,#071522 87%),#030a12); }
+.nfl-player-card::after { content:""; position:absolute; right:3%; top:8%; width:280px; height:280px; background:var(--player-logo) center/contain no-repeat; opacity:.06; pointer-events:none; }
+.player-card-close { position:absolute; z-index:3; right:12px; top:12px; width:38px; height:38px; border:1px solid var(--line2); border-radius:50%; background:#071522; color:#fff; font-size:1.4rem; }
+.player-nav-arrow, .dialog-nav-arrow { border:1px solid var(--line2); background:color-mix(in srgb,var(--player-team,var(--accent)) 20%,#071522); color:#fff; font-size:1.7rem; font-weight:900; }
+.player-nav-arrow { position:absolute; z-index:3; top:50%; width:42px; height:64px; border-radius:8px; transform:translateY(-50%); }
+.player-nav-prev { left:8px; } .player-nav-next { right:8px; }
+.player-nav-arrow:disabled, .dialog-nav-arrow:disabled { opacity:.25; cursor:default; }
+.dialog-nav-arrow { width:38px; height:44px; border-radius:7px; }
+.string-rank { display:block; margin-top:3px; color:var(--warn); font-size:.55rem; font-weight:900; text-transform:uppercase; }
+.nfl-player-card-head { position:relative; z-index:1; display:flex; align-items:center; gap:18px; padding:22px; border-bottom:3px solid var(--player-team); }
+.nfl-player-card-head h2 { margin:3px 0; font-size:2rem; }
+.nfl-player-card-head span { color:color-mix(in srgb,var(--player-team) 55%,white 45%); font-weight:900; text-transform:uppercase; letter-spacing:.08em; }
+.nfl-player-card-head p { margin:0; color:var(--muted); }
+.player-card-portrait-wrap { position:relative; width:116px; height:116px; flex:0 0 auto; }
+.player-card-portrait { width:100%; height:100%; object-fit:contain; border-radius:12px; background:rgba(255,255,255,.04); }
+.player-card-logo { position:absolute; right:-9px; bottom:-6px; z-index:2; width:42px; height:42px; object-fit:contain; filter:drop-shadow(0 3px 5px #000); }
+.nfl-player-card-content { position:relative; z-index:1; display:grid; gap:13px; padding:18px; }
+.player-card-stat-group { border:1px solid var(--line); border-radius:10px; background:rgba(3,12,21,.78); overflow:hidden; }
+.player-card-stat-group > header { display:flex; justify-content:space-between; padding:9px 12px; background:color-mix(in srgb,var(--player-team) 18%,transparent); }
+.player-card-stat-grid { display:grid; grid-template-columns:repeat(6,minmax(0,1fr)); }
+.player-card-stat-grid div { display:grid; gap:2px; padding:10px; border-right:1px solid var(--line); border-top:1px solid var(--line); }
+.player-card-stat-grid span { color:var(--muted); font-size:.68rem; font-weight:800; }
+.player-card-stat-grid b { font-size:1.2rem; }
+.player-card-stat-grid small { color:var(--muted); font-size:.58rem; }
+
+.date-picker-popover { position:fixed; z-index:10000; padding:10px; border:1px solid var(--line2); border-radius:9px; background:linear-gradient(180deg,rgba(255,255,255,.055),transparent 36%),#071522; color:var(--text); box-shadow:0 18px 38px rgba(0,0,0,.55); }
+.date-picker-head { display:grid; grid-template-columns:34px 34px minmax(0,1fr) 34px 34px; align-items:center; gap:6px; margin-bottom:8px; }
+.date-picker-head strong { text-align:center; white-space:nowrap; }
+.date-picker-head button, .date-picker-actions button, .date-picker-day { border:1px solid var(--line); border-radius:6px; background:#0d2035; color:var(--text); cursor:pointer; }
+.date-picker-head button { width:34px; height:30px; font-size:1.1rem; }
+.date-picker-weekdays, .date-picker-grid { display:grid; grid-template-columns:repeat(7,1fr); gap:4px; }
+.date-picker-weekdays { margin-bottom:5px; color:var(--muted); font-size:.58rem; font-weight:800; text-align:center; text-transform:uppercase; }
+.date-picker-day { min-height:34px; padding:0; font-weight:800; }
+.date-picker-day.muted { opacity:.42; }
+.date-picker-day.today { outline:1px solid var(--accent); outline-offset:1px; }
+.date-picker-day.selected-week { border-color:#8edfff; background:linear-gradient(180deg,rgba(98,215,255,.28),rgba(98,215,255,.12)); color:#fff; }
+.date-picker-day.week-start { border-left:3px solid #fff; }
+.date-picker-day.week-end { border-right:3px solid #fff; }
+.date-picker-legend { margin-top:8px; color:var(--muted); font-size:.68rem; text-align:center; }
+.date-picker-actions { display:flex; gap:8px; margin-top:9px; }
+.date-picker-actions button { flex:1; min-height:30px; }
+
+@media (max-width: 850px) {
+  .projected-grid { grid-template-columns:1fr; }
+  .matchup-summary { grid-template-columns:repeat(2,minmax(0,1fr)); }
+  .player-card-stat-grid { grid-template-columns:repeat(3,minmax(0,1fr)); }
+  .nfl-player-card-head { align-items:flex-end; }
+}
+
 * {
   box-sizing: border-box;
 }
@@ -1158,6 +1248,40 @@ button {
   .rail {
     grid-template-rows: auto auto auto;
   }
+}
+
+.player-tier-summary { display:flex; align-items:center; flex-wrap:wrap; gap:8px; margin-top:12px; }
+.player-tier-summary small { flex-basis:100%; color:var(--muted); }
+.player-tier, .inline-tier { display:inline-flex; align-items:center; border:1px solid currentColor; border-radius:999px; padding:2px 7px; font-size:.7rem; font-weight:900; letter-spacing:.08em; text-transform:uppercase; }
+.tier-elite { color:#56f0b5; background:rgba(21,154,105,.13); }
+.tier-mid { color:#ffd166; background:rgba(255,177,25,.12); }
+.tier-bad { color:#ff7d8d; background:rgba(220,52,76,.12); }
+.tier-controls { display:flex; flex-wrap:wrap; gap:5px; margin-top:9px; }
+.tier-controls button { border:1px solid var(--line); border-radius:5px; padding:5px 9px; background:#091827; color:var(--muted); text-transform:capitalize; cursor:pointer; }
+.tier-controls button.active { color:#fff; border-color:var(--player-team); box-shadow:inset 0 -2px var(--player-team); }
+.forecast-strip { border:1px solid color-mix(in srgb, var(--player-team) 55%, var(--line)); border-left:4px solid var(--player-team); border-radius:8px; padding:12px; background:linear-gradient(110deg,color-mix(in srgb,var(--player-team) 14%,transparent),rgba(4,13,23,.76)); }
+.forecast-strip header { display:flex; justify-content:space-between; gap:12px; margin-bottom:9px; }
+.forecast-strip header span { color:var(--muted); font-size:.76rem; }
+.forecast-strip > div { display:grid; grid-template-columns:repeat(4,minmax(80px,1fr)); gap:7px; }
+.forecast-strip > div > div { padding:8px; border:1px solid rgba(255,255,255,.09); border-radius:6px; background:rgba(0,0,0,.2); }
+.forecast-strip span { display:block; color:var(--muted); font-size:.72rem; }
+.forecast-strip b { display:block; margin-top:3px; font-size:1.1rem; }
+.player-card-qb .forecast-strip { --position-accent:#64d8ff; }
+.player-card-rb .forecast-strip { --position-accent:#74ef9a; }
+.player-card-wr .forecast-strip, .player-card-te .forecast-strip { --position-accent:#c8ff57; }
+.player-card-cb .forecast-strip, .player-card-db .forecast-strip, .player-card-s .forecast-strip { --position-accent:#ff9f68; }
+.player-card-stat-group[class*="stat-passing"] { border-top:3px solid #64d8ff; }
+.player-card-stat-group[class*="stat-rushing"] { border-top:3px solid #74ef9a; }
+.player-card-stat-group[class*="stat-receiv"] { border-top:3px solid #c8ff57; }
+.player-card-stat-group[class*="stat-defens"], .player-card-stat-group[class*="stat-interception"] { border-top:3px solid #ff9f68; }
+.coverage-tier-splits { display:grid; grid-template-columns:repeat(3,minmax(150px,1fr)); gap:8px; margin:10px 0; }
+.coverage-tier-splits > span { border:1px solid currentColor; border-radius:7px; padding:9px; }
+.coverage-tier-splits b, .coverage-tier-splits em { display:block; }
+.coverage-tier-splits em { margin-top:4px; color:var(--text); font-style:normal; font-size:.78rem; }
+.run-defense-read { border-left:3px solid currentColor !important; }
+
+@media (max-width: 660px) {
+  .forecast-strip > div, .coverage-tier-splits { grid-template-columns:repeat(2,minmax(0,1fr)); }
 }
 
 @media (max-width: 660px) {

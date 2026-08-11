@@ -1,7 +1,10 @@
-const API_BASE = 'https://site.api.espn.com/apis/site/v2/sports/football/nfl';
+// The web host sends CORS headers when this dashboard is opened directly from disk.
+const API_BASE = 'https://site.web.api.espn.com/apis/site/v2/sports/football/nfl';
 const CORE_BASE = 'https://sports.core.api.espn.com/v2/sports/football/leagues/nfl';
 const STORAGE_PREFIX = 'nfl-game-center:v1';
 const nflAthleteProfileCache = new Map();
+const nflverseRosterCache = new Map();
+const RUN_DEFENSE_2025 = [{"team":"JAX","games":17,"yards":1455,"ypg":85.6,"rank":1},{"team":"DEN","games":17,"yards":1548,"ypg":91.1,"rank":2},{"team":"SEA","games":17,"yards":1563,"ypg":91.9,"rank":3},{"team":"HOU","games":17,"yards":1593,"ypg":93.7,"rank":4},{"team":"TB","games":17,"yards":1684,"ypg":99.1,"rank":5},{"team":"NE","games":17,"yards":1729,"ypg":101.7,"rank":6},{"team":"IND","games":17,"yards":1732,"ypg":101.9,"rank":7},{"team":"LAC","games":17,"yards":1791,"ypg":105.4,"rank":8},{"team":"KC","games":17,"yards":1797,"ypg":105.7,"rank":9},{"team":"BAL","games":17,"yards":1813,"ypg":106.6,"rank":10},{"team":"SF","games":17,"yards":1833,"ypg":107.8,"rank":11},{"team":"LA","games":17,"yards":1884,"ypg":110.8,"rank":12},{"team":"PIT","games":17,"yards":1922,"ypg":113.1,"rank":13},{"team":"DET","games":17,"yards":1947,"ypg":114.5,"rank":14},{"team":"TEN","games":17,"yards":1948,"ypg":114.6,"rank":15},{"team":"CLE","games":17,"yards":1979,"ypg":116.4,"rank":16},{"team":"LV","games":17,"yards":1986,"ypg":116.8,"rank":17},{"team":"GB","games":17,"yards":2001,"ypg":117.7,"rank":18},{"team":"NO","games":17,"yards":2050,"ypg":120.6,"rank":19},{"team":"CAR","games":17,"yards":2096,"ypg":123.3,"rank":20},{"team":"MIN","games":17,"yards":2110,"ypg":124.1,"rank":21},{"team":"PHI","games":17,"yards":2115,"ypg":124.4,"rank":22},{"team":"DAL","games":17,"yards":2133,"ypg":125.5,"rank":23},{"team":"ATL","games":17,"yards":2146,"ypg":126.2,"rank":24},{"team":"ARI","games":17,"yards":2158,"ypg":126.9,"rank":25},{"team":"MIA","games":17,"yards":2251,"ypg":132.4,"rank":26},{"team":"CHI","games":17,"yards":2287,"ypg":134.5,"rank":27},{"team":"BUF","games":17,"yards":2315,"ypg":136.2,"rank":28},{"team":"NYJ","games":17,"yards":2371,"ypg":139.5,"rank":29},{"team":"WAS","games":17,"yards":2406,"ypg":141.5,"rank":30},{"team":"NYG","games":17,"yards":2470,"ypg":145.3,"rank":31},{"team":"CIN","games":17,"yards":2500,"ypg":147.1,"rank":32}];
 
 const els = {
   slateLabel: document.getElementById('slateLabel'),
@@ -20,6 +23,15 @@ const els = {
   divisionToggle: document.getElementById('divisionToggle'),
   leadersGrid: document.getElementById('leadersGrid'),
   leaderSeasonType: document.getElementById('leaderSeasonType'),
+  matchupGameSelect: document.getElementById('matchupGameSelect'),
+  matchupWindow: document.getElementById('matchupWindow'),
+  matchupSummary: document.getElementById('matchupSummary'),
+  matchupBoard: document.getElementById('matchupBoard'),
+  coverageDataStatus: document.getElementById('coverageDataStatus'),
+  coverageImport: document.getElementById('coverageImport'),
+  coverageExportBtn: document.getElementById('coverageExportBtn'),
+  coverageTemplateBtn: document.getElementById('coverageTemplateBtn'),
+  coverageClearBtn: document.getElementById('coverageClearBtn'),
   propForm: document.getElementById('propForm'),
   propSelection: document.getElementById('propSelection'),
   propMarket: document.getElementById('propMarket'),
@@ -33,6 +45,8 @@ const els = {
   touchdownFeed: document.getElementById('touchdownFeed'),
   gameDialog: document.getElementById('gameDialog'),
   gameDialogBody: document.getElementById('gameDialogBody'),
+  playerDialog: document.getElementById('playerDialog'),
+  playerDialogBody: document.getElementById('playerDialogBody'),
 };
 
 const state = {
@@ -48,6 +62,15 @@ const state = {
   slip: readJson(key('slip'), []),
   groupDivisions: readJson(key('groupDivisions'), true),
   teamSort: readJson(key('teamSort'), { key: 'winPct', dir: 'desc' }),
+  coverageRows: readJson(key('coverageRows'), []),
+  matchupGameId: localStorage.getItem(key('matchupGameId')) || '',
+  matchupSummaries: new Map(),
+  openGameId: '',
+  playerCardContext: [],
+  playerCardIndex: -1,
+  playerTierOverrides: readJson(key('playerTierOverrides'), {}),
+  ratingCohorts: new Map(),
+  runDefenseRatings: new Map(),
 };
 
 function key(name) {
@@ -96,6 +119,54 @@ function addDays(value, days) {
   return formatDate(date);
 }
 
+function parseFlexibleDateInput(value) {
+  const text = String(value || '').trim();
+  if (!text) return '';
+  let match = text.match(/^(\d{4})-(\d{1,2})-(\d{1,2})$/);
+  if (!match) match = text.match(/^(\d{1,2})[\/-](\d{1,2})(?:[\/-](\d{2,4}))?$/);
+  let year; let month; let day;
+  if (match && match[1]?.length === 4) [, year, month, day] = match.map(Number);
+  else if (match) { month = Number(match[1]); day = Number(match[2]); year = Number(match[3] || new Date().getFullYear()); if (year < 100) year += 2000; }
+  else { match = text.match(/^(\d{4})(\d{2})(\d{2})$/); if (match) [, year, month, day] = match.map(Number); }
+  const parsed = new Date(year, Number(month) - 1, day, 12);
+  return Number.isFinite(year) && parsed.getFullYear() === year && parsed.getMonth() === Number(month) - 1 && parsed.getDate() === day ? formatDate(parsed) : '';
+}
+
+function nflWeekStart(value) {
+  const date = parseDate(value);
+  const day = date.getDay();
+  const delta = day === 2 ? 2 : day === 3 ? 1 : -((day + 3) % 7);
+  date.setDate(date.getDate() + delta);
+  return formatDate(date);
+}
+
+function nflWeekEnd(value) { return addDays(nflWeekStart(value), 4); }
+
+function nflWeekLabel(value) {
+  const start = parseDate(nflWeekStart(value)); const end = parseDate(nflWeekEnd(value));
+  const fmt = new Intl.DateTimeFormat('en-US', { month: 'short', day: 'numeric' });
+  return `${fmt.format(start)} – ${fmt.format(end)}, ${end.getFullYear()}`;
+}
+
+let datePickerEl = null; let datePickerMonth = null;
+
+function closeDatePicker() { datePickerEl?.remove(); datePickerEl = null; }
+
+function renderDatePicker() {
+  if (!datePickerEl) return;
+  const selectedStart = nflWeekStart(state.selectedDate); const selectedEnd = nflWeekEnd(state.selectedDate); const today = todayValue();
+  const first = datePickerMonth || new Date(parseDate(selectedStart).getFullYear(), parseDate(selectedStart).getMonth(), 1);
+  const start = new Date(first); start.setDate(1 - first.getDay());
+  const days = Array.from({ length: 42 }, (_, index) => { const day = new Date(start); day.setDate(start.getDate() + index); const value = formatDate(day); const inWeek = value >= selectedStart && value <= selectedEnd; return `<button type="button" class="date-picker-day${day.getMonth() !== first.getMonth() ? ' muted' : ''}${inWeek ? ' selected-week' : ''}${value === selectedStart ? ' week-start' : ''}${value === selectedEnd ? ' week-end' : ''}${value === today ? ' today' : ''}" data-date-picker-day="${value}" title="NFL week ${nflWeekLabel(value)}">${day.getDate()}</button>`; }).join('');
+  datePickerEl.innerHTML = `<div class="date-picker-head"><button data-date-picker-year="-1">&laquo;</button><button data-date-picker-shift="-1">&lsaquo;</button><strong>${new Intl.DateTimeFormat('en-US',{month:'long',year:'numeric'}).format(first)}</strong><button data-date-picker-shift="1">&rsaquo;</button><button data-date-picker-year="1">&raquo;</button></div><div class="date-picker-weekdays"><span>Sun</span><span>Mon</span><span>Tue</span><span>Wed</span><span>Thu</span><span>Fri</span><span>Sat</span></div><div class="date-picker-grid">${days}</div><div class="date-picker-legend">Highlighted NFL week runs Thursday through Monday.</div><div class="date-picker-actions"><button data-date-picker-today>Current week</button><button data-date-picker-close>Close</button></div>`;
+  const rect = els.dateInput.getBoundingClientRect(); const width = Math.min(340, window.innerWidth - 16); datePickerEl.style.width = `${width}px`; datePickerEl.style.left = `${Math.max(8, Math.min(rect.left, window.innerWidth - width - 8))}px`; datePickerEl.style.top = `${Math.max(8, Math.min(rect.bottom + 8, window.innerHeight - 390))}px`;
+}
+
+function openDatePicker() {
+  if (!datePickerEl) { datePickerEl = document.createElement('div'); datePickerEl.className = 'date-picker-popover'; datePickerEl.addEventListener('mousedown', (event) => event.preventDefault()); datePickerEl.addEventListener('click', (event) => { const day = event.target.closest('[data-date-picker-day]'); if (day) { state.selectedDate = nflWeekStart(day.dataset.datePickerDay); closeDatePicker(); loadAll(); return; } const shift = event.target.closest('[data-date-picker-shift]'); if (shift) { datePickerMonth.setMonth(datePickerMonth.getMonth() + Number(shift.dataset.datePickerShift)); renderDatePicker(); return; } const year = event.target.closest('[data-date-picker-year]'); if (year) { datePickerMonth.setFullYear(datePickerMonth.getFullYear() + Number(year.dataset.datePickerYear)); renderDatePicker(); return; } if (event.target.closest('[data-date-picker-today]')) { state.selectedDate = nflWeekStart(todayValue()); closeDatePicker(); loadAll(); } if (event.target.closest('[data-date-picker-close]')) closeDatePicker(); }); document.body.appendChild(datePickerEl); }
+  const selected = parseDate(nflWeekStart(state.selectedDate)); datePickerMonth = new Date(selected.getFullYear(), selected.getMonth(), 1); renderDatePicker();
+}
+
 function longDate(value) {
   return new Intl.DateTimeFormat('en-US', { weekday: 'short', month: 'short', day: 'numeric', year: 'numeric' }).format(parseDate(value));
 }
@@ -103,6 +174,12 @@ function longDate(value) {
 function seasonForDate(value) {
   const date = parseDate(value);
   return date.getMonth() >= 2 ? date.getFullYear() : date.getFullYear() - 1;
+}
+
+function analysisSeasonForGame(game) {
+  const season = Number(game?.season?.year || seasonForDate(game?.date || state.selectedDate));
+  const seasonType = Number(game?.season?.type || 2); const week = Number(game?.week?.number || game?.week || 0);
+  return seasonType === 1 || week === 1 ? season - 1 : season;
 }
 
 function nflSeasonYearsForDate(value) {
@@ -124,6 +201,12 @@ async function getJson(url) {
   const response = await fetch(url, { cache: 'no-store' });
   if (!response.ok) throw new Error(`${response.status} ${response.statusText}`);
   return response.json();
+}
+
+async function getText(url) {
+  const response = await fetch(url, { cache: 'no-store' });
+  if (!response.ok) throw new Error(`${response.status} ${response.statusText}`);
+  return response.text();
 }
 
 async function getJsonFirst(urls) {
@@ -264,7 +347,7 @@ function formatKickoff(value) {
 
 async function fetchScoreboard() {
   const url = new URL(`${API_BASE}/scoreboard`);
-  url.searchParams.set('dates', compactDate(state.selectedDate));
+  url.searchParams.set('dates', `${compactDate(nflWeekStart(state.selectedDate))}-${compactDate(nflWeekEnd(state.selectedDate))}`);
   url.searchParams.set('limit', '100');
   const data = await getJson(url.toString());
   return {
@@ -555,11 +638,258 @@ function renderAll() {
   renderScoreboard();
   renderTeams();
   renderLeaders();
+  renderMatchups();
   renderBetSlip();
   renderWatchList();
   renderSlateNotes();
   renderTouchdownFeed();
   populatePropOptions();
+}
+
+const COVERAGE_COLUMNS = ['date', 'game_id', 'offense_team', 'defense_team', 'receiver', 'receiver_id', 'receiver_tier', 'defender', 'defender_id', 'defender_tier', 'receiver_alignment', 'coverage_type', 'routes', 'targets', 'receptions', 'yards', 'touchdowns', 'interceptions', 'passer_rating', 'source'];
+
+function normalizeCoverageRow(row = {}) {
+  const clean = {};
+  for (const column of COVERAGE_COLUMNS) clean[column] = String(row[column] ?? row[normalizeStatKey(column)] ?? '').trim();
+  for (const column of ['routes', 'targets', 'receptions', 'yards', 'touchdowns', 'interceptions', 'passer_rating']) {
+    clean[column] = clean[column] === '' ? null : Number(clean[column]);
+  }
+  clean.offense_team = clean.offense_team.toUpperCase();
+  clean.defense_team = clean.defense_team.toUpperCase();
+  return clean;
+}
+
+function coverageRowValid(row) {
+  return row.receiver && row.defender && row.offense_team && row.defense_team && (row.date || row.game_id);
+}
+
+function parseCsv(text) {
+  const lines = String(text).replace(/^\uFEFF/, '').split(/\r?\n/).filter((line) => line.trim());
+  if (!lines.length) return [];
+  const cells = (line) => {
+    const output = []; let value = ''; let quoted = false;
+    for (let i = 0; i < line.length; i += 1) {
+      const char = line[i];
+      if (char === '"' && quoted && line[i + 1] === '"') { value += '"'; i += 1; }
+      else if (char === '"') quoted = !quoted;
+      else if (char === ',' && !quoted) { output.push(value); value = ''; }
+      else value += char;
+    }
+    output.push(value); return output;
+  };
+  const headers = cells(lines.shift()).map((value) => normalizeStatKey(value));
+  return lines.map((line) => Object.fromEntries(cells(line).map((value, index) => [headers[index], value])));
+}
+
+const NFLVERSE_TEAM_ALIASES = { JAC: 'JAX', WSH: 'WAS', LAR: 'LA' };
+function normalizedNflTeam(value) { const team = String(value || '').toUpperCase(); return NFLVERSE_TEAM_ALIASES[team] || team; }
+function rosterPlayer(row = {}, source = 'nflverse weekly roster') {
+  return { id: String(row.espnid || row.gsisid || row.id || ''), name: row.playername || row.fullname || row.footballname || row.displayname || row.name || 'Player', position: String(row.posabb || row.depthchartposition || row.depthchartpos || row.position || row.ngsposition || '').toUpperCase(), depth: Number(row.posrank || row.depthteam || row.depth || row.rank) || 99, slot: Number(row.posslot) || 99, status: row.statusdescriptionabbr || row.status || '', source, stats: [] };
+}
+async function fetchNflverseSeasonFile(kind, season) {
+  const cacheKey = `${kind}:${season}`;
+  if (nflverseRosterCache.has(cacheKey)) return nflverseRosterCache.get(cacheKey);
+  const filename = kind === 'depth' ? `depth_charts_${season}.csv` : `roster_weekly_${season}.csv`;
+  const tag = kind === 'depth' ? 'depth_charts' : 'weekly_rosters';
+  const promise = getText(`https://github.com/nflverse/nflverse-data/releases/download/${tag}/${filename}`).then(parseCsv).catch(() => []);
+  nflverseRosterCache.set(cacheKey, promise); return promise;
+}
+function newestDepthRows(rows, team, game) {
+  const matching = rows.filter((row) => normalizedNflTeam(row.clubcode || row.team) === normalizedNflTeam(team.abbrev));
+  const gameDate = String(game?.date || state.selectedDate).slice(0, 10);
+  const stamps = [...new Set(matching.map((row) => row.timestamp || row.dt || row.date || '').filter(Boolean))].sort();
+  const newest = stamps.filter((stamp) => stamp.slice(0, 10) <= gameDate).pop() || stamps[0];
+  return (newest ? matching.filter((row) => (row.timestamp || row.dt || row.date || '') === newest) : matching).map((row) => rosterPlayer(row, 'nflverse depth chart'));
+}
+function weeklyRosterRows(rows, team, game) {
+  const week = Number(game?.week?.number || game?.week || 0);
+  const matching = rows.filter((row) => normalizedNflTeam(row.team) === normalizedNflTeam(team.abbrev));
+  const available = [...new Set(matching.map((row) => Number(row.week)).filter(Number.isFinite))].sort((a, b) => a - b);
+  const selectedWeek = available.filter((value) => !week || value <= week).pop() || available.pop();
+  return matching.filter((row) => !selectedWeek || Number(row.week) === selectedWeek).map((row) => rosterPlayer(row));
+}
+async function fetchEspnRoster(team) {
+  const data = await getJson(`${API_BASE}/teams/${encodeURIComponent(team.id || team.abbrev)}/roster`); const output = [];
+  for (const group of data?.athletes || []) for (const item of group?.items || group?.athletes || []) output.push({ id: String(item.id || ''), name: item.fullName || item.displayName || item.shortName || 'Player', position: String(item.position?.abbreviation || group.position || group.abbreviation || '').toUpperCase(), depth: Number(item.depth || item.rank) || 99, status: item.status?.abbreviation || item.status?.name || '', source: 'ESPN roster', stats: [] });
+  return output;
+}
+async function loadMatchupPersonnel(game) {
+  const season = seasonForDate(game?.date || state.selectedDate);
+  const [depth, weekly, awayEspn, homeEspn] = await Promise.all([fetchNflverseSeasonFile('depth', season), fetchNflverseSeasonFile('weekly', season), fetchEspnRoster(game.away).catch(() => []), fetchEspnRoster(game.home).catch(() => [])]);
+  const side = (team, espn) => { const chart = newestDepthRows(depth, team, game); const roster = weeklyRosterRows(weekly, team, game); const rows = chart.length ? chart : roster.length ? roster : espn; return [...new Map(rows.map((player) => [`${normalizeStatKey(player.name)}|${player.position}`, player])).values()].sort((a, b) => a.depth - b.depth || a.slot - b.slot || a.name.localeCompare(b.name)); };
+  return { away: side(game.away, awayEspn), home: side(game.home, homeEspn), sources: { depth: depth.length > 0, weekly: weekly.length > 0, espn: awayEspn.length + homeEspn.length > 0 } };
+}
+
+function coverageRowsForGame(game) {
+  if (!game) return [];
+  const teams = new Set([game.away.abbrev, game.home.abbrev].map((value) => String(value).toUpperCase()));
+  const matching = state.coverageRows.filter((row) => row.game_id === game.id || (teams.has(row.offense_team) && teams.has(row.defense_team)));
+  const baselineSeason = analysisSeasonForGame(game);
+  const seasonRows = matching.filter((row) => String(row.date || '').startsWith(`${baselineSeason}-`));
+  const rows = baselineSeason < seasonForDate(game.date || state.selectedDate) && seasonRows.length ? seasonRows : matching;
+  const limit = Number(els.matchupWindow?.value);
+  if (!Number.isFinite(limit)) return rows;
+  const dates = [...new Set(rows.map((row) => row.date).filter(Boolean))].sort().reverse().slice(0, limit);
+  return rows.filter((row) => !row.date || dates.includes(row.date));
+}
+
+function aggregateCoverage(rows) {
+  const groups = new Map();
+  for (const row of rows) {
+    const id = `${row.receiver_id || normalizeStatKey(row.receiver)}|${row.defender_id || normalizeStatKey(row.defender)}`;
+    const item = groups.get(id) || { ...row, games: new Set(), routes: 0, targets: 0, receptions: 0, yards: 0, touchdowns: 0, interceptions: 0 };
+    item.games.add(row.game_id || row.date);
+    for (const field of ['routes', 'targets', 'receptions', 'yards', 'touchdowns', 'interceptions']) item[field] += Number(row[field]) || 0;
+    groups.set(id, item);
+  }
+  return [...groups.values()].map((item) => ({ ...item, games: item.games.size })).sort((a, b) => b.routes - a.routes || b.targets - a.targets);
+}
+
+function coverageMetric(value, fallback = '0') {
+  return Number.isFinite(Number(value)) ? String(Number(value).toFixed(Number(value) % 1 ? 1 : 0)) : fallback;
+}
+
+function coverageHistoryHtml(rows) {
+  const aggregated = aggregateCoverage(rows);
+  const tierGroups = new Map();
+  for (const row of rows) { const tier = state.playerTierOverrides[String(row.defender_id)] || row.defender_tier || 'unrated'; const item = tierGroups.get(tier) || { targets: 0, receptions: 0, yards: 0, touchdowns: 0 }; for (const field of Object.keys(item)) item[field] += Number(row[field]) || 0; tierGroups.set(tier, item); }
+  const tierSummary = `<div class="coverage-tier-splits">${[...tierGroups].map(([tier, item]) => `<span class="tier-${tier}"><b>vs ${escapeHtml(tier)} CB</b><em>${item.receptions}/${item.targets} · ${item.yards} yds · ${item.touchdowns} TD</em></span>`).join('')}</div>`;
+  if (!aggregated.length) return '<div class="empty">No verified WR–defender history has been imported for these teams.</div>';
+  return `${tierSummary}<div class="table-wrap"><table class="nfl-table coverage-table"><thead><tr><th>Receiver</th><th>Defender</th><th>Align / coverage</th><th>G</th><th>Routes</th><th>Tgt</th><th>Rec</th><th>Yds</th><th>TD</th><th>INT</th><th>Y/RR</th><th>Catch%</th></tr></thead><tbody>${aggregated.map((row) => {
+    const yardsPerRoute = row.routes ? row.yards / row.routes : 0;
+    const catchRate = row.targets ? (row.receptions / row.targets) * 100 : 0;
+    const receiverTier = state.playerTierOverrides[String(row.receiver_id)] || row.receiver_tier || ''; const defenderTier = state.playerTierOverrides[String(row.defender_id)] || row.defender_tier || '';
+    return `<tr><td><strong>${escapeHtml(row.receiver)}</strong><small>${escapeHtml(row.offense_team)}${receiverTier ? ` · ${escapeHtml(receiverTier)}` : ''}</small></td><td><strong>${escapeHtml(row.defender)}</strong><small>${escapeHtml(row.defense_team)}${defenderTier ? ` · ${escapeHtml(defenderTier)}` : ''}</small></td><td>${escapeHtml([row.receiver_alignment, row.coverage_type].filter(Boolean).join(' / ') || '--')}</td><td>${row.games}</td><td>${coverageMetric(row.routes)}</td><td>${coverageMetric(row.targets)}</td><td>${coverageMetric(row.receptions)}</td><td>${coverageMetric(row.yards)}</td><td>${coverageMetric(row.touchdowns)}</td><td>${coverageMetric(row.interceptions)}</td><td>${yardsPerRoute.toFixed(2)}</td><td>${catchRate.toFixed(1)}%</td></tr>`;
+  }).join('')}</tbody></table></div>`;
+}
+
+function isReceiverPosition(position) { return /^(WR|TE|LWR|RWR|SWR|SLWR|SRWR)$/.test(String(position || '').toUpperCase()); }
+function isSecondaryPosition(position) { return /^(CB|DB|S|FS|SS|NB|LCB|RCB|SCB)$/.test(String(position || '').toUpperCase()); }
+function brandCoverageSide(html, offense, defense) {
+  const style = `--offense-color:${offense.color};--defense-color:${defense.color};--offense-logo:url('${offense.logo}');--defense-logo:url('${defense.logo}')`;
+  return html.replace('class="coverage-side"', `class="coverage-side" style="${escapeHtml(style)}"`);
+}
+function projectedMatchupsHtml(game, box, personnel = null) {
+  const away = depthChartForTeam(box?.players || [], game.away);
+  const home = depthChartForTeam(box?.players || [], game.home);
+  const awayRoster = personnel?.away || []; const homeRoster = personnel?.home || [];
+  const offense = (rows) => rows.filter((row) => isReceiverPosition(row.position));
+  const defense = (rows) => rows.filter((row) => isSecondaryPosition(row.position));
+  return [brandCoverageSide(projectedSideHtml(game.away, offense(awayRoster).length ? offense(awayRoster) : away.offense, game.home, defense(homeRoster).length ? defense(homeRoster) : home.defense), game.away, game.home), brandCoverageSide(projectedSideHtml(game.home, offense(homeRoster).length ? offense(homeRoster) : home.offense, game.away, defense(awayRoster).length ? defense(awayRoster) : away.defense), game.home, game.away)].join('');
+}
+
+function projectedSideHtml(offense, offenseRows, defense, defenseRows) {
+  const receivers = offenseRows.filter((row) => isReceiverPosition(row.position)).slice(0, 6);
+  const backs = defenseRows.filter((row) => isSecondaryPosition(row.position)).slice(0, 7);
+  const count = Math.max(receivers.length, backs.length);
+  if (!count) return `<section class="coverage-side"><header><strong>${escapeHtml(offense.abbrev)} receivers vs ${escapeHtml(defense.abbrev)} secondary</strong><span class="status-pill projected">Projected</span></header><div class="empty">Pregame personnel is not available in this ESPN game payload yet. Import verified history below or reopen near kickoff.</div></section>`;
+  return `<section class="coverage-side"><header><strong>${escapeHtml(offense.abbrev)} receivers vs ${escapeHtml(defense.abbrev)} secondary</strong><span class="status-pill projected">Projected—not charted</span></header><p class="source-note">Players are paired by listed role/order for research orientation. This is not a claim of shadow coverage.</p><div class="alignment-list">${Array.from({ length: count }, (_, index) => {
+    const wr = receivers[index]; const db = backs[index];
+    return `<div class="alignment-row"><div><span class="position-label">${escapeHtml(wr?.position || 'WR')}</span><strong>${wr ? playerButtonHtml(wr, offense) : 'Receiver TBD'}</strong>${wr?.status ? `<small>${escapeHtml(wr.status)}</small>` : ''}</div><b>vs</b><div><span class="position-label">${escapeHtml(db?.position || 'DB')}</span><strong>${db ? playerButtonHtml(db, defense) : 'Defender TBD'}</strong>${db?.status ? `<small>${escapeHtml(db.status)}</small>` : ''}</div></div>`;
+  }).join('')}</div></section>`;
+}
+
+async function renderMatchups() {
+  if (!els.matchupBoard) return;
+  const previous = state.matchupGameId;
+  els.matchupGameSelect.innerHTML = state.games.map((game) => `<option value="${escapeHtml(game.id)}">${escapeHtml(game.away.abbrev)} at ${escapeHtml(game.home.abbrev)}</option>`).join('');
+  const game = state.games.find((item) => item.id === previous) || state.games[0];
+  if (!game) { els.matchupBoard.innerHTML = '<div class="empty">Load a slate to analyze its coverage matchups.</div>'; return; }
+  state.matchupGameId = game.id; els.matchupGameSelect.value = game.id;
+  localStorage.setItem(key('matchupGameId'), game.id);
+  const rows = coverageRowsForGame(game);
+  els.coverageDataStatus.textContent = `${state.coverageRows.length} verified row${state.coverageRows.length === 1 ? '' : 's'} stored locally`;
+  els.matchupSummary.innerHTML = `<span><b>${rows.length}</b> source rows for this matchup</span><span><b>${new Set(rows.map((row) => row.receiver)).size}</b> receivers</span><span><b>${new Set(rows.map((row) => row.defender)).size}</b> defenders</span><span><b>${new Set(rows.map((row) => row.game_id || row.date)).size}</b> meetings</span>`;
+  els.matchupBoard.innerHTML = '<div class="empty">Loading matchup personnel…</div>';
+  let summary = state.matchupSummaries.get(game.id);
+  if (!summary) {
+    summary = await getJson(`${API_BASE}/summary?event=${encodeURIComponent(game.id)}`).catch(() => null);
+    if (summary) { await hydrateGamePlayerProfiles(summary.boxscore || {}, game).catch(() => {}); state.matchupSummaries.set(game.id, summary); }
+  }
+  const personnel = await loadMatchupPersonnel(game).catch(() => null);
+  if (state.matchupGameId !== game.id) return;
+  const source = personnel?.sources?.depth ? 'nflverse depth charts' : personnel?.sources?.weekly ? 'nflverse weekly rosters' : personnel?.sources?.espn ? 'ESPN team rosters' : 'game participant fallback';
+  els.matchupBoard.innerHTML = `<div class="matchup-source-strip">Personnel source: ${source}. Every player includes an explicit position label.</div><div class="projected-grid">${projectedMatchupsHtml(game, summary?.boxscore || {}, personnel)}</div><section class="coverage-history"><header><div><span class="eyebrow">Verified History</span><strong>Receiver vs defender results</strong></div><span class="status-pill verified">Imported / charted</span></header>${coverageHistoryHtml(rows)}</section>`;
+}
+
+function downloadText(filename, text, type = 'text/plain') {
+  const url = URL.createObjectURL(new Blob([text], { type }));
+  const anchor = document.createElement('a'); anchor.href = url; anchor.download = filename; anchor.click();
+  setTimeout(() => URL.revokeObjectURL(url), 0);
+}
+
+function relevantStatCategories(position, categories = []) {
+  const pos = String(position || '').toUpperCase();
+  const wanted = isReceiverPosition(pos) ? ['receiving','rushing']
+    : /^(QB)$/.test(pos) ? ['passing','rushing']
+    : /^(RB|HB|FB)$/.test(pos) ? ['rushing','receiving']
+    : isSecondaryPosition(pos) ? ['defensive','interceptions','fumbles']
+    : /^(DE|LDE|RDE|DT|LDT|RDT|NT|DL|EDGE|LB|ILB|MLB|OLB|WLB|SLB)$/.test(pos) ? ['defensive','sacks','fumbles','interceptions']
+    : /^(K|PK)$/.test(pos) ? ['kicking'] : /^(P)$/.test(pos) ? ['punting'] : [];
+  const selected = categories.filter((category) => wanted.some((name) => normalizeStatKey(category.name).includes(normalizeStatKey(name))));
+  return selected.length ? selected : categories.slice(0, 3);
+}
+
+function playerStatCardHtml(category) {
+  const useful = category.stats.filter((stat) => stat.value !== '--').slice(0, 12);
+  return `<section class="player-card-stat-group stat-${normalizeStatKey(category.name)}"><header><strong>${escapeHtml(category.displayName)}</strong><span>${escapeHtml(category.position || '')}</span></header><div class="player-card-stat-grid">${useful.map((stat) => `<div><span>${escapeHtml(stat.label)}</span><b>${escapeHtml(stat.value)}</b><small>${escapeHtml(stat.displayName)}</small></div>`).join('')}</div></section>`;
+}
+
+function profileStat(profile, names) {
+  for (const category of profile?.statCategories || []) for (const stat of category.stats || []) if (names.some((name) => normalizeStatKey(stat.name || stat.label) === normalizeStatKey(name))) return numericStatValue(stat.value);
+  return 0;
+}
+
+function playerForecastScore(position, profile) {
+  const pos = depthPositionGroup(position || profile?.position);
+  if (pos === 'QB') return profileStat(profile, ['passingYards']) / 35 + profileStat(profile, ['passingTouchdowns']) * 5 - profileStat(profile, ['interceptions']) * 3 + profileStat(profile, ['adjQBR']) / 4;
+  if (pos === 'WR' || pos === 'TE') return profileStat(profile, ['receivingYards']) / 12 + profileStat(profile, ['receptions']) * .7 + profileStat(profile, ['receivingTouchdowns']) * 7;
+  if (pos === 'RB' || pos === 'FB') return profileStat(profile, ['rushingYards']) / 12 + profileStat(profile, ['rushingTouchdowns']) * 7 + profileStat(profile, ['receivingYards']) / 25;
+  if (['CB','S','FS','SS','DB'].includes(pos)) return profileStat(profile, ['interceptions']) * 15 + profileStat(profile, ['passesDefended']) * 4 + profileStat(profile, ['totalTackles']) * .4 + profileStat(profile, ['sacks']) * 5;
+  return profileStat(profile, ['totalTackles']) * .5 + profileStat(profile, ['sacks']) * 8 + profileStat(profile, ['interceptions']) * 12 + profileStat(profile, ['tacklesForLoss']) * 3;
+}
+
+function autoPlayerTier(id, position, profile) {
+  const group = depthPositionGroup(position || profile?.position); const score = playerForecastScore(group, profile);
+  if (!Number.isFinite(score) || score <= 0) return { tier: 'mid', decile: 5, score: 0, provisional: true };
+  if (id && Number.isFinite(score)) { if (!state.ratingCohorts.has(group)) state.ratingCohorts.set(group, new Map()); state.ratingCohorts.get(group).set(String(id), score); }
+  const values = [...(state.ratingCohorts.get(group)?.values() || [])].sort((a, b) => a - b); const rank = values.length > 1 ? values.filter((value) => value <= score).length / values.length : .5;
+  const tier = rank >= .8 ? 'elite' : rank <= .3 ? 'bad' : 'mid';
+  return { tier, decile: Math.max(1, Math.min(10, Math.ceil(rank * 10))), score };
+}
+
+function playerTierFor(id, position, profile) {
+  const auto = autoPlayerTier(id, position, profile); const override = state.playerTierOverrides[String(id)]; return { ...auto, tier: override || auto.tier, overridden: Boolean(override) };
+}
+
+function forecastHighlights(position, profile) {
+  const pos = depthPositionGroup(position || profile?.position); const games = Math.max(1, profileStat(profile, ['gamesPlayed']));
+  const metrics = pos === 'QB' ? [['Pass Yds/G', profileStat(profile,['passingYards']) / games],['Pass TD/G',profileStat(profile,['passingTouchdowns']) / games],['INT/G',profileStat(profile,['interceptions']) / games],['Rating',profileStat(profile,['QBRating'])]]
+    : pos === 'WR' || pos === 'TE' ? [['Rec/G',profileStat(profile,['receptions']) / games],['Rec Yds/G',profileStat(profile,['receivingYards']) / games],['TD/G',profileStat(profile,['receivingTouchdowns']) / games],['Y/Rec',profileStat(profile,['yardsPerReception'])]]
+    : pos === 'RB' || pos === 'FB' ? [['Rush Yds/G',profileStat(profile,['rushingYards']) / games],['Y/Carry',profileStat(profile,['yardsPerRushAttempt'])],['Rush TD/G',profileStat(profile,['rushingTouchdowns']) / games],['Rec Yds/G',profileStat(profile,['receivingYards']) / games]]
+    : [['Tackles/G',profileStat(profile,['totalTackles']) / games],['Sacks',profileStat(profile,['sacks'])],['INT',profileStat(profile,['interceptions'])],['TFL',profileStat(profile,['tacklesForLoss'])]];
+  return metrics.map(([label,value]) => `<div><span>${label}</span><b>${Number(value || 0).toFixed(1)}</b></div>`).join('');
+}
+
+async function openNflPlayerCard(button, preserveContext = false) {
+  const id = button.dataset.playerId || ''; const name = button.dataset.playerName || 'Player'; const position = button.dataset.playerPosition || ''; const teamAbbrev = button.dataset.playerTeam || '';
+  if (!preserveContext) {
+    const scope = button.closest('#gameDialog, #matchupsPage') || document;
+    state.playerCardContext = [...new Map([...scope.querySelectorAll('[data-player-card]')].map((entry) => [`${entry.dataset.playerId}|${entry.dataset.playerName}`, entry])).values()];
+  }
+  state.playerCardIndex = state.playerCardContext.findIndex((entry) => String(entry.dataset.playerId) === String(id) && entry.dataset.playerName === name);
+  const team = state.teams.find((entry) => entry.abbrev === teamAbbrev) || [...state.games.flatMap((game) => [game.away, game.home])].find((entry) => entry.abbrev === teamAbbrev) || {};
+  const color = button.dataset.playerColor || team.color || '#62d7ff'; const logo = button.dataset.playerLogo || team.logo || '';
+  els.playerDialogBody.innerHTML = `<div class="player-card-loading">Loading ${escapeHtml(name)}…</div>`; if (!els.playerDialog.open) els.playerDialog.showModal();
+  const contextGame = state.games.find((game) => game.id === state.openGameId) || state.games.find((game) => game.away.abbrev === teamAbbrev || game.home.abbrev === teamAbbrev);
+  const season = analysisSeasonForGame(contextGame); const profile = id ? await fetchNflAthleteSeasonProfile(id, season).catch(() => null) : null;
+  const categories = relevantStatCategories(position || profile?.position, profile?.statCategories || []);
+  els.playerDialogBody.innerHTML = `<article class="nfl-player-card" style="--player-team:${escapeHtml(color)};--player-logo:url('${escapeHtml(logo)}')"><button type="button" class="player-card-close" data-player-dialog-close>×</button><button type="button" class="player-nav-arrow player-nav-prev" data-player-nav="-1" ${state.playerCardIndex <= 0 ? 'disabled' : ''} aria-label="Previous player">‹</button><button type="button" class="player-nav-arrow player-nav-next" data-player-nav="1" ${state.playerCardIndex < 0 || state.playerCardIndex >= state.playerCardContext.length - 1 ? 'disabled' : ''} aria-label="Next player">›</button><header class="nfl-player-card-head"><div class="player-card-portrait-wrap"><img class="player-card-logo" src="${escapeHtml(logo)}" alt=""><img class="player-card-portrait" src="${escapeHtml(profile?.headshot || (id ? `https://a.espncdn.com/i/headshots/nfl/players/full/${id}.png` : logo))}" alt="${escapeHtml(name)}"></div><div><span>${escapeHtml(teamAbbrev)} · ${escapeHtml(position || profile?.position || 'Position unavailable')}</span><h2>${escapeHtml(name)}</h2><p>${categories.length ? `Season statistics tailored for ${escapeHtml(position || profile?.position || 'player')} responsibilities` : 'No official season statistics were returned for this player.'}</p></div></header><div class="nfl-player-card-content">${categories.length ? categories.map(playerStatCardHtml).join('') : `<div class="empty">${/^(LT|LG|C|RG|RT|OL)$/.test(position) ? 'Individual offensive-line box-score statistics are not published in this ESPN feed. Position and roster status remain available.' : 'Season data is unavailable from the current source.'}</div>`}</div></article>`;
+  const tierData = playerTierFor(id, position || profile?.position, profile); const actualYear = categories.find((category) => category.season)?.season || season;
+  els.playerDialogBody.querySelector('.nfl-player-card-head > div:last-child')?.insertAdjacentHTML('beforeend', `<div class="player-tier-summary"><span class="player-tier tier-${tierData.tier}">${tierData.tier}</span><b>Decile ${tierData.decile}</b><small>${tierData.overridden ? 'Manual designation' : 'Automatic positional cohort'} · ${actualYear} data${actualYear !== seasonForDate(state.selectedDate) ? ' · prior-season baseline' : ''}</small></div><div class="tier-controls" aria-label="Player tier override">${['elite','mid','bad'].map((tier) => `<button type="button" data-tier-player="${escapeHtml(id)}" data-tier-value="${tier}" class="${tierData.tier === tier ? 'active' : ''}">${tier}</button>`).join('')}<button type="button" data-tier-player="${escapeHtml(id)}" data-tier-value="auto">Auto</button></div>`);
+  const positionGroup = normalizeStatKey(depthPositionGroup(position || profile?.position));
+  els.playerDialogBody.querySelector('.nfl-player-card')?.classList.add(`player-card-${positionGroup}`);
+  els.playerDialogBody.querySelector('.nfl-player-card-content')?.insertAdjacentHTML('afterbegin', `<section class="forecast-strip"><header><strong>Forecast profile</strong><span>Per-game and efficiency signals</span></header><div>${forecastHighlights(position || profile?.position, profile)}</div></section>`);
 }
 
 function renderTabs() {
@@ -1051,13 +1381,14 @@ function toggleWatch(gameId) {
 async function openGameDialog(gameId) {
   const game = state.games.find((item) => item.id === String(gameId));
   if (!game) return;
+  state.openGameId = game.id;
   els.gameDialogBody.innerHTML = gameDialogLoadingHtml(game);
-  els.gameDialog.showModal();
+  if (!els.gameDialog.open) els.gameDialog.showModal();
   try {
     const summary = await getJson(`${API_BASE}/summary?event=${encodeURIComponent(game.id)}`);
     enrichGameFromSummary(game, summary);
-    await hydrateGamePlayerProfiles(summary?.boxscore || {}, game);
-    els.gameDialogBody.innerHTML = gameDialogHtml(game, summary);
+    const [, personnel] = await Promise.all([hydrateGamePlayerProfiles(summary?.boxscore || {}, game), loadMatchupPersonnel(game).catch(() => null)]);
+    els.gameDialogBody.innerHTML = gameDialogHtml(game, summary, personnel);
   } catch {
     els.gameDialogBody.innerHTML = gameDialogHtml(game, null);
   }
@@ -1076,7 +1407,7 @@ async function hydrateGamePlayerProfiles(box, game) {
   }
   const unique = [...new Map(athletes.map((entry) => [entry.id, entry])).values()].slice(0, 80);
   await Promise.all(unique.map(async ({ id, athlete }) => {
-    const profile = await fetchNflAthleteSeasonProfile(id, seasonForDate(game?.date || state.selectedDate)).catch(() => null);
+    const profile = await fetchNflAthleteSeasonProfile(id, analysisSeasonForGame(game)).catch(() => null);
     if (profile) Object.assign(athlete, profile);
   }));
 }
@@ -1086,21 +1417,33 @@ async function fetchNflAthleteSeasonProfile(id, season) {
   if (nflAthleteProfileCache.has(cacheKey)) return nflAthleteProfileCache.get(cacheKey);
   const promise = (async () => {
     const [profile, stats] = await Promise.all([
-      getJson(`${CORE_BASE}/athletes/${encodeURIComponent(id)}?lang=en&region=us`).catch(() => null),
-      getJson(`${CORE_BASE}/seasons/${encodeURIComponent(season)}/types/2/athletes/${encodeURIComponent(id)}/statistics?lang=en&region=us`).catch(() => null),
+      getJson(`https://site.web.api.espn.com/apis/common/v3/sports/football/nfl/athletes/${encodeURIComponent(id)}`).catch(() => null),
+      getJson(`https://site.web.api.espn.com/apis/common/v3/sports/football/nfl/athletes/${encodeURIComponent(id)}/stats?region=us&lang=en&season=${encodeURIComponent(season)}`).catch(() => null),
     ]);
     const positionRef = profile?.position?.$ref || '';
     const position = profile?.position?.abbreviation || profile?.position?.displayName || (positionRef ? await getJson(positionRef).then((pos) => pos.abbreviation || pos.displayName || pos.name || '').catch(() => '') : '');
     return {
       position,
-      seasonStats: flattenNflSeasonStats(stats),
+      seasonStats: flattenNflSeasonStats(stats, season),
+      statCategories: nflSeasonStatCategories(stats, season),
+      headshot: profile?.athlete?.headshot?.href || profile?.headshot?.href || `https://a.espncdn.com/i/headshots/nfl/players/full/${encodeURIComponent(id)}.png`,
     };
   })();
   nflAthleteProfileCache.set(cacheKey, promise);
   return promise;
 }
 
-function flattenNflSeasonStats(payload) {
+function nflSeasonStatCategories(payload, season) {
+  return (payload?.categories || []).map((category) => {
+    const row = (category.statistics || []).find((entry) => Number(entry?.season?.year) === Number(season)) || (category.statistics || []).at(-1);
+    if (!row) return null;
+    return { name: category.name || '', displayName: category.displayName || category.name || 'Statistics', position: row.position || '', season: Number(row?.season?.year) || Number(season), stats: (category.labels || []).map((label, index) => ({ label, name: category.names?.[index] || label, displayName: category.displayNames?.[index] || label, value: row.stats?.[index] ?? '--' })) };
+  }).filter(Boolean);
+}
+
+function flattenNflSeasonStats(payload, season) {
+  const common = nflSeasonStatCategories(payload, season).flatMap((category) => category.stats.map((stat) => ({ label: stat.label, value: String(stat.value), category: category.name })));
+  if (common.length) return common;
   const rows = [];
   const categories = payload?.splits?.categories || payload?.categories || payload?.statistics || [];
   for (const category of categories || []) {
@@ -1124,21 +1467,29 @@ function gameDialogLoadingHtml(game) {
   `;
 }
 
-function gameDialogHtml(game, summary) {
+function gameDialogHtml(game, summary, personnel = null) {
   const box = summary?.boxscore || {};
+  const gameIndex = state.games.findIndex((item) => item.id === game.id);
   return `
     <div class="dialog-head">
+      <button type="button" class="dialog-nav-arrow" data-game-nav="-1" ${gameIndex <= 0 ? 'disabled' : ''} aria-label="Previous game">‹</button>
       <div><span class="eyebrow">${escapeHtml(statusText(game))}</span><h2>${escapeHtml(game.name)}</h2></div>
+      <button type="button" class="dialog-nav-arrow" data-game-nav="1" ${gameIndex >= state.games.length - 1 ? 'disabled' : ''} aria-label="Next game">›</button>
       <button type="button" data-dialog-close>x</button>
     </div>
     <section class="madden-dialog-panel">
       <div class="madden-dialog-tabs" role="tablist" aria-label="Game detail tabs">
         <button type="button" class="active" data-game-detail-tab="depth">Depth Charts</button>
+        <button type="button" data-game-detail-tab="coverage">WR vs Secondary</button>
         <button type="button" data-game-detail-tab="players">Player Stats</button>
         <button type="button" data-game-detail-tab="teams">Team Stats</button>
       </div>
       <div class="game-detail-tab-panel active" data-game-detail-panel="depth">
-        ${dialogDepthChartsHtml(game, box)}
+        ${dialogDepthChartsHtml(game, box, personnel)}
+      </div>
+      <div class="game-detail-tab-panel" data-game-detail-panel="coverage">
+        <div class="projected-grid">${projectedMatchupsHtml(game, box, personnel)}</div>
+        <section class="coverage-history"><header><div><span class="eyebrow">Verified History</span><strong>Imported head-to-head coverage</strong></div><span class="status-pill verified">Charted</span></header>${coverageHistoryHtml(coverageRowsForGame(game))}</section>
       </div>
       <div class="game-detail-tab-panel" data-game-detail-panel="players">
         ${dialogPlayerStatsHtml(box)}
@@ -1165,20 +1516,32 @@ function gameDialogHtml(game, summary) {
   `;
 }
 
-function dialogDepthChartsHtml(game, box) {
+function dialogDepthChartsHtml(game, box, personnel = null) {
   const playerGroups = box?.players || [];
   const away = depthChartForTeam(playerGroups, game.away);
   const home = depthChartForTeam(playerGroups, game.home);
+  const offense = (rows) => rows.filter((row) => isReceiverPosition(row.position) || /^(QB|RB|FB|LT|LG|C|RG|RT|OL)$/.test(row.position));
+  const defense = (rows) => rows.filter((row) => isSecondaryPosition(row.position) || /^(DE|LDE|RDE|DT|LDT|RDT|DL|NT|LB|ILB|MLB|WLB|SLB|OLB|EDGE)$/.test(row.position));
+  const gameHasParticipants = game?.status?.type?.state !== 'pre';
+  const resolveUnit = (participants, roster, filter, unit) => {
+    const eligibleRoster = filter(roster || []);
+    const rows = gameHasParticipants && participants.length ? mergeParticipantPositions(participants, eligibleRoster) : eligibleRoster;
+    return assignDepthStrings(rows, unit);
+  };
+  away.offense = resolveUnit(away.offense, personnel?.away, offense, 'offense');
+  away.defense = resolveUnit(away.defense, personnel?.away, defense, 'defense');
+  home.offense = resolveUnit(home.offense, personnel?.home, offense, 'offense');
+  home.defense = resolveUnit(home.defense, personnel?.home, defense, 'defense');
   return `
     <div class="depth-matchup-toggle" role="tablist" aria-label="Depth chart matchup">
       <button type="button" class="active" data-depth-matchup="away">${escapeHtml(game.away.abbrev)} O vs ${escapeHtml(game.home.abbrev)} D</button>
       <button type="button" data-depth-matchup="home">${escapeHtml(game.home.abbrev)} O vs ${escapeHtml(game.away.abbrev)} D</button>
     </div>
     <div class="depth-chart-grid active" data-depth-matchup-panel="away">
-      ${depthMatchupHtml(game.away, away.offense, game.home, home.defense)}
+      ${depthMatchupHtml(game.away, away.offense, game.home, home.defense, game)}
     </div>
     <div class="depth-chart-grid" data-depth-matchup-panel="home">
-      ${depthMatchupHtml(game.home, home.offense, game.away, away.defense)}
+      ${depthMatchupHtml(game.home, home.offense, game.away, away.defense, game)}
     </div>
   `;
 }
@@ -1202,6 +1565,7 @@ function depthChartForTeam(playerGroups = [], team) {
         name: player.displayName || player.shortName || 'Player',
         position: player.position?.abbreviation || player.position?.displayName || athlete.position?.abbreviation || athlete.position?.displayName || athlete.position || '',
         stats: [],
+        statCategories: player.statCategories || [],
       };
       if (!existing.position && athlete.position) existing.position = athlete.position;
       const labels = category.labels || category.names || [];
@@ -1221,32 +1585,86 @@ function depthChartForTeam(playerGroups = [], team) {
     }
   }
   return {
-    offense: [...buckets.offense.values()].slice(0, 12),
-    defense: [...buckets.defense.values()].slice(0, 12),
+    offense: [...buckets.offense.values()],
+    defense: [...buckets.defense.values()],
   };
 }
 
-function depthMatchupHtml(offenseTeam, offenseRows, defenseTeam, defenseRows) {
-  const enrichedOffense = enrichDepthRowsWithAverages(offenseRows);
-  const enrichedDefense = enrichDepthRowsWithAverages(defenseRows);
+function depthMatchupHtml(offenseTeam, offenseRows, defenseTeam, defenseRows, game) {
+  const enrichedOffense = enrichDepthRowsWithAverages(offenseRows).sort((a, b) => footballPositionRank(a.position, 'offense') - footballPositionRank(b.position, 'offense') || (a.depth || 99) - (b.depth || 99) || a.name.localeCompare(b.name));
+  const enrichedDefense = enrichDepthRowsWithAverages(defenseRows).sort((a, b) => footballPositionRank(a.position, 'defense') - footballPositionRank(b.position, 'defense') || (a.depth || 99) - (b.depth || 99) || a.name.localeCompare(b.name));
   return `
-    <section class="depth-team" style="--team-accent:${escapeHtml(offenseTeam.color)}">
+    <section class="depth-team" style="--team-accent:${escapeHtml(offenseTeam.color)};--depth-logo:url('${escapeHtml(offenseTeam.logo)}')">
       <header>
         <img src="${escapeHtml(offenseTeam.logo)}" alt="" />
         <div><strong style="color:${escapeHtml(readableTeamColor(offenseTeam.color))}">${escapeHtml(offenseTeam.abbrev)} Offense</strong><span>season/game stats vs ${escapeHtml(defenseTeam.abbrev)} defense</span></div>
       </header>
       <div class="matchup-read">
-        ${matchupReadHtml(offenseTeam, defenseTeam)}
+        ${matchupReadHtml(offenseTeam, defenseTeam, game)}
       </div>
       <div class="depth-lanes">
-        <div><span class="eyebrow">${escapeHtml(offenseTeam.abbrev)} Offense</span>${enrichedOffense.length ? enrichedOffense.map((player) => depthPlayerRowHtml(player)).join('') : '<div class="empty">Offensive data unavailable.</div>'}</div>
-        <div><span class="eyebrow">${escapeHtml(defenseTeam.abbrev)} Defense</span>${enrichedDefense.length ? enrichedDefense.map((player) => depthPlayerRowHtml(player)).join('') : '<div class="empty">Defensive data unavailable.</div>'}</div>
+        <div><span class="eyebrow">${escapeHtml(offenseTeam.abbrev)} Offense</span>${enrichedOffense.length ? enrichedOffense.map((player) => depthPlayerRowHtml(player, offenseTeam)).join('') : '<div class="empty">Offensive data unavailable.</div>'}</div>
+        <div><span class="eyebrow">${escapeHtml(defenseTeam.abbrev)} Defense</span>${enrichedDefense.length ? enrichedDefense.map((player) => depthPlayerRowHtml(player, defenseTeam)).join('') : '<div class="empty">Defensive data unavailable.</div>'}</div>
       </div>
     </section>
   `;
 }
 
-function depthPlayerRowHtml(player) {
+function footballPositionRank(position, unit = '') {
+  const keyName = String(position || '').toUpperCase();
+  const offense = ['QB','RB','HB','FB','LWR','WR','RWR','SWR','SLWR','SRWR','TE','LT','LG','C','RG','RT','OL'];
+  const defense = ['LDE','DE','RDE','LDT','DT','RDT','NT','DL','EDGE','WLB','OLB','MLB','ILB','LB','SLB','LCB','CB','RCB','SCB','NB','FS','SS','S','DB'];
+  const special = ['K','PK','P','LS','H','KR','PR'];
+  const order = unit === 'offense' ? offense : unit === 'defense' ? defense : [...offense, ...defense, ...special];
+  const index = order.indexOf(keyName); return index < 0 ? 999 : index;
+}
+
+function depthPositionGroup(position) {
+  const pos = String(position || '').toUpperCase();
+  if (/^(LWR|RWR|SWR|SLWR|SRWR|WR)$/.test(pos)) return 'WR';
+  if (/^(HB|RB)$/.test(pos)) return 'RB';
+  if (/^(LDE|RDE|DE)$/.test(pos)) return 'DE';
+  if (/^(LDT|RDT|DT|NT)$/.test(pos)) return 'DT';
+  if (/^(WLB|SLB|MLB|ILB|OLB|LB)$/.test(pos)) return 'LB';
+  if (/^(LCB|RCB|SCB|CB|NB)$/.test(pos)) return 'CB';
+  return pos;
+}
+
+function numericPlayerStat(player, aliases) {
+  for (const stat of dedupeDepthStats(player?.stats || [])) if (aliases.some((alias) => normalizeStatKey(stat.label) === normalizeStatKey(alias))) { const value = numericStatValue(stat.value); if (Number.isFinite(value)) return value; }
+  return 0;
+}
+
+function playerUsageScore(player) {
+  const group = depthPositionGroup(player.position);
+  if (group === 'QB') return numericPlayerStat(player, ['ATT','passingAttempts']) * 12 + numericPlayerStat(player, ['YDS','passingYards']) + numericPlayerStat(player, ['TD','passingTouchdowns']) * 75;
+  if (group === 'RB' || group === 'FB') return numericPlayerStat(player, ['CAR','rushingAttempts']) * 12 + numericPlayerStat(player, ['YDS','rushingYards']) + numericPlayerStat(player, ['TD','rushingTouchdowns']) * 65 + numericPlayerStat(player, ['REC','receptions']) * 8;
+  if (group === 'WR' || group === 'TE') return numericPlayerStat(player, ['REC','receptions']) * 30 + numericPlayerStat(player, ['YDS','receivingYards']) + numericPlayerStat(player, ['TD','receivingTouchdowns']) * 80 + numericPlayerStat(player, ['TGTS','targets']) * 8;
+  if (['DE','DT','DL','EDGE','LB','CB','S','FS','SS','DB'].includes(group)) return numericPlayerStat(player, ['TOT','totalTackles']) * 12 + numericPlayerStat(player, ['SOLO','soloTackles']) * 4 + numericPlayerStat(player, ['SACKS','sacks']) * 45 + numericPlayerStat(player, ['INT','interceptions']) * 70 + numericPlayerStat(player, ['TFL','tacklesForLoss']) * 15;
+  return numericPlayerStat(player, ['GP','gamesPlayed']) * 2;
+}
+
+function assignDepthStrings(rows, unit) {
+  const groups = new Map();
+  for (const row of rows) { const group = depthPositionGroup(row.position); if (!groups.has(group)) groups.set(group, []); groups.get(group).push(row); }
+  const output = [];
+  for (const [group, players] of groups) {
+    players.sort((a, b) => (Number(a.depth) || 99) - (Number(b.depth) || 99) || playerUsageScore(b) - playerUsageScore(a) || a.name.localeCompare(b.name));
+    players.slice(0, 3).forEach((player, index) => output.push({ ...player, string: Number(player.depth) < 4 ? Number(player.depth) : index + 1, positionGroup: group }));
+  }
+  return output.sort((a, b) => footballPositionRank(a.position, unit) - footballPositionRank(b.position, unit) || a.string - b.string || playerUsageScore(b) - playerUsageScore(a));
+}
+
+function mergeParticipantPositions(participants, roster) {
+  return participants.map((player) => { const match = roster.find((row) => String(row.id) === String(player.id) || normalizeStatKey(row.name) === normalizeStatKey(player.name)); return match ? { ...match, ...player, position: player.position || match.position, depth: match.depth, slot: match.slot, status: match.status } : player; }).filter((player) => player.position);
+}
+
+function playerButtonHtml(player, team) {
+  return `<button type="button" class="player-name-button" data-player-card data-player-id="${escapeHtml(player.id || '')}" data-player-name="${escapeHtml(player.name)}" data-player-position="${escapeHtml(player.position || '')}" data-player-team="${escapeHtml(team?.abbrev || '')}" data-player-color="${escapeHtml(team?.color || '')}" data-player-logo="${escapeHtml(team?.logo || '')}">${escapeHtml(player.name)}</button>`;
+}
+
+function depthPlayerRowHtml(player, team) {
+  const tierData = playerTierFor(player.id, player.position, { position: player.position, statCategories: player.statCategories || [] });
   const statText = dedupeDepthStats(player.stats).slice(0, 4).map((stat) => {
     const delta = Number(stat.delta);
     const deltaText = Number.isFinite(delta) && delta > 0 ? ` (+${formatCompactNumber(delta)} vs avg)` : '';
@@ -1254,8 +1672,8 @@ function depthPlayerRowHtml(player) {
   }).join(' | ');
   return `
     <div class="depth-player">
-      <span>${escapeHtml(player.position || '-')}</span>
-      <strong>${escapeHtml(player.name)}</strong>
+      <span>${escapeHtml(player.position || '-')}<small class="string-rank">${player.string ? `${player.string}${player.string === 1 ? 'st' : player.string === 2 ? 'nd' : 'rd'}` : ''}</small></span>
+      <strong>${playerButtonHtml(player, team)} <span class="inline-tier tier-${tierData.tier}">${tierData.tier} · D${tierData.decile}</span></strong>
       <em>${escapeHtml(statText || 'Season data unavailable')}</em>
     </div>
   `;
@@ -1306,13 +1724,18 @@ function dedupeDepthStats(stats = []) {
   });
 }
 
-function matchupReadHtml(team, opponent) {
+function matchupReadHtml(team, opponent, game) {
+  const runDefense = RUN_DEFENSE_2025.find((row) => row.team === normalizedNflTeam(opponent.abbrev));
   const rows = [
     ['Pass', statLookup(team.stats, ['netPassingYards', 'passing yards']), statLookup(opponent.stats, ['netPassingYards', 'passing yards'])],
     ['Rush', statLookup(team.stats, ['rushingYards', 'rushing yards']), statLookup(opponent.stats, ['rushingYards', 'rushing yards'])],
     ['TO', statLookup(team.stats, ['turnovers']), statLookup(opponent.stats, ['takeaways', 'turnovers'])],
   ];
-  return rows.map(([label, teamValue, oppValue]) => `<span><b>${escapeHtml(label)}</b><em>Off ${escapeHtml(teamValue)}</em><em>Def ${escapeHtml(oppValue)}</em></span>`).join('');
+  const basics = rows.map(([label, teamValue, oppValue]) => `<span><b>${escapeHtml(label)}</b><em>Off ${escapeHtml(teamValue)}</em><em>Def ${escapeHtml(oppValue)}</em></span>`).join('');
+  if (!runDefense) return basics;
+  const tier = runDefense.rank <= 8 ? 'elite' : runDefense.rank >= 25 ? 'bad' : 'mid';
+  const baselineSeason = analysisSeasonForGame(game);
+  return `${basics}<span class="run-defense-read tier-${tier}"><b>Run D ${tier}</b><em>#${runDefense.rank} NFL</em><em>${runDefense.ypg} rush YPG allowed · ${baselineSeason === 2025 ? '2025 model baseline' : '2025 fallback baseline'}</em></span>`;
 }
 
 function dialogPlayerStatsHtml(box) {
@@ -1487,6 +1910,7 @@ function mergeStandings(teams, standings) {
 }
 
 async function loadAll({ silent = false } = {}) {
+  state.selectedDate = nflWeekStart(state.selectedDate || todayValue());
   if (!silent) els.statusBar.textContent = `Loading ${longDate(state.selectedDate)} NFL slate...`;
   els.dateInput.value = state.selectedDate;
   localStorage.setItem(key('date'), state.selectedDate);
@@ -1495,11 +1919,11 @@ async function loadAll({ silent = false } = {}) {
     if (!scoreboard.games.length) {
       const snapDate = await findMostRecentSlateDate(state.selectedDate).catch(() => state.selectedDate);
       if (snapDate && snapDate !== state.selectedDate) {
-        state.selectedDate = snapDate;
+        state.selectedDate = nflWeekStart(snapDate);
         state.snappedDate = true;
         els.dateInput.value = state.selectedDate;
         localStorage.setItem(key('date'), state.selectedDate);
-        scoreboard = { games: await fetchScoreboardForDate(state.selectedDate), raw: null };
+        scoreboard = { games: await fetchScoreboardRange(nflWeekStart(state.selectedDate), nflWeekEnd(state.selectedDate)), raw: null };
       } else {
         state.snappedDate = false;
       }
@@ -1522,7 +1946,7 @@ async function loadAll({ silent = false } = {}) {
     state.teams = mergeStandings(teams, standings);
     state.leaders = await fetchLeaders(els.leaderSeasonType.value).catch(() => leadersFromGames(state.seasonGames.length ? state.seasonGames : state.games));
     state.touchdowns = await fetchTouchdownsForSlate(state.games).catch(() => []);
-    els.slateLabel.textContent = `${state.games.length} games | ${longDate(state.selectedDate)}`;
+    els.slateLabel.textContent = `${state.games.length} games | ${nflWeekLabel(state.selectedDate)}`;
     els.statusBar.textContent = state.snappedDate
       ? `No games on the requested date. Showing the most recent NFL slate: ${longDate(state.selectedDate)}.`
       : `Loaded ${state.games.length} games for ${longDate(state.selectedDate)}.`;
@@ -1540,19 +1964,30 @@ function setPage(page) {
 }
 
 function bindEvents() {
+  document.addEventListener('click', (event) => {
+    const tierButton = event.target.closest('[data-tier-player]');
+    if (tierButton) { const id = tierButton.dataset.tierPlayer; if (tierButton.dataset.tierValue === 'auto') delete state.playerTierOverrides[id]; else state.playerTierOverrides[id] = tierButton.dataset.tierValue; writeJson(key('playerTierOverrides'), state.playerTierOverrides); const current = state.playerCardContext[state.playerCardIndex]; if (current) openNflPlayerCard(current, true); return; }
+    const playerNav = event.target.closest('[data-player-nav]');
+    if (playerNav && !playerNav.disabled) { const next = state.playerCardContext[state.playerCardIndex + Number(playerNav.dataset.playerNav)]; if (next) openNflPlayerCard(next, true); return; }
+    const playerButton = event.target.closest('[data-player-card]');
+    if (playerButton) { event.preventDefault(); event.stopPropagation(); openNflPlayerCard(playerButton); return; }
+    if (event.target.closest('[data-player-dialog-close]') || event.target === els.playerDialog) els.playerDialog?.close();
+  });
   document.querySelectorAll('[data-page]').forEach((button) => {
     button.addEventListener('click', () => setPage(button.dataset.page));
   });
   els.dateInput.addEventListener('change', () => {
-    state.selectedDate = els.dateInput.value || todayValue();
+    state.selectedDate = nflWeekStart(parseFlexibleDateInput(els.dateInput.value) || state.selectedDate || todayValue());
     loadAll();
   });
+  els.dateInput.addEventListener('focus', openDatePicker);
+  els.dateInput.addEventListener('click', openDatePicker);
   els.prevDayBtn.addEventListener('click', () => {
-    state.selectedDate = addDays(state.selectedDate, -1);
+    state.selectedDate = addDays(nflWeekStart(state.selectedDate), -7);
     loadAll();
   });
   els.nextDayBtn.addEventListener('click', () => {
-    state.selectedDate = addDays(state.selectedDate, 1);
+    state.selectedDate = addDays(nflWeekStart(state.selectedDate), 7);
     loadAll();
   });
   els.prevWeekBtn.addEventListener('click', () => {
@@ -1564,7 +1999,7 @@ function bindEvents() {
     loadAll();
   });
   els.todayBtn.addEventListener('click', () => {
-    state.selectedDate = todayValue();
+    state.selectedDate = nflWeekStart(todayValue());
     loadAll();
   });
   els.refreshBtn.addEventListener('click', () => loadAll({ silent: true }));
@@ -1593,6 +2028,37 @@ function bindEvents() {
     state.leaders = await fetchLeaders(els.leaderSeasonType.value).catch(() => leadersFromGames(state.seasonGames.length ? state.seasonGames : state.games));
     renderLeaders();
   });
+  els.matchupGameSelect?.addEventListener('change', () => {
+    state.matchupGameId = els.matchupGameSelect.value;
+    renderMatchups();
+  });
+  els.matchupWindow?.addEventListener('change', renderMatchups);
+  els.coverageImport?.addEventListener('change', async () => {
+    const file = els.coverageImport.files?.[0];
+    if (!file) return;
+    try {
+      const text = await file.text();
+      const parsed = file.name.toLowerCase().endsWith('.json') ? JSON.parse(text) : parseCsv(text);
+      const sourceRows = Array.isArray(parsed) ? parsed : parsed.rows;
+      if (!Array.isArray(sourceRows)) throw new Error('Expected an array or an object with a rows array.');
+      const incoming = sourceRows.map(normalizeCoverageRow).filter(coverageRowValid);
+      if (!incoming.length) throw new Error('No valid rows. Receiver, defender, offense_team, defense_team, and date or game_id are required.');
+      const merged = new Map(state.coverageRows.map((row) => [JSON.stringify(COVERAGE_COLUMNS.map((column) => row[column])), row]));
+      incoming.forEach((row) => merged.set(JSON.stringify(COVERAGE_COLUMNS.map((column) => row[column])), row));
+      state.coverageRows = [...merged.values()];
+      writeJson(key('coverageRows'), state.coverageRows);
+      els.coverageImport.value = '';
+      renderMatchups();
+    } catch (error) {
+      els.coverageDataStatus.textContent = `Import failed: ${error.message}`;
+    }
+  });
+  els.coverageExportBtn?.addEventListener('click', () => downloadText('nfl-coverage-history.json', JSON.stringify({ schemaVersion: 1, exportedAt: new Date().toISOString(), rows: state.coverageRows }, null, 2), 'application/json'));
+  els.coverageTemplateBtn?.addEventListener('click', () => downloadText('nfl-coverage-template.csv', `${COVERAGE_COLUMNS.join(',')}\n2025-09-07,,PHI,DAL,A.J. Brown,,elite,DaRon Bland,,elite,wide,man,28,7,5,84,1,0,118.8,charting-provider\n`, 'text/csv'));
+  els.coverageClearBtn?.addEventListener('click', () => {
+    if (!state.coverageRows.length || !window.confirm(`Remove all ${state.coverageRows.length} imported coverage rows from this browser?`)) return;
+    state.coverageRows = []; writeJson(key('coverageRows'), state.coverageRows); renderMatchups();
+  });
   els.propForm.addEventListener('submit', (event) => {
     event.preventDefault();
     const title = `${els.propSelection.value || 'NFL prop'} - ${els.propMarket.value}`;
@@ -1619,6 +2085,12 @@ function bindEvents() {
     renderScoreboard();
   });
   els.gameDialog.addEventListener('click', (event) => {
+    const gameNav = event.target.closest('[data-game-nav]');
+    if (gameNav && !gameNav.disabled) {
+      const current = state.games.findIndex((game) => game.id === state.openGameId); const next = state.games[current + Number(gameNav.dataset.gameNav)];
+      if (next) openGameDialog(next.id);
+      return;
+    }
     const depthTab = event.target.closest('[data-depth-matchup]');
     if (depthTab) {
       event.preventDefault();
@@ -1639,14 +2111,17 @@ function bindEvents() {
   });
   document.addEventListener('keydown', (event) => {
     if (event.target.matches('input, select, textarea')) return;
+    const direction = event.key === 'ArrowLeft' ? -1 : event.key === 'ArrowRight' ? 1 : 0;
+    if (direction && els.playerDialog?.open) { const next = state.playerCardContext[state.playerCardIndex + direction]; if (next) { event.preventDefault(); openNflPlayerCard(next, true); } return; }
+    if (direction && els.gameDialog?.open) { const current = state.games.findIndex((game) => game.id === state.openGameId); const next = state.games[current + direction]; if (next) { event.preventDefault(); openGameDialog(next.id); } return; }
     if (event.key === 'ArrowLeft') {
       event.preventDefault();
-      state.selectedDate = addDays(state.selectedDate, -1);
+      state.selectedDate = addDays(nflWeekStart(state.selectedDate), -7);
       loadAll();
     }
     if (event.key === 'ArrowRight') {
       event.preventDefault();
-      state.selectedDate = addDays(state.selectedDate, 1);
+      state.selectedDate = addDays(nflWeekStart(state.selectedDate), 7);
       loadAll();
     }
     if (event.key.toLowerCase() === 'r') loadAll({ silent: true });

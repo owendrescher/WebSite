@@ -6,21 +6,21 @@
     <meta name="color-scheme" content="dark" />
     <title>NFL Game Center</title>
     <meta name="description" content="Live NFL scoreboard, weekly matchups, team form, leaders, betting notes, and game detail dashboard." />
-    <link rel="stylesheet" href="styles.css?v=20260506-nfl-5" />
+    <link rel="stylesheet" href="styles.css?v=20260807-nfl-11" />
   </head>
   <body>
     <div class="app-shell">
       <header class="topbar">
-        <a class="home-link" href="../dashboard-live-prototype.html" title="Back to MLB Game Center">MLB</a>
+        <a class="home-link" href="../mlb/heavy_mlb.html" title="Back to MLB Game Center">MLB</a>
         <div class="brand">
           <span>NFL GAME CENTER</span>
           <strong id="slateLabel">Loading slate</strong>
         </div>
         <div class="date-tools" aria-label="Slate controls">
           <button id="prevWeekBtn" type="button" title="Previous week">-W</button>
-          <button id="prevDayBtn" type="button" title="Previous day">-D</button>
-          <input id="dateInput" type="date" />
-          <button id="nextDayBtn" type="button" title="Next day">+D</button>
+          <button id="prevDayBtn" type="button" title="Previous day" hidden>-D</button>
+          <input id="dateInput" type="text" inputmode="numeric" autocomplete="off" placeholder="NFL week" aria-label="NFL week, Thursday through Monday" />
+          <button id="nextDayBtn" type="button" title="Next day" hidden>+D</button>
           <button id="nextWeekBtn" type="button" title="Next week">+W</button>
           <button id="todayBtn" type="button">Today</button>
         </div>
@@ -28,6 +28,7 @@
           <button type="button" class="active" data-page="scoreboard">Scoreboard</button>
           <button type="button" data-page="teams">Teams</button>
           <button type="button" data-page="leaders">Leaders</button>
+          <button type="button" data-page="matchups">WR vs Secondary</button>
           <button type="button" data-page="props">Props</button>
         </nav>
       </header>
@@ -60,6 +61,30 @@
               </select>
             </div>
             <div id="leadersGrid" class="leaders-grid"></div>
+          </section>
+          <section id="matchupsPage" class="page" aria-label="Wide receiver and secondary matchups">
+            <div class="section-head">
+              <div>
+                <span class="eyebrow">Coverage Lab</span>
+                <strong>Projected alignments and verified WR–defender history</strong>
+              </div>
+              <div class="matchup-toolbar">
+                <label>Game <select id="matchupGameSelect"></select></label>
+                <label>Window <select id="matchupWindow"><option value="all">All imported</option><option value="5">Last 5 meetings</option><option value="3">Last 3 meetings</option></select></label>
+              </div>
+            </div>
+            <div id="matchupSummary" class="matchup-summary"></div>
+            <div id="matchupBoard" class="coverage-board"></div>
+            <section class="tool-card coverage-data-card">
+              <header><div><span class="eyebrow">Coverage Data</span><strong>Import charted matchup history</strong></div><span id="coverageDataStatus"></span></header>
+              <p class="source-note">ESPN supplies schedules, box scores, rosters, and season totals—not defender coverage assignments. Imported rows are marked verified; lineup-based pairings are marked projected.</p>
+              <div class="coverage-actions">
+                <label class="file-button">Import CSV / JSON<input id="coverageImport" type="file" accept=".csv,.json,application/json,text/csv" /></label>
+                <button id="coverageExportBtn" type="button" class="soft-btn">Export data</button>
+                <button id="coverageTemplateBtn" type="button" class="soft-btn">Download template</button>
+                <button id="coverageClearBtn" type="button" class="soft-btn danger">Clear imported data</button>
+              </div>
+            </section>
           </section>
           <section id="propsPage" class="page" aria-label="Prop research">
             <div class="props-layout">
@@ -131,6 +156,9 @@
     <dialog id="gameDialog" class="game-dialog">
       <div id="gameDialogBody" class="game-dialog-body"></div>
     </dialog>
+    <dialog id="playerDialog" class="player-dialog">
+      <div id="playerDialogBody" class="player-dialog-body"></div>
+    </dialog>
 
     <template id="gameCardTemplate">
       <article class="game-card">
@@ -142,6 +170,6 @@
       </article>
     </template>
 
-    <script src="app.js?v=20260506-nfl-5"></script>
+    <script src="app.js?v=20260807-nfl-11"></script>
   </body>
 </html>
