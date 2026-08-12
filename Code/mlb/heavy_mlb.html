@@ -3,7 +3,6 @@
   <head>
     <meta charset="utf-8" />
     <meta name="viewport" content="width=device-width, initial-scale=1" />
-    <base href="../fast-skeleton/" />
     <meta name="color-scheme" content="dark" />
     <title>MLB Game Center Live Prototype</title>
     <meta name="description" content="Live MLB scoreboard, lineup cards, hot player tracking, team form, pitcher trends, home run feed, and baseball betting stat tools for every MLB team." />
@@ -75,17 +74,16 @@
     </style>
     <style>
       .game-card .scoreboard {
-        border-color: color-mix(in srgb, var(--away-secondary, var(--line)) 12%, var(--home-secondary, var(--line)) 12%, var(--line));
+        border-color:var(--line);
       }
       .game-card .away-row, .game-card .home-row { box-shadow: none; }
-      .game-card .away-logo { outline: 1px solid color-mix(in srgb, var(--away-secondary, transparent) 34%, transparent); }
-      .game-card .home-logo { outline: 1px solid color-mix(in srgb, var(--home-secondary, transparent) 34%, transparent); }
+      .game-card .away-logo,.game-card .home-logo { outline:none; }
       .game-card .score-state-strip {
         border-color: color-mix(in srgb, var(--away-secondary, var(--line)) 16%, var(--home-secondary, var(--line)) 16%, var(--line));
       }
       #lineupOverlay .lineup-logo-pick-trigger:not(.is-pick-selected):not(.is-game-pick-leading):not(.is-game-pick-trailing):not(.is-game-pick-hit):not(.is-game-pick-miss) { outline:none!important; box-shadow:none; }
-      #lineupOverlay .away-lineup-logo:is(.is-pick-selected,.is-game-pick-leading,.is-game-pick-trailing,.is-game-pick-hit,.is-game-pick-miss) { outline:2px solid color-mix(in srgb,var(--away-secondary) 72%,transparent); }
-      #lineupOverlay .home-lineup-logo:is(.is-pick-selected,.is-game-pick-leading,.is-game-pick-trailing,.is-game-pick-hit,.is-game-pick-miss) { outline:2px solid color-mix(in srgb,var(--home-secondary) 72%,transparent); }
+      #lineupOverlay .away-lineup-logo:is(.is-pick-selected,.is-game-pick-leading,.is-game-pick-trailing,.is-game-pick-hit,.is-game-pick-miss) { outline:3px solid var(--away-selection,var(--away-color)); }
+      #lineupOverlay .home-lineup-logo:is(.is-pick-selected,.is-game-pick-leading,.is-game-pick-trailing,.is-game-pick-hit,.is-game-pick-miss) { outline:3px solid var(--home-selection,var(--home-color)); }
       #lineupOverlay .lineup-series-game { border-color:color-mix(in srgb,var(--series-outline) 82%,#dcecff 18%); background:linear-gradient(180deg,color-mix(in srgb,var(--series-fill) 34%,#071724 66%),color-mix(in srgb,var(--series-fill) 18%,#07111c 82%)); }
       #lineupOverlay .lineup-series-pitcher { border-color:color-mix(in srgb,var(--series-pitcher) 58%,#dcecff 42%); background:linear-gradient(180deg,color-mix(in srgb,var(--series-pitcher) 25%,#132638 75%),color-mix(in srgb,var(--series-pitcher) 12%,#07111c 88%)); }
       #lineupOverlay .away-lineup-pitcher { border-left-color: var(--away-tertiary, var(--line)); }
@@ -144,29 +142,32 @@
       body.dashboard-page .away-row.is-pick-selected {
         position:relative;
         z-index:3;
-        outline:3px solid color-mix(in srgb,var(--away-secondary,#ffe16b) 58%,#fff 42%);
-        outline-offset:-3px;
+        outline:4px solid var(--away-selection,var(--away-color,#ffe16b));
+        outline-offset:-4px;
         box-shadow:
-          inset 0 0 0 1px #fff,
-          inset 0 0 0 999px rgba(var(--away-rgb,102,217,255),.20),
-          0 0 20px rgba(var(--away-rgb,102,217,255),.68)!important;
+          inset 0 0 0 999px color-mix(in srgb,var(--away-selection,var(--away-color,#ffe16b)) 22%,transparent),
+          0 0 26px color-mix(in srgb,var(--away-selection,var(--away-color,#ffe16b)) 88%,transparent)!important;
       }
       body.dashboard-page .home-row.is-pick-selected {
         position:relative;
         z-index:3;
-        outline:3px solid color-mix(in srgb,var(--home-secondary,#ffe16b) 58%,#fff 42%);
-        outline-offset:-3px;
+        outline:4px solid var(--home-selection,var(--home-color,#ffe16b));
+        outline-offset:-4px;
         box-shadow:
-          inset 0 0 0 1px #fff,
-          inset 0 0 0 999px rgba(var(--home-rgb,240,218,153),.20),
-          0 0 20px rgba(var(--home-rgb,240,218,153),.68)!important;
+          inset 0 0 0 999px color-mix(in srgb,var(--home-selection,var(--home-color,#ffe16b)) 22%,transparent),
+          0 0 26px color-mix(in srgb,var(--home-selection,var(--home-color,#ffe16b)) 88%,transparent)!important;
       }
-      body.dashboard-page .scoreboard-side .score.is-pick-selected {
-        border:3px solid #fff!important;
+      body.dashboard-page .scoreboard-side .away-score.is-pick-selected {
+        border:4px solid var(--away-selection,var(--away-color,#ffe16b))!important;
         box-shadow:
-          inset 0 0 0 2px #ffe16b,
-          inset 0 0 0 999px rgba(255,225,107,.18),
-          0 0 18px rgba(255,225,107,.75)!important;
+          inset 0 0 0 999px color-mix(in srgb,var(--away-selection,var(--away-color,#ffe16b)) 22%,transparent),
+          0 0 22px color-mix(in srgb,var(--away-selection,var(--away-color,#ffe16b)) 88%,transparent)!important;
+      }
+      body.dashboard-page .scoreboard-side .home-score.is-pick-selected {
+        border:4px solid var(--home-selection,var(--home-color,#ffe16b))!important;
+        box-shadow:
+          inset 0 0 0 999px color-mix(in srgb,var(--home-selection,var(--home-color,#ffe16b)) 22%,transparent),
+          0 0 22px color-mix(in srgb,var(--home-selection,var(--home-color,#ffe16b)) 88%,transparent)!important;
       }
 
       /*
@@ -899,7 +900,7 @@
       </article>
     </template>
 
-    <script src="../shared/supabase-config.js?v=20260521heatmap"></script>
+    <script src="supabase-config.js?v=20260521heatmap"></script>
     <script>
       window.OWENTOOLS_SYNC = {
         toolId: "baseball-dashboard",
@@ -916,11 +917,11 @@
         ]
       };
     </script>
-    <script src="../shared/owentools-sync.js?v=20260721durableSession1"></script>
+    <script src="owentools-sync.js?v=20260721durableSession1"></script>
     <script src="rotowire-default-lineups.js?v=20260811rotowire"></script>
     <script src="mlb-contracts-data.js?v=20260708liveSearchFix1"></script>
     <script>window.MLB_DASHBOARD_BUILD_ID="20260711-tooltip-cleanup2";</script>
-    <script src="../mlb/data/savant/savant_aggregates_2026.js?v=20260811hand1"></script>
-    <script src="../mlb/live-dashboard-prototype.js?v=20260812scoreFont23"></script>
+    <script src="data/savant/savant_aggregates_2026.js?v=20260811hand1"></script>
+    <script src="live-dashboard-prototype.js?v=20260812trackerVivid28"></script>
   </body>
 </html>

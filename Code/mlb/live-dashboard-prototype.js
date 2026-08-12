@@ -906,6 +906,27 @@ const TEAM_PALETTES = {
   TOR: ['#134A8E', '#E8291C', '#1D2D5C'], WSH: ['#AB0003', '#14225A', '#FFFFFF'],
 };
 
+// UI hierarchy derived from current club colors: dominant identity, broad
+// supporting surface, then small accent. White is intentionally the supporting
+// color for clubs whose uniforms use brighter colors only as trim.
+const TEAM_UI_PALETTES = {
+  ARI:['#A71930','#E3D4AD','#30CED8'], ATL:['#CE1141','#FFFFFF','#13274F'],
+  BAL:['#DF4601','#FFFFFF','#111111'], BOS:['#BD3039','#FFFFFF','#0C2340'],
+  CHC:['#0E3386','#FFFFFF','#CC3433'], CHW:['#27251F','#FFFFFF','#C4CED4'],
+  CIN:['#C6011F','#FFFFFF','#111111'], CLE:['#00385D','#FFFFFF','#E50022'],
+  COL:['#333366','#FFFFFF','#C4CED4'], DET:['#0C2340','#FFFFFF','#FA4616'],
+  HOU:['#002D62','#FFFFFF','#EB6E1F'], KC:['#004687','#FFFFFF','#BD9B60'],
+  LAA:['#BA0021','#FFFFFF','#003263'], LAD:['#005A9C','#FFFFFF','#EF3E42'],
+  MIA:['#00A3E0','#FFFFFF','#EF3340'], MIL:['#12284B','#FFF3D0','#FFC52F'],
+  MIN:['#002B5C','#FFFFFF','#D31145'], NYM:['#002D72','#FFFFFF','#FF5910'],
+  NYY:['#0C2340','#FFFFFF','#C4CED4'], ATH:['#003831','#FFFFFF','#EFB21E'],
+  PHI:['#E81828','#FFFFFF','#002D72'], PIT:['#27251F','#FFFFFF','#FDB827'],
+  SD:['#2F241D','#FFFFFF','#FFC425'], SEA:['#0C2C56','#FFFFFF','#005C5C'],
+  SF:['#FD5A1E','#FFF2D6','#27251F'], STL:['#C41E3A','#FFFFFF','#0C2340'],
+  TB:['#092C5C','#FFFFFF','#8FBCE6'], TEX:['#003278','#FFFFFF','#C0111F'],
+  TOR:['#134A8E','#FFFFFF','#E8291C'], WSH:['#AB0003','#FFFFFF','#14225A'],
+};
+
 const TEAM_COLORS = Object.fromEntries(
   Object.entries(TEAM_PALETTES).map(([team, palette]) => [team, palette[0]]),
 );
@@ -5128,8 +5149,8 @@ function seriesStarterRowHtml(item = {}, side = '') {
 function seriesResultSliverHtml(item = {}, extraClass = '') {
   if (!item?.hasScore) return '';
   const winnerColor = item.winnerColor || getTeamColor(item.winnerTeam) || '#7bd0ff';
-  const winnerPalette = getTeamPalette(item.winnerTeam);
-  const winnerFill = winnerPalette[1] || winnerPalette[2] || getTeamTextColor(item.winnerTeam);
+  const winnerPalette = getTeamUiPalette(item.winnerTeam);
+  const winnerFill = getTeamUiSurfaceColor(item.winnerTeam);
   const awayScore = item.awayScore ?? '-';
   const homeScore = item.homeScore ?? '-';
   const title = `${displayTeamAbbrev(item.away)} ${awayScore}, ${displayTeamAbbrev(item.home)} ${homeScore}${item.live ? ' (live)' : ''}`;
@@ -8109,10 +8130,10 @@ async function getTeamLastSevenTooltipGames(teamAbbrev, date) {
 function teamLastSevenTooltipHtml(team, games = []) {
   const tiles = listify(games).map((game) => {
     const opponent = canonicalTeamAbbrev(game.opponent);
-    const palette = getTeamPalette(opponent);
+    const palette = getTeamUiPalette(opponent);
     const stat = game.statline || {};
     const strikeouts = statNumber(stat.strikeouts);
-    return `<span class="lineup-l7-game" style="--l7-primary:${escapeHtml(palette[0])};--l7-secondary:${escapeHtml(palette[1])};--l7-tertiary:${escapeHtml(palette[2])}"><span class="lineup-l7-logo-wrap"><img src="${escapeHtml(getLogoPath(opponent))}" alt="${escapeHtml(displayTeamAbbrev(opponent))} logo"><b class="is-${game.won ? 'win' : 'loss'}">${game.won ? 'W' : 'L'}</b></span><span class="lineup-l7-score">${game.awayScore} - ${game.homeScore}</span><span class="lineup-l7-starter">${escapeHtml(game.starterName)} (${escapeHtml(game.starterHand || '?')})</span><small>${escapeHtml(stat.ip || '0.0')} IP, ${statNumber(stat.earnedRuns)} ER, ${statNumber(stat.homeRuns)} HR, ${strikeouts} ${strikeouts === 1 ? 'K' : 'Ks'}</small></span>`;
+    return `<span class="lineup-l7-game" style="--l7-primary:${escapeHtml(palette[0])};--l7-secondary:${escapeHtml(getTeamUiSurfaceColor(opponent))};--l7-tertiary:${escapeHtml(palette[2])}"><span class="lineup-l7-logo-wrap"><img src="${escapeHtml(getLogoPath(opponent))}" alt="${escapeHtml(displayTeamAbbrev(opponent))} logo"><b class="is-${game.won ? 'win' : 'loss'}">${game.won ? 'W' : 'L'}</b></span><span class="lineup-l7-score">${game.awayScore} - ${game.homeScore}</span><span class="lineup-l7-starter">${escapeHtml(game.starterName)} (${escapeHtml(game.starterHand || '?')})</span><small>${escapeHtml(stat.ip || '0.0')} IP, ${statNumber(stat.earnedRuns)} ER, ${statNumber(stat.homeRuns)} HR, ${strikeouts} ${strikeouts === 1 ? 'K' : 'Ks'}</small></span>`;
   }).join('');
   return `<div class="lineup-l7-tooltip" style="--l7-team:${escapeHtml(getTeamTextColor(team))}">${tiles || '<span class="lineup-l7-empty">Recent games unavailable</span>'}</div>`;
 }
@@ -8255,8 +8276,49 @@ function getTeamColor(abbrev) {
   return TEAM_COLORS[canonicalTeamAbbrev(abbrev)] || '#DDE9FF';
 }
 
+// Tracker accents need to pop against the tracker panel. For clubs whose
+// official primary is a very dark navy/black, use their vivid uniform accent
+// (for example HOU/DET orange and MIL gold) rather than muting the identity.
+function getPlayerTrackerTeamColor(abbrev) {
+  const team = canonicalTeamAbbrev(abbrev);
+  return TEAM_TEXT_COLORS[team] || getTeamColor(team) || '#66d9ff';
+}
+
 function getTeamPalette(abbrev) {
   return TEAM_PALETTES[canonicalTeamAbbrev(abbrev)] || ['#DDE9FF', '#7BD0FF', '#FFFFFF'];
+}
+
+function getTeamUiPalette(abbrev) {
+  return TEAM_UI_PALETTES[canonicalTeamAbbrev(abbrev)] || getTeamPalette(abbrev);
+}
+
+function getTeamUiSurfaceColor(abbrev) {
+  const team = canonicalTeamAbbrev(abbrev);
+  const palette = getTeamUiPalette(team);
+  const supporting = String(palette[1] || '').toUpperCase();
+  // Mixing white into the dashboard's dark panel produces generic gray.
+  // Preserve white as a supporting brand color, but use the curated readable
+  // team hue whenever a component needs an actual broad tinted surface.
+  return ['#FFFFFF', '#FFF', 'WHITE'].includes(supporting)
+    ? getTeamTextColor(team)
+    : (palette[1] || getTeamTextColor(team));
+}
+
+function getTeamSelectionColor(abbrev) {
+  const team = canonicalTeamAbbrev(abbrev);
+  const palette = getTeamUiPalette(team);
+  const primary = palette[0] || getTeamColor(team);
+  const channels = rgbChannels(primary);
+  const luminance = (0.2126 * channels.r + 0.7152 * channels.g + 0.0722 * channels.b) / 255;
+  if (luminance >= 0.20) return mixHex(primary, 'white', 0.28);
+  const coloredAccent = [palette[2], palette[1], getTeamTextColor(team)]
+    .find((color) => {
+      const value = String(color || '').toUpperCase();
+      if (!value || ['#FFFFFF', '#FFF', 'WHITE', '#111111', '#000000', '#27251F'].includes(value)) return false;
+      const accentChannels = rgbChannels(value);
+      return ((0.2126 * accentChannels.r + 0.7152 * accentChannels.g + 0.0722 * accentChannels.b) / 255) >= 0.28;
+    });
+  return coloredAccent || mixHex(primary, 'white', 0.48);
 }
 
 function getTeamTextColor(abbrev) {
@@ -23760,7 +23822,14 @@ function moveTrackedPlayer(playerId, beforePlayerId = '') {
     ? tracked.findIndex((entry) => String(entry.playerId) === beforeId)
     : tracked.length;
   tracked.splice(toIndex >= 0 ? toIndex : tracked.length, 0, moving);
-  saveTrackedPlayers(tracked);
+  // A manual drag is an explicit ordering choice. Keep it visible instead of
+  // immediately sorting the items back to their original addedAt timestamps.
+  playerTrackerSortMode = 'added';
+  const manualOrderBase = Date.now();
+  saveTrackedPlayers(tracked.map((entry, index) => ({
+    ...entry,
+    addedAt: manualOrderBase + index,
+  })));
   renderPlayerTrackerList(latestRenderedGames);
   return true;
 }
@@ -24056,7 +24125,7 @@ function trackedPlayerOpponentPitcher(profile, game) {
     name: lastName(fullName) || fullName,
     hand: pitcherThrowHandValue(pitcher),
     teamAbbrev,
-    teamColor: pitcher?.teamColor || getTeamColor(teamAbbrev) || '#a9c5dc',
+    teamColor: getPlayerTrackerTeamColor(teamAbbrev),
   };
 }
 
@@ -24130,7 +24199,7 @@ function renderPlayerTrackerList(games = latestRenderedGames) {
     const playerId = Number(entry.playerId);
     const teamAbbrev = profile?.teamAbbrev || entry.teamAbbrev || '';
     const position = profile?.position || entry.position || '';
-    const teamColor = profile?.teamColor || game?.awayColor || game?.homeColor || '#66d9ff';
+    const teamColor = getPlayerTrackerTeamColor(teamAbbrev);
     const todayLine = trackedPlayerTodayLine(profile);
     const playerName = profile?.fullName || entry.playerName || 'Unknown';
     const confidence = normalizeTrackerConfidence(entry?.confidence);
@@ -24774,7 +24843,7 @@ function initBetInput() {
     const { playerId, overId, after } = trackerPointerDrag;
     clearTrackerPointerDrag();
     if (!playerId || !overId) return;
-    const tracked = getTrackedPlayers();
+    const tracked = sortTrackedPlayersForDisplay(getTrackedPlayers(), latestRenderedGames);
     const overIndex = tracked.findIndex((entry) => String(entry.playerId) === String(overId));
     const beforeEntry = after ? tracked[overIndex + 1] : tracked[overIndex];
     moveTrackedPlayer(playerId, beforeEntry?.playerId || '');
@@ -24815,7 +24884,7 @@ function initBetInput() {
     e.preventDefault();
     const rect = overItem.getBoundingClientRect();
     const after = e.clientY >= rect.top + (rect.height / 2);
-    const tracked = getTrackedPlayers();
+    const tracked = sortTrackedPlayersForDisplay(getTrackedPlayers(), latestRenderedGames);
     const overIndex = tracked.findIndex((entry) => String(entry.playerId) === String(overItem.dataset.playerId || ''));
     const beforeEntry = after ? tracked[overIndex + 1] : tracked[overIndex];
     moveTrackedPlayer(movingId, beforeEntry?.playerId || '');
@@ -49871,12 +49940,14 @@ async function syncLineupOverlay(game, options = {}) {
   lineupOverlayEl.style.setProperty('--home-color', getTeamTextColor(game.home));
   lineupOverlayEl.style.setProperty('--away-rgb', hexToRgb(game.awayColor || '#66d9ff'));
   lineupOverlayEl.style.setProperty('--home-rgb', hexToRgb(game.homeColor || '#f0da99'));
-  const awayLineupPalette = getTeamPalette(game.away);
-  const homeLineupPalette = getTeamPalette(game.home);
+  const awayLineupPalette = getTeamUiPalette(game.away);
+  const homeLineupPalette = getTeamUiPalette(game.home);
   lineupOverlayEl.style.setProperty('--away-secondary', awayLineupPalette[1]);
   lineupOverlayEl.style.setProperty('--away-tertiary', awayLineupPalette[2]);
+  lineupOverlayEl.style.setProperty('--away-selection', getTeamSelectionColor(game.away));
   lineupOverlayEl.style.setProperty('--home-secondary', homeLineupPalette[1]);
   lineupOverlayEl.style.setProperty('--home-tertiary', homeLineupPalette[2]);
+  lineupOverlayEl.style.setProperty('--home-selection', getTeamSelectionColor(game.home));
   const stillRenderingLineup = () => lineupOverlayEl.dataset.lineupRenderToken === renderToken
     && String(activeLineupGame?.gamePk || game.gamePk || '') === renderGamePk;
   const previousActiveLineupGame = activeLineupGame;
@@ -52393,12 +52464,14 @@ function upsertCard(game) {
   card.style.setProperty('--home-row-bg', homeRowBg);
   card.style.setProperty('--away-rgb', hexToRgb(game.awayColor || '#66d9ff'));
   card.style.setProperty('--home-rgb', hexToRgb(game.homeColor || '#f0da99'));
-  const awayPalette = getTeamPalette(game.away);
-  const homePalette = getTeamPalette(game.home);
+  const awayPalette = getTeamUiPalette(game.away);
+  const homePalette = getTeamUiPalette(game.home);
   card.style.setProperty('--away-secondary', awayPalette[1]);
   card.style.setProperty('--away-tertiary', awayPalette[2]);
+  card.style.setProperty('--away-selection', getTeamSelectionColor(game.away));
   card.style.setProperty('--home-secondary', homePalette[1]);
   card.style.setProperty('--home-tertiary', homePalette[2]);
+  card.style.setProperty('--home-selection', getTeamSelectionColor(game.home));
 
   card.querySelector('.away').textContent = displayTeamAbbrev(game.away);
   card.querySelector('.home').textContent = displayTeamAbbrev(game.home);
