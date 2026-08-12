@@ -97,15 +97,15 @@
   },
   "BOS": {
     "RHP": [
-      "Nick Sogard",
-      "Ceddanne Rafaela",
-      "Wilyer Abreu",
-      "Willson Contreras",
-      "Adley Rutschman",
       "Masataka Yoshida",
+      "Ceddanne Rafaela",
+      "Adley Rutschman",
+      "Willson Contreras",
+      "Wilyer Abreu",
       "Caleb Durbin",
       "Jarren Duran",
-      "Andruw Monasterio"
+      "Andruw Monasterio",
+      "Nick Sogard"
     ],
     "LHP": [
       "Jahmai Jones",
@@ -459,13 +459,13 @@
     "RHP": [
       "Trent Grisham",
       "Ben Rice",
-      "Heliot Ramos",
-      "Luis Garcia",
-      "Jazz Chisholm",
       "Spencer Jones",
-      "George Lombard",
+      "Luis Garcia",
+      "Heliot Ramos",
+      "Jazz Chisholm",
       "Ryan McMahon",
-      "Austin Wells"
+      "Austin Wells",
+      "George Lombard"
     ],
     "LHP": [
       "Paul Goldschmidt",
@@ -553,14 +553,14 @@
   },
   "SEA": {
     "RHP": [
+      "Taylor Ward",
       "Cole Young",
       "Randy Arozarena",
       "Dominic Canzone",
       "Julio Rodriguez",
       "Josh Naylor",
-      "Cal Raleigh",
       "Brendan Donovan",
-      "Taylor Ward",
+      "Cal Raleigh",
       "Colt Emerson"
     ],
     "LHP": [
