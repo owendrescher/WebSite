@@ -119,6 +119,97 @@
       .game-card .away, .game-card .away-record, #lineupOverlay .away-lineup-team, #lineupOverlay .away-lineup .lineup-name, #lineupOverlay .away-lineup-pitcher { -webkit-text-stroke:0; text-shadow:0 1px 2px rgba(0,0,0,.9); }
       .game-card .home, .game-card .home-record, #lineupOverlay .home-lineup-team, #lineupOverlay .home-lineup .lineup-name, #lineupOverlay .home-lineup-pitcher { -webkit-text-stroke:0; text-shadow:0 1px 2px rgba(0,0,0,.9); }
       #playerStatName { -webkit-text-stroke:0; text-shadow:0 1px 2px rgba(0,0,0,.9); }
+
+      /* Home-run feed readability: readable secondary team accents without a text outline. */
+      #hrDisplay .hr-name,
+      #hrDisplay .hr-meta,
+      #hrDisplay .hr-rating,
+      #hrDisplay .hr-compact-line {
+        -webkit-text-stroke:0;
+        paint-order:normal;
+      }
+      #hrDisplay .hr-rating { color:var(--hr-team-readable,var(--accent)); }
+
+      /* Score numeral trial: larger type in the existing box, with no hazy text effects. */
+      body.dashboard-page .scoreboard-side .score,
+      body.dashboard-page .score {
+        font-size:1.28rem!important;
+        letter-spacing:0!important;
+        -webkit-text-stroke:0!important;
+        text-shadow:none!important;
+        filter:none!important;
+      }
+
+      /* Make a pending scoreboard pick unmistakable without changing row geometry. */
+      body.dashboard-page .away-row.is-pick-selected {
+        position:relative;
+        z-index:3;
+        outline:3px solid color-mix(in srgb,var(--away-secondary,#ffe16b) 58%,#fff 42%);
+        outline-offset:-3px;
+        box-shadow:
+          inset 0 0 0 1px #fff,
+          inset 0 0 0 999px rgba(var(--away-rgb,102,217,255),.20),
+          0 0 20px rgba(var(--away-rgb,102,217,255),.68)!important;
+      }
+      body.dashboard-page .home-row.is-pick-selected {
+        position:relative;
+        z-index:3;
+        outline:3px solid color-mix(in srgb,var(--home-secondary,#ffe16b) 58%,#fff 42%);
+        outline-offset:-3px;
+        box-shadow:
+          inset 0 0 0 1px #fff,
+          inset 0 0 0 999px rgba(var(--home-rgb,240,218,153),.20),
+          0 0 20px rgba(var(--home-rgb,240,218,153),.68)!important;
+      }
+      body.dashboard-page .scoreboard-side .score.is-pick-selected {
+        border:3px solid #fff!important;
+        box-shadow:
+          inset 0 0 0 2px #ffe16b,
+          inset 0 0 0 999px rgba(255,225,107,.18),
+          0 0 18px rgba(255,225,107,.75)!important;
+      }
+
+      /*
+       * Typography normalization: the dashboard now uses only its standard UI
+       * face and the condensed team-abbreviation face. Any former third-font
+       * treatment is intentionally redirected to the abbreviation face.
+       */
+      :root {
+        --font-body:var(--font-ui);
+        --display-font:var(--font-display);
+      }
+      body.dashboard-page { font-family:var(--font-ui)!important; }
+      body.dashboard-page .scoreboard,
+      body.dashboard-page .scoreboard .team-record,
+      body.dashboard-page .scoreboard .team-streak,
+      body.dashboard-page .scoreboard .matchup-line,
+      body.dashboard-page .scoreboard .score-state-strip,
+      body.dashboard-page .scoreboard .score-mini-last-play {
+        font-family:var(--font-ui)!important;
+      }
+      body.dashboard-page .scoreboard .team,
+      body.dashboard-page .scoreboard .score {
+        font-family:var(--font-display)!important;
+      }
+      body.dashboard-page[data-theme="baseball-retro"],
+      body.dashboard-page[data-theme="paper-scorebook"],
+      body.dashboard-page code,
+      body.dashboard-page pre,
+      body.dashboard-page kbd,
+      body.dashboard-page samp,
+      body.dashboard-page .owentools-home-link,
+      body.dashboard-page .stats-profiler,
+      body.dashboard-page .player-track-confidence select,
+      body.dashboard-page .player-stat-jersey {
+        font-family:var(--font-display)!important;
+      }
+      @media print {
+        html body.dashboard-page.printing-predictions,
+        body.dashboard-page.printing-predictions .prediction-print-shell {
+          font-family:var(--font-display)!important;
+        }
+      }
+
     </style>
     <style>
       .player-stat-modal { border-color: color-mix(in srgb, var(--player-team-secondary, var(--line)) 38%, var(--line)); }
@@ -832,7 +923,7 @@
     <script src="mlb-contracts-data.js?v=20260708liveSearchFix1"></script>
     <script>window.MLB_DASHBOARD_BUILD_ID="20260711-tooltip-cleanup2";</script>
     <script src="../mlb/data/savant/savant_aggregates_2026.js?v=20260811hand1"></script>
-    <script src="../mlb/live-dashboard-prototype.js?v=20260811trackerPortrait17"></script>
+    <script src="../mlb/live-dashboard-prototype.js?v=20260812scoreFont23"></script>
   </body>
 </html>
 

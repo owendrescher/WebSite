@@ -921,6 +921,18 @@ const TEAM_TEXT_COLORS = {
   STL:'#F7657E', TB:'#8FCBFF', TEX:'#70A6FF', TOR:'#6CACF3', WSH:'#FF6670',
 };
 
+// Purpose-built accents for the dark Home Run Feed. These are recognizable
+// club colors rather than mechanically selected palette slots; neutral gray
+// and black uniform colors are deliberately excluded.
+const HOME_RUN_FEED_ACCENT_COLORS = {
+  ARI:'#30CED8', ATL:'#CE1141', BAL:'#FF6A18', BOS:'#F05A67', CHC:'#4D8DFF',
+  CHW:'#FFFFFF', CIN:'#FF334E', CLE:'#FF405A', COL:'#9B8CFF', DET:'#FA6A32',
+  HOU:'#FF812E', KC:'#54A9F5', LAA:'#FF4261', LAD:'#5CAEFF', MIA:'#31C9F4',
+  MIL:'#FFD447', MIN:'#F0446D', NYM:'#FF6A1A', NYY:'#79A8D8', ATH:'#F2C230',
+  PHI:'#FF4057', PIT:'#FFD038', SD:'#FFD04A', SEA:'#35C4B5', SF:'#FF6A2B',
+  STL:'#F0445F', TB:'#79C8FF', TEX:'#4D8FFF', TOR:'#55A0F0', WSH:'#F04459',
+};
+
 const TEAM_LOGOS = {
   ARI: 'Diamondbacks.png', ATL: 'Braves.png', BAL: 'Orioles.png', BOS: 'RedSox.png', CHC: 'Cubs.png',
   CHW: 'WhiteSox.png', CIN: 'Reds.png', CLE: 'Guardians.png', COL: 'Rockies.png', DET: 'Tigers.png',
@@ -26405,6 +26417,9 @@ function renderHomeRunFeed(homeRuns, options = {}) {
     });
     item.style.setProperty('--hr-team-color', hr.teamColor || '#66d9ff');
     item.style.setProperty('--hr-team-rgb', hexToRgb(hr.teamColor || '#66d9ff'));
+    const teamCode = canonicalTeamAbbrev(hr.teamAbbr || hr.homeAbbr || '');
+    const readableTeamColor = HOME_RUN_FEED_ACCENT_COLORS[teamCode] || getTeamTextColor(teamCode);
+    item.style.setProperty('--hr-team-readable', readableTeamColor);
     const img = item.querySelector('.hr-logo');
     if (img && img.dataset.src !== String(hr.teamLogo || 'placeholder.png')) {
       img.dataset.src = String(hr.teamLogo || 'placeholder.png');
@@ -26414,7 +26429,7 @@ function renderHomeRunFeed(homeRuns, options = {}) {
     const nameEl = item.querySelector('.hr-name');
     if (nameEl) {
       nameEl.textContent = `${hr.batter || 'Unknown'} ${hr.resultLabel || 'Homerun'}`;
-      nameEl.style.color = hr.teamColor || '#dbebff';
+      nameEl.style.color = readableTeamColor;
     }
     const metaEl = item.querySelector('.hr-meta');
     if (metaEl) {
@@ -26441,7 +26456,7 @@ function renderHomeRunFeed(homeRuns, options = {}) {
         hr.distance ? `${hr.distance} ft` : '',
         hr.inningText || '',
       ].filter(Boolean).join(' · ');
-      compactEl.innerHTML = `<strong class="hr-compact-player" style="color:${escapeHtml(hr.teamColor || '#dbebff')}">${escapeHtml(lastName(hr.batter || 'Unknown'))}</strong><span class="hr-compact-detail"> · ${escapeHtml(detail)}</span>`;
+      compactEl.innerHTML = `<strong class="hr-compact-player" style="color:${escapeHtml(readableTeamColor)}">${escapeHtml(lastName(hr.batter || 'Unknown'))}</strong><span class="hr-compact-detail"> · ${escapeHtml(detail)}</span>`;
     }
     const ratingEl = item.querySelector('.hr-rating');
     if (ratingEl) {
