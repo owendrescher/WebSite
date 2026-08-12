@@ -173,20 +173,20 @@
       "Chase DeLauter",
       "Jose Ramirez",
       "Nathaniel Lowe",
+      "Jo Adell",
       "Travis Bazzana",
       "Brayan Rocchio",
-      "Petey Halpin",
       "Patrick Bailey",
       "Angel Genao"
     ],
     "LHP": [
       "Steven Kwan",
-      "Jose Ramirez",
       "Chase DeLauter",
+      "Jose Ramirez",
       "Jo Adell",
-      "Rhys Hoskins",
       "Angel Martinez",
-      "Travis Bazzana",
+      "Rhys Hoskins",
+      "Angel Genao",
       "Austin Hedges",
       "Brayan Rocchio"
     ]
@@ -361,15 +361,15 @@
   },
   "MIA": {
     "RHP": [
-      "Jakob Marsee",
       "Xavier Edwards",
       "Otto Lopez",
       "Griffin Conine",
       "Heriberto Hernandez",
+      "Jakob Marsee",
+      "Javier Sanoja",
       "Owen Caissie",
       "Agustin Ramirez",
-      "Joe Mack",
-      "Javier Sanoja"
+      "Joe Mack"
     ],
     "LHP": [
       "Otto Lopez",
@@ -577,14 +577,14 @@
   },
   "SF": {
     "RHP": [
-      "Bryce Eldridge",
       "Jung Hoo Lee",
       "Willy Adames",
+      "Bryce Eldridge",
       "Rafael Devers",
-      "Osleivis Basabe",
+      "Victor Bericoto",
       "Drew Gilbert",
+      "Osleivis Basabe",
       "Drew Cavanaugh",
-      "Grant McCray",
       "Christian Koss"
     ],
     "LHP": [
