@@ -84,15 +84,15 @@
       "Carlos Narvaez"
     ],
     "LHP": [
-      "Christian Franklin",
-      "Pete Alonso",
-      "Gunnar Henderson",
       "Tyler O'Neill",
-      "Coby Mayo",
-      "Christian Encarnacion-Strand",
+      "Pete Alonso",
       "Jackson Holliday",
-      "Jeremiah Jackson",
-      "Yohel Pozo"
+      "Coby Mayo",
+      "Gunnar Henderson",
+      "Christian Encarnacion-Strand",
+      "Christian Franklin",
+      "Leody Taveras",
+      "Carlos Narvaez"
     ]
   },
   "BOS": {
@@ -247,7 +247,7 @@
       "Colt Keith",
       "Zach McKinstry",
       "Spencer Torkelson",
-      "Ben Malgeri",
+      "Brett Callahan",
       "Max Clark",
       "Javier Baez"
     ],
@@ -372,14 +372,14 @@
       "Graham Pauley"
     ],
     "LHP": [
-      "Otto Lopez",
+      "Esteury Ruiz",
       "Heriberto Hernandez",
-      "Agustin Ramirez",
       "Xavier Edwards",
+      "Agustin Ramirez",
+      "Otto Lopez",
+      "Javier Sanoja",
       "Leo Jimenez",
       "Griffin Conine",
-      "Javier Sanoja",
-      "Esteury Ruiz",
       "Joe Mack"
     ]
   },
@@ -627,9 +627,9 @@
     "RHP": [
       "Yandy Diaz",
       "Jonathan Aranda",
-      "Chandler Simpson",
       "Junior Caminero",
       "Liam Hicks",
+      "Chandler Simpson",
       "Victor Mesa",
       "Cedric Mullins",
       "Richie Palacios",
