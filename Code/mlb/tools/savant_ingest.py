@@ -100,6 +100,7 @@ def new_bucket(player_id, pitch_type, pitch_name, opponent_hand="ALL"):
         "player_id": player_id, "pitch_type": pitch_type, "pitch_name": pitch_name,
         "pitches": 0, "speed_sum": 0.0, "speed_n": 0,
         "pfx_x_sum": 0.0, "pfx_x_n": 0, "pfx_z_sum": 0.0, "pfx_z_n": 0,
+        "arm_angle_sum": 0.0, "arm_angle_n": 0,
         "spin_sum": 0.0, "spin_n": 0, "bbe": 0, "exit_sum": 0.0,
         "hard_hit": 0, "pa": 0, "ab": 0, "hits": 0, "home_runs": 0, "total_bases": 0,
         "xba_sum": 0.0, "xba_n": 0, "xslg_sum": 0.0, "xslg_n": 0,
@@ -166,6 +167,8 @@ def aggregate(rows):
             add_value(bucket, row, "pfx_x", "pfx_x_sum", "pfx_x_n", 12.0)
             add_value(bucket, row, "pfx_z", "pfx_z_sum", "pfx_z_n", 12.0)
             add_value(bucket, row, "release_spin_rate", "spin_sum", "spin_n")
+        for bucket in pitcher_buckets:
+            add_value(bucket, row, "arm_angle", "arm_angle_sum", "arm_angle_n")
         exit_velocity = number(row.get("launch_speed"))
         if exit_velocity is not None:
             for bucket in pitcher_buckets + batter_buckets:
@@ -211,6 +214,7 @@ FIELDS = [
     "player_id", "player_name", "team", "hand", "opponent_hand", "pitch_type", "pitch_name",
     "pitches", "usage_pct", "avg_speed_mph", "avg_horizontal_break_in",
     "avg_induced_vertical_break_in", "avg_spin_rpm", "pa", "ab", "hits", "home_runs",
+    "avg_arm_angle_deg",
     "total_bases", "avg", "slg", "xba", "xslg", "batted_balls",
     "avg_exit_velocity", "hard_hit_pct",
 ]
@@ -229,6 +233,7 @@ def output_row(bucket, total, names):
         "avg_horizontal_break_in": mean(bucket["pfx_x_sum"], bucket["pfx_x_n"], 1),
         "avg_induced_vertical_break_in": mean(bucket["pfx_z_sum"], bucket["pfx_z_n"], 1),
         "avg_spin_rpm": mean(bucket["spin_sum"], bucket["spin_n"], 0),
+        "avg_arm_angle_deg": mean(bucket["arm_angle_sum"], bucket["arm_angle_n"], 1),
         "pa": bucket["pa"], "ab": ab, "hits": bucket["hits"], "home_runs": bucket["home_runs"],
         "total_bases": bucket["total_bases"],
         "avg": mean(bucket["hits"], ab), "slg": mean(bucket["total_bases"], ab),

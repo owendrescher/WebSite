@@ -4435,7 +4435,33 @@ body[data-overlay-dock='bottom'] .player-stat-overlay {
 
 .player-stat-comparison-table td:last-child {
   white-space: normal;
-  min-width: 112px;
+  min-width: 0;
+}
+
+#playerStatSeason .player-stat-comparison-table {
+  table-layout: fixed;
+  width: 100%;
+}
+
+#playerStatSeason .player-stat-comparison-table th,
+#playerStatSeason .player-stat-comparison-table td {
+  min-width: 0;
+  padding: 3px 4px;
+  font-size: 0.72rem;
+  white-space: nowrap;
+}
+
+#playerStatSeason .player-stat-comparison-table th:first-child,
+#playerStatSeason .player-stat-comparison-table td:first-child {
+  width: 3.7em;
+  padding-left: 4px;
+  padding-right: 2px;
+}
+
+#playerStatSeason .player-season-recent-toggle {
+  min-width: 0;
+  padding: 2px 4px;
+  font-size: 0.64rem;
 }
 
 .pitcher-opponent-hr-batters {
@@ -7662,6 +7688,10 @@ body[data-theme='dark-pastel'] .scoreboard .score-mini-count strong {
   line-height: 1.14;
 }
 
+.lineup-live-details .ticker li {
+  color: color-mix(in srgb, var(--ticker-team-color, var(--accent)) 48%, white 52%) !important;
+}
+
 .lineup-live-details .play-col[data-play-by-play-trigger] {
   cursor: pointer;
 }
@@ -8650,6 +8680,47 @@ body[data-overlay-dock='bottom'] .score-state-strip,
 .player-track-drag:active {
   cursor: grabbing;
 }
+
+.score-lock-tracker-tooltip {
+  width: min(430px, calc(100vw - 34px));
+  color: var(--text);
+  text-align: left;
+}
+.score-lock-tracker-tooltip > header {
+  display: flex;
+  justify-content: space-between;
+  gap: 14px;
+  padding: 2px 2px 7px;
+  border-bottom: 1px solid rgba(132, 194, 232, .28);
+}
+.score-lock-tracker-tooltip > header b { color: #f5fbff; letter-spacing: .07em; }
+.score-lock-tracker-tooltip > header span { color: var(--muted); }
+.score-lock-tracker-list { display: grid; gap: 4px; padding-top: 5px; }
+.score-lock-tracker-row {
+  display: grid;
+  grid-template-columns: 30px minmax(92px, 1fr) minmax(76px, auto) 52px;
+  gap: 7px;
+  align-items: center;
+  min-height: 38px;
+  padding: 3px 5px;
+  border: 1px solid color-mix(in srgb, var(--lock-tracker-color) 48%, rgba(135, 174, 202, .3));
+  border-left: 3px solid var(--lock-tracker-color);
+  border-radius: 6px;
+  background: linear-gradient(90deg, rgba(var(--lock-tracker-rgb), .18), rgba(5, 17, 29, .9) 58%);
+}
+.score-lock-tracker-row.is-live { box-shadow: inset 0 0 0 1px var(--lock-tracker-color), 0 0 9px rgba(var(--lock-tracker-rgb), .32); }
+.score-lock-tracker-row.is-due:not(.is-live) { background: linear-gradient(90deg, rgba(var(--lock-tracker-rgb), .25), rgba(5, 17, 29, .9) 66%); }
+.score-lock-tracker-row > img { width: 30px; height: 30px; border-radius: 5px; object-fit: cover; object-position: center 22%; }
+.score-lock-tracker-copy, .score-lock-tracker-live, .score-lock-tracker-expectation { display: grid; min-width: 0; }
+.score-lock-tracker-copy strong { overflow: hidden; color: var(--lock-tracker-color); text-overflow: ellipsis; white-space: nowrap; }
+.score-lock-tracker-row small { color: #aebdca; font-size: .61rem; line-height: 1.1; }
+.score-lock-tracker-live { text-align: right; }
+.score-lock-tracker-live b { color: #f5fbff; white-space: nowrap; }
+.score-lock-tracker-live small { color: var(--lock-tracker-color); font-weight: 850; }
+.score-lock-tracker-expectation { position: relative; justify-items: center; padding: 2px 3px; border: 1px solid color-mix(in srgb, var(--lock-tracker-color) 48%, transparent); border-radius: 5px; }
+.score-lock-tracker-expectation b { color: #fff; }
+.score-lock-tracker-expectation em { position: absolute; top: -4px; right: -3px; color: #79ffab; font-style: normal; }
+.score-lock-tracker-empty { padding: 10px 4px 4px; color: var(--muted); text-align: center; }
 .player-track-copy {
   min-width: 0;
   display: grid;
@@ -10152,11 +10223,42 @@ body[data-overlay-dock='right'] .playoff-bracket-right .playoff-round-lcs {
 }
 
 .play-by-play-modal {
+  position: fixed;
+  inset: 16px auto auto 50%;
+  transform: translateX(-50%);
+  margin: 0;
+  z-index: 12000;
   width: min(820px, calc(100vw - 24px));
+  height: min(720px, calc(100dvh - 32px));
   max-height: calc(100dvh - 32px);
   display: grid;
   grid-template-rows: auto minmax(0, 1fr);
   overflow: hidden;
+}
+
+.play-by-play-backdrop {
+  position: fixed;
+  inset: 0;
+  z-index: 11999;
+  background: rgba(1, 8, 18, 0.58);
+}
+
+.play-by-play-modal .player-card-head {
+  position: relative;
+  padding-right: 54px;
+}
+
+.play-by-play-modal .pbp-close {
+  position: absolute;
+  top: 10px;
+  right: 10px;
+  margin: 0;
+  display: grid;
+  place-items: center;
+  border: 1px solid color-mix(in srgb, var(--accent) 64%, white 16%);
+  background: color-mix(in srgb, var(--panel-item) 88%, black 12%);
+  color: var(--text);
+  box-shadow: 0 2px 8px rgba(0,0,0,0.28);
 }
 
 .pbp-text {
@@ -10166,7 +10268,7 @@ body[data-overlay-dock='right'] .playoff-bracket-right .playoff-round-lcs {
   margin: 0;
   padding: 14px;
   font: 0.92rem/1.4 var(--font);
-  color: var(--text);
+  color: var(--lineup-team-color, var(--text));
   background: rgba(3, 12, 22, 0.72);
   overscroll-behavior: contain;
   touch-action: pan-y;
@@ -10187,7 +10289,7 @@ body[data-overlay-dock='right'] .playoff-bracket-right .playoff-round-lcs {
 
 .pbp-half h3 {
   margin: 0 0 5px;
-  color: var(--pbp-team-color, var(--accent));
+  color: color-mix(in srgb, var(--pbp-team-color, var(--accent)) 48%, white 52%);
   font-size: 0.8rem;
   letter-spacing: 0.06em;
   text-transform: uppercase;
@@ -10195,17 +10297,84 @@ body[data-overlay-dock='right'] .playoff-bracket-right .playoff-round-lcs {
 
 .pbp-half p {
   margin: 0;
-  color: color-mix(in srgb, var(--text) 86%, var(--pbp-team-color, var(--accent)) 14%);
+  color: var(--text);
 }
 
 .pbp-half strong {
-  color: color-mix(in srgb, var(--pbp-team-color, var(--accent)) 62%, white 38%);
+  color: color-mix(in srgb, var(--pbp-team-color, var(--accent)) 54%, white 46%);
   font-weight: 900;
 }
 
 .pbp-empty {
   margin: 0;
   color: var(--muted);
+}
+
+.arm-angle-glyph {
+  display: inline-block;
+  width: 1.05em;
+  height: 1.05em;
+  margin-left: 0.22em;
+  vertical-align: -0.16em;
+  overflow: visible;
+}
+
+.arm-angle-glyph circle,
+.arm-angle-glyph line {
+  fill: none;
+  stroke: currentColor;
+  stroke-width: 1.55;
+  stroke-linecap: round;
+}
+
+@media (max-width: 700px) {
+  dialog.player-stat-modal.play-by-play-modal[open],
+  .play-by-play-modal.is-open {
+    position: fixed;
+    inset: 8px;
+    width: auto;
+    height: calc(100dvh - 16px);
+    max-height: calc(100dvh - 16px);
+    margin: 0;
+    transform: none;
+  }
+
+  dialog.player-stat-modal.play-by-play-modal:not([open]) {
+    display: none;
+  }
+}
+
+/* Final placement override: shared player-modal rules appear earlier/later in
+   the stylesheet, so the play-by-play dialog needs its own fixed geometry. */
+.play-by-play-modal.is-open {
+  position: fixed !important;
+  top: 16px !important;
+  left: 50vw !important;
+  right: auto !important;
+  bottom: auto !important;
+  width: min(820px, calc(100vw - 24px)) !important;
+  height: min(720px, calc(100dvh - 32px)) !important;
+  max-height: calc(100dvh - 32px) !important;
+  margin: 0 !important;
+  transform: translateX(-50%) !important;
+}
+
+dialog.player-stat-modal.play-by-play-modal[open] .pbp-close,
+.play-by-play-modal.is-open .pbp-close {
+  display: grid !important;
+  z-index: 3;
+}
+
+@media (max-width: 700px) {
+  dialog.player-stat-modal.play-by-play-modal[open],
+  .play-by-play-modal.is-open {
+    top: 8px !important;
+    left: 8px !important;
+    width: calc(100vw - 16px) !important;
+    height: calc(100dvh - 16px) !important;
+    max-height: calc(100dvh - 16px) !important;
+    transform: none !important;
+  }
 }
 
 .player-bet-menu {
@@ -12215,14 +12384,16 @@ body[data-overlay-dock='bottom'] .player-stat-overlay {
   }
 }
 
-dialog.player-stat-modal.play-by-play-modal[open] {
+dialog.player-stat-modal.play-by-play-modal[open],
+.play-by-play-modal.is-open {
   display: grid;
   grid-template-rows: auto minmax(0, 1fr);
   max-height: calc(100dvh - 32px);
   overflow: hidden;
 }
 
-dialog.player-stat-modal.play-by-play-modal[open] .pbp-text {
+dialog.player-stat-modal.play-by-play-modal[open] .pbp-text,
+.play-by-play-modal.is-open .pbp-text {
   min-height: 0;
   max-height: none;
   overflow-y: auto;
@@ -14719,7 +14890,7 @@ body.dashboard-page .scoreboard-main > .score-state-strip .score-mini-inning.is-
   padding-inline: 7px !important;
 }
 
-body.dashboard-page .scoreboard-main > .score-state-strip .score-mini-inning.is-tossup-locked::before {
+html body.dashboard-page .scoreboard-main > .score-state-strip .score-mini-inning.is-tossup-locked::before {
   content: '🔒' !important;
   position: absolute !important;
   left: 50% !important;
@@ -16723,4 +16894,8 @@ body.dashboard-page .player-velo-bucket-summary-grid b.is-active {
   .team-detail-pitcher-list {
     grid-template-columns: minmax(0, 1fr);
   }
+}
+/* Unicode-safe lock glyph; overrides legacy mojibake declarations. */
+body.dashboard-page .scoreboard-main > .score-state-strip .score-mini-inning.is-tossup-locked::before {
+  content: '\1F512' !important;
 }

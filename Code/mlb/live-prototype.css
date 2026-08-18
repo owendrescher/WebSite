@@ -5766,7 +5766,7 @@ body.dashboard-page .scoreboard-main > .score-state-strip .score-mini-inning.is-
   padding-inline: 7px !important;
 }
 
-body.dashboard-page .scoreboard-main > .score-state-strip .score-mini-inning.is-tossup-locked::before {
+html body.dashboard-page .scoreboard-main > .score-state-strip .score-mini-inning.is-tossup-locked::before {
   content: '🔒' !important;
   position: absolute !important;
   left: 50% !important;
@@ -9130,4 +9130,8 @@ body.light-mlb-page .lineup-list li:not(.lineup-row-substitution) > .lineup-rati
     text-overflow: ellipsis !important;
     white-space: nowrap !important;
   }
+}
+/* Unicode-safe lock glyph; overrides legacy mojibake declarations. */
+body.dashboard-page .scoreboard-main > .score-state-strip .score-mini-inning.is-tossup-locked::before {
+  content: '\1F512' !important;
 }
