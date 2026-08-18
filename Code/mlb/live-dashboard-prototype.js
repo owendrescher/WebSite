@@ -27479,9 +27479,9 @@ function armAngleGlyphHtml(angle, hand = '') {
   if (!Number.isFinite(numeric)) return '';
   const isLefty = handednessCode(hand) === 'L';
   const degreesAboveHorizontal = Math.max(0, Math.min(75, Math.abs(numeric)));
-  // SVG y increases downward. Start with a horizontal ray to the right: righties
-  // rotate upward by -angle; lefties mirror it across the vertical axis.
-  const rotation = isLefty ? -degreesAboveHorizontal : 180 - degreesAboveHorizontal;
+  // SVG y increases downward. From the hitter's perspective, a lefty releases
+  // above the right-side horizon and a righty above the left-side horizon.
+  const rotation = isLefty ? -degreesAboveHorizontal : 180 + degreesAboveHorizontal;
   return `<svg class="arm-angle-glyph${isLefty ? ' is-lefty' : ' is-righty'}" viewBox="0 0 20 20" aria-label="${degreesAboveHorizontal.toFixed(1)} degrees above horizontal"><circle cx="10" cy="10" r="7.5"/><line x1="10" y1="10" x2="17.5" y2="10" transform="rotate(${rotation} 10 10)"/></svg>`;
 }
 
