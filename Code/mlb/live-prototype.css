@@ -7870,7 +7870,7 @@ body.light-mlb-page .lineup-pitcher-overall-pill.is-loading {
   border-top: 1px solid rgba(190,220,237,.16);
 }
 .lineup-series-pitcher-tooltip > span b {
-  color: #91aabd;
+  color: color-mix(in srgb, var(--series-pitcher, var(--accent)) 62%, white 38%);
   font: 900 .55rem/1 var(--font-ui);
 }
 .lineup-series-pitcher-tooltip > span em {
@@ -8945,6 +8945,40 @@ body.dashboard-page .player-stat-overlay.is-bullpen-profile #playerStatMatchup {
   font-weight: 850;
   text-align: right;
 }
+
+/* Two compact stat rows: season above, last 14 days beneath. */
+.bullpen-profile-arm {
+  grid-template-columns: minmax(150px, .8fr) 52px minmax(0, 1.55fr) !important;
+  grid-template-areas: "name overall season" "used used recent" !important;
+  gap: 4px 7px !important;
+  padding: 6px 9px !important;
+}
+.bullpen-profile-arm-name { grid-area: name; }
+.bullpen-profile-arm-overall-shell { grid-area: overall; }
+.bullpen-profile-arm-stats { grid-area: season; grid-template-columns: repeat(6, minmax(36px, 1fr)); }
+.bullpen-profile-arm-recent { grid-area: recent; grid-template-columns: repeat(5, minmax(36px, 1fr)); position: relative; }
+.bullpen-profile-arm-used { grid-area: used; text-align: left; font-size: .52rem; }
+.bullpen-profile-arm-stats > i { display: none; }
+.bullpen-profile-arm-recent::before { content: 'LAST 14D'; position: absolute; left: 0; top: -10px; color: #7da3b9; font-size: .43rem; font-style: normal; font-weight: 950; }
+.bullpen-profile-arm-recent { margin-top: 7px; }
+.bullpen-profile-arm-stats > span { padding: 3px 2px; }
+.bullpen-profile-hand-tally { display: block; margin-top: 4px; color: #9bb9ca; font-size: .56rem; font-weight: 850; white-space: nowrap; }
+
+/* Pitching tab names use the same display face and bright curated team text as lineup names. */
+.lineup-pitching-panel .pitching-card-name,
+.lineup-pitching-panel .bullpen-name {
+  font-family: var(--font-display, var(--font-ui));
+  font-weight: 950;
+}
+
+/* Pitcher identity text must inherit the curated bright team color from its row. */
+.lineup-pitching-panel .pitcher-name-text { color: var(--pitcher-name-color, inherit) !important; }
+.pitcher-game-k { margin-left: .28em; color: var(--text); font: 900 .72em/1 var(--font-ui); white-space: nowrap; }
+
+/* The bullpen card uses a plain, readable identity line instead of badges/ellipsis. */
+.bullpen-profile-arm-name { overflow: visible; }
+.bullpen-profile-arm-name b { overflow: visible; text-overflow: clip; white-space: normal; }
+.bullpen-profile-arm-name em { padding: 0; border: 0; border-radius: 0; background: transparent; color: #9bb4c5; font-size: .56rem; }
 .bullpen-profile-note {
   padding: 10px;
   color: #9eb6c6;

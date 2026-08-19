@@ -5660,6 +5660,13 @@ body[data-overlay-dock='bottom'] .lineup-modal {
   border-bottom: 1px solid color-mix(in srgb, var(--line) 58%, transparent);
 }
 
+/* Keep the inning strip compact: each inning is only about two characters wide. */
+.lineup-inning-scoreboard {
+  grid-template-columns: 34px repeat(var(--lineup-score-cols, 9), 2ch) 22px 22px !important;
+  min-width: 0 !important;
+}
+.lineup-score-cell { padding: 3px 1px !important; }
+
 .lineup-score-head,
 .lineup-score-total-head {
   color: var(--muted);
@@ -16606,6 +16613,9 @@ body.dashboard-page .player-velo-bucket-summary-grid b.is-active {
 .team-detail-hero-main .team-detail-recent-line {
   color: color-mix(in srgb, var(--team-color, var(--accent)) 36%, white 64%);
 }
+
+.team-stats-run-diff.is-positive { color: #72ef9f; font-weight: 900; }
+.team-stats-run-diff.is-negative { color: #ff7180; font-weight: 900; }
 
 .team-detail-hero-stats {
   display: grid;

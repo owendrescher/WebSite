@@ -5049,6 +5049,13 @@ function seriesPitcherLineText(pitcher = null) {
   return `${pitcher?.fullName || pitcher?.name || 'Pitcher'}: ${stat.ip ?? '0.0'} IP, ${statNumber(stat.earnedRuns)} ER, ${statNumber(stat.homeRuns)} HR, ${strikeouts} ${strikeouts === 1 ? 'K' : 'Ks'}`;
 }
 
+function seriesPitcherLineHtml(pitcher = null) {
+  const stat = pitcher?.statline || {};
+  const strikeouts = statNumber(stat.strikeouts);
+  const details = `${stat.ip ?? '0.0'} IP, ${statNumber(stat.earnedRuns)} ER, ${statNumber(stat.homeRuns)} HR, ${strikeouts} ${strikeouts === 1 ? 'K' : 'Ks'}`;
+  return `<b>${escapeHtml(pitcher?.fullName || pitcher?.name || 'Pitcher')}</b>: ${escapeHtml(details)}`;
+}
+
 function seriesStarterPitcherTitle(starter = null) {
   if (!starter) return 'Starting pitcher unavailable';
   return listify(starter.pitcherLines).length
@@ -5174,7 +5181,7 @@ function seriesStarterRowHtml(item = {}, side = '') {
   const pitcherLines = listify(starter?.pitcherLines).length ? starter.pitcherLines : (starter ? [starter] : []);
   const tooltipHtml = starter ? `
     <div class="lineup-series-pitcher-tooltip" style="--series-pitcher:${escapeHtml(color || getTeamColor(team) || '#7bd0ff')}">
-      ${pitcherLines.map((pitcher) => `<span class="lineup-series-pitcher-line">${escapeHtml(seriesPitcherLineText(pitcher))}</span>`).join('')}
+      ${pitcherLines.map((pitcher) => `<span class="lineup-series-pitcher-line">${seriesPitcherLineHtml(pitcher)}</span>`).join('')}
     </div>` : '';
   return `
     <span class="lineup-series-pitcher lineup-series-${escapeHtml(side)}-pitcher" style="--series-pitcher:${escapeHtml(color || getTeamColor(team) || '#7bd0ff')}"${starter ? ` data-theme-tooltip-html="${escapeHtml(tooltipHtml)}" aria-label="${escapeHtml(seriesStarterPitcherTitle(starter))}"` : ''}>
@@ -7668,6 +7675,7 @@ function formatLineupTeamStatus(record = '', stats = null) {
   if (stats?.avg) parts.push(`AVG ${stats.avg}`);
   if (stats?.slg) parts.push(`SLG ${stats.slg}`);
   if (stats?.era) parts.push(`ERA ${stats.era}`);
+  if (stats?.kPerGame) parts.push(`K/G ${stats.kPerGame}`);
   return parts.filter(Boolean).join(' | ');
 }
 
@@ -7874,6 +7882,7 @@ function aggregateRecentTeamBoxStats(aggregate, teamBox = {}) {
   aggregate.atBats += statNumber(batting.atBats);
   aggregate.hits += statNumber(batting.hits);
   aggregate.walks += statNumber(batting.baseOnBalls ?? batting.walks);
+  aggregate.strikeOuts += statNumber(batting.strikeOuts);
   const totalBases = statNumber(batting.totalBases);
   aggregate.totalBases += totalBases || Math.max(0,
     statNumber(batting.hits)
@@ -7959,7 +7968,7 @@ async function getLineupTeamRecentStats(teamAbbrev, date, gameLimit = 7) {
       : recentTeamSummaryFromGames([...localGamesByPk.values()], team, limit);
     const auditedGamePks = new Set(listify(summary?.gamesAudit).map((entry) => String(entry?.gamePk || '')).filter(Boolean));
     const aggregateGames = auditedGamePks.size ? finished.filter((game) => auditedGamePks.has(String(game?.gamePk || ''))) : finished.slice(0, limit);
-    const aggregate = { atBats: 0, hits: 0, walks: 0, totalBases: 0, pitchingOuts: 0, earnedRuns: 0 };
+    const aggregate = { atBats: 0, hits: 0, walks: 0, strikeOuts: 0, totalBases: 0, pitchingOuts: 0, earnedRuns: 0 };
 
     await mapWithConcurrency(aggregateGames, 3, async (game) => {
       const side = teamBoxSideForGame(game, team);
@@ -7977,6 +7986,7 @@ async function getLineupTeamRecentStats(teamAbbrev, date, gameLimit = 7) {
         ? formatRateValue(((aggregate.hits + aggregate.walks) / (aggregate.atBats + aggregate.walks)) + (aggregate.totalBases / aggregate.atBats), 3, false)
         : '',
       era: aggregate.pitchingOuts > 0 ? formatRateValue((aggregate.earnedRuns * 27) / aggregate.pitchingOuts, 2, false) : '',
+      kPerGame: aggregateGames.length ? formatRateValue(aggregate.strikeOuts / aggregateGames.length, 1, false) : '',
     };
   })().catch(async () => {
     const fallbackRecord = localTeamRecentRecord(team, cutoffDate, limit)
@@ -22185,10 +22195,11 @@ function lineupPitcherMarkerClusterHtml(pitcher = null, contextGame = null) {
   ].filter(Boolean).join('');
 }
 
-function lineupPitcherNameHtml(pitcher, contextGame = null) {
+function lineupPitcherNameHtml(pitcher, contextGame = null, nameColor = '') {
   const fullName = pitcher?.fullName || pitcher?.name || 'Unknown';
   const id = pitcher?.id || pitcher?.person?.id || pitcher?.playerId || '';
   const hand = handednessCode(pitcherThrowHandValue(pitcher));
+  const gameKs = statNumber(pitcher?.gamePitching?.so ?? pitcher?.stats?.pitching?.strikeOutsGame);
   const homeRunCards = pitcherLastStartHrMarkerHtml(id);
   const fingerprint = [
     id,
@@ -22197,8 +22208,8 @@ function lineupPitcherNameHtml(pitcher, contextGame = null) {
   ].join('~');
   return `
     <span class="pitcher-identity-row" data-pitcher-identity-row="1" data-pitcher-id="${escapeHtml(String(id))}" data-pitcher-identity-fingerprint="${escapeHtml(fingerprint)}" title="Loading pitcher bio…">
-      <span class="pitcher-name-text pitcher-identity-name">${escapeHtml(lastName(fullName) || fullName)}</span>
-      <span class="pitcher-identity-hand">${handednessHtml(hand)}</span>
+      <span class="pitcher-name-text pitcher-identity-name"${nameColor ? ` style="--pitcher-name-color:${escapeHtml(nameColor)}"` : ''}>${escapeHtml(lastName(fullName) || fullName)}</span>
+      <span class="pitcher-identity-hand">${handednessHtml(hand)}</span>${gameKs > 0 ? `<small class="pitcher-game-k">K ${gameKs}</small>` : ''}
       <span class="pitcher-identity-markers" aria-label="Recent home runs allowed">${homeRunCards}</span>
     </span>
   `;
@@ -29503,7 +29514,9 @@ function teamStatsRowHtml(row) {
       <td>${escapeHtml(row.record || '---')}</td>
       <td>${escapeHtml(row.gamesBack || '-')}</td>
       <td>${escapeHtml(row.lastTen || '--')}</td>
+      <td class="team-stats-run-diff ${Number(row.runDiff) >= 0 ? 'is-positive' : 'is-negative'}">${Number(row.runDiff) > 0 ? '+' : ''}${row.runDiff}</td>
       <td>${row.runs}</td>
+      <td>${row.runsAllowed}</td>
       <td>${row.homeRuns}</td>
       <td>${row.stolenBases}</td>
       <td>${row.leftOnBase}</td>
@@ -29527,6 +29540,7 @@ function teamStatsSortValue(row, key) {
     case 'gamesBack': return row.gamesBack === '-' || row.gamesBack === '' ? 0 : Number(row.gamesBack) || 0;
     case 'lastTen': return numberFromRecordPct(row.lastTen);
     case 'runs': return Number(row.runs) || 0;
+    case 'runDiff': return Number(row.runDiff) || 0;
     case 'homeRuns': return Number(row.homeRuns) || 0;
     case 'stolenBases': return Number(row.stolenBases) || 0;
     case 'leftOnBase': return Number(row.leftOnBase) || 0;
@@ -29607,6 +29621,8 @@ async function getTeamStatsRows(season, options = {}) {
           gamesBack: recordInfo?.gb || '-',
           lastTen: recordInfo?.lastTen || '--',
           runs: statNumber(hitting.runs),
+          runsAllowed: statNumber(pitching.runs ?? pitching.runsAllowed),
+          runDiff: statNumber(hitting.runs) - statNumber(pitching.runs ?? pitching.runsAllowed),
           homeRuns: statNumber(hitting.homeRuns),
           stolenBases: statNumber(hitting.stolenBases),
           leftOnBase: statNumber(hitting.leftOnBase ?? hitting.lob ?? hitting.teamLeftOnBase),
@@ -29647,7 +29663,9 @@ function teamStatsTableHtml(rows) {
             ${teamStatsHeaderHtml('record', 'Record')}
             ${teamStatsHeaderHtml('gamesBack', 'GB')}
             ${teamStatsHeaderHtml('lastTen', 'L10')}
+            ${teamStatsHeaderHtml('runDiff', 'Run Dif')}
             ${teamStatsHeaderHtml('runs', 'R')}
+            ${teamStatsHeaderHtml('runsAllowed', 'RA')}
             ${teamStatsHeaderHtml('homeRuns', 'HR')}
             ${teamStatsHeaderHtml('stolenBases', 'SB')}
             ${teamStatsHeaderHtml('leftOnBase', 'LOB')}
@@ -29663,7 +29681,7 @@ function teamStatsTableHtml(rows) {
             ${teamStatsHeaderHtml('hitterWalks', 'BB (H)')}
           </tr>
         </thead>
-        <tbody>${rows.map(teamStatsRowHtml).join('') || '<tr><td colspan="18">No team stats loaded</td></tr>'}</tbody>
+        <tbody>${rows.map(teamStatsRowHtml).join('') || '<tr><td colspan="20">No team stats loaded</td></tr>'}</tbody>
       </table>
     </div>
   `;
@@ -39068,7 +39086,7 @@ function renderPitcherListItems(listEl, pitchers, color, emptyText, contextDate 
     li.innerHTML = `
       <div class="bullpen-main pitcher-priority-line">
         ${predictionBadge}
-        <span class="bullpen-name pitcher-priority-name" style="color:${color}">${lineupPitcherNameHtml(arm)}${pitchTag ? ` <span class="pitch-count-inline">${escapeHtml(pitchTag)}</span>` : ''}</span>
+        <span class="bullpen-name pitcher-priority-name" style="--pitcher-name-color:${color};color:${color}">${lineupPitcherNameHtml(arm, null, color)}${pitchTag ? ` <span class="pitch-count-inline">${escapeHtml(pitchTag)}</span>` : ''}</span>
         <span class="bullpen-meta pitcher-priority-meta">${pitcherSeasonMetaLine(arm)}</span>
       </div>
       <div class="bullpen-today">${escapeHtml(pitcherListStatusLine(arm, contextDate))}</div>
@@ -39219,6 +39237,7 @@ function splitPitchingDisplayGroups(staff) {
 
 function renderPitchingSide(sectionEl, teamCode, color, staff, game = null) {
   if (!sectionEl) return;
+  const textColor = getTeamTextColor(teamCode) || color;
   const titleEl = sectionEl.querySelector('.lineup-pitching-team-code');
   const currentEl = sectionEl.querySelector('.current-pitcher-card');
   const rotationEl = sectionEl.querySelector('.rotation-list');
@@ -39256,12 +39275,12 @@ function renderPitchingSide(sectionEl, teamCode, color, staff, game = null) {
     const currentPitchChip = '';
     const currentNameHtml = currentIsTbdFallback
       ? `<span class="lineup-team-pitcher-tbd">TBD</span><span class="lineup-team-pitcher-fallback">Fallback: ${lineupPitcherNameHtml(current, game)}</span>`
-      : `${lineupPitcherNameHtml(current, game)}${currentPitchCount && !currentIsTbdFallback ? ` <span class="pitch-count-inline">(P${currentPitchCount})</span>` : ''}`;
+      : `${lineupPitcherNameHtml(current, game, textColor)}${currentPitchCount && !currentIsTbdFallback ? ` <span class="pitch-count-inline">(P${currentPitchCount})</span>` : ''}`;
     const currentMetaLine = pitcherSeasonMetaLine(current);
     const currentHtml = current ? `
       <div class="pitching-card-label">${currentLabel}${currentPitchChip}</div>
       <div class="pitching-card-main pitcher-priority-line${currentIsTbdFallback ? ' has-tbd-fallback' : ''}">
-        <div class="pitching-card-name pitcher-priority-name${currentIsTbdFallback ? ' has-tbd-fallback' : ''}" style="color:${color}">${currentNameHtml}</div>
+        <div class="pitching-card-name pitcher-priority-name${currentIsTbdFallback ? ' has-tbd-fallback' : ''}" style="--pitcher-name-color:${textColor};color:${textColor}">${currentNameHtml}</div>
         <div class="pitching-card-meta pitcher-priority-meta">${currentMetaLine}</div>
       </div>
       ${starterExited ? `<div class="pitcher-substitution-note">Starter ${escapeHtml(lastName(starter.fullName || starter.name || 'Pitcher'))} has exited</div>` : ''}
@@ -39273,15 +39292,17 @@ function renderPitchingSide(sectionEl, teamCode, color, staff, game = null) {
     }
   }
 
-  renderPitchingHistory(historyEl, staff?.history || [], color, renderDate);
+  // Use the same curated high-contrast team text color as the lineup. The
+  // availability refresh below re-renders asynchronously, so it needs it too.
+  renderPitchingHistory(historyEl, staff?.history || [], textColor, renderDate);
   const groups = splitPitchingDisplayGroups(staff);
-  renderPitcherListItems(rotationEl, groups.starters, color, 'No additional starters loaded', renderDate);
+  renderPitcherListItems(rotationEl, groups.starters, textColor, 'No additional starters loaded', renderDate);
   hydrateStarterLastPitchedLines(rotationEl, groups.starters, game, renderDate).catch(() => {});
   renderBullpenSummary(bullpenSummaryEl, groups.relievers, color);
   hydrateBullpenSummaryRanks(bullpenSummaryEl, teamCode, groups.relievers, color, game);
-  renderPitcherListItems(bullpenEl, groups.relievers, color, 'Awaiting relief data', renderDate);
+  renderPitcherListItems(bullpenEl, groups.relievers, textColor, 'Awaiting relief data', renderDate);
   const side = sameTeamAbbrev(teamCode, game?.away) ? 'away' : sameTeamAbbrev(teamCode, game?.home) ? 'home' : '';
-  hydrateRelieverUsagePredictionFlags(bullpenEl, teamCode, groups.relievers, color, game, side);
+  hydrateRelieverUsagePredictionFlags(bullpenEl, teamCode, groups.relievers, textColor, game, side);
 }
 
 function pitcherRateNumber(value) {
@@ -39881,10 +39902,22 @@ function bullpenArmLastUsedSortValue(arm = {}) {
   return Number.isFinite(date) ? Math.max(0, (Date.now() - date) / 86400000) : 9999;
 }
 
+async function hydrateBullpenArmTwoWeekStats(context, token) {
+  const rows = await Promise.all(listify(context?.arms).map(async (arm) => {
+    const id = Number(arm?.id ?? arm?.person?.id);
+    const splits = id > 0 ? await playerStatGameLogSplits(id, 'pitching', context?.game).catch(() => []) : [];
+    const stats = aggregatePlayerCardPitchingSplits(playerStatCalendarWindowSplits(splits, playerStatTargetDate(context?.game), 14));
+    return [id, stats?.outs ? stats : null];
+  }));
+  if (activePlayerStatContext !== context || playerStatOverlayEl?.dataset?.playerRenderToken !== token) return;
+  context.recentArmStats = new Map(rows.filter(([id, stats]) => id > 0 && stats));
+  renderOpenBullpenProfileRoster();
+}
+
 function bullpenProfileRosterHtml(context = activePlayerStatContext) {
   const arms = [...listify(context?.arms)];
   const ratings = context?.ratingData?.armRatings || new Map();
-  const sort = context?.bullpenSort === 'overall' ? 'overall' : 'recent';
+  const sort = context?.bullpenSort === 'overall' ? 'overall' : 'availability';
   arms.sort((a, b) => {
     if (sort === 'overall') {
       const aRating = Number(ratings.get(Number(a?.id))?.overall);
@@ -39892,7 +39925,7 @@ function bullpenProfileRosterHtml(context = activePlayerStatContext) {
       return (Number.isFinite(bRating) ? bRating : -1) - (Number.isFinite(aRating) ? aRating : -1)
         || bullpenArmLastUsedSortValue(a) - bullpenArmLastUsedSortValue(b);
     }
-    return bullpenArmLastUsedSortValue(a) - bullpenArmLastUsedSortValue(b)
+    return bullpenArmLastUsedSortValue(b) - bullpenArmLastUsedSortValue(a)
       || String(a?.fullName || a?.name || '').localeCompare(String(b?.fullName || b?.name || ''));
   });
   const score = (value) => Number.isFinite(Number(value)) ? Math.round(Number(value)) : 'N/A';
@@ -39901,7 +39934,7 @@ function bullpenProfileRosterHtml(context = activePlayerStatContext) {
     <div class="bullpen-profile-toolbar">
       <strong>${arms.length} RELIEVERS</strong>
       <div>
-        <button type="button" data-bullpen-sort="recent" class="${sort === 'recent' ? 'is-active' : ''}">MOST RECENTLY USED</button>
+        <button type="button" data-bullpen-sort="availability" class="${sort === 'availability' ? 'is-active' : ''}">MOST AVAILABLE</button>
         <button type="button" data-bullpen-sort="overall" class="${sort === 'overall' ? 'is-active' : ''}">BEST OVERALL</button>
       </div>
     </div>
@@ -39923,7 +39956,7 @@ function bullpenProfileRosterHtml(context = activePlayerStatContext) {
           metric('SV', String(pitcherSaveCount(arm))),
         ].join('');
         return `<button type="button" class="bullpen-profile-arm" data-player-card-link data-player-role="pitcher" data-player-id="${id > 0 ? id : ''}">
-          <span class="bullpen-profile-arm-name"><b>${escapeHtml(arm?.fullName || arm?.name || 'Unknown pitcher')}</b><small>${hand ? `(${escapeHtml(hand)})` : ''}</small><em>${escapeHtml(role)}</em></span>
+          <span class="bullpen-profile-arm-name"><b>${escapeHtml(arm?.fullName || arm?.name || 'Unknown pitcher')}</b><small>${escapeHtml(hand)}</small><em>${escapeHtml(role)}</em></span>
           <span class="lineup-pitcher-overall-shell bullpen-profile-arm-overall-shell" style="--team-color:${escapeHtml(getTeamColor(context?.team || ''))}">${bullpenOverallPillHtml(rating.overall, rating.recentOverall)}</span>
           <span class="bullpen-profile-arm-stats">${metricHtml}</span>
           <span class="bullpen-profile-arm-used">${escapeHtml(used)}</span>
@@ -39949,11 +39982,15 @@ function bullpenCombinedSeasonHtml(values = null) {
   return `<strong>COMBINED SEASON</strong><div class="bullpen-profile-combined">${metrics.map(([label, value]) => `<span><small>${escapeHtml(label)}</small><b>${escapeHtml(value)}</b></span>`).join('')}</div>`;
 }
 
-function bullpenProfileRatingSummaryHtml(overall = null, recentOverall = null, armCount = 0, team = '') {
+function bullpenProfileRatingSummaryHtml(overall = null, recentOverall = null, armCount = 0, team = '', arms = []) {
+  const handTally = ['L', 'R'].map((hand) => {
+    const matching = listify(arms).filter((arm) => handednessCode(pitcherThrowHandValue(arm)) === hand);
+    return `${hand} ${matching.length} / ${matching.filter((arm) => Number(arm?.daysSinceLastPitched) > 1).length} fresh`;
+  }).join(' · ');
   return `<strong>BULLPEN RATING</strong><div class="bullpen-profile-rating-summary">
     <span class="lineup-pitcher-overall-shell" style="--team-color:${escapeHtml(getTeamColor(team))}">${bullpenOverallPillHtml(overall, recentOverall)}</span>
     <span><b>${Math.max(0, Number(armCount) || 0)}</b><small>RELIEVERS</small></span>
-  </div>`;
+  </div><small class="bullpen-profile-hand-tally">${escapeHtml(handTally)}</small>`;
 }
 
 function openBullpenStatOverlay(teamCode, arms = [], game = null, ratingData = null) {
@@ -39967,7 +40004,7 @@ function openBullpenStatOverlay(teamCode, arms = [], game = null, ratingData = n
   playerStatOverlayEl.dataset.playerRenderToken = token;
   playerStatOverlayEl.dataset.playerId = `bullpen:${team}`;
   playerStatOverlayEl.dataset.playerRole = 'bullpen';
-  activePlayerStatContext = { kind: 'bullpen', game, team, arms, ratingData, bullpenSort: 'recent' };
+  activePlayerStatContext = { kind: 'bullpen', game, team, arms, ratingData, bullpenSort: 'availability', recentArmStats: new Map() };
   playerStatNameEl.textContent = `${displayTeamAbbrev(team)} BULLPEN`;
   playerStatNameEl.style.color = color;
   playerStatMetaEl.textContent = `${arms.length} RELIEVERS | COMBINED PITCHING`;
@@ -39979,7 +40016,7 @@ function openBullpenStatOverlay(teamCode, arms = [], game = null, ratingData = n
   if (playerStatJerseyEl) playerStatJerseyEl.hidden = true;
   playerStatHeadshotEl.alt = `${displayTeamAbbrev(team)} logo`;
   playerStatBioEl.innerHTML = `<strong style="color:${escapeHtml(color)}">${escapeHtml(displayTeamAbbrev(team))} BP</strong><br>Season and recent bullpen performance graded against every MLB bullpen.`;
-  playerStatTodayEl.innerHTML = bullpenProfileRatingSummaryHtml(ratingData?.overall, ratingData?.recentOverall, arms.length, team);
+  playerStatTodayEl.innerHTML = bullpenProfileRatingSummaryHtml(ratingData?.overall, ratingData?.recentOverall, arms.length, team, arms);
   playerStatSeasonEl.innerHTML = bullpenProfileRosterHtml(activePlayerStatContext);
   playerStatExtraEl.innerHTML = bullpenCombinedSeasonHtml(values);
   playerStatMatchupEl.innerHTML = '<div class="bullpen-profile-note">Select a reliever to open their individual pitcher card. Overall superscripts represent recent performance.</div>';
@@ -39992,7 +40029,7 @@ function openBullpenStatOverlay(teamCode, arms = [], game = null, ratingData = n
       if (playerStatOverlayEl?.dataset?.playerRenderToken !== token || activePlayerStatContext?.kind !== 'bullpen') return;
       activePlayerStatContext.ratingData = freshRatings;
       playerStatOverallBadgeEl.innerHTML = bullpenOverallPillHtml(freshRatings?.overall, freshRatings?.recentOverall);
-      playerStatTodayEl.innerHTML = bullpenProfileRatingSummaryHtml(freshRatings?.overall, freshRatings?.recentOverall, arms.length, team);
+      playerStatTodayEl.innerHTML = bullpenProfileRatingSummaryHtml(freshRatings?.overall, freshRatings?.recentOverall, arms.length, team, arms);
       renderOpenBullpenProfileRoster();
     }).catch(() => {});
   }
@@ -40034,6 +40071,7 @@ function pitcherSeasonMetaLine(pitcher, l3Leaders = null) {
     pitcherSeasonMetaMetricHtml('IP', pitcherInningsPitched(pitcher), l3Leaders?.ip),
     pitcherSeasonMetaMetricHtml('ERA', pitcherEra(pitcher), l3Leaders?.era),
     pitcherSeasonMetaMetricHtml('WHIP', pitcherWhip(pitcher), l3Leaders?.whip),
+    pitcherSeasonMetaMetricHtml('K', pitcherStrikeoutCount(pitcher), l3Leaders?.strikeOuts),
     pitcherSeasonMetaMetricHtml('HR/9', formatRateValue(pitcherHrPerNine(pitcher), 2, false), l3Leaders?.hr9),
     pitcherSeasonMetaMetricHtml('K/9', formatRateValue(pitcherKPerNine(pitcher), 2, false), l3Leaders?.k9),
   ].join(' | ') + escapeHtml(memory);
@@ -45437,6 +45475,7 @@ function aggregatePlayerCardBattingSplits(splits = []) {
     sum.hbp += statNumber(stat.hitByPitch);
     sum.sacFlies += statNumber(stat.sacFlies);
     sum.strikeOuts += statNumber(stat.strikeOuts);
+    sum.stolenBases += statNumber(stat.stolenBases);
     sum.totalBases += statNumber(stat.totalBases) || totalBasesFromBatting(stat);
     return sum;
   }, {
@@ -45452,6 +45491,7 @@ function aggregatePlayerCardBattingSplits(splits = []) {
     hbp: 0,
     sacFlies: 0,
     strikeOuts: 0,
+    stolenBases: 0,
     totalBases: 0,
   });
   const obpDenominator = totals.atBats + totals.walks + totals.hbp + totals.sacFlies;
@@ -46067,6 +46107,7 @@ function playerBattingComparisonRows(profile, recent = null, abRecent = null, ga
     ['SLG', batting.slg || '---', recentWithHandSplits('slg', { rate: true }), alternateRecentCell(abRecent, 'slg', { rate: true })],
     ['OPS', batting.ops || '---', recentWithHandSplits('ops', { rate: true }), alternateRecentCell(abRecent, 'ops', { rate: true })],
     ['HR', { text: statNumber(batting.hr), title: battingProjectionHoverTitle(profile, game, gamesSince, 'hr'), className: 'has-split-tooltip' }, recentWithHandSplits('homeRuns'), alternateRecentCell(abRecent, 'homeRuns')],
+    ['SB', statNumber(batting.stolenBases ?? batting.sb), recentWithHandSplits('stolenBases'), alternateRecentCell(abRecent, 'stolenBases')],
     ['AB/HR', formatAtBatsPerHomeRun(batting.atBats, batting.hr), recentAbHrCell(), alternateAbHrCell(abRecent)],
   ];
   rows.push(['HR vs SP/RP', {
@@ -50608,7 +50649,7 @@ function initLineupOverlay() {
     if (bullpenSort && activePlayerStatContext?.kind === 'bullpen') {
       e.preventDefault();
       e.stopPropagation();
-      activePlayerStatContext.bullpenSort = bullpenSort.dataset.bullpenSort === 'overall' ? 'overall' : 'recent';
+      activePlayerStatContext.bullpenSort = bullpenSort.dataset.bullpenSort === 'overall' ? 'overall' : 'availability';
       renderOpenBullpenProfileRoster();
       return;
     }
