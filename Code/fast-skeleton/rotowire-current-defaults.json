@@ -1,14 +1,14 @@
 {
   "ARI": {
     "RHP": [
-      "Geraldo Perdomo",
+      "Lars Nootbaar",
       "Corbin Carroll",
       "Gabriel Moreno",
-      "Lars Nootbaar",
+      "Geraldo Perdomo",
       "Nolan Arenado",
       "Max Kepler",
-      "Jordan Lawlar",
       "Tim Tawa",
+      "Jordan Lawlar",
       "Ildemaro Vargas"
     ],
     "LHP": [
@@ -158,12 +158,12 @@
     "LHP": [
       "Elly De La Cruz",
       "Sal Stewart",
-      "Tyler Stephenson",
-      "Eugenio Suarez",
       "Dane Myers",
-      "JJ Bleday",
+      "Eugenio Suarez",
+      "Tyler Stephenson",
       "Matt McLain",
-      "Hector Rodriguez",
+      "JJ Bleday",
+      "Michael Toglia",
       "Ke'Bryan Hayes"
     ]
   },
@@ -409,25 +409,25 @@
   },
   "MIN": {
     "RHP": [
+      "Luke Keaschall",
+      "Byron Buxton",
+      "Josh Bell",
+      "Ryan Jeffers",
+      "Kody Clemens",
+      "Royce Lewis",
       "Trevor Larnach",
+      "Brooks Lee",
+      "Kaelen Culpepper"
+    ],
+    "LHP": [
+      "Luke Keaschall",
       "Byron Buxton",
       "Ryan Jeffers",
       "Josh Bell",
       "Royce Lewis",
       "Kody Clemens",
-      "Luke Keaschall",
-      "Brooks Lee",
-      "Kaelen Culpepper"
-    ],
-    "LHP": [
-      "Byron Buxton",
-      "Ryan Jeffers",
-      "Josh Bell",
-      "Royce Lewis",
       "Victor Caratini",
-      "Luke Keaschall",
       "Brooks Lee",
-      "Ryan Kreidler",
       "Kaelen Culpepper"
     ]
   },
@@ -545,9 +545,9 @@
       "Manny Machado",
       "Ty France",
       "Jackson Merrill",
-      "Austin Hays",
-      "Luis Campusano",
       "Xander Bogaerts",
+      "Luis Campusano",
+      "Austin Hays",
       "Jake Cronenworth"
     ]
   },
