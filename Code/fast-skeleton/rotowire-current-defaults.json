@@ -28,9 +28,9 @@
       "Henry Bolte",
       "Jeff McNeil",
       "Zack Gelof",
+      "Carlos Cortes",
       "Lawrence Butler",
       "Tommy White",
-      "Carlos Cortes",
       "Jonah Heim",
       "Donovan Walton",
       "Max Muncy"
@@ -49,8 +49,8 @@
   },
   "ATL": {
     "RHP": [
-      "Ronald Acuna",
       "Drake Baldwin",
+      "Ronald Acuna",
       "Matt Olson",
       "Michael Harris",
       "Ozzie Albies",
@@ -64,9 +64,9 @@
       "Drake Baldwin",
       "Matt Olson",
       "Ozzie Albies",
+      "Lane Thomas",
       "Michael Harris",
       "Mauricio Dubon",
-      "Lane Thomas",
       "Austin Riley",
       "Sean Murphy"
     ]
@@ -338,13 +338,13 @@
   "LAD": {
     "RHP": [
       "Shohei Ohtani",
-      "Mookie Betts",
       "Freddie Freeman",
+      "Mookie Betts",
       "Max Muncy",
       "Tommy Edman",
       "Kyle Tucker",
       "Teoscar Hernandez",
-      "Miguel Rojas",
+      "Alek Thomas",
       "Hunter Feduccia"
     ],
     "LHP": [
@@ -389,22 +389,22 @@
       "Jackson Chourio",
       "Jake Bauers",
       "William Contreras",
-      "Garrett Mitchell",
-      "Andrew Vaughn",
       "Christian Yelich",
+      "Andrew Vaughn",
+      "Garrett Mitchell",
       "David Hamilton",
       "Cooper Pratt"
     ],
     "LHP": [
-      "William Contreras",
-      "Brice Turang",
       "Jackson Chourio",
+      "Brice Turang",
+      "William Contreras",
       "Jake Bauers",
       "Andrew Vaughn",
       "Gary Sanchez",
+      "Joey Ortiz",
       "Luis Lara",
-      "Cooper Pratt",
-      "Joey Ortiz"
+      "Cooper Pratt"
     ]
   },
   "MIN": {
@@ -459,23 +459,23 @@
     "RHP": [
       "Trent Grisham",
       "Ben Rice",
-      "Luis Garcia",
       "Heliot Ramos",
-      "Jazz Chisholm",
+      "Luis Garcia",
       "Spencer Jones",
       "George Lombard",
-      "Amed Rosario",
-      "Austin Wells"
+      "Jazz Chisholm",
+      "Austin Wells",
+      "Jose Caballero"
     ],
     "LHP": [
       "Paul Goldschmidt",
-      "Ben Rice",
       "Amed Rosario",
       "Heliot Ramos",
-      "Jose Caballero",
-      "Jazz Chisholm",
+      "Ben Rice",
       "George Lombard",
+      "Jazz Chisholm",
       "Trent Grisham",
+      "Jose Caballero",
       "Ali Sanchez"
     ]
   },
@@ -511,20 +511,20 @@
       "Esmerlyn Valdez",
       "Oneil Cruz",
       "Nick Gonzales",
+      "Rafael Flores",
       "Jake Mangum",
-      "Jacob Gonzalez",
-      "Henry Davis"
+      "Jacob Gonzalez"
     ],
     "LHP": [
       "Nick Gonzales",
-      "Bryan Reynolds",
       "Esmerlyn Valdez",
+      "Bryan Reynolds",
       "Brandon Lowe",
       "Rafael Flores",
       "Oneil Cruz",
       "Jake Mangum",
-      "Jared Triolo",
-      "Henry Davis"
+      "Nick Yorke",
+      "Jared Triolo"
     ]
   },
   "SD": {
@@ -690,9 +690,9 @@
       "George Springer",
       "Kazuma Okamoto",
       "Ernie Clement",
-      "Andres Gimenez",
-      "Myles Straw",
-      "Daz Cameron"
+      "Daz Cameron",
+      "Charles McAdoo",
+      "Myles Straw"
     ]
   },
   "WSH": {
