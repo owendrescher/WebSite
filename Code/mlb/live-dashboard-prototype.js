@@ -778,17 +778,6 @@ const LIVE_LAB_BALLPARKS = {
   },
 };
 
-const FANGRAPHS_PITCHER_HAND_SPLIT_SEEDS = {
-  [normalizeNameKey('Sandy Alcantara')]: {
-    season: 2026,
-    playerId: 645261,
-    source: 'FanGraphs',
-    sourceUrl: 'https://www.fangraphs.com/players/sandy-alcantara/18684/splits?position=P',
-    vsLeft: { avg: '.248', slg: '.390', homeRuns: 3, strikeOuts: 17 },
-    vsRight: { avg: '.234', slg: '.319', homeRuns: 1, strikeOuts: 19 },
-  },
-};
-
 const PREDICTION_STADIUM_WIND_MODELS = {
   ARI: { stadium: 'Chase Field', roofType: 'retractable roof', cfAzimuth: 359.7, lfAzimuth: 324.7, rfAzimuth: 34.7, station: 'PHX', stationLabel: 'KPHX', stationDistanceMiles: 4.0 },
   ATL: { stadium: 'Truist Park', roofType: 'open air', cfAzimuth: 157.6, lfAzimuth: 122.6, rfAzimuth: 192.6, station: 'FTY', stationLabel: 'KFTY', stationDistanceMiles: 12.5 },
@@ -14168,16 +14157,6 @@ function battingProjectionRows(profile, game = null, gamesSince = null) {
   ];
 }
 
-function pitcherOpponentHandSeed(profile, season = seasonForDate(dateInput.value || formatDate(new Date()))) {
-  const id = Number(profile?.id);
-  const nameKey = normalizeNameKey(profile?.fullName || profile?.name || '');
-  const seed = FANGRAPHS_PITCHER_HAND_SPLIT_SEEDS[nameKey]
-    || Object.values(FANGRAPHS_PITCHER_HAND_SPLIT_SEEDS).find((entry) => Number(entry.playerId) === id)
-    || null;
-  if (!seed || Number(seed.season) !== Number(season)) return null;
-  return seed;
-}
-
 async function getPitcherOpponentHandSplit(playerId, sitCode, season = seasonForDate(dateInput.value || formatDate(new Date()))) {
   const id = Number(playerId);
   if (!Number.isFinite(id) || id <= 0 || !sitCode) return null;
@@ -14263,20 +14242,17 @@ async function getPitcherOpponentHandSplitsFromGameLogs(profile, season = season
 
 async function getPitcherOpponentHandSplits(profile, season = seasonForDate(dateInput.value || formatDate(new Date()))) {
   const targetSeason = pitcherOpponentHandSeasonForProfile(profile, season);
-  const seed = pitcherOpponentHandSeed(profile, targetSeason);
   const [apiLeft, apiRight] = await Promise.all([
     getPitcherOpponentHandSplit(profile?.id, 'vl', targetSeason).catch(() => null),
     getPitcherOpponentHandSplit(profile?.id, 'vr', targetSeason).catch(() => null),
   ]);
-  if (seed) {
-    return {
-      vsLeft: { ...(apiLeft || {}), ...(seed.vsLeft || {}) },
-      vsRight: { ...(apiRight || {}), ...(seed.vsRight || {}) },
-      source: seed.source,
-      sourceUrl: seed.sourceUrl,
-    };
-  }
-  if (pitcherOpponentHandStatHasData(apiLeft) || pitcherOpponentHandStatHasData(apiRight)) {
+  const hasApiData = pitcherOpponentHandStatHasData(apiLeft) || pitcherOpponentHandStatHasData(apiRight);
+  const seasonHomeRuns = pitcherHomeRunsAllowed(profile);
+  const apiHomeRuns = pitcherOpponentHandValue(apiLeft, 'homeRuns') + pitcherOpponentHandValue(apiRight, 'homeRuns');
+  // A split is only useful if it reconciles to the pitcher card's season total.
+  // When the API response is partial, rebuild the handedness breakdown from the
+  // individual game feeds instead of showing an unexplained missing remainder.
+  if (hasApiData && (!seasonHomeRuns || apiHomeRuns === seasonHomeRuns)) {
     return { vsLeft: apiLeft, vsRight: apiRight, source: `${targetSeason} MLB Stats API` };
   }
   const gameLogFallback = await getPitcherOpponentHandSplitsFromGameLogs(profile, targetSeason).catch(() => null);
@@ -22195,11 +22171,61 @@ function lineupPitcherMarkerClusterHtml(pitcher = null, contextGame = null) {
   ].filter(Boolean).join('');
 }
 
+function pitcherContextGameLine(pitcher = null, contextGame = null) {
+  const pitcherId = Number(pitcher?.id ?? pitcher?.person?.id ?? pitcher?.playerId);
+  const candidates = [];
+  const addCandidate = (line) => {
+    if (line && typeof line === 'object') candidates.push(line);
+  };
+  addCandidate(pitcher?.gamePitching);
+  if (Number.isFinite(pitcherId) && pitcherId > 0) {
+    addCandidate(contextGame?.playerLookup?.[String(pitcherId)]?.gamePitching);
+    for (const side of ['away', 'home']) {
+      const staff = contextGame?.pitching?.[side] || {};
+      if (Number(staff?.current?.id ?? staff?.current?.person?.id) === pitcherId) {
+        addCandidate(staff.current?.gamePitching);
+      }
+      const appearance = listify(staff?.history).find((entry) => Number(entry?.id ?? entry?.person?.id ?? entry?.playerId) === pitcherId);
+      if (appearance) {
+        addCandidate({
+          ip: appearance.ip ?? appearance.inningsPitched,
+          pitches: appearance.pitches ?? appearance.numberOfPitches ?? appearance.pitchesThrown ?? appearance.pitchCount,
+          so: appearance.so ?? appearance.k ?? appearance.strikeOuts,
+          hits: appearance.hits,
+          bb: appearance.bb ?? appearance.baseOnBalls ?? appearance.walks,
+          earnedRuns: appearance.earnedRuns ?? appearance.er,
+        });
+      }
+    }
+  }
+  const activity = (line) => (
+    statNumber(line?.pitches ?? line?.numberOfPitches ?? line?.pitchesThrown ?? line?.pitchCount)
+    + statNumber(line?.so ?? line?.k ?? line?.strikeOuts)
+    + inningsToOuts(line?.ip ?? line?.inningsPitched)
+    + statNumber(line?.hits)
+    + statNumber(line?.bb ?? line?.baseOnBalls ?? line?.walks)
+    + statNumber(line?.earnedRuns ?? line?.er)
+  );
+  const available = candidates.filter(Boolean).sort((a, b) => activity(b) - activity(a));
+  if (!available.length) return pitcher?.gamePitching || {};
+  const best = available[0];
+  const maximum = (getter) => Math.max(0, ...available.map(getter));
+  // Game totals only increase. Preserve the best value from every live-feed
+  // representation so an async profile refresh cannot erase P/K from the label.
+  return {
+    ...best,
+    pitches: maximum((line) => statNumber(line?.pitches ?? line?.numberOfPitches ?? line?.pitchesThrown ?? line?.pitchCount)),
+    so: maximum((line) => statNumber(line?.so ?? line?.k ?? line?.strikeOuts)),
+  };
+}
+
 function lineupPitcherNameHtml(pitcher, contextGame = null, nameColor = '') {
   const fullName = pitcher?.fullName || pitcher?.name || 'Unknown';
   const id = pitcher?.id || pitcher?.person?.id || pitcher?.playerId || '';
   const hand = handednessCode(pitcherThrowHandValue(pitcher));
-  const gameKs = statNumber(pitcher?.gamePitching?.so ?? pitcher?.stats?.pitching?.strikeOutsGame);
+  const gameLine = pitcherContextGameLine(pitcher, contextGame);
+  const gameKs = statNumber(gameLine?.so ?? gameLine?.k ?? gameLine?.strikeOuts ?? pitcher?.stats?.pitching?.strikeOutsGame);
+  const gamePitches = statNumber(gameLine?.pitches ?? gameLine?.numberOfPitches ?? gameLine?.pitchesThrown ?? gameLine?.pitchCount);
   const homeRunCards = pitcherLastStartHrMarkerHtml(id);
   const fingerprint = [
     id,
@@ -22209,7 +22235,7 @@ function lineupPitcherNameHtml(pitcher, contextGame = null, nameColor = '') {
   return `
     <span class="pitcher-identity-row" data-pitcher-identity-row="1" data-pitcher-id="${escapeHtml(String(id))}" data-pitcher-identity-fingerprint="${escapeHtml(fingerprint)}" title="Loading pitcher bio…">
       <span class="pitcher-name-text pitcher-identity-name"${nameColor ? ` style="--pitcher-name-color:${escapeHtml(nameColor)}"` : ''}>${escapeHtml(lastName(fullName) || fullName)}</span>
-      <span class="pitcher-identity-hand">${handednessHtml(hand)}</span>${gameKs > 0 ? `<small class="pitcher-game-k">K ${gameKs}</small>` : ''}
+      <span class="pitcher-identity-hand">${handednessHtml(hand)}</span>${gamePitches > 0 ? `<small class="pitcher-game-pitches">(P${gamePitches})</small>` : ''}${gameKs > 0 ? `<small class="pitcher-game-k">${gameKs} ${gameKs === 1 ? 'K' : 'Ks'}</small>` : ''}
       <span class="pitcher-identity-markers" aria-label="Recent home runs allowed">${homeRunCards}</span>
     </span>
   `;
@@ -39275,7 +39301,7 @@ function renderPitchingSide(sectionEl, teamCode, color, staff, game = null) {
     const currentPitchChip = '';
     const currentNameHtml = currentIsTbdFallback
       ? `<span class="lineup-team-pitcher-tbd">TBD</span><span class="lineup-team-pitcher-fallback">Fallback: ${lineupPitcherNameHtml(current, game)}</span>`
-      : `${lineupPitcherNameHtml(current, game, textColor)}${currentPitchCount && !currentIsTbdFallback ? ` <span class="pitch-count-inline">(P${currentPitchCount})</span>` : ''}`;
+      : `${lineupPitcherNameHtml(current, game, textColor)}`;
     const currentMetaLine = pitcherSeasonMetaLine(current);
     const currentHtml = current ? `
       <div class="pitching-card-label">${currentLabel}${currentPitchChip}</div>
@@ -39556,6 +39582,24 @@ function lineupStarterExitNoticeVisible(game, staff, current) {
   return true;
 }
 
+function pitcherLiveGameLine(primary = null, fallback = null) {
+  const primaryLine = primary?.gamePitching || {};
+  const fallbackLine = fallback?.gamePitching || {};
+  const activity = (line) => (
+    statNumber(line?.pitches ?? line?.numberOfPitches ?? line?.pitchesThrown ?? line?.pitchCount)
+    + statNumber(line?.so ?? line?.strikeOuts)
+    + statNumber(line?.hits)
+    + statNumber(line?.bb ?? line?.baseOnBalls ?? line?.walks)
+    + statNumber(line?.earnedRuns)
+    + inningsToOuts(line?.ip ?? line?.inningsPitched)
+  );
+  // The feed-derived live pitcher entry wins ties. A later season-profile fetch
+  // can legitimately have an empty game line, but must never erase live P/Ks.
+  return activity(primaryLine) >= activity(fallbackLine)
+    ? { ...fallbackLine, ...primaryLine }
+    : { ...primaryLine, ...fallbackLine };
+}
+
 function renderLineupPitcherSummary(containerEl, color, staff, game = null) {
   if (!containerEl) return;
   containerEl.classList.remove('is-bullpen-mode');
@@ -39597,6 +39641,7 @@ function renderLineupPitcherSummary(containerEl, color, staff, game = null) {
       ...renderLookupProfile,
       id: renderPitcherId,
       role: displayPitcherForRender?.role || renderLookupProfile?.role,
+      gamePitching: pitcherLiveGameLine(displayPitcherForRender, renderLookupProfile),
       isTbdFallbackStarter: Boolean(displayPitcherForRender?.isTbdFallbackStarter),
       fallbackStarter: displayPitcherForRender?.fallbackStarter || renderLookupProfile?.fallbackStarter,
     };
@@ -40071,7 +40116,6 @@ function pitcherSeasonMetaLine(pitcher, l3Leaders = null) {
     pitcherSeasonMetaMetricHtml('IP', pitcherInningsPitched(pitcher), l3Leaders?.ip),
     pitcherSeasonMetaMetricHtml('ERA', pitcherEra(pitcher), l3Leaders?.era),
     pitcherSeasonMetaMetricHtml('WHIP', pitcherWhip(pitcher), l3Leaders?.whip),
-    pitcherSeasonMetaMetricHtml('K', pitcherStrikeoutCount(pitcher), l3Leaders?.strikeOuts),
     pitcherSeasonMetaMetricHtml('HR/9', formatRateValue(pitcherHrPerNine(pitcher), 2, false), l3Leaders?.hr9),
     pitcherSeasonMetaMetricHtml('K/9', formatRateValue(pitcherKPerNine(pitcher), 2, false), l3Leaders?.k9),
   ].join(' | ') + escapeHtml(memory);
@@ -40716,7 +40760,12 @@ function resolveLineupPitcherForDisplay(game, side) {
   const currentSource = game?.pitching?.[side]?.current;
   const currentProfile = currentSource?.id ? game?.playerLookup?.[String(currentSource.id)] || null : null;
   const current = normalizePitcherDisplayEntry(
-    currentProfile ? { ...currentSource, ...currentProfile, role: currentSource?.role || currentProfile?.role } : currentSource,
+    currentProfile ? {
+      ...currentSource,
+      ...currentProfile,
+      role: currentSource?.role || currentProfile?.role,
+      gamePitching: pitcherLiveGameLine(currentSource, currentProfile),
+    } : currentSource,
     currentSource?.role || 'current',
   );
   return {
@@ -41166,9 +41215,14 @@ function renderLineupLiveDetails(game) {
     const realTicker = Array.isArray(game?.ticker) ? game.ticker.filter((item) => !isPlaceholderPlay(item?.text)) : [];
     const displayPlay = firstRealPlayText(game?.lastPlay, realTicker[0]?.text) || defaultPlayText(game);
     const playColor = game?.lastPlaySide === 'home' ? game?.homeColor : game?.lastPlaySide === 'away' ? game?.awayColor : '#cddfff';
-    const items = [{ text: pregame ? defaultPlayText(game) : displayPlay, color: playColor }];
+    const atBatText = pregame ? '' : scoreboardActiveAtBatText(game);
+    const items = [
+      ...(atBatText ? [{ text: atBatText, color: game?.battingSide === 'home' ? game?.homeColor : game?.awayColor, currentBatter: true }] : []),
+      { text: pregame ? defaultPlayText(game) : displayPlay, color: playColor },
+    ];
     for (const item of items) {
       const li = document.createElement('li');
+      li.classList.toggle('is-current-batter', Boolean(item.currentBatter));
       const words = String(item.text || '').trim().split(/\s+/).filter(Boolean);
       const name = words.shift() || '';
       const rest = words.join(' ');
@@ -44103,7 +44157,12 @@ function boldNamesInPlayText(text) {
 
 function fullPlayByPlayDialogHtml(game) {
   const plays = Array.isArray(game?.playByPlay) ? [...game.playByPlay] : [];
-  if (!plays.length) return '<p class="pbp-empty">Full play by play is not loaded for this game yet.</p>';
+  if (!plays.length) {
+    const atBatText = scoreboardActiveAtBatText(game);
+    const lastPlay = firstRealPlayText(game?.lastPlay, game?.ticker?.[0]?.text);
+    const liveContext = atBatText || lastPlay ? `<section class="pbp-live-context">${atBatText ? `<strong>${escapeHtml(atBatText)}</strong>` : ''}${lastPlay ? `<span>Last play: ${escapeHtml(lastPlay)}</span>` : ''}</section>` : '';
+    return `${liveContext}<p class="pbp-empty">Full play by play is not loaded for this game yet.</p>`;
+  }
   const groups = new Map();
   for (const play of plays) {
     const half = play.half === 'top' ? 'top' : play.half === 'bottom' ? 'bottom' : '';
@@ -44120,7 +44179,14 @@ function fullPlayByPlayDialogHtml(game) {
     const description = cleanPlayText(play.description || play.event || '');
     if (description) groups.get(key).descriptions.push(description);
   }
-  return [...groups.values()].reverse().map((group) => {
+  const atBatText = scoreboardActiveAtBatText(game);
+  const lastPlay = firstRealPlayText(game?.lastPlay, game?.ticker?.[0]?.text);
+  const liveContext = atBatText || lastPlay ? `
+    <section class="pbp-live-context">
+      ${atBatText ? `<strong>${escapeHtml(atBatText)}</strong>` : ''}
+      ${lastPlay ? `<span>Last play: ${escapeHtml(lastPlay)}</span>` : ''}
+    </section>` : '';
+  return liveContext + [...groups.values()].reverse().map((group) => {
     const label = `${group.half === 'top' ? 'Top' : group.half === 'bottom' ? 'Bottom' : 'Inning'} ${group.inning || ''}`.trim();
     const paragraph = group.descriptions.map((description) => boldNamesInPlayText(description)).join(' ');
     return `

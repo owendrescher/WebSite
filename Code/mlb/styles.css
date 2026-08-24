@@ -12409,6 +12409,28 @@ dialog.player-stat-modal.play-by-play-modal[open] .pbp-text,
   -webkit-overflow-scrolling: touch;
 }
 
+/* The popped-out feed owns the mobile gesture: never inherit modal clipping. */
+.play-by-play-modal.is-open .pbp-text {
+  height: 100% !important;
+  overflow-y: scroll !important;
+  overflow-x: hidden !important;
+  pointer-events: auto !important;
+  touch-action: pan-y !important;
+}
+
+.pbp-live-context {
+  display: grid;
+  gap: 3px;
+  margin: 0 0 10px;
+  padding: 8px 10px;
+  border-left: 3px solid var(--accent);
+  border-radius: 7px;
+  background: rgba(8, 28, 48, .8);
+}
+.pbp-live-context strong { color: var(--text); font: 900 .86rem/1.1 var(--font-display, var(--font-ui)); }
+.pbp-live-context span { color: var(--muted); font-size: .76rem; }
+.lineup-live-details .ticker li.is-current-batter { color: color-mix(in srgb, var(--ticker-team-color, var(--accent)) 38%, white 62%) !important; font-weight: 900; }
+
 /* Pitch-card additions: show previous-start usage below current usage. */
 .player-heatmap-pitch-table .pitch-use-cell,
 .pitch-strength-table .pitch-use-cell,

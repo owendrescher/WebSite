@@ -8973,7 +8973,19 @@ body.dashboard-page .player-stat-overlay.is-bullpen-profile #playerStatMatchup {
 
 /* Pitcher identity text must inherit the curated bright team color from its row. */
 .lineup-pitching-panel .pitcher-name-text { color: var(--pitcher-name-color, inherit) !important; }
-.pitcher-game-k { margin-left: .28em; color: var(--text); font: 900 .72em/1 var(--font-ui); white-space: nowrap; }
+.pitcher-game-pitches,
+.pitcher-game-k {
+  flex: 0 0 auto;
+  margin-left: .1em;
+  color: var(--text);
+  font: 900 .72em/1 var(--font-ui);
+  white-space: nowrap;
+}
+@media (max-width: 720px) {
+  .pitcher-game-pitches,
+  .pitcher-game-k { display: inline-block !important; font-size: .68em; }
+  .pitcher-identity-name { max-width: 5.7ch !important; }
+}
 
 /* The bullpen card uses a plain, readable identity line instead of badges/ellipsis. */
 .bullpen-profile-arm-name { overflow: visible; }
