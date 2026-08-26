@@ -8,8 +8,8 @@
       "Nolan Arenado",
       "Max Kepler",
       "Tim Tawa",
-      "Jordan Lawlar",
-      "Ildemaro Vargas"
+      "Ildemaro Vargas",
+      "Ryan Waldschmidt"
     ],
     "LHP": [
       "Ildemaro Vargas",
@@ -145,14 +145,14 @@
   },
   "CIN": {
     "RHP": [
+      "Hector Rodriguez",
       "Elly De La Cruz",
       "Sal Stewart",
       "JJ Bleday",
       "Tyler Stephenson",
       "Eugenio Suarez",
-      "Matt McLain",
       "Dane Myers",
-      "Hector Rodriguez",
+      "Matt McLain",
       "Ke'Bryan Hayes"
     ],
     "LHP": [
@@ -196,10 +196,10 @@
       "Jake McCarthy",
       "Mickey Moniak",
       "Cole Carrigg",
+      "Hunter Goodman",
       "TJ Rumfield",
       "Willi Castro",
       "Connor Norby",
-      "Brett Sullivan",
       "Zac Veen",
       "Ezequiel Tovar"
     ],
@@ -207,11 +207,11 @@
       "Jake McCarthy",
       "Willi Castro",
       "Cole Carrigg",
+      "Hunter Goodman",
       "TJ Rumfield",
       "Connor Norby",
       "Jordan Beck",
       "Mickey Moniak",
-      "Braxton Fulford",
       "Ezequiel Tovar"
     ]
   },
@@ -220,11 +220,11 @@
       "Sam Antonacci",
       "Munetaka Murakami",
       "Miguel Vargas",
-      "Andrew Benintendi",
       "Braden Montgomery",
       "Colson Montgomery",
       "Chase Meidroth",
       "Tristan Peters",
+      "Randal Grichuk",
       "Drew Romo"
     ],
     "LHP": [
@@ -241,12 +241,12 @@
   },
   "DET": {
     "RHP": [
+      "Brett Callahan",
       "Kevin McGonigle",
       "Gleyber Torres",
       "Colt Keith",
       "Dillon Dingler",
       "Zach McKinstry",
-      "Brett Callahan",
       "Spencer Torkelson",
       "Max Clark",
       "Hao-Yu Lee"
@@ -390,8 +390,8 @@
       "Jake Bauers",
       "William Contreras",
       "Christian Yelich",
-      "Andrew Vaughn",
       "Garrett Mitchell",
+      "Sal Frelick",
       "David Hamilton",
       "Cooper Pratt"
     ],
@@ -560,7 +560,7 @@
       "Cal Raleigh",
       "Cole Young",
       "Taylor Ward",
-      "Weston Wilson",
+      "J.P. Crawford",
       "Brock Rodden"
     ],
     "LHP": [
@@ -570,32 +570,32 @@
       "Josh Naylor",
       "Cal Raleigh",
       "Taylor Ward",
-      "Weston Wilson",
       "Cole Young",
-      "Brock Rodden"
+      "Weston Wilson",
+      "J.P. Crawford"
     ]
   },
   "SF": {
     "RHP": [
       "Drew Gilbert",
       "Rafael Devers",
-      "Willy Adames",
       "Jung Hoo Lee",
-      "Osleivis Basabe",
       "Turner Hill",
-      "Victor Bericoto",
       "Drew Cavanaugh",
+      "Nate Furman",
+      "Shay Whitcomb",
+      "Grant McCray",
       "Christian Koss"
     ],
     "LHP": [
       "Osleivis Basabe",
       "Rafael Devers",
-      "Willy Adames",
-      "Victor Bericoto",
-      "Jung Hoo Lee",
       "Jonah Cox",
-      "Andrew Knizner",
+      "Jung Hoo Lee",
+      "Shay Whitcomb",
+      "Buddy Kennedy",
       "Drew Gilbert",
+      "Andrew Knizner",
       "Christian Koss"
     ]
   },
@@ -607,7 +607,7 @@
       "Jordan Walker",
       "Joshua Baez",
       "Nathan Church",
-      "Masyn Winn",
+      "Bryan Torres",
       "Blaze Jordan",
       "Jimmy Crooks"
     ],
@@ -618,8 +618,8 @@
       "Alec Burleson",
       "Joshua Baez",
       "Blaze Jordan",
-      "Masyn Winn",
-      "Nathan Church",
+      "Jose Fermin",
+      "Ramon Urias",
       "Pedro Pages"
     ]
   },
@@ -656,7 +656,7 @@
       "Ezequiel Duran",
       "Evan Carter",
       "Jake Burger",
-      "Nicky Lopez",
+      "Cody Freeman",
       "Danny Jansen"
     ],
     "LHP": [
@@ -699,9 +699,9 @@
     "RHP": [
       "CJ Abrams",
       "Abimelec Ortiz",
-      "Brady House",
-      "Daylen Lile",
       "Dylan Crews",
+      "Daylen Lile",
+      "Brady House",
       "Keibert Ruiz",
       "Andres Chaparro",
       "Nasim Nunez",
