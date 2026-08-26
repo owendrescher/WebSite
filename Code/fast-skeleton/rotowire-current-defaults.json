@@ -18,8 +18,8 @@
       "Geraldo Perdomo",
       "Nolan Arenado",
       "Tim Tawa",
-      "Jordan Lawlar",
       "Jose Fernandez",
+      "Jordan Lawlar",
       "Ryan Waldschmidt"
     ]
   },
@@ -318,9 +318,9 @@
       "Moises Ballesteros",
       "Vaughn Grissom",
       "Josh Lowe",
-      "Denzer Guzman",
-      "Gustavo Campero",
       "Christian Moore",
+      "Denzer Guzman",
+      "Adam Frazier",
       "Tyler Heineman"
     ],
     "LHP": [
@@ -329,10 +329,10 @@
       "Vaughn Grissom",
       "Moises Ballesteros",
       "Jose Siri",
-      "Gustavo Campero",
-      "Denzer Guzman",
       "Christian Moore",
-      "Travis d'Arnaud"
+      "Denzer Guzman",
+      "Travis d'Arnaud",
+      "Bryce Teodosio"
     ]
   },
   "LAD": {
@@ -511,8 +511,8 @@
       "Esmerlyn Valdez",
       "Oneil Cruz",
       "Nick Gonzales",
-      "Rafael Flores",
       "Jake Mangum",
+      "Rafael Flores",
       "Jacob Gonzalez"
     ],
     "LHP": [
@@ -568,8 +568,8 @@
       "Dominic Canzone",
       "Julio Rodriguez",
       "Josh Naylor",
-      "Cal Raleigh",
       "Taylor Ward",
+      "Cal Raleigh",
       "Cole Young",
       "Weston Wilson",
       "J.P. Crawford"
@@ -579,22 +579,22 @@
     "RHP": [
       "Drew Gilbert",
       "Rafael Devers",
+      "Bryce Eldridge",
       "Jung Hoo Lee",
       "Turner Hill",
       "Drew Cavanaugh",
       "Nate Furman",
       "Shay Whitcomb",
-      "Grant McCray",
       "Christian Koss"
     ],
     "LHP": [
-      "Osleivis Basabe",
-      "Rafael Devers",
       "Jonah Cox",
+      "Rafael Devers",
+      "Bryce Eldridge",
+      "Osleivis Basabe",
       "Jung Hoo Lee",
-      "Shay Whitcomb",
       "Buddy Kennedy",
-      "Drew Gilbert",
+      "Turner Hill",
       "Andrew Knizner",
       "Christian Koss"
     ]
