@@ -17,9 +17,9 @@
     <meta name="twitter:description" content="Live MLB scoreboard, lineups, pitcher trends, hot players, and betting stat tools." />
     <link rel="icon" type="image/png" href="baseball.png" />
     <link rel="apple-touch-icon" href="baseball.png" />
-    <link rel="stylesheet" href="styles.css?v=20260824pbpScroll1" />
+    <link rel="stylesheet" href="styles.css?v=20260826teamPalette2" />
     <link rel="stylesheet" href="dashboard.css?v=20260711bullpen14d1" />
-    <link rel="stylesheet" href="live-prototype.css?v=20260824livePitcherPbp1" />
+    <link rel="stylesheet" href="live-prototype.css?v=20260826teamAdornment3" />
     <style>
       @media (hover: none), (pointer: coarse), (max-width: 760px) {
         body.dashboard-page .scoreboard { min-height: 132px !important; }
@@ -263,10 +263,49 @@
     <dialog id="siteHelpDialog" class="bet-dialog site-help-dialog">
       <form class="bet-dialog-form" method="dialog">
         <header class="bet-dialog-header">
-          <strong>Site Controls</strong>
-          <button id="siteHelpCloseBtn" class="bet-dialog-close" type="button" aria-label="Close controls help">x</button>
+          <strong>Options</strong>
+          <button id="siteHelpCloseBtn" class="bet-dialog-close" type="button" aria-label="Close options">x</button>
         </header>
-        <div class="site-help-content">
+        <div class="site-options-tabs" role="tablist" aria-label="Options menu">
+          <button type="button" class="site-options-tab active" data-site-options-tab="options" aria-selected="true">Options</button>
+          <button type="button" class="site-options-tab" data-site-options-tab="help" aria-selected="false">Help</button>
+        </div>
+        <section class="site-options-content" data-site-options-panel="options">
+          <label class="site-option-range">
+            <span><b>Tooltip delay</b><output id="siteTooltipDelayValue">1.5 sec</output></span>
+            <input id="siteTooltipDelayRange" type="range" min="0" max="200" step="1" value="100" aria-label="Tooltip activation delay" />
+            <small>0–3 seconds · 100% is the current delay</small>
+          </label>
+          <label class="site-option-range">
+            <span><b>Sound effects</b><output id="siteSoundVolumeValue">100%</output></span>
+            <div class="site-option-volume-row">
+              <input id="siteSoundVolumeRange" type="range" min="0" max="100" step="1" value="100" aria-label="Sound effects volume" />
+              <button id="siteSoundMuteBtn" type="button" aria-pressed="false">On</button>
+            </div>
+            <small>Controls home-run alerts and their fallback tone.</small>
+          </label>
+          <label class="site-option-range site-option-color">
+            <span><b>Site color</b><output id="siteAccentColorValue">RGB(102, 217, 255)</output></span>
+            <div class="site-option-color-row">
+              <button id="siteAccentColorBtn" class="site-accent-picker-open" type="button" aria-expanded="false" aria-controls="siteAccentColorPopover">
+                <i id="siteAccentColorSwatch" aria-hidden="true"></i><span>Adjust RGB</span>
+              </button>
+              <small>RGB channels only. Middle-click the color button to restore this theme’s default accent.</small>
+              <div id="siteAccentColorPopover" class="site-accent-color-popover" role="dialog" aria-label="Site color RGB controls" hidden>
+                <div class="site-accent-wheel-row">
+                  <button id="siteAccentColorWheel" class="site-accent-color-wheel" type="button" aria-label="Choose site color from RGB wheel"><i id="siteAccentColorWheelMarker" aria-hidden="true"></i></button>
+                  <div class="site-accent-rgb-inputs">
+                    <label><span>R</span><input data-site-accent-channel="r" type="number" min="0" max="255" step="1" inputmode="numeric" value="102" aria-label="Red channel" /></label>
+                    <label><span>G</span><input data-site-accent-channel="g" type="number" min="0" max="255" step="1" inputmode="numeric" value="217" aria-label="Green channel" /></label>
+                    <label><span>B</span><input data-site-accent-channel="b" type="number" min="0" max="255" step="1" inputmode="numeric" value="255" aria-label="Blue channel" /></label>
+                  </div>
+                </div>
+                <button id="siteAccentColorResetBtn" type="button">Reset default</button>
+              </div>
+            </div>
+          </label>
+        </section>
+        <div class="site-help-content" data-site-options-panel="help" hidden>
           <section>
             <h2>Scoreboard</h2>
             <p>Left-click a team to stage a winner pick. Ctrl-click or Cmd-click a game to focus it. Middle-click, Alt-click, or press L while hovering a game to open the lineup card.</p>
@@ -310,7 +349,7 @@
             <div class="topbar-actions">
               <span id="dashboardSummary" class="dashboard-summary">Loading games</span>
               <button id="overlayDockToggleBtn" class="toolbar-btn dashboard-hidden" type="button">Scoreboard: Right</button>
-              <button id="scoreboardColumnsBtn" class="toolbar-btn help-btn" type="button" aria-label="Open site controls help" title="Controls and site capabilities">?</button>
+              <button id="scoreboardColumnsBtn" class="toolbar-btn help-btn site-options-btn" type="button" aria-label="Open options and help" title="Options and help">&#9881;</button>
               <button id="globalPlayerSearchBtn" class="toolbar-btn player-search-btn" type="button" aria-label="Search players" title="Search players">&#128269;</button>
               <div id="gameVisibilityControl" class="game-visibility-control" hidden>
                 <button id="gameVisibilityBtn" class="toolbar-btn game-visibility-btn" type="button" aria-label="Hide games by status" aria-expanded="false">Hide</button>
@@ -918,10 +957,10 @@
       };
     </script>
     <script src="owentools-sync.js?v=20260721durableSession1"></script>
-    <script src="rotowire-default-lineups.js?v=20260818rotowire"></script>
+    <script src="rotowire-default-lineups.js?v=20260825rotowire"></script>
     <script src="mlb-contracts-data.js?v=20260708liveSearchFix1"></script>
     <script>window.MLB_DASHBOARD_BUILD_ID="20260711-tooltip-cleanup2";</script>
     <script src="data/savant/savant_aggregates_2026.js?v=20260818armAngle1"></script>
-  <script src="live-dashboard-prototype.js?v=20260824livePitcherPbp4"></script>
+    <script src="live-dashboard-prototype.js?v=20260826teamAdornment1"></script>
   </body>
 </html>

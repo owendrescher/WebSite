@@ -9181,3 +9181,669 @@ body.light-mlb-page .lineup-list li:not(.lineup-row-substitution) > .lineup-rati
 body.dashboard-page .scoreboard-main > .score-state-strip .score-mini-inning.is-tossup-locked::before {
   content: '\1F512' !important;
 }
+/* Player-card Savant tabs: recent trend first, detailed arsenal second. */
+body.dashboard-page .savant-matchup-arsenal.savant-player-tabs {
+  width: min(100%, 320px);
+  min-width: 0;
+  padding: 3px;
+  overflow: hidden;
+}
+
+body.dashboard-page .savant-player-tab-list {
+  display: grid;
+  grid-template-columns: repeat(3, minmax(0, 1fr));
+  gap: 2px;
+  margin: -1px -1px 4px;
+  padding: 2px;
+  border-top: 2px solid color-mix(in srgb, var(--player-team-secondary, var(--accent)) 78%, var(--line));
+  border-bottom: 1px solid color-mix(in srgb, var(--line) 48%, transparent);
+  background: color-mix(in srgb, var(--panel-bg) 78%, transparent);
+}
+
+body.dashboard-page .savant-player-tab {
+  min-width: 0;
+  min-height: 21px;
+  padding: 2px 3px;
+  border: 1px solid transparent;
+  border-radius: 4px;
+  background: transparent;
+  color: var(--muted);
+  font: 900 .47rem/1 var(--font-ui);
+  letter-spacing: .045em;
+  text-transform: uppercase;
+  cursor: pointer;
+}
+
+body.dashboard-page .savant-player-tab:hover,
+body.dashboard-page .savant-player-tab:focus-visible,
+body.dashboard-page .savant-player-tab.active {
+  border-color: color-mix(in srgb, var(--player-team-secondary, var(--accent)) 72%, var(--line));
+  background: color-mix(in srgb, var(--player-team-primary, var(--panel-item)) 25%, var(--panel-bg));
+  color: var(--text);
+  outline: none;
+}
+
+body.dashboard-page .savant-player-tab-panel {
+  min-width: 0;
+}
+
+body.dashboard-page .savant-graph-window-row {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  min-height: 18px;
+  margin: 0 2px 2px;
+  color: var(--muted);
+  font: 800 .4rem/1 var(--font-ui);
+  letter-spacing: .045em;
+  text-transform: uppercase;
+}
+
+body.dashboard-page .savant-graph-window-toggle {
+  min-width: 29px;
+  min-height: 17px;
+  padding: 1px 4px;
+  border: 1px solid color-mix(in srgb, var(--player-team-secondary, var(--accent)) 66%, var(--line));
+  border-radius: 4px;
+  background: color-mix(in srgb, var(--player-team-primary, var(--panel-item)) 24%, var(--panel-bg));
+  color: var(--text);
+  font: 900 .43rem/1 var(--font-ui);
+  letter-spacing: .04em;
+  cursor: pointer;
+}
+
+body.dashboard-page .savant-graph-window-toggle:hover,
+body.dashboard-page .savant-graph-window-toggle:focus-visible {
+  border-color: var(--player-team-secondary, var(--accent));
+  filter: brightness(1.12);
+  outline: none;
+}
+
+body.dashboard-page .savant-tab-status {
+  min-height: 12px;
+  margin: 0 2px 2px;
+  color: var(--muted);
+  font: 800 .38rem/1 var(--font-ui);
+  letter-spacing: .03em;
+  text-align: right;
+}
+
+body.dashboard-page .savant-tab-loading,
+body.dashboard-page .savant-performance-graph-empty {
+  min-height: 118px;
+  display: grid;
+  place-items: center;
+  padding: 6px;
+  color: var(--muted);
+  font: 800 .52rem/1.2 var(--font-ui);
+  text-align: center;
+}
+
+body.dashboard-page .savant-projections-placeholder {
+  min-height: 118px;
+  align-content: center;
+  justify-items: center;
+  gap: 5px;
+  padding: 8px;
+  border: 1px dashed color-mix(in srgb, var(--player-team-secondary, var(--accent)) 44%, var(--line));
+  border-radius: 5px;
+  background: linear-gradient(135deg, color-mix(in srgb, var(--player-team-primary, var(--panel-item)) 22%, transparent), transparent 70%);
+  text-align: center;
+}
+
+body.dashboard-page .savant-projections-placeholder strong {
+  color: var(--text);
+  font: 900 .6rem/1 var(--font-ui);
+  letter-spacing: .06em;
+  text-transform: uppercase;
+}
+
+body.dashboard-page .savant-projections-placeholder span {
+  color: var(--muted);
+  font: 700 .48rem/1.2 var(--font-ui);
+}
+
+body.dashboard-page .savant-performance-graph-card {
+  display: grid;
+  grid-template-rows: auto minmax(0, 1fr);
+  min-height: 142px;
+  padding: 5px;
+  border: 1px solid color-mix(in srgb, var(--line) 58%, transparent);
+  border-radius: 6px;
+  background: linear-gradient(180deg, rgba(255,255,255,.045), transparent 58%), color-mix(in srgb, var(--panel-bg) 70%, transparent);
+}
+
+body.dashboard-page .savant-performance-graph-head {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 6px;
+  color: var(--muted);
+  font: 950 .51rem/1 var(--font-ui);
+  letter-spacing: .055em;
+  text-transform: uppercase;
+}
+
+body.dashboard-page .savant-performance-graph-head > div {
+  display: inline-flex;
+  gap: 4px;
+}
+
+body.dashboard-page .savant-performance-graph-head > div span {
+  color: var(--metric-color, var(--text));
+}
+
+body.dashboard-page .savant-performance-graph-card svg {
+  display: block;
+  width: 100%;
+  height: 118px;
+  overflow: visible;
+}
+
+body.dashboard-page .savant-performance-graph-card .axis {
+  stroke: color-mix(in srgb, var(--line) 78%, transparent);
+  stroke-width: 1.2;
+}
+
+body.dashboard-page .savant-performance-graph-card .grid {
+  stroke: rgba(255,255,255,.12);
+  stroke-width: 1;
+  stroke-dasharray: 3 4;
+}
+
+body.dashboard-page .savant-performance-graph-card polyline {
+  fill: none;
+  stroke: var(--metric-color);
+  stroke-width: 2.1;
+  stroke-linecap: round;
+  stroke-linejoin: round;
+  filter: drop-shadow(0 0 4px color-mix(in srgb, var(--metric-color) 55%, transparent));
+}
+
+body.dashboard-page .savant-performance-graph-card circle {
+  fill: var(--metric-color);
+  stroke: #06111b;
+  stroke-width: 1.1;
+}
+
+body.dashboard-page .savant-performance-graph-card circle[data-theme-tooltip-html] {
+  cursor: help;
+}
+
+body.dashboard-page .savant-performance-graph-hit-target {
+  fill: transparent;
+  cursor: help;
+  pointer-events: all;
+}
+
+body.dashboard-page .savant-performance-graph-hit-target:focus {
+  outline: none;
+}
+
+body.dashboard-page .savant-performance-graph-card circle:focus-visible {
+  stroke: #fff;
+  stroke-width: 2;
+  outline: none;
+}
+
+body.dashboard-page .savant-performance-graph-card .tick,
+body.dashboard-page .savant-performance-graph-card svg > text {
+  fill: var(--muted);
+  font: 800 7px var(--font-ui);
+}
+
+.savant-graph-point-summary {
+  display: grid;
+  gap: 2px;
+  margin-bottom: 6px;
+  padding-bottom: 6px;
+  border-bottom: 1px solid color-mix(in srgb, var(--line) 48%, transparent);
+}
+
+.savant-graph-point-summary strong { color: var(--text); font-size: .74rem; }
+.savant-graph-point-summary span,
+.savant-graph-point-empty { color: var(--muted); font-size: .61rem; }
+
+/* Gear menu: options live beside the existing help content. */
+body.dashboard-page .toolbar-btn.site-options-btn {
+  color: #fff !important;
+  font-family: "Segoe UI Symbol", "Segoe UI", sans-serif;
+  font-size: 1.18rem;
+  font-weight: 400;
+  line-height: 1;
+  text-shadow: none !important;
+}
+
+.site-options-tabs {
+  display: flex;
+  gap: 4px;
+  padding: 0 0 8px;
+  border-bottom: 1px solid color-mix(in srgb, var(--line) 42%, transparent);
+}
+
+.site-options-tab {
+  min-height: 27px;
+  padding: 4px 9px;
+  border: 1px solid color-mix(in srgb, var(--line) 68%, transparent);
+  border-radius: 6px;
+  background: color-mix(in srgb, var(--panel-item) 76%, transparent);
+  color: var(--muted);
+  font: 900 .6rem/1 var(--font-ui);
+  letter-spacing: .06em;
+  text-transform: uppercase;
+  cursor: pointer;
+}
+
+.site-options-tab.active,
+.site-options-tab:hover,
+.site-options-tab:focus-visible {
+  border-color: color-mix(in srgb, var(--accent) 72%, #fff 12%);
+  color: var(--text);
+  outline: none;
+}
+
+.site-options-content {
+  display: grid;
+  gap: 12px;
+  padding-top: 10px;
+}
+
+.site-option-range {
+  display: grid;
+  gap: 6px;
+  padding: 8px;
+  border: 1px solid color-mix(in srgb, var(--line) 46%, transparent);
+  border-radius: 7px;
+  background: color-mix(in srgb, var(--panel-item) 38%, transparent);
+}
+
+.site-option-range > span {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 8px;
+  color: var(--text);
+  font: 850 .67rem/1 var(--font-ui);
+}
+
+.site-option-range output { color: var(--accent); font-weight: 950; }
+.site-option-range small { color: var(--muted); font-size: .59rem; line-height: 1.25; }
+.site-option-range input[type='range'] { width: 100%; accent-color: var(--accent); }
+
+.site-option-volume-row {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) 42px;
+  align-items: center;
+  gap: 7px;
+}
+
+.site-option-volume-row button {
+  min-height: 25px;
+  border: 1px solid color-mix(in srgb, var(--accent) 64%, var(--line));
+  border-radius: 5px;
+  background: color-mix(in srgb, var(--panel-bg) 64%, transparent);
+  color: var(--text);
+  font: 900 .56rem/1 var(--font-ui);
+  cursor: pointer;
+}
+
+.site-option-volume-row button[aria-pressed='true'] { color: var(--muted); border-color: color-mix(in srgb, var(--line) 70%, transparent); }
+
+.site-option-color-row {
+  position: relative;
+  display: grid;
+  grid-template-columns: auto minmax(0, 1fr);
+  align-items: center;
+  gap: 9px;
+}
+
+.site-accent-picker-open {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  min-height: 28px;
+  padding: 4px 7px;
+  border: 1px solid color-mix(in srgb, var(--accent) 62%, var(--line));
+  border-radius: 5px;
+  background: var(--panel-bg);
+  color: var(--text);
+  font: 850 .55rem/1 var(--font-ui);
+  letter-spacing: .04em;
+  text-transform: uppercase;
+  cursor: pointer;
+}
+
+.site-accent-picker-open i {
+  display: block;
+  width: 14px;
+  height: 14px;
+  border: 1px solid rgba(255,255,255,.68);
+  border-radius: 3px;
+  box-shadow: 0 0 0 1px rgba(0,0,0,.38), inset 0 1px 0 rgba(255,255,255,.2);
+}
+
+.site-option-color-row small { color: var(--muted); font-size: .59rem; line-height: 1.25; }
+
+.site-accent-color-popover {
+  position: absolute;
+  z-index: 12;
+  top: calc(100% + 6px);
+  left: 0;
+  width: min(224px, calc(100vw - 72px));
+  display: grid;
+  gap: 8px;
+  padding: 8px;
+  border: 1px solid color-mix(in srgb, var(--accent) 62%, var(--line));
+  border-radius: 7px;
+  background: color-mix(in srgb, var(--panel-bg) 95%, #000 5%);
+  box-shadow: 0 14px 28px rgba(0,0,0,.36), inset 0 1px 0 rgba(255,255,255,.07);
+}
+
+.site-accent-color-popover[hidden] {
+  display: none !important;
+}
+
+.site-accent-wheel-row {
+  display: grid;
+  grid-template-columns: 92px minmax(0, 1fr);
+  align-items: center;
+  gap: 9px;
+}
+
+.site-accent-color-wheel {
+  position: relative;
+  display: block;
+  width: 92px;
+  height: 92px;
+  padding: 0;
+  overflow: hidden;
+  border: 1px solid rgba(255,255,255,.62);
+  border-radius: 50%;
+  background:
+    radial-gradient(circle at center, #fff 0%, rgba(255,255,255,0) 68%),
+    conic-gradient(from 0deg, #ff4040, #ffe340, #49ff65, #35eaff, #4989ff, #c65cff, #ff40b8, #ff4040);
+  box-shadow: 0 0 0 1px rgba(0,0,0,.52), inset 0 0 16px rgba(0,0,0,.18);
+  cursor: crosshair;
+  touch-action: none;
+}
+
+.site-accent-color-wheel i {
+  position: absolute;
+  width: 10px;
+  height: 10px;
+  box-sizing: border-box;
+  border: 2px solid #fff;
+  border-radius: 50%;
+  background: rgba(0,0,0,.25);
+  box-shadow: 0 0 0 1px rgba(0,0,0,.75), 0 1px 4px rgba(0,0,0,.72);
+  transform: translate(-50%, -50%);
+  pointer-events: none;
+}
+
+.site-accent-rgb-inputs {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr);
+  gap: 6px;
+}
+
+.site-accent-rgb-inputs label {
+  display: grid;
+  grid-template-columns: 14px minmax(0, 1fr);
+  align-items: center;
+  gap: 4px;
+  color: var(--muted);
+  font: 900 .58rem/1 var(--font-ui);
+}
+
+.site-accent-rgb-inputs input {
+  width: 100%;
+  min-width: 0;
+  height: 25px;
+  box-sizing: border-box;
+  padding: 2px 3px;
+  border: 1px solid color-mix(in srgb, var(--accent) 38%, var(--line));
+  border-radius: 4px;
+  background: color-mix(in srgb, var(--panel-head) 70%, #000 30%);
+  color: var(--text);
+  font: 800 .6rem/1 var(--font-ui);
+  text-align: center;
+}
+
+.site-accent-color-popover > button {
+  min-height: 25px;
+  border: 1px solid color-mix(in srgb, var(--accent) 48%, var(--line));
+  border-radius: 4px;
+  background: color-mix(in srgb, var(--panel-head) 62%, #000 38%);
+  color: var(--text);
+  font: 850 .55rem/1 var(--font-ui);
+  letter-spacing: .04em;
+  text-transform: uppercase;
+  cursor: pointer;
+}
+
+/* Custom site RGB should reach every neutral UI layer, while team identity
+   colors remain reserved for actual team/player context. */
+body.dashboard-page .current-pitch-count,
+body.dashboard-page .lineup-live-details .play-col[data-play-by-play-trigger]:hover {
+  background: color-mix(in srgb, var(--accent) 16%, transparent);
+}
+
+body.dashboard-page .panel-tab-btn.is-active,
+body.dashboard-page .player-tracker-count {
+  text-shadow: 0 0 10px color-mix(in srgb, var(--accent) 28%, transparent);
+}
+
+body.dashboard-page .player-tracker-count {
+  box-shadow: inset 0 1px 0 rgba(255,255,255,.08), 0 0 12px color-mix(in srgb, var(--accent) 8%, transparent);
+}
+
+body.dashboard-page .bet-leg-pill-active {
+  box-shadow: 0 0 0 1px color-mix(in srgb, var(--accent) 28%, transparent) inset, 0 0 12px color-mix(in srgb, var(--accent) 24%, transparent);
+}
+
+body.dashboard-page .bet-item-active {
+  box-shadow: 0 0 0 1px color-mix(in srgb, var(--accent) 30%, transparent) inset, 0 0 18px color-mix(in srgb, var(--accent) 18%, transparent);
+}
+
+body.dashboard-page .lineup-archetype-badge.is-pitcher,
+body.dashboard-page .player-archetype-matchup-table tbody th b {
+  border-color: color-mix(in srgb, var(--accent) 34%, transparent);
+  background: color-mix(in srgb, var(--accent) 14%, transparent);
+  color: color-mix(in srgb, var(--accent) 30%, #fff 70%);
+}
+
+body.dashboard-page .lineup-archetype-badge.is-pitcher {
+  background: linear-gradient(180deg, color-mix(in srgb, var(--accent) 26%, transparent), color-mix(in srgb, var(--accent) 8%, transparent));
+}
+
+body.dashboard-page .player-archetype-matchup-table tbody tr.is-batter {
+  background: linear-gradient(90deg, color-mix(in srgb, var(--accent) 8%, transparent), transparent 84%);
+}
+
+@media (max-width: 600px) {
+  body.dashboard-page .savant-player-tab { font-size: .43rem; }
+  body.dashboard-page .savant-performance-graph-card { min-height: 132px; }
+  body.dashboard-page .savant-performance-graph-card svg { height: 108px; }
+}
+
+/* Four-role team adornment. These rules use the registry's light, dark, and
+   trim colors only on existing team surfaces; names and other main text keep
+   the established readable `text` color. */
+body.dashboard-page .game-card {
+  border-top-color: color-mix(in srgb,
+    var(--away-dark, var(--accent)) 50%,
+    var(--home-dark, var(--accent)) 50%);
+}
+
+body.dashboard-page .scoreboard {
+  border-top-color: color-mix(in srgb,
+    var(--away-dark, var(--accent)) 50%,
+    var(--home-dark, var(--accent)) 50%);
+}
+
+body.dashboard-page .scoreboard::before {
+  content: '';
+  position: absolute;
+  z-index: 3;
+  top: 0;
+  right: 9px;
+  left: 9px;
+  height: 2px;
+  border-radius: 0 0 999px 999px;
+  background: linear-gradient(90deg,
+    var(--away-light, var(--accent)),
+    var(--away-dark, var(--accent)) 39%,
+    var(--home-dark, var(--accent)) 61%,
+    var(--home-light, var(--accent)));
+  opacity: .82;
+  pointer-events: none;
+}
+
+body.dashboard-page .scoreboard-side .away-score {
+  border-bottom-color: color-mix(in srgb, var(--away-trim, var(--away-light, var(--accent))) 68%, var(--line));
+}
+
+body.dashboard-page .scoreboard-side .home-score {
+  border-bottom-color: color-mix(in srgb, var(--home-trim, var(--home-light, var(--accent))) 68%, var(--line));
+}
+
+body.dashboard-page .lineup-modal {
+  border-color: color-mix(in srgb,
+    color-mix(in srgb, var(--away-dark, var(--accent)) 50%, var(--home-dark, var(--accent)) 50%) 58%,
+    var(--line));
+}
+
+body.dashboard-page .lineup-modal::before {
+  content: '';
+  position: absolute;
+  z-index: 3;
+  top: 0;
+  right: 14px;
+  left: 14px;
+  height: 2px;
+  border-radius: 0 0 999px 999px;
+  background: linear-gradient(90deg,
+    var(--away-light, var(--accent)),
+    var(--away-dark, var(--accent)) 40%,
+    var(--home-dark, var(--accent)) 60%,
+    var(--home-light, var(--accent)));
+  opacity: .78;
+  pointer-events: none;
+}
+
+body.dashboard-page .lineup-modal-team,
+body.dashboard-page .lineup-pitching-panel,
+body.dashboard-page .lineup-roster-panel {
+  border-top: 1px solid color-mix(in srgb, var(--team-dark, var(--team-color, var(--accent))) 44%, var(--line));
+  box-shadow: inset 2px 0 0 color-mix(in srgb, var(--team-light, var(--team-color, var(--accent))) 56%, transparent);
+}
+
+body.dashboard-page .lineup-pitching-panel .current-pitcher-card {
+  border-color: color-mix(in srgb, var(--team-dark, var(--team-color, var(--accent))) 54%, var(--line));
+  background:
+    linear-gradient(100deg, color-mix(in srgb, var(--team-light, var(--team-color, var(--accent))) 11%, transparent), transparent 66%),
+    color-mix(in srgb, var(--panel-item) 55%, transparent);
+}
+
+body.dashboard-page .lineup-pitching-panel .bullpen-summary-card {
+  border-color: color-mix(in srgb, var(--team-dark, var(--team-color, var(--accent))) 50%, var(--line));
+  box-shadow:
+    inset 2px 0 0 color-mix(in srgb, var(--team-light, var(--team-color, var(--accent))) 56%, transparent),
+    inset -1px 0 0 color-mix(in srgb, var(--team-trim, var(--team-color, var(--accent))) 48%, transparent);
+}
+
+body.dashboard-page .lineup-pitching-panel .bullpen-summary-label {
+  color: var(--team-text, var(--text));
+}
+
+body.dashboard-page .lineup-pitching-panel .bullpen-item {
+  border-bottom-color: color-mix(in srgb, var(--team-trim, var(--team-color, var(--accent))) 34%, var(--line));
+}
+
+body.dashboard-page .lineup-roster-panel .roster-status-item {
+  border-bottom-color: color-mix(in srgb, var(--team-trim, var(--team-color, var(--accent))) 32%, var(--line));
+}
+
+body.dashboard-page .player-stat-modal {
+  border-color: color-mix(in srgb, var(--player-team-dark, var(--accent)) 56%, var(--line));
+  box-shadow:
+    inset 0 2px 0 color-mix(in srgb, var(--player-team-light, var(--accent)) 66%, transparent),
+    inset 0 -1px 0 color-mix(in srgb, var(--player-team-tertiary, var(--accent)) 34%, transparent),
+    0 24px 48px rgba(0, 0, 0, 0.4),
+    inset 0 0 0 1px color-mix(in srgb, var(--line) 35%, transparent);
+}
+
+body.dashboard-page .player-stat-header {
+  border-bottom-color: color-mix(in srgb, var(--player-team-dark, var(--accent)) 48%, var(--line));
+  box-shadow: inset 0 2px 0 color-mix(in srgb, var(--player-team-light, var(--accent)) 54%, transparent);
+}
+
+body.dashboard-page .player-stat-left {
+  border-color: color-mix(in srgb, var(--player-team-dark, var(--accent)) 42%, var(--line));
+  box-shadow:
+    inset 2px 0 0 color-mix(in srgb, var(--player-team-light, var(--accent)) 48%, transparent),
+    inset -1px 0 0 color-mix(in srgb, var(--player-team-tertiary, var(--accent)) 34%, transparent),
+    inset 0 1px 0 rgba(255,255,255,.06);
+}
+
+body.dashboard-page .player-stat-headshot {
+  border-color: color-mix(in srgb, var(--player-team-trim, var(--player-team-tertiary, var(--accent))) 62%, var(--line));
+}
+
+body.dashboard-page .player-stat-bio {
+  border-color: color-mix(in srgb, var(--player-team-dark, var(--accent)) 34%, var(--line));
+}
+
+body.dashboard-page .player-track-item {
+  border-top-color: color-mix(in srgb, var(--tracker-team-trim, var(--tracker-team-color, var(--accent))) 54%, var(--line));
+}
+
+body.dashboard-page .player-track-item::before {
+  background: linear-gradient(180deg,
+    var(--tracker-team-light, var(--tracker-team-color, var(--accent))),
+    var(--tracker-team-dark, var(--tracker-team-color, var(--accent))) 68%,
+    var(--tracker-team-trim, var(--tracker-team-color, var(--accent))));
+}
+
+body.dashboard-page .player-track-face {
+  border-color: color-mix(in srgb, var(--tracker-team-trim, var(--tracker-team-color, var(--accent))) 62%, var(--line));
+}
+
+body.dashboard-page .player-track-status {
+  border-color: color-mix(in srgb, var(--tracker-team-trim, var(--tracker-team-color, var(--accent))) 58%, var(--line));
+  background: color-mix(in srgb, var(--tracker-team-dark, var(--tracker-team-color, var(--accent))) 22%, transparent);
+}
+
+body.dashboard-page .team-detail-card {
+  border-top: 2px solid color-mix(in srgb, var(--team-dark, var(--team-color, var(--accent))) 64%, var(--line));
+  box-shadow:
+    inset 2px 0 0 color-mix(in srgb, var(--team-light, var(--team-color, var(--accent))) 56%, transparent),
+    inset -1px 0 0 color-mix(in srgb, var(--team-trim, var(--team-color, var(--accent))) 42%, transparent);
+}
+
+body.dashboard-page .team-detail-hero img,
+body.dashboard-page .team-detail-title-logo {
+  border: 1px solid color-mix(in srgb, var(--team-trim, var(--team-color, var(--accent))) 58%, var(--line));
+  box-shadow: 0 0 0 1px color-mix(in srgb, var(--team-light, var(--team-color, var(--accent))) 28%, transparent);
+}
+
+body.dashboard-page .team-detail-hero-main > span,
+body.dashboard-page .team-detail-hero-rotation {
+  border-color: color-mix(in srgb, var(--team-dark, var(--team-color, var(--accent))) 46%, var(--line));
+}
+
+body.dashboard-page .lineup-series-game {
+  border-top-color: color-mix(in srgb, var(--series-light, var(--series-winner)) 76%, var(--line));
+  border-bottom-color: color-mix(in srgb, var(--series-trim, var(--series-winner)) 58%, var(--line));
+  box-shadow:
+    inset 2px 0 0 color-mix(in srgb, var(--series-dark, var(--series-winner)) 52%, transparent),
+    inset 0 1px 0 rgba(255,255,255,.12);
+}
+
+body.dashboard-page .lineup-series-game.is-live {
+  box-shadow:
+    inset 2px 0 0 color-mix(in srgb, var(--series-dark, var(--series-winner)) 52%, transparent),
+    inset 0 1px 0 rgba(255,255,255,.12),
+    0 0 0 1px color-mix(in srgb, var(--series-winner) 70%, white 12%),
+    0 0 10px color-mix(in srgb, var(--series-winner) 42%, transparent);
+}

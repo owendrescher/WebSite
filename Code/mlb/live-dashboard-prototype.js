@@ -32,6 +32,21 @@ const globalPlayerAgeFilterEl = document.getElementById('globalPlayerAgeFilter')
 const globalPlayerHandFilterEl = document.getElementById('globalPlayerHandFilter');
 const siteHelpDialogEl = document.getElementById('siteHelpDialog');
 const siteHelpCloseBtnEl = document.getElementById('siteHelpCloseBtn');
+const siteOptionsTabBtns = Array.from(document.querySelectorAll('[data-site-options-tab]'));
+const siteOptionsPanels = Array.from(document.querySelectorAll('[data-site-options-panel]'));
+const siteTooltipDelayRangeEl = document.getElementById('siteTooltipDelayRange');
+const siteTooltipDelayValueEl = document.getElementById('siteTooltipDelayValue');
+const siteSoundVolumeRangeEl = document.getElementById('siteSoundVolumeRange');
+const siteSoundVolumeValueEl = document.getElementById('siteSoundVolumeValue');
+const siteSoundMuteBtnEl = document.getElementById('siteSoundMuteBtn');
+const siteAccentColorBtnEl = document.getElementById('siteAccentColorBtn');
+const siteAccentColorPopoverEl = document.getElementById('siteAccentColorPopover');
+const siteAccentColorSwatchEl = document.getElementById('siteAccentColorSwatch');
+const siteAccentColorWheelEl = document.getElementById('siteAccentColorWheel');
+const siteAccentColorWheelMarkerEl = document.getElementById('siteAccentColorWheelMarker');
+const siteAccentColorValueEl = document.getElementById('siteAccentColorValue');
+const siteAccentColorResetBtnEl = document.getElementById('siteAccentColorResetBtn');
+const siteAccentRgbInputEls = Array.from(document.querySelectorAll('[data-site-accent-channel]'));
 const leadersToolbarEl = document.getElementById('leadersToolbar');
 const leadersPageEl = document.getElementById('leadersPage');
 const hotPageEl = document.getElementById('hotPage');
@@ -222,6 +237,8 @@ let nonLiveLineupRenderSignature = '';
 let playerStatRecentGameWindow = 5;
 let playerStatSeasonRecentDays = 14;
 let playerStatSeasonRecentAbWindow = 50;
+let savantPlayerCardActiveTab = 'graph';
+let savantPlayerCardGraphWindow = 5;
 const playerCalendarStatCache = new Map();
 const playerBattingSeasonBlockCache = new Map();
 const playerOutcomeViewerCache = new Map();
@@ -290,6 +307,8 @@ const LINEUP_STAT_WINDOW_KEY = 'lineup-stat-window:v1';
 const PLAYER_STAT_RECENT_WINDOW_KEY = 'player-stat-recent-window:v1';
 const PLAYER_STAT_SEASON_RECENT_DAYS_KEY = 'player-stat-season-recent-days:v1';
 const PLAYER_STAT_SEASON_RECENT_AB_KEY = 'player-stat-season-recent-ab:v1';
+const SAVANT_PLAYER_CARD_TAB_KEY = 'savant-player-card-tab:v1';
+const SAVANT_PLAYER_CARD_GRAPH_WINDOW_KEY = 'savant-player-card-graph-window:v1';
 const PREDICTION_SNAPSHOT_STORAGE_KEY = 'prediction-snapshots:v1';
 const HITTING_PREDICTION_CACHE_STORAGE_KEY = 'hitting-predictions-cache:v1';
 const HITTING_PREDICTION_CACHE_VERSION = 25;
@@ -306,6 +325,8 @@ const LOCKED_TOSSUP_SCOREBOARD_STORAGE_KEY = 'locked-tossup-scoreboards:v1';
 const OVER_UNDER_SCOREBOARD_STORAGE_KEY = 'over-under-scoreboards:v1';
 const HOME_RUN_AUDIO_PLAYED_STORAGE_KEY = 'home-run-audio-played:v1';
 const HOME_RUN_AUDIO_WINDOW_MS = 60 * 1000;
+const SITE_OPTIONS_STORAGE_KEY = 'dashboard-site-options:v1';
+const TOOLTIP_HOVER_BASE_DELAY_MS = 1500;
 const MANUAL_STATE_BACKUP_KEY = 'manual-state-backup:v1';
 const MANUAL_STATE_MIRROR_KEY = 'manual-state-mirror:v1';
 const MANUAL_STATE_DURABLE_KEY = 'manual-state-durable:v1';
@@ -325,7 +346,7 @@ const ROTOWIRE_LINEUP_CACHE_TTL_MS = 30 * 1000;
 const ROTOWIRE_LINEUP_PREWARM_BUCKET_MS = ROTOWIRE_LINEUP_CACHE_TTL_MS;
 const ROTOWIRE_AUTOMATIC_REFRESH_MS = 45 * 1000;
 const LINEUP_FALLBACK_CACHE_TTL_MS = 2 * 60 * 1000;
-const ROTOWIRE_DYNAMIC_LINEUP_STORAGE_KEY = 'rotowire-dynamic-lineup-source:v1';
+const ROTOWIRE_DYNAMIC_LINEUP_STORAGE_KEY = 'rotowire-dynamic-lineup-source:v2';
 const ROTOWIRE_DYNAMIC_LINEUP_MAX_AGE_DAYS = 10;
 const PANEL_GAP = 8;
 const PANEL_SNAP_THRESHOLD = 10;
@@ -918,20 +939,63 @@ const TEAM_UI_PALETTES = {
   TOR:['#134A8E','#FFFFFF','#E8291C'], WSH:['#AB0003','#FFFFFF','#14225A'],
 };
 
+// Authoritative four-role club registry. This is the only place to edit the
+// user-facing color roles: text is the established readable text color, while
+// lightPrimary/darkPrimary/tertiary are reserved for restrained ornamentation.
+// Existing TEAM_PALETTES and TEAM_UI_PALETTES remain below/above for legacy
+// surface and layout behavior; this registry controls readable text and the
+// optional accent roles without reorganizing those established views.
+const TEAM_COLOR_REGISTRY = Object.freeze({
+  ARI:{ text:'#FF6B7E', lightPrimary:'#E3D4AD', darkPrimary:'#A71930', tertiary:'#30CED8' },
+  ATL:{ text:'#F35D83', lightPrimary:'#CE1141', darkPrimary:'#13274F', tertiary:'#8EC9E8' },
+  BAL:{ text:'#FF7A2F', lightPrimary:'#DF4601', darkPrimary:'#111111', tertiary:'#FFFFFF' },
+  BOS:{ text:'#F06A72', lightPrimary:'#BD3039', darkPrimary:'#0C2340', tertiary:'#FFFFFF' },
+  CHC:{ text:'#72A5FF', lightPrimary:'#CC3433', darkPrimary:'#0E3386', tertiary:'#FFFFFF' },
+  CHW:{ text:'#E4E8EA', lightPrimary:'#FFFFFF', darkPrimary:'#27251F', tertiary:'#C4CED4' },
+  CIN:{ text:'#FF6277', lightPrimary:'#C6011F', darkPrimary:'#111111', tertiary:'#FFFFFF' },
+  CLE:{ text:'#FF627A', lightPrimary:'#E31937', darkPrimary:'#0C2340', tertiary:'#FFFFFF' },
+  COL:{ text:'#AAA8FF', lightPrimary:'#C4CED4', darkPrimary:'#333366', tertiary:'#131413' },
+  DET:{ text:'#FF7847', lightPrimary:'#FA4616', darkPrimary:'#0C2340', tertiary:'#FFFFFF' },
+  HOU:{ text:'#FF8A45', lightPrimary:'#EB6E1F', darkPrimary:'#002D62', tertiary:'#F4911E' },
+  KC: { text:'#68AEF2', lightPrimary:'#7AB2DD', darkPrimary:'#004687', tertiary:'#BD9B60' },
+  LAA:{ text:'#FF647E', lightPrimary:'#BA0021', darkPrimary:'#001F3F', tertiary:'#C4CED4' },
+  LAD:{ text:'#71B5FF', lightPrimary:'#FFFFFF', darkPrimary:'#005A9C', tertiary:'#EF3E42' },
+  MIA:{ text:'#55D7FF', lightPrimary:'#00A3E0', darkPrimary:'#111111', tertiary:'#EF3340' },
+  MIL:{ text:'#FFD457', lightPrimary:'#FFC52F', darkPrimary:'#002B5C', tertiary:'#FFFFFF' },
+  MIN:{ text:'#FF6489', lightPrimary:'#D31145', darkPrimary:'#002B5C', tertiary:'#FFFFFF' },
+  NYM:{ text:'#FF7B35', lightPrimary:'#FF5910', darkPrimary:'#002D72', tertiary:'#FFFFFF' },
+  NYY:{ text:'#DCE4EC', lightPrimary:'#FFFFFF', darkPrimary:'#000000', tertiary:'#C4CED4' },
+  ATH:{ text:'#54D2A3', lightPrimary:'#FFFFFF', darkPrimary:'#003831', tertiary:'#EFB21E' },
+  PHI:{ text:'#FF6875', lightPrimary:'#FFFFFF', darkPrimary:'#E81828', tertiary:'#002D72' },
+  PIT:{ text:'#FFD04D', lightPrimary:'#FDB827', darkPrimary:'#111111', tertiary:'#FFFFFF' },
+  SD: { text:'#FFD05C', lightPrimary:'#FFC425', darkPrimary:'#2F241D', tertiary:'#FFFFFF' },
+  SEA:{ text:'#61D1CB', lightPrimary:'#005C5C', darkPrimary:'#0C2C56', tertiary:'#C4CED4' },
+  SF: { text:'#FF8051', lightPrimary:'#FD5A1E', darkPrimary:'#27251F', tertiary:'#FFF2D6' },
+  STL:{ text:'#F7657E', lightPrimary:'#FFFFFF', darkPrimary:'#C41E3A', tertiary:'#C4CED4' },
+  TB: { text:'#8FCBFF', lightPrimary:'#8FBCE6', darkPrimary:'#092C5C', tertiary:'#F5D130' },
+  TEX:{ text:'#70A6FF', lightPrimary:'#C0111F', darkPrimary:'#003278', tertiary:'#FFFFFF' },
+  TOR:{ text:'#6CACF3', lightPrimary:'#134A8E', darkPrimary:'#1D2D5C', tertiary:'#E8291C' },
+  WSH:{ text:'#FF6670', lightPrimary:'#AB0003', darkPrimary:'#14225A', tertiary:'#FFFFFF' },
+});
+
 const TEAM_COLORS = Object.fromEntries(
   Object.entries(TEAM_PALETTES).map(([team, palette]) => [team, palette[0]]),
 );
 
-// Explicit display colors preserve each club's identity while remaining legible
-// on the dashboard's dark and team-tinted surfaces.
-const TEAM_TEXT_COLORS = {
-  ARI:'#FF6B7E', ATL:'#F35D83', BAL:'#FF7A2F', BOS:'#F06A72', CHC:'#72A5FF',
-  CHW:'#E4E8EA', CIN:'#FF6277', CLE:'#FF627A', COL:'#AAA8FF', DET:'#FF7847',
-  HOU:'#FF8A45', KC:'#68AEF2', LAA:'#FF647E', LAD:'#71B5FF', MIA:'#55D7FF',
-  MIL:'#FFD457', MIN:'#FF6489', NYM:'#FF7B35', NYY:'#DCE4EC', ATH:'#54D2A3',
-  PHI:'#FF6875', PIT:'#FFD04D', SD:'#FFD05C', SEA:'#61D1CB', SF:'#FF8051',
-  STL:'#F7657E', TB:'#8FCBFF', TEX:'#70A6FF', TOR:'#6CACF3', WSH:'#FF6670',
-};
+// Derived compatibility maps. Keep all default text calls pointing at the
+// established display text so existing scoreboard, lineup, roster, and card
+// legibility remains unchanged.
+const TEAM_TEXT_COLORS = Object.freeze(Object.fromEntries(
+  Object.entries(TEAM_COLOR_REGISTRY).map(([team, colors]) => [team, colors.text]),
+));
+const TEAM_DEFAULT_TEXT_COLORS = TEAM_TEXT_COLORS;
+const TEAM_ALTERNATE_ACCENTS = Object.freeze(Object.fromEntries(
+  Object.entries(TEAM_COLOR_REGISTRY).map(([team, colors]) => [team, Object.freeze([
+    colors.lightPrimary,
+    colors.darkPrimary,
+    colors.tertiary,
+  ])]),
+));
 
 // Purpose-built accents for the dark Home Run Feed. These are recognizable
 // club colors rather than mechanically selected palette slots; neutral gray
@@ -1429,9 +1493,270 @@ function normalizeScoreboardColumns(value, dock = currentOverlayDock) {
 
 function updateScoreboardColumnsButton() {
   if (!scoreboardColumnsBtnEl) return;
-  scoreboardColumnsBtnEl.textContent = '?';
-  scoreboardColumnsBtnEl.setAttribute('aria-label', 'Open site controls help');
-  scoreboardColumnsBtnEl.title = 'Controls and site capabilities';
+  scoreboardColumnsBtnEl.textContent = '⚙';
+  scoreboardColumnsBtnEl.setAttribute('aria-label', 'Open options and help');
+  scoreboardColumnsBtnEl.title = 'Options and help';
+}
+
+let siteOptions = (() => {
+  try {
+    const stored = JSON.parse(localStorage.getItem(SITE_OPTIONS_STORAGE_KEY) || '{}');
+    const tooltipDelayRatio = Number(stored?.tooltipDelayRatio);
+    const soundVolume = Number(stored?.soundVolume);
+    return {
+      tooltipDelayRatio: Number.isFinite(tooltipDelayRatio) ? Math.max(0, Math.min(2, tooltipDelayRatio)) : 1,
+      soundVolume: Number.isFinite(soundVolume) ? Math.max(0, Math.min(1, soundVolume)) : 1,
+      soundMuted: Boolean(stored?.soundMuted),
+      accentColor: normalizeSiteAccentColor(stored?.accentColor),
+    };
+  } catch {
+    return { tooltipDelayRatio: 1, soundVolume: 1, soundMuted: false, accentColor: '' };
+  }
+})();
+
+const SITE_ACCENT_TINT_SURFACE_WEIGHTS = Object.freeze({
+  '--panel-bg': 15,
+  '--panel-head': 21,
+  '--panel-item': 15,
+  '--input-bg': 17,
+  '--badge-bg': 18,
+});
+let siteAccentBaseSurfaceColors = null;
+
+function normalizeSiteAccentColor(value) {
+  const color = String(value || '').trim();
+  return /^#[0-9a-f]{6}$/i.test(color) ? color.toUpperCase() : '';
+}
+
+function activeSiteAccentColor() {
+  const selected = normalizeSiteAccentColor(siteOptions?.accentColor);
+  if (selected) return selected;
+  const themeAccent = typeof getComputedStyle === 'function' && document.body
+    ? normalizeSiteAccentColor(getComputedStyle(document.body).getPropertyValue('--accent').trim())
+    : '';
+  return themeAccent || '#66D9FF';
+}
+
+function siteAccentTintBaseSurfaces() {
+  if (siteAccentBaseSurfaceColors || !document.body || typeof getComputedStyle !== 'function') return siteAccentBaseSurfaceColors || {};
+  const computed = getComputedStyle(document.body);
+  siteAccentBaseSurfaceColors = Object.fromEntries(Object.keys(SITE_ACCENT_TINT_SURFACE_WEIGHTS).map((name) => [name, computed.getPropertyValue(name).trim()]));
+  return siteAccentBaseSurfaceColors;
+}
+
+function applySiteAccentColor() {
+  const color = normalizeSiteAccentColor(siteOptions?.accentColor);
+  if (color) {
+    document.documentElement?.style?.setProperty('--accent', color);
+    document.body?.style?.setProperty('--accent', color);
+    const baseSurfaces = siteAccentTintBaseSurfaces();
+    Object.entries(SITE_ACCENT_TINT_SURFACE_WEIGHTS).forEach(([name, accentWeight]) => {
+      const base = baseSurfaces?.[name];
+      if (!base) return;
+      document.body?.style?.setProperty(name, `color-mix(in srgb, ${base} ${100 - accentWeight}%, ${color} ${accentWeight}%)`);
+    });
+  } else {
+    document.documentElement?.style?.removeProperty('--accent');
+    document.body?.style?.removeProperty('--accent');
+    Object.keys(SITE_ACCENT_TINT_SURFACE_WEIGHTS).forEach((name) => document.body?.style?.removeProperty(name));
+  }
+}
+
+function siteAccentColorFromRgbInputs() {
+  const fallback = rgbChannels(activeSiteAccentColor());
+  const values = { ...fallback };
+  siteAccentRgbInputEls.forEach((input) => {
+    const channel = String(input?.dataset?.siteAccentChannel || '').toLowerCase();
+    if (!['r', 'g', 'b'].includes(channel)) return;
+    const value = Number(input.value);
+    if (Number.isFinite(value)) values[channel] = Math.max(0, Math.min(255, Math.round(value)));
+  });
+  return `#${[values.r, values.g, values.b].map((value) => value.toString(16).padStart(2, '0')).join('')}`.toUpperCase();
+}
+
+function hueSaturationFromColor(color) {
+  const { r, g, b } = rgbChannels(color);
+  const red = r / 255;
+  const green = g / 255;
+  const blue = b / 255;
+  const maximum = Math.max(red, green, blue);
+  const minimum = Math.min(red, green, blue);
+  const delta = maximum - minimum;
+  let hue = 0;
+  if (delta) {
+    if (maximum === red) hue = 60 * (((green - blue) / delta) % 6);
+    else if (maximum === green) hue = 60 * (((blue - red) / delta) + 2);
+    else hue = 60 * (((red - green) / delta) + 4);
+  }
+  return { hue: (hue + 360) % 360, saturation: maximum ? delta / maximum : 0 };
+}
+
+function siteAccentColorFromHueSaturation(hue = 0, saturation = 0) {
+  const normalizedHue = ((Number(hue) % 360) + 360) % 360;
+  const normalizedSaturation = Math.max(0, Math.min(1, Number(saturation) || 0));
+  const chroma = normalizedSaturation;
+  const secondary = chroma * (1 - Math.abs(((normalizedHue / 60) % 2) - 1));
+  const match = [
+    [chroma, secondary, 0], [secondary, chroma, 0], [0, chroma, secondary],
+    [0, secondary, chroma], [secondary, 0, chroma], [chroma, 0, secondary],
+  ][Math.floor(normalizedHue / 60)] || [chroma, secondary, 0];
+  return `#${match.map((value) => Math.round(value * 255).toString(16).padStart(2, '0')).join('')}`.toUpperCase();
+}
+
+function syncSiteAccentColorWheel(color = activeSiteAccentColor()) {
+  if (!siteAccentColorWheelMarkerEl) return;
+  const { hue, saturation } = hueSaturationFromColor(color);
+  const radians = (hue * Math.PI) / 180;
+  const radius = saturation * 43;
+  // A CSS conic gradient starts at 12 o'clock and advances clockwise.
+  siteAccentColorWheelMarkerEl.style.left = `${50 + (Math.sin(radians) * radius)}%`;
+  siteAccentColorWheelMarkerEl.style.top = `${50 - (Math.cos(radians) * radius)}%`;
+}
+
+function applySiteAccentColorWheelPointer(event) {
+  if (!siteAccentColorWheelEl) return;
+  const rect = siteAccentColorWheelEl.getBoundingClientRect();
+  if (!rect.width || !rect.height) return;
+  let x = ((event.clientX - rect.left) / rect.width) * 2 - 1;
+  let y = ((event.clientY - rect.top) / rect.height) * 2 - 1;
+  const distance = Math.hypot(x, y);
+  if (distance > 1) {
+    x /= distance;
+    y /= distance;
+  }
+  const hue = (Math.atan2(x, -y) * 180 / Math.PI + 360) % 360;
+  setSiteAccentColor(siteAccentColorFromHueSaturation(hue, Math.min(1, distance)));
+}
+
+function setSiteAccentColor(color = '') {
+  siteOptions = { ...siteOptions, accentColor: normalizeSiteAccentColor(color) };
+  applySiteAccentColor();
+  saveSiteOptions();
+  syncSiteOptionsControls();
+}
+
+function setSiteAccentColorPopover(open = false) {
+  if (!siteAccentColorPopoverEl || !siteAccentColorBtnEl) return;
+  siteAccentColorPopoverEl.hidden = !open;
+  siteAccentColorBtnEl.setAttribute('aria-expanded', open ? 'true' : 'false');
+}
+
+function saveSiteOptions() {
+  try {
+    localStorage.setItem(SITE_OPTIONS_STORAGE_KEY, JSON.stringify(siteOptions));
+  } catch {}
+}
+
+function tooltipHoverDelayMs() {
+  return Math.round(TOOLTIP_HOVER_BASE_DELAY_MS * siteOptions.tooltipDelayRatio);
+}
+
+function siteSoundIsMuted() {
+  return Boolean(siteOptions.soundMuted) || Number(siteOptions.soundVolume) <= 0;
+}
+
+function applyHomeRunAudioPreferences(audio = homeRunAudioEl) {
+  if (!audio) return;
+  const muted = siteSoundIsMuted();
+  audio.muted = muted;
+  audio.volume = muted ? 0 : Math.max(0, Math.min(1, Number(siteOptions.soundVolume) || 0));
+}
+
+function setSiteOptionsTab(tab = 'options') {
+  const activeTab = tab === 'help' ? 'help' : 'options';
+  siteOptionsTabBtns.forEach((button) => {
+    const active = button.dataset.siteOptionsTab === activeTab;
+    button.classList.toggle('active', active);
+    button.setAttribute('aria-selected', active ? 'true' : 'false');
+  });
+  siteOptionsPanels.forEach((panel) => {
+    panel.hidden = panel.dataset.siteOptionsPanel !== activeTab;
+  });
+}
+
+function syncSiteOptionsControls() {
+  const tooltipPercent = Math.round(Math.max(0, Math.min(2, siteOptions.tooltipDelayRatio)) * 100);
+  const volumePercent = Math.round(Math.max(0, Math.min(1, siteOptions.soundVolume)) * 100);
+  if (siteTooltipDelayRangeEl) siteTooltipDelayRangeEl.value = String(tooltipPercent);
+  if (siteTooltipDelayValueEl) siteTooltipDelayValueEl.textContent = `${(tooltipHoverDelayMs() / 1000).toFixed(1)} sec`;
+  if (siteSoundVolumeRangeEl) siteSoundVolumeRangeEl.value = String(volumePercent);
+  if (siteSoundVolumeValueEl) siteSoundVolumeValueEl.textContent = `${volumePercent}%`;
+  const accentColor = activeSiteAccentColor();
+  if (siteAccentColorValueEl) {
+    const { r, g, b } = rgbChannels(accentColor);
+    siteAccentColorValueEl.textContent = `RGB(${r}, ${g}, ${b})`;
+  }
+  if (siteAccentColorSwatchEl) siteAccentColorSwatchEl.style.background = accentColor;
+  const channels = rgbChannels(accentColor);
+  siteAccentRgbInputEls.forEach((input) => {
+    const channel = String(input?.dataset?.siteAccentChannel || '').toLowerCase();
+    if (['r', 'g', 'b'].includes(channel)) input.value = String(channels[channel]);
+  });
+  syncSiteAccentColorWheel(accentColor);
+  if (siteSoundMuteBtnEl) {
+    const muted = siteSoundIsMuted();
+    siteSoundMuteBtnEl.textContent = muted ? 'Off' : 'On';
+    siteSoundMuteBtnEl.setAttribute('aria-pressed', muted ? 'true' : 'false');
+    siteSoundMuteBtnEl.setAttribute('aria-label', muted ? 'Enable sound effects' : 'Disable sound effects');
+    siteSoundMuteBtnEl.title = muted ? 'Enable sound effects' : 'Disable sound effects';
+  }
+  applyHomeRunAudioPreferences();
+}
+
+function initSiteOptionsControls() {
+  setSiteOptionsTab('options');
+  applySiteAccentColor();
+  syncSiteOptionsControls();
+  siteOptionsTabBtns.forEach((button) => button.addEventListener('click', () => setSiteOptionsTab(button.dataset.siteOptionsTab)));
+  siteTooltipDelayRangeEl?.addEventListener('input', () => {
+    siteOptions = { ...siteOptions, tooltipDelayRatio: Math.max(0, Math.min(2, Number(siteTooltipDelayRangeEl.value) / 100 || 0)) };
+    saveSiteOptions();
+    syncSiteOptionsControls();
+  });
+  siteSoundVolumeRangeEl?.addEventListener('input', () => {
+    const nextVolume = Math.max(0, Math.min(1, Number(siteSoundVolumeRangeEl.value) / 100 || 0));
+    siteOptions = { ...siteOptions, soundVolume: nextVolume, soundMuted: nextVolume <= 0 ? true : siteOptions.soundMuted };
+    saveSiteOptions();
+    syncSiteOptionsControls();
+  });
+  siteSoundMuteBtnEl?.addEventListener('click', () => {
+    siteOptions = { ...siteOptions, soundMuted: !siteSoundIsMuted() };
+    saveSiteOptions();
+    syncSiteOptionsControls();
+  });
+  siteAccentColorBtnEl?.addEventListener('click', () => {
+    setSiteAccentColorPopover(siteAccentColorPopoverEl?.hidden !== false);
+  });
+  siteAccentColorBtnEl?.addEventListener('auxclick', (event) => {
+    if (event.button !== 1) return;
+    event.preventDefault();
+    setSiteAccentColor('');
+    setSiteAccentColorPopover(false);
+  });
+  siteAccentRgbInputEls.forEach((input) => input.addEventListener('input', () => {
+    setSiteAccentColor(siteAccentColorFromRgbInputs());
+  }));
+  siteAccentColorWheelEl?.addEventListener('pointerdown', (event) => {
+    event.preventDefault();
+    siteAccentColorWheelEl.setPointerCapture?.(event.pointerId);
+    applySiteAccentColorWheelPointer(event);
+  });
+  siteAccentColorWheelEl?.addEventListener('pointermove', (event) => {
+    if (event.buttons) applySiteAccentColorWheelPointer(event);
+  });
+  siteAccentColorResetBtnEl?.addEventListener('click', () => {
+    setSiteAccentColor('');
+    setSiteAccentColorPopover(false);
+  });
+  document.addEventListener('pointerdown', (event) => {
+    if (siteAccentColorPopoverEl?.hidden) return;
+    const target = event.target instanceof Node ? event.target : null;
+    if (target && (siteAccentColorPopoverEl.contains(target) || siteAccentColorBtnEl?.contains(target))) return;
+    setSiteAccentColorPopover(false);
+  });
+  document.addEventListener('keydown', (event) => {
+    if (event.key === 'Escape') setSiteAccentColorPopover(false);
+  });
 }
 
 function getWorkspaceBounds(dock = currentOverlayDock) {
@@ -1809,8 +2134,10 @@ function initScoreboardColumnsControl() {
   if (!scoreboardColumnsBtnEl) return;
   scoreboardColumnsBtnEl.classList.add('help-btn');
   scoreboardColumnsBtnEl.addEventListener('click', () => {
+    setSiteOptionsTab('options');
+    syncSiteOptionsControls();
     if (siteHelpDialogEl?.showModal) siteHelpDialogEl.showModal();
-    else window.alert('Controls: left-click a team to stage a winner pick. Middle-click, Alt-click, or press L while hovering a game to open the lineup card. Use A/D to move the date.');
+    else window.alert('Options are available in the full dashboard. Controls: left-click a team to stage a winner pick. Middle-click, Alt-click, or press L while hovering a game to open the lineup card.');
   });
   siteHelpCloseBtnEl?.addEventListener('click', () => siteHelpDialogEl?.close());
   siteHelpDialogEl?.addEventListener('click', (e) => {
@@ -2492,6 +2819,39 @@ function savePlayerStatSeasonRecentAbWindow(value) {
     localStorage.setItem(PLAYER_STAT_SEASON_RECENT_AB_KEY, String(next));
     localStorage.setItem(storageKey(PLAYER_STAT_SEASON_RECENT_AB_KEY), String(next));
   } catch {}
+}
+
+function normalizeSavantPlayerCardTab(value) {
+  return ['graph', 'arsenal', 'projections'].includes(value) ? value : 'graph';
+}
+
+function normalizeSavantPlayerCardGraphWindow(value) {
+  const numeric = Number(value);
+  return [5, 7, 14].includes(numeric) ? numeric : 5;
+}
+
+function nextSavantPlayerCardGraphWindow(value = savantPlayerCardGraphWindow) {
+  const options = [5, 7, 14];
+  const index = options.indexOf(normalizeSavantPlayerCardGraphWindow(value));
+  return options[(index + 1) % options.length];
+}
+
+function savedSavantPlayerCardTab() {
+  try { return normalizeSavantPlayerCardTab(localStorage.getItem(SAVANT_PLAYER_CARD_TAB_KEY)); } catch { return 'graph'; }
+}
+
+function saveSavantPlayerCardTab(value) {
+  savantPlayerCardActiveTab = normalizeSavantPlayerCardTab(value);
+  try { localStorage.setItem(SAVANT_PLAYER_CARD_TAB_KEY, savantPlayerCardActiveTab); } catch {}
+}
+
+function savedSavantPlayerCardGraphWindow() {
+  try { return normalizeSavantPlayerCardGraphWindow(localStorage.getItem(SAVANT_PLAYER_CARD_GRAPH_WINDOW_KEY)); } catch { return 5; }
+}
+
+function saveSavantPlayerCardGraphWindow(value) {
+  savantPlayerCardGraphWindow = normalizeSavantPlayerCardGraphWindow(value);
+  try { localStorage.setItem(SAVANT_PLAYER_CARD_GRAPH_WINDOW_KEY, String(savantPlayerCardGraphWindow)); } catch {}
 }
 
 function syncPlayerStatRecentToggle() {
@@ -5184,6 +5544,7 @@ function seriesResultSliverHtml(item = {}, extraClass = '') {
   if (!item?.hasScore) return '';
   const winnerColor = item.winnerColor || getTeamColor(item.winnerTeam) || '#7bd0ff';
   const winnerPalette = getTeamUiPalette(item.winnerTeam);
+  const winnerRoles = getTeamColorRoles(item.winnerTeam);
   const winnerFill = getTeamUiSurfaceColor(item.winnerTeam);
   const awayScore = item.awayScore ?? '-';
   const homeScore = item.homeScore ?? '-';
@@ -5194,7 +5555,7 @@ function seriesResultSliverHtml(item = {}, extraClass = '') {
     : '';
   const classes = ['lineup-series-game', item.live ? 'is-live' : '', extraClass].filter(Boolean).join(' ');
   return `
-    <span class="${escapeHtml(classes)}" style="--series-winner:${escapeHtml(winnerColor)};--series-outline:${escapeHtml(winnerPalette[0] || winnerColor)};--series-fill:${escapeHtml(winnerFill)}" aria-label="${escapeHtml(title)}">
+    <span class="${escapeHtml(classes)}" style="--series-winner:${escapeHtml(winnerColor)};--series-outline:${escapeHtml(winnerPalette[0] || winnerColor)};--series-fill:${escapeHtml(winnerFill)};--series-light:${escapeHtml(winnerRoles.lightPrimary)};--series-dark:${escapeHtml(winnerRoles.darkPrimary)};--series-trim:${escapeHtml(winnerRoles.tertiary)}" aria-label="${escapeHtml(title)}">
       <img class="lineup-series-winner-logo" src="${escapeHtml(item.winnerLogo || 'placeholder.png')}" alt="${escapeHtml(displayTeamAbbrev(item.winnerTeam || 'Winner'))} logo" />
       <b class="lineup-series-score"${scoreTooltipAttrs}>${escapeHtml(String(awayScore))}-${escapeHtml(String(homeScore))}</b>
       ${seriesStarterRowHtml(item, 'away')}
@@ -8302,6 +8663,7 @@ function renderLineupTeamHandChip(game, side) {
   chip.hidden = !show;
   chip.title = show ? text : '';
   chip.style.setProperty('--team-color', (side === 'away' ? game?.awayColor : game?.homeColor) || getTeamColor(side === 'away' ? game?.away : game?.home) || '#66d9ff');
+  applyTeamColorRoleVars(chip, side === 'away' ? game?.away : game?.home);
 }
 
 function renderLineupTeamHandChips(game) {
@@ -8359,7 +8721,35 @@ function getTeamSelectionColor(abbrev) {
 }
 
 function getTeamTextColor(abbrev) {
-  return TEAM_TEXT_COLORS[canonicalTeamAbbrev(abbrev)] || '#F3F7FC';
+  return TEAM_DEFAULT_TEXT_COLORS[canonicalTeamAbbrev(abbrev)] || '#F3F7FC';
+}
+
+function getTeamColorRoles(abbrev) {
+  const team = canonicalTeamAbbrev(abbrev);
+  const registered = TEAM_COLOR_REGISTRY[team];
+  if (registered) return registered;
+  const fallback = getTeamPalette(team);
+  return {
+    text: getTeamTextColor(team),
+    lightPrimary: fallback[1] || getTeamTextColor(team),
+    darkPrimary: fallback[0] || getTeamColor(team),
+    tertiary: fallback[2] || '#FFFFFF',
+  };
+}
+
+function applyTeamColorRoleVars(element, abbrev, prefix = 'team') {
+  if (!element?.style) return getTeamColorRoles(abbrev);
+  const roles = getTeamColorRoles(abbrev);
+  element.style.setProperty(`--${prefix}-text`, roles.text);
+  element.style.setProperty(`--${prefix}-light`, roles.lightPrimary);
+  element.style.setProperty(`--${prefix}-dark`, roles.darkPrimary);
+  element.style.setProperty(`--${prefix}-trim`, roles.tertiary);
+  return roles;
+}
+
+function getTeamAlternateAccents(abbrev) {
+  const team = canonicalTeamAbbrev(abbrev);
+  return TEAM_ALTERNATE_ACCENTS[team] || getTeamUiPalette(team);
 }
 
 function getLogoPath(abbrev) {
@@ -14796,8 +15186,187 @@ async function getPitcherArmReleaseAngle(playerId, dateValue = '') {
 }
 
 function savantArsenalShell(kind = 'pitcher', playerId = '', pitcherId = '') {
-  const title = kind === 'batter' ? 'TODAY PITCH MATCHUP' : 'PITCH ARSENAL';
-  return `<section class='savant-matchup-arsenal' data-savant-arsenal='${escapeHtml(kind)}' data-player-id='${escapeHtml(String(playerId || ''))}' data-pitcher-id='${escapeHtml(String(pitcherId || ''))}'><div class='savant-arsenal-head'><strong>${title}</strong><span>Loading Savant data</span></div><div class='savant-arsenal-empty'>Loading pitch profiles...</div></section>`;
+  const title = kind === 'batter' ? 'Today pitch matchup' : 'Pitch arsenal';
+  const activeTab = normalizeSavantPlayerCardTab(savantPlayerCardActiveTab);
+  const graphWindow = normalizeSavantPlayerCardGraphWindow(savantPlayerCardGraphWindow);
+  const tabState = (tab) => tab === activeTab ? ' active' : '';
+  const selected = (tab) => tab === activeTab ? 'true' : 'false';
+  const hidden = (tab) => tab === activeTab ? '' : ' hidden';
+  return `<section class='savant-matchup-arsenal savant-player-tabs' data-savant-arsenal='${escapeHtml(kind)}' data-player-id='${escapeHtml(String(playerId || ''))}' data-pitcher-id='${escapeHtml(String(pitcherId || ''))}'>
+    <div class='savant-player-tab-list' role='tablist' aria-label='${escapeHtml(title)} views'>
+      <button type='button' class='savant-player-tab${tabState('graph')}' data-savant-player-tab='graph' aria-selected='${selected('graph')}'>Graph</button>
+      <button type='button' class='savant-player-tab${tabState('arsenal')}' data-savant-player-tab='arsenal' aria-selected='${selected('arsenal')}'>Arsenal</button>
+      <button type='button' class='savant-player-tab${tabState('projections')}' data-savant-player-tab='projections' aria-selected='${selected('projections')}'>Today</button>
+    </div>
+    <section class='savant-player-tab-panel${tabState('graph')}' data-savant-player-panel='graph'${hidden('graph')}><div class='savant-graph-window-row'><span>Recent</span><button type='button' class='savant-graph-window-toggle' data-savant-graph-window-toggle aria-label='Graph range. Left click for next; right click for previous.' title='Recent graph range. Left click for next; right click for previous.'>${graphWindow}G</button></div><div class='savant-tab-loading' data-savant-arsenal-graph>Loading recent trend...</div></section>
+    <section class='savant-player-tab-panel${tabState('arsenal')}' data-savant-player-panel='arsenal'${hidden('arsenal')}><div class='savant-tab-status' data-savant-arsenal-status>Loading Savant data</div><div class='savant-arsenal-grid' data-savant-arsenal-content><div class='savant-arsenal-empty'>Loading pitch profiles...</div></div></section>
+    <section class='savant-player-tab-panel savant-projections-placeholder${tabState('projections')}' data-savant-player-panel='projections'${hidden('projections')}><strong>Projected today</strong><span>Daily projections will appear here.</span></section>
+  </section>`;
+}
+
+function savantGraphPointTooltipHtml(game = {}, metricLabel = '', metricValue = '') {
+  const statLine = `<div class='savant-graph-point-summary'><strong>${escapeHtml(game.date || 'Game')}</strong><span>${escapeHtml(`${metricLabel} ${metricValue} · H ${statNumber(game.hits)} · TB ${statNumber(game.totalBases)} · HR ${statNumber(game.homeRuns)} · SB ${statNumber(game.stolenBases)}`)}</span></div>`;
+  if (game?.starter) return `${statLine}${batterSeriesPitcherTooltipHtml(game.starter)}`;
+  return `${statLine}<div class='savant-graph-point-empty'>Pitcher breakdown unavailable for this game.</div>`;
+}
+
+function savantPerformanceGraphHtml(games = [], metrics = [], label = 'Recent performance', graphKind = 'pitcher') {
+  const rows = listify(games);
+  const safeLabel = cleanSummary(label) || 'Recent performance';
+  if (!rows.length) return `<div class='savant-performance-graph-empty'>${escapeHtml(safeLabel)} unavailable</div>`;
+  const top = 14;
+  const right = 30;
+  const bottom = 24;
+  const left = 28;
+  const width = 320;
+  const height = 118;
+  const plotWidth = width - left - right;
+  const plotHeight = height - top - bottom;
+  const maxValue = Math.max(1, ...rows.flatMap((row) => metrics.map(([key]) => Number(row?.[key]) || 0)));
+  const xFor = (index) => left + (rows.length <= 1 ? plotWidth / 2 : (plotWidth * index) / (rows.length - 1));
+  const yFor = (value) => top + plotHeight - ((Number(value) || 0) / maxValue) * plotHeight;
+  const ticks = Array.from({ length: 5 }, (_, index) => {
+    const value = (maxValue * index) / 4;
+    return { value, y: yFor(value), label: value.toFixed(maxValue < 10 ? 1 : 0) };
+  });
+  const grid = ticks.map((tick, index) => `<line class='grid' x1='${left}' y1='${tick.y.toFixed(1)}' x2='${width - right}' y2='${tick.y.toFixed(1)}'/><text class='tick' x='${index === 0 ? 8 : 4}' y='${(tick.y + (index === 0 ? 4 : 3)).toFixed(1)}'>${escapeHtml(index === 0 ? '0' : tick.label)}</text>`).join('');
+  // The batter graph is read game-by-game.  Give each whole date column the
+  // same rich starter/bullpen tooltip as the individual plotted points so a
+  // user does not have to hunt for a 5px dot to inspect that matchup.
+  const hoverColumns = graphKind === 'batter' ? rows.map((row, index) => {
+    const columnWidth = rows.length <= 1 ? plotWidth : plotWidth / (rows.length - 1);
+    const columnX = Math.max(left, xFor(index) - columnWidth / 2);
+    const columnRight = Math.min(width - right, xFor(index) + columnWidth / 2);
+    const tooltipHtml = savantGraphPointTooltipHtml(row, 'Game', '');
+    return `<rect class='savant-performance-graph-hit-target' x='${columnX.toFixed(1)}' y='${top}' width='${Math.max(1, columnRight - columnX).toFixed(1)}' height='${(plotHeight + bottom).toFixed(1)}' tabindex='0' data-theme-tooltip-title='${escapeHtml(`${row?.date || 'Game'} vs ${row?.opponent || 'opponent'}`)}' data-theme-tooltip-html='${escapeHtml(tooltipHtml)}'/>`;
+  }).join('') : '';
+  const lines = metrics.map(([key, metricLabel, color]) => {
+    const points = rows.map((row, index) => `${xFor(index).toFixed(1)},${yFor(row?.[key]).toFixed(1)}`).join(' ');
+    const dots = rows.map((row, index) => {
+      const value = Number(row?.[key]) || 0;
+      const metricValue = key === 'ip' ? value.toFixed(1) : value;
+      const tooltipHtml = graphKind === 'batter' ? savantGraphPointTooltipHtml(row, metricLabel, metricValue) : '';
+      const attrs = tooltipHtml
+        ? ` tabindex='0' data-theme-tooltip-title='${escapeHtml(`${row?.date || 'Game'} · ${metricLabel} ${metricValue}`)}' data-theme-tooltip-html='${escapeHtml(tooltipHtml)}'`
+        : ` aria-label='${escapeHtml(`${row?.date || 'Game'} ${metricLabel}: ${metricValue}`)}'`;
+      return `<circle cx='${xFor(index).toFixed(1)}' cy='${yFor(value).toFixed(1)}' r='2.7'${attrs}/>`;
+    }).join('');
+    return `<g style='--metric-color:${color}'><polyline points='${points}'/>${dots}</g>`;
+  }).join('');
+  const dateLabels = rows.map((row, index) => {
+    const anchor = index === 0 ? 'start' : index === rows.length - 1 ? 'end' : 'middle';
+    return `<text x='${xFor(index).toFixed(1)}' y='111' text-anchor='${anchor}'>${escapeHtml(String(row?.date || '').replace(/^0/, ''))}</text>`;
+  }).join('');
+  const legend = metrics.map(([, metricLabel, color]) => `<span style='--metric-color:${color}'>${escapeHtml(metricLabel)}</span>`).join('');
+  return `<div class='savant-performance-graph-card'><div class='savant-performance-graph-head'><span>${escapeHtml(safeLabel)}</span><div>${legend}</div></div><svg viewBox='0 0 ${width} ${height}' role='img' aria-label='${escapeHtml(`${safeLabel} graph`)}'><line class='axis' x1='${left}' y1='${top}' x2='${left}' y2='${height - bottom}'/><line class='axis' x1='${left}' y1='${height - bottom}' x2='${width - right}' y2='${height - bottom}'/>${grid}${hoverColumns}${lines}${dateLabels}</svg></div>`;
+}
+
+function savantPitcherTrendGraphHtml(starts = [], label = 'Last 5 Starts', limit = 5) {
+  const games = listify(starts).slice(0, normalizeSavantPlayerCardGraphWindow(limit)).reverse().map((split) => {
+    const stat = split?.stat || split || {};
+    return {
+      date: formatLeadersDateLabel(split?.date || ''),
+      ip: inningsToOuts(stat.inningsPitched ?? stat.ip) / 3,
+      hits: statNumber(stat.hits),
+      er: statNumber(stat.earnedRuns ?? stat.er),
+      hr: statNumber(stat.homeRuns ?? stat.hrAllowed ?? stat.hr),
+      strikeOuts: statNumber(stat.strikeOuts ?? stat.strikeouts ?? stat.so ?? stat.k),
+    };
+  });
+  return savantPerformanceGraphHtml(games, [
+    ['ip', 'IP', '#7bd0ff'],
+    ['hits', 'H', '#ffd166'],
+    ['er', 'ER', '#ff6b7d'],
+    ['hr', 'HR', '#bda7ff'],
+    ['strikeOuts', 'K', '#79e4a0'],
+  ], label, 'pitcher');
+}
+
+const savantBatterTrendCache = new Map();
+async function savantBatterTrendGames(playerId, game = null, limit = 5) {
+  const id = Number(playerId);
+  if (!Number.isFinite(id) || id <= 0) return [];
+  const graphWindow = normalizeSavantPlayerCardGraphWindow(limit);
+  const targetDate = playerStatTargetDate(game);
+  const key = `${id}:${targetDate}:${gameIsLiveForRecentHistory(game) ? String(game?.gamePk || 'live') : 'default'}:savant-batter-trend:${graphWindow}`;
+  if (savantBatterTrendCache.has(key)) return savantBatterTrendCache.get(key);
+  const promise = (async () => {
+    const splits = filteredRecentHistorySplits(await playerStatGameLogSplits(id, 'hitting', game), game).slice(0, graphWindow);
+    const starterContext = await batterSeriesStarterContextMap(id, splits.map((split) => ({ splits: [split] }))).catch(() => new Map());
+    return splits.slice().reverse().map((split) => {
+      const stat = split?.stat || {};
+      const gamePk = statLogSplitGamePk(split);
+      return {
+        date: formatLeadersDateLabel(split?.date || ''),
+        opponent: displayTeamAbbrev(split?.opponent?.abbreviation || split?.opponent?.teamCode || split?.opponent?.name || split?.opponentTeam?.abbreviation || split?.opponentTeam?.name || ''),
+        hits: statNumber(stat.hits),
+        totalBases: statNumber(stat.totalBases) || totalBasesFromBatting(stat),
+        homeRuns: statNumber(stat.homeRuns),
+        stolenBases: statNumber(stat.stolenBases),
+        starter: starterContext.get(gamePk) || null,
+      };
+    });
+  })().catch((error) => {
+    savantBatterTrendCache.delete(key);
+    throw error;
+  });
+  savantBatterTrendCache.set(key, promise);
+  return promise;
+}
+
+function setSavantPlayerTab(shell, tab = 'graph') {
+  if (!shell) return;
+  const activeTab = ['graph', 'arsenal', 'projections'].includes(tab) ? tab : 'graph';
+  shell.querySelectorAll('[data-savant-player-tab]').forEach((button) => {
+    const active = button.dataset.savantPlayerTab === activeTab;
+    button.classList.toggle('active', active);
+    button.setAttribute('aria-selected', active ? 'true' : 'false');
+  });
+  shell.querySelectorAll('[data-savant-player-panel]').forEach((panel) => {
+    const active = panel.dataset.savantPlayerPanel === activeTab;
+    panel.hidden = !active;
+    panel.classList.toggle('is-active', active);
+  });
+}
+
+function initSavantPlayerTabs() {
+  document.addEventListener('click', (event) => {
+    const graphToggle = event.target?.closest?.('[data-savant-graph-window-toggle]');
+    if (graphToggle) {
+      const shell = graphToggle.closest('[data-savant-arsenal]');
+      if (!shell) return;
+      event.preventDefault();
+      event.stopPropagation();
+      saveSavantPlayerCardGraphWindow(nextSavantPlayerCardGraphWindow());
+      refreshSavantArsenalGraph(shell);
+      return;
+    }
+    const button = event.target?.closest?.('[data-savant-player-tab]');
+    if (!button) return;
+    const shell = button.closest('[data-savant-arsenal]');
+    if (!shell) return;
+    event.preventDefault();
+    saveSavantPlayerCardTab(button.dataset.savantPlayerTab);
+    setSavantPlayerTab(shell, button.dataset.savantPlayerTab);
+  });
+  document.addEventListener('contextmenu', (event) => {
+    const graphToggle = event.target?.closest?.('[data-savant-graph-window-toggle]');
+    if (!graphToggle) return;
+    const shell = graphToggle.closest('[data-savant-arsenal]');
+    if (!shell) return;
+    event.preventDefault();
+    event.stopPropagation();
+    saveSavantPlayerCardGraphWindow(nextSavantPlayerCardGraphWindow(nextSavantPlayerCardGraphWindow()));
+    refreshSavantArsenalGraph(shell);
+  }, true);
+}
+
+function refreshSavantArsenalGraph(shell) {
+  if (!shell?.isConnected) return;
+  const profile = activePlayerStatContext?.profile || { id: Number(shell.dataset.playerId) || 0 };
+  const game = activePlayerStatContext?.game || null;
+  const token = playerStatExtraEl?.dataset?.splitToken || '';
+  hydrateSavantArsenalShells(profile, game, token, { shell });
 }
 
 function savantArsenalRate(row = {}, key = 'slg') {
@@ -14862,30 +15431,59 @@ function savantArsenalHtml(pitcherRows = [], batterRows = null, kind = 'pitcher'
   return `<div class='savant-arsenal-column-head'><span>Pitch</span><span>Use / Velo</span><span>${pitcherMode ? 'SLG L|R' : 'SLG'}</span><span>${pitcherMode ? 'AVG L|R' : 'AVG'}</span><span>HR</span><span>AB</span></div>${cards}`;
 }
 
-function hydrateSavantArsenalShells(profile, game, token) {
-  const shells = [...(playerStatExtraEl?.querySelectorAll?.('[data-savant-arsenal]') || [])];
+function hydrateSavantArsenalShells(profile, game, token, options = {}) {
+  const shells = options.shell
+    ? [options.shell]
+    : [...(playerStatExtraEl?.querySelectorAll?.('[data-savant-arsenal]') || [])];
   const season = seasonForDate(playerStatTargetDate(game));
   for (const shell of shells) {
     const kind = shell.dataset.savantArsenal === 'batter' ? 'batter' : 'pitcher';
     const playerId = String(shell.dataset.playerId || profile?.id || '');
     const pitcherId = String(shell.dataset.pitcherId || (kind === 'pitcher' ? playerId : '') || '');
+    const isCurrent = () => Boolean(shell.isConnected && (!token || playerStatExtraEl?.dataset?.splitToken === token));
+    const graph = shell.querySelector('[data-savant-arsenal-graph]');
+    const graphWindow = normalizeSavantPlayerCardGraphWindow(savantPlayerCardGraphWindow);
+    const graphToggle = shell.querySelector('[data-savant-graph-window-toggle]');
+    if (graphToggle) graphToggle.textContent = `${graphWindow}G`;
+    setSavantPlayerTab(shell, savantPlayerCardActiveTab);
+    if (kind === 'pitcher') {
+      const graphLabel = `Last ${graphWindow} ${pitcherShouldUseStartHistory(profile) ? 'Starts' : 'Apps'}`;
+      const paintPitcherGraph = (starts) => {
+        if (isCurrent() && graph) graph.innerHTML = savantPitcherTrendGraphHtml(starts, graphLabel, graphWindow);
+      };
+      if (Array.isArray(options.starts) && options.starts.length >= graphWindow) paintPitcherGraph(options.starts);
+      else getPitcherLastFiveStarts(playerId, game, profile, graphWindow).then(paintPitcherGraph).catch(() => {
+        if (isCurrent() && graph) graph.innerHTML = `<div class='savant-performance-graph-empty'>${escapeHtml(graphLabel)} unavailable</div>`;
+      });
+    } else {
+      savantBatterTrendGames(playerId, game, graphWindow).then((games) => {
+        if (isCurrent() && graph) graph.innerHTML = savantPerformanceGraphHtml(games, [
+          ['hits', 'H', '#ffd166'],
+          ['totalBases', 'TB', '#7bd0ff'],
+          ['homeRuns', 'HR', '#ff6b7d'],
+          ['stolenBases', 'SB', '#79e4a0'],
+        ], `Last ${graphWindow} Games`, 'batter');
+      }).catch(() => {
+        if (isCurrent() && graph) graph.innerHTML = `<div class='savant-performance-graph-empty'>Last ${graphWindow} games unavailable</div>`;
+      });
+    }
     Promise.all([
       loadSavantAggregateCsv('pitcher', season),
       kind === 'batter' ? loadSavantAggregateCsv('batter', season) : Promise.resolve(new Map()),
     ]).then(([pitcherIndex, batterIndex]) => {
-      if (!shell.isConnected || playerStatExtraEl?.dataset?.splitToken !== token) return;
+      if (!isCurrent()) return;
       const pitcherRows = pitcherIndex.get(pitcherId) || [];
       const batterRows = kind === 'batter' ? batterIndex.get(playerId) || [] : null;
-      const label = shell.querySelector('.savant-arsenal-head span');
+      const label = shell.querySelector('[data-savant-arsenal-status]');
       if (label) {
         const pitcherHand = String(pitcherRows.find((row) => !row.opponent_hand || row.opponent_hand === 'ALL')?.hand || '').toUpperCase();
         label.textContent = kind === 'batter' ? `vs ${pitcherHand || '?'}HP · by usage` : 'LHB | RHB · red strong';
       }
-      const empty = shell.querySelector('.savant-arsenal-empty');
-      if (empty) empty.outerHTML = `<div class='savant-arsenal-grid'>${savantArsenalHtml(pitcherRows, batterRows, kind)}</div>`;
+      const content = shell.querySelector('[data-savant-arsenal-content]');
+      if (content) content.innerHTML = savantArsenalHtml(pitcherRows, batterRows, kind);
     }).catch(() => {
-      if (!shell.isConnected || playerStatExtraEl?.dataset?.splitToken !== token) return;
-      const empty = shell.querySelector('.savant-arsenal-empty');
+      if (!isCurrent()) return;
+      const empty = shell.querySelector('[data-savant-arsenal-content]');
       if (empty) empty.textContent = 'Run the Savant updater to publish this season’s pitch profiles.';
     });
   }
@@ -15084,13 +15682,14 @@ function hydrateVisiblePlayerCardPitchTables(profile, game, token) {
   }
 }
 
-async function getPitcherLastFiveStarts(playerId, game = null, profile = null) {
+async function getPitcherLastFiveStarts(playerId, game = null, profile = null, limit = 5) {
+  const graphWindow = normalizeSavantPlayerCardGraphWindow(limit);
   const fallbackSeason = Number(profile?.seasonStatSource?.pitching?.season || 0);
   const splits = await playerStatGameLogSplits(playerId, 'pitching', game, fallbackSeason);
   const eligible = filteredRecentHistorySplits(splits, game);
-  const appearances = eligible.filter(playerStatPitchingAppearanceSplit).slice(0, 5);
+  const appearances = eligible.filter(playerStatPitchingAppearanceSplit).slice(0, graphWindow);
   if (!pitcherShouldUseStartHistory(profile)) return appearances;
-  const starts = eligible.filter(isPitchingStartSplit).slice(0, 5);
+  const starts = eligible.filter(isPitchingStartSplit).slice(0, graphWindow);
   return starts.length ? starts : appearances;
 }
 
@@ -15098,7 +15697,7 @@ function renderPitcherOpponentHandSplits(profile, token, game = null) {
   if (!playerStatExtraEl || !profile?.id) return;
   const graphLabel = pitcherShouldUseStartHistory(profile) ? 'Last 5 Starts' : 'Last 5 Apps';
   playerStatExtraEl.innerHTML = `${pitcherOpponentHandHtml(null, null, graphLabel, profile.id, null, profile)}<div class="player-stat-loading">Loading opponent handed splits</div>`;
-  hydrateSavantArsenalShells(profile, game, token);
+  hydrateSavantArsenalShells(profile, game, token, { graphLabel });
   const handSplitSeason = pitcherOpponentHandSeasonForProfile(profile);
   Promise.allSettled([
     getPitcherOpponentHandSplits(profile, handSplitSeason),
@@ -15113,7 +15712,7 @@ function renderPitcherOpponentHandSplits(profile, token, game = null) {
       playerStatExtraEl.innerHTML = splits
         ? pitcherOpponentHandHtml(splits, starts, graphLabel, profile.id, recentHand, profile)
         : `${pitcherOpponentHandHtml(null, starts, graphLabel, profile.id, recentHand, profile)}<div class="player-stat-loading">Unavailable</div>`;
-      hydrateSavantArsenalShells(profile, game, token);
+      hydrateSavantArsenalShells(profile, game, token, { starts, graphLabel });
     });
 }
 
@@ -20724,7 +21323,7 @@ function pitcherHandFromStatSplit(split = {}) {
 }
 
 function emptyRecentHandStat() {
-  return { atBats: 0, hits: 0, totalBases: 0, homeRuns: 0, walks: 0, hbp: 0, sacFlies: 0, xbh: 0 };
+  return { atBats: 0, hits: 0, totalBases: 0, homeRuns: 0, stolenBases: 0, walks: 0, hbp: 0, sacFlies: 0, xbh: 0 };
 }
 
 function addRecentHandStat(target, stat = {}) {
@@ -20732,6 +21331,7 @@ function addRecentHandStat(target, stat = {}) {
   target.hits += statNumber(stat.hits);
   target.totalBases += statNumber(stat.totalBases);
   target.homeRuns += statNumber(stat.homeRuns);
+  target.stolenBases += statNumber(stat.stolenBases ?? stat.sb);
   target.walks += statNumber(stat.baseOnBalls ?? stat.walks);
   target.hbp += statNumber(stat.hitByPitch ?? stat.hbp);
   target.sacFlies += statNumber(stat.sacFlies);
@@ -20855,6 +21455,35 @@ function battingEventCountsWalk(eventType = '') {
   return event === 'walk' || event === 'base_on_balls' || event === 'intent_walk' || event === 'intentional_walk';
 }
 
+function runnerIdFromPlayRunner(runner = {}) {
+  return Number(
+    runner?.details?.runner?.id
+    ?? runner?.details?.runner?.person?.id
+    ?? runner?.runner?.id
+    ?? runner?.runner?.person?.id
+    ?? runner?.movement?.runner?.id
+    ?? 0,
+  );
+}
+
+function stolenBasesForPlayerPlay(play = {}, playerId) {
+  const id = Number(playerId);
+  if (!(id > 0)) return 0;
+  const eventText = `${play?.result?.eventType || ''} ${play?.result?.event || ''}`.toLowerCase();
+  let stolenBases = 0;
+  for (const runner of listify(play?.runners)) {
+    if (runnerIdFromPlayRunner(runner) !== id) continue;
+    const runnerText = `${runner?.details?.eventType || ''} ${runner?.details?.event || ''}`.toLowerCase();
+    const isCaught = /caught[_ ]?steal/.test(runnerText) || /caught[_ ]?steal/.test(eventText);
+    const isSteal = runner?.details?.isStolenBase === true || /stolen[_ ]?base|steal/.test(runnerText);
+    if (isSteal && !isCaught) stolenBases += 1;
+  }
+  if (!stolenBases && Number(play?.matchup?.batter?.id) === id && /stolen[_ ]?base/.test(eventText) && !/caught[_ ]?steal/.test(eventText)) {
+    stolenBases = 1;
+  }
+  return stolenBases;
+}
+
 async function recentBattingHandSplitsFromGameFeeds(playerId, splits = [], game = null, days = 14) {
   const id = Number(playerId);
   if (!Number.isFinite(id) || id <= 0) return null;
@@ -20878,21 +21507,25 @@ async function recentBattingHandSplitsFromGameFeeds(playerId, splits = [], game 
   await mapWithConcurrency(gamePks, 4, async (gamePk) => {
     const feed = await getLiveGameFeed(gamePk).catch(() => null);
     for (const play of listify(feed?.liveData?.plays?.allPlays)) {
-      if (Number(play?.matchup?.batter?.id) !== id) continue;
+      const targetIsBatter = Number(play?.matchup?.batter?.id) === id;
+      const stolenBases = stolenBasesForPlayerPlay(play, id);
+      if (!targetIsBatter && !stolenBases) continue;
       const hand = handednessCode(play?.matchup?.pitchHand?.code || play?.matchup?.pitchHand?.description || '');
       if (hand !== 'L' && hand !== 'R') continue;
       const event = String(play?.result?.eventType || '').toLowerCase();
-      if (!event) continue;
       const target = summary[hand];
-      const bases = battingEventTotalBases(event);
-      if (battingEventCountsAtBat(event)) target.atBats += 1;
-      if (bases > 0) target.hits += 1;
-      target.totalBases += bases;
-      if (event === 'home_run') target.homeRuns += 1;
-      if (bases >= 2) target.xbh += 1;
-      if (battingEventCountsWalk(event)) target.walks += 1;
-      if (event === 'hit_by_pitch') target.hbp += 1;
-      if (event === 'sac_fly') target.sacFlies += 1;
+      if (targetIsBatter && event) {
+        const bases = battingEventTotalBases(event);
+        if (battingEventCountsAtBat(event)) target.atBats += 1;
+        if (bases > 0) target.hits += 1;
+        target.totalBases += bases;
+        if (event === 'home_run') target.homeRuns += 1;
+        if (bases >= 2) target.xbh += 1;
+        if (battingEventCountsWalk(event)) target.walks += 1;
+        if (event === 'hit_by_pitch') target.hbp += 1;
+        if (event === 'sac_fly') target.sacFlies += 1;
+      }
+      target.stolenBases += stolenBases;
       found = true;
     }
   });
@@ -20914,14 +21547,19 @@ async function getLineupRecentBattingHandSplits(playerId, game = null, days = 14
     url.searchParams.set('statSplits', 'pitcherHand');
     const response = await getJson(url.toString());
     const apiSummary = summarizeRecentBattingHandSplits(response?.stats?.[0]?.splits || [], game, days);
-    if (apiSummary) return apiSummary;
     const plainUrl = new URL(`${MLB_API_BASE}/people/${id}/stats`);
     plainUrl.searchParams.set('stats', 'gameLog');
     plainUrl.searchParams.set('group', 'hitting');
     plainUrl.searchParams.set('season', String(seasonForDate(selectedDate)));
     plainUrl.searchParams.set('gameType', 'R');
     const plainResponse = await getJson(plainUrl.toString());
-    return recentBattingHandSplitsFromGameFeeds(id, plainResponse?.stats?.[0]?.splits || [], game, days);
+    const feedSummary = await recentBattingHandSplitsFromGameFeeds(id, plainResponse?.stats?.[0]?.splits || [], game, days);
+    if (!apiSummary) return feedSummary;
+    if (feedSummary) {
+      apiSummary.left.stolenBases = statNumber(feedSummary.left?.stolenBases);
+      apiSummary.right.stolenBases = statNumber(feedSummary.right?.stolenBases);
+    }
+    return apiSummary;
   })().catch((error) => {
     lineupRecentBattingCache.delete(key);
     throw error;
@@ -21522,7 +22160,7 @@ async function playerLastFiftyBothHandSplits(playerId, splits = [], game = null,
   if (!(id > 0)) return null;
   const targetDate = playerStatTargetDate(game);
   const limit = normalizePlayerStatSeasonRecentAbWindow(targetAtBats);
-  const key = `${id}:${targetDate}:last-${limit}-ab-both:v2`;
+  const key = `${id}:${targetDate}:last-${limit}-ab-both:v3`;
   if (lineupRecentBattingCache.has(key)) return lineupRecentBattingCache.get(key);
   const promise = (async () => {
     const orderedGamePks = [];
@@ -21542,23 +22180,27 @@ async function playerLastFiftyBothHandSplits(playerId, splits = [], game = null,
       for (let gameIndex = 0; gameIndex < feeds.length; gameIndex += 1) {
         const feed = feeds[gameIndex];
         for (const play of listify(feed?.liveData?.plays?.allPlays).slice().reverse()) {
-          if (Number(play?.matchup?.batter?.id) !== id) continue;
+          const targetIsBatter = Number(play?.matchup?.batter?.id) === id;
+          const stolenBases = stolenBasesForPlayerPlay(play, id);
+          if (!targetIsBatter && !stolenBases) continue;
           const hand = handednessCode(play?.matchup?.pitchHand?.code || play?.matchup?.pitchHand?.description || '');
           if ((hand !== 'L' && hand !== 'R') || summary[hand].atBats >= limit) continue;
           const event = String(play?.result?.eventType || '').toLowerCase();
-          if (!event) continue;
           const target = summary[hand];
-          const bases = battingEventTotalBases(event);
-          if (battingEventCountsAtBat(event)) {
-            target.atBats += 1;
+          if (targetIsBatter && event) {
+            const bases = battingEventTotalBases(event);
+            if (battingEventCountsAtBat(event)) {
+              target.atBats += 1;
+            }
+            if (bases > 0) target.hits += 1;
+            target.totalBases += bases;
+            if (event === 'home_run') target.homeRuns += 1;
+            if (bases >= 2) target.xbh += 1;
+            if (battingEventCountsWalk(event)) target.walks += 1;
+            if (event === 'hit_by_pitch') target.hbp += 1;
+            if (event === 'sac_fly') target.sacFlies += 1;
           }
-          if (bases > 0) target.hits += 1;
-          target.totalBases += bases;
-          if (event === 'home_run') target.homeRuns += 1;
-          if (bases >= 2) target.xbh += 1;
-          if (battingEventCountsWalk(event)) target.walks += 1;
-          if (event === 'hit_by_pitch') target.hbp += 1;
-          if (event === 'sac_fly') target.sacFlies += 1;
+          target.stolenBases += stolenBases;
           gamesUsed.add(batch[gameIndex]);
         }
       }
@@ -23348,25 +23990,40 @@ function openBetContextMenu(player, x, y, options = {}) {
   const menu = document.createElement('div');
   menu.id = 'playerBetMenu';
   menu.className = 'player-bet-menu';
-  const props = player.isPitcher
-    ? [['pitcherK', 'K'], ['pitcherBB', 'BB'], ['pitcherHits', 'Hits Allowed'], ['pitcherER', 'ER'], ['pitcherHR', 'HR Allowed']]
-    : [['hit', 'Hit'], ['double', '2B'], ['triple', '3B'], ['hr', 'HR'], ['run', 'Run'], ['tb', 'Total Bases'], ['xbh', 'XBH'], ['rbi', 'RBI'], ['k', 'K']];
+  const team = canonicalTeamAbbrev(player.teamAbbrev || '');
+  const teamColor = getTeamColor(team) || activeSiteAccentColor();
+  const [accentLead, accentSupport, accentTrim] = getTeamAlternateAccents(team);
+  menu.style.setProperty('--accent', teamColor);
+  menu.style.setProperty('--accent-lead', accentLead || teamColor);
+  menu.style.setProperty('--accent-secondary', accentSupport || teamColor);
+  menu.style.setProperty('--accent-tertiary', accentTrim || teamColor);
+  menu.style.setProperty('--player-menu-text', getTeamTextColor(team) || '#F3F7FF');
+  const props = [['hit', 'H', 1], ['tb', '2TB', 2], ['xbh', 'XBH', 1], ['hr', 'HR', 1]];
+  const pickerHtml = player.isPitcher
+    ? `<div class="player-pitcher-k-control"><div class="player-pitcher-k-heading"><span>Strikeout target</span><output data-pitcher-k-output>7 Ks</output></div><div class="player-pitcher-k-range-wrap"><span class="player-pitcher-k-notch-track" aria-hidden="true"><i></i><i></i><i></i><i></i><i></i><i></i><i></i></span><input class="player-pitcher-k-range" type="range" min="5" max="11" step="1" value="7" aria-label="Strikeout target from 5 to 11"></div><div class="player-pitcher-k-ticks" aria-hidden="true"><span>5</span><span>6</span><span>7</span><span>8</span><span>9</span><span>10</span><span>11</span></div></div>`
+    : `<div class="player-bet-menu-options">${props.map(([prop, label, target]) => `<button type="button" data-prop-type="${prop}" data-bet-target="${target}">${label}</button>`).join('')}</div>`;
+  const trackButtonHtml = player.isPitcher
+    ? '<button class="player-bet-menu-track" type="button" data-menu-action="track-player">Track Player</button>'
+    : '';
   menu.innerHTML = `
     <div class="player-bet-menu-head">
       <strong>${escapeHtml(player.playerName)}</strong>
-      <span>${escapeHtml(displayTeamAbbrev(player.teamAbbrev || ''))}</span>
+      <span>${escapeHtml(displayTeamAbbrev(team))}</span>
     </div>
-    <button class="player-bet-menu-track" type="button" data-menu-action="track-player">Track Player</button>
-    <label class="player-bet-menu-target"><span>#</span><input type="number" min="1" step="1" value="1" /></label>
-    <div class="player-bet-menu-options"></div>
+    ${trackButtonHtml}
+    ${pickerHtml}
   `;
-  const optionsEl = menu.querySelector('.player-bet-menu-options');
-  for (const [prop, label] of props) {
-    const btn = document.createElement('button');
-    btn.type = 'button';
-    btn.dataset.propType = prop;
-    btn.textContent = label;
-    optionsEl.appendChild(btn);
+  const pitcherKRange = menu.querySelector('.player-pitcher-k-range');
+  const pitcherKOutput = menu.querySelector('[data-pitcher-k-output]');
+  if (pitcherKRange instanceof HTMLInputElement) {
+    pitcherKRange.addEventListener('input', () => {
+      if (pitcherKOutput) pitcherKOutput.textContent = `${pitcherKRange.value} Ks`;
+    });
+    pitcherKRange.addEventListener('change', () => {
+      addPlayerToTracker(player, { expectation: 'K', strikeoutTarget: pitcherKRange.value });
+      if (activeBetContextMenuPlayer === player) activeBetContextMenuPlayer = null;
+      menu.remove();
+    });
   }
   const handleMenuAction = (event) => {
     const target = event.target instanceof Element ? event.target : null;
@@ -23377,14 +24034,19 @@ function openBetContextMenu(player, x, y, options = {}) {
     event.preventDefault();
     event.stopPropagation();
     if (trackBtn) {
-      showTrackExpectationStep(menu, player);
+      addPlayerToTracker(player, player.isPitcher
+        ? { expectation: 'K', strikeoutTarget: pitcherKRange instanceof HTMLInputElement ? pitcherKRange.value : 7 }
+        : { expectation: 'H' });
+      if (activeBetContextMenuPlayer === player) activeBetContextMenuPlayer = null;
+      menu.remove();
       return;
     }
     try {
       if (expectationBtn) {
         addPlayerToTracker(player, { expectation: expectationBtn.dataset.expectationValue });
       } else {
-        quickAddBetLeg(player, propBtn.dataset.propType, menu.querySelector('input')?.value || 1);
+        const hitterExpectation = { hit: 'H', tb: '2+TB', xbh: 'XBH', hr: 'HR' }[propBtn.dataset.propType] || 'H';
+        addPlayerToTracker(player, { expectation: hitterExpectation });
       }
     } catch (error) {
       console.warn('Player context menu action failed', error);
@@ -23442,7 +24104,7 @@ function initPlayerBetContextMenu() {
       document.getElementById('playerBetMenu')?.remove();
       return;
     }
-    openBetContextMenu(player, e.clientX, e.clientY, { expectationOnly: true });
+    openBetContextMenu(player, e.clientX, e.clientY);
   });
   document.addEventListener('pointerdown', (e) => {
     const target = e.target instanceof Element ? e.target : null;
@@ -23779,12 +24441,18 @@ const PLAYER_EXPECTATION_OPTIONS = [
   ['XBH', 'XBH'],
   ['HR', 'HR'],
   ['2+TB', '2+TB'],
+  ['K', 'K'],
 ];
+
+function normalizePitcherStrikeoutTarget(value) {
+  const target = Math.round(Number(value));
+  return Number.isFinite(target) ? clamp(target, 5, 11) : 7;
+}
 
 function normalizePlayerExpectation(value) {
   const text = String(value || '').trim().toUpperCase().replace(/\s+/g, '');
   if (text === '2TB' || text === '2+TB' || text === 'TB2+') return '2+TB';
-  if (['H', 'XBH', 'HR'].includes(text)) return text;
+  if (['H', 'XBH', 'HR', 'K'].includes(text)) return text;
   return 'H';
 }
 
@@ -23802,6 +24470,7 @@ function normalizeTrackedPlayerEntries(players = []) {
       position: entry?.position || '',
       addedAt: Number(entry?.addedAt) || Date.now() + deduped.length,
       expectation: normalizePlayerExpectation(entry?.expectation || entry?.expected || ''),
+      strikeoutTarget: normalizePitcherStrikeoutTarget(entry?.strikeoutTarget ?? entry?.kTarget),
       confidence: normalizeTrackerConfidence(entry?.confidence),
     });
   }
@@ -24063,7 +24732,7 @@ function trackedPlayerTodayLine(profile) {
   const batting = cleanSummary(profile.todayBatting || '');
   const pitching = cleanSummary(profile.todayPitching || '');
   const position = String(profile.position || '').toUpperCase();
-  if (position === 'P' && pitching && pitching !== 'Unused today') return pitching;
+  if (/^(P|SP|RP|CP)$/.test(position) && pitching && pitching !== 'Unused today') return pitching;
   if (batting && batting !== '0-0') return batting;
   if (pitching && pitching !== 'Unused today') return pitching;
   return batting || pitching || '0-0';
@@ -24154,9 +24823,24 @@ function trackedPlayerGameBattingStats(profile, lineupEntry = null) {
   };
 }
 
-function trackedPlayerExpectationHit(profile, lineupEntry = null, expectation = 'H') {
+function trackedPlayerGamePitchingStrikeOuts(profile = {}, lineupEntry = null) {
+  const text = cleanSummary(lineupEntry?.todayPitching || profile?.todayPitching || '');
+  const match = text.match(/\b(\d+)\s*K(?:S)?\b/i) || text.match(/\bK(?:S)?\s*(\d+)\b/i);
+  if (match) return statNumber(match[1]);
+  const pitching = lineupEntry?.gamePitching || profile?.gamePitching || {};
+  const direct = pitching?.strikeOuts ?? pitching?.strikeouts ?? pitching?.so ?? pitching?.k;
+  return direct !== undefined && direct !== null && direct !== '' ? statNumber(direct) : 0;
+}
+
+function trackedPlayerExpectationLabel(expectation = 'H', strikeoutTarget = 7) {
+  const value = normalizePlayerExpectation(expectation);
+  return value === 'K' ? `${normalizePitcherStrikeoutTarget(strikeoutTarget)} K` : value;
+}
+
+function trackedPlayerExpectationHit(profile, lineupEntry = null, expectation = 'H', strikeoutTarget = 7) {
   const stats = trackedPlayerGameBattingStats(profile, lineupEntry);
   const value = normalizePlayerExpectation(expectation);
+  if (value === 'K') return trackedPlayerGamePitchingStrikeOuts(profile, lineupEntry) >= normalizePitcherStrikeoutTarget(strikeoutTarget);
   if (value === 'HR') return statNumber(stats.homeRuns) > 0;
   if (value === 'XBH') return statNumber(stats.doubles) + statNumber(stats.triples) + statNumber(stats.homeRuns) > 0;
   if (value === '2+TB') return statNumber(stats.totalBases) >= 2;
@@ -24169,13 +24853,15 @@ function scoreboardTrackedPlayersTooltipHtml(game = null) {
     const { profile } = resolveTrackedPlayerProfile(entry, [game]);
     if (!profile || !trackedPlayerSideForGame(entry, profile, game)) return null;
     const expectation = normalizePlayerExpectation(entry?.expectation);
+    const expectationLabel = trackedPlayerExpectationLabel(expectation, entry?.strikeoutTarget);
     const inningStatus = trackedPlayerInningStatus(entry, profile, game);
     return {
       entry,
       profile,
       expectation,
+      expectationLabel,
       inningStatus,
-      expectationHit: trackedPlayerExpectationHit(profile, inningStatus.lineupEntry, expectation),
+      expectationHit: trackedPlayerExpectationHit(profile, inningStatus.lineupEntry, expectation, entry?.strikeoutTarget),
     };
   }).filter(Boolean);
   const matchup = `${displayTeamAbbrev(game.away)} @ ${displayTeamAbbrev(game.home)}`;
@@ -24184,7 +24870,7 @@ function scoreboardTrackedPlayersTooltipHtml(game = null) {
   }
   return `<div class="score-lock-tracker-tooltip">
     <header><b>GAME TRACKER</b><span>${escapeHtml(matchup)}</span></header>
-    <div class="score-lock-tracker-list">${rows.map(({ entry, profile, expectation, inningStatus, expectationHit }) => {
+    <div class="score-lock-tracker-list">${rows.map(({ entry, profile, expectationLabel, inningStatus, expectationHit }) => {
       const team = canonicalTeamAbbrev(profile?.teamAbbrev || entry?.teamAbbrev || '');
       const color = getPlayerTrackerTeamColor(team);
       const playerName = cleanSummary(profile?.fullName || entry?.playerName || 'Unknown');
@@ -24194,7 +24880,7 @@ function scoreboardTrackedPlayersTooltipHtml(game = null) {
         <img src="${playerTrackerHeadshotUrl(entry.playerId)}" alt="" loading="lazy" decoding="async" />
         <span class="score-lock-tracker-copy"><strong>${escapeHtml(playerName)}</strong><small>${escapeHtml([displayTeamAbbrev(team), profile?.position].filter(Boolean).join(' | '))}</small></span>
         <span class="score-lock-tracker-live"><b>${escapeHtml(todayLine)}</b><small>${escapeHtml(status)}</small></span>
-        <span class="score-lock-tracker-expectation"><small>EXPECT</small><b>${escapeHtml(expectation)}</b>${expectationHit ? '<em>✓</em>' : ''}</span>
+        <span class="score-lock-tracker-expectation"><small>EXPECT</small><b>${escapeHtml(expectationLabel)}</b>${expectationHit ? '<em>✓</em>' : ''}</span>
       </div>`;
     }).join('')}</div>
   </div>`;
@@ -24326,9 +25012,10 @@ function renderPlayerTrackerList(games = latestRenderedGames) {
   const rows = allTracked.map((entry) => {
     const { profile, game } = resolveTrackedPlayerProfile(entry, games);
     const expectation = normalizePlayerExpectation(entry?.expectation);
+    const expectationLabel = trackedPlayerExpectationLabel(expectation, entry?.strikeoutTarget);
     const inningStatus = trackedPlayerInningStatus(entry, profile, game);
-    const expectationHit = trackedPlayerExpectationHit(profile, inningStatus.lineupEntry, expectation);
-    return { entry, profile, game, expectation, inningStatus, expectationHit };
+    const expectationHit = trackedPlayerExpectationHit(profile, inningStatus.lineupEntry, expectation, entry?.strikeoutTarget);
+    return { entry, profile, game, expectation, expectationLabel, inningStatus, expectationHit };
   }).filter((row) => gameAllowedByVisibility(row.game));
   const tracked = rows.map((row) => row.entry);
   const counts = {
@@ -24354,6 +25041,7 @@ function renderPlayerTrackerList(games = latestRenderedGames) {
         row.profile?.todayPitching || '',
         row.profile?.teamAbbrev || '',
         row.expectation,
+        row.entry?.strikeoutTarget || '',
         row.expectationHit ? 1 : 0,
         row.inningStatus.isLive ? 1 : 0,
         row.inningStatus.isDueThisInning ? 1 : 0,
@@ -24366,6 +25054,7 @@ function renderPlayerTrackerList(games = latestRenderedGames) {
         stats.hits,
         stats.homeRuns,
         stats.totalBases,
+        trackedPlayerGamePitchingStrikeOuts(row.profile, row.inningStatus.lineupEntry),
       ].join(':');
     }),
   });
@@ -24386,7 +25075,7 @@ function renderPlayerTrackerList(games = latestRenderedGames) {
     fragment.appendChild(empty);
   }
   for (const row of rows) {
-    const { entry, profile, game, expectation, inningStatus, expectationHit } = row;
+    const { entry, profile, game, expectation, expectationLabel, inningStatus, expectationHit } = row;
     const playerId = Number(entry.playerId);
     const teamAbbrev = profile?.teamAbbrev || entry.teamAbbrev || '';
     const position = profile?.position || entry.position || '';
@@ -24401,7 +25090,7 @@ function renderPlayerTrackerList(games = latestRenderedGames) {
         : `<span class="player-track-pitcher-name" style="--tracker-pitcher-color:${escapeHtml(opponentPitcher.teamColor)}">${escapeHtml(opponentPitcher.name)}</span>`}${opponentPitcher.hand ? ` (${escapeHtml(opponentPitcher.hand)})` : ''}</sup>`
       : '';
     const expectationOptions = PLAYER_EXPECTATION_OPTIONS
-      .map(([value, label]) => `<option value="${value}"${expectation === value ? ' selected' : ''}>${label}</option>`)
+      .map(([value, label]) => `<option value="${value}"${expectation === value ? ' selected' : ''}>${value === 'K' ? `K ${normalizePitcherStrikeoutTarget(entry?.strikeoutTarget)}` : label}</option>`)
       .join('');
     const statusChip = inningStatus.statusText
       ? `<span class="player-track-status">${escapeHtml(inningStatus.statusText)}</span>`
@@ -24420,6 +25109,7 @@ function renderPlayerTrackerList(games = latestRenderedGames) {
     el.draggable = false;
     el.style.setProperty('--tracker-team-color', teamColor);
     el.style.setProperty('--tracker-team-rgb', hexToRgb(teamColor));
+    applyTeamColorRoleVars(el, teamAbbrev, 'tracker-team');
     el.innerHTML = `
       <button class="player-track-drag" type="button" draggable="false" data-player-track-drag="${playerId}" aria-label="Hold and drag to reorder tracked player">||</button>
       <img class="player-track-face" draggable="false" src="${playerTrackerHeadshotUrl(playerId)}" alt="${escapeHtml(playerName)} headshot" width="46" height="46" loading="lazy" decoding="async" />
@@ -24529,10 +25219,13 @@ function addPlayerToTracker(player, options = {}) {
     : getTrackedPlayers();
   const existingIndex = tracked.findIndex((entry) => String(entry.playerId) === String(player.playerId));
   const expectation = normalizePlayerExpectation(options.expectation ?? player.expectation);
+  const strikeoutTarget = expectation === 'K'
+    ? normalizePitcherStrikeoutTarget(options.strikeoutTarget ?? tracked[existingIndex]?.strikeoutTarget)
+    : normalizePitcherStrikeoutTarget(tracked[existingIndex]?.strikeoutTarget);
   if (existingIndex >= 0) {
-    tracked[existingIndex] = { ...tracked[existingIndex], expectation };
+    tracked[existingIndex] = { ...tracked[existingIndex], expectation, strikeoutTarget };
   } else {
-    tracked.push({ ...player, expectation });
+    tracked.push({ ...player, expectation, strikeoutTarget });
   }
   saveTrackedPlayers(tracked);
   setBetPanelMode('players');
@@ -26251,10 +26944,9 @@ function ensureHomeRunAudio() {
   if (!homeRunAudioEl) {
     homeRunAudioEl = new Audio('homerun.mp3');
     homeRunAudioEl.preload = 'auto';
-    homeRunAudioEl.volume = 1;
-    homeRunAudioEl.muted = false;
     homeRunAudioEl.setAttribute('playsinline', '');
   }
+  applyHomeRunAudioPreferences(homeRunAudioEl);
   return homeRunAudioEl;
 }
 
@@ -26271,6 +26963,7 @@ function ensureHomeRunAudioContext() {
 }
 
 function playHomeRunAudioFallbackBeep() {
+  if (siteSoundIsMuted()) return;
   const context = ensureHomeRunAudioContext();
   if (!context) return;
   const play = () => {
@@ -26282,7 +26975,7 @@ function playHomeRunAudioFallbackBeep() {
       oscillator.frequency.setValueAtTime(660, now);
       oscillator.frequency.exponentialRampToValueAtTime(990, now + 0.16);
       gain.gain.setValueAtTime(0.0001, now);
-      gain.gain.exponentialRampToValueAtTime(0.22, now + 0.02);
+      gain.gain.exponentialRampToValueAtTime(0.22 * Math.max(0, Math.min(1, Number(siteOptions.soundVolume) || 0)), now + 0.02);
       gain.gain.exponentialRampToValueAtTime(0.0001, now + 0.48);
       oscillator.connect(gain);
       gain.connect(context.destination);
@@ -26321,7 +27014,7 @@ function unlockHomeRunAudio() {
         audio.pause();
         audio.currentTime = 0;
         audio.muted = previousMuted;
-        audio.volume = previousVolume || 1;
+        audio.volume = previousVolume;
       } catch {}
       homeRunAudioUnlocked = Boolean(unlocked);
       homeRunAudioUnlockInFlight = false;
@@ -26348,6 +27041,7 @@ function initHomeRunAudioUnlock() {
 }
 
 function playHomeRunAudio(options = {}) {
+  if (siteSoundIsMuted()) return;
   const now = Date.now();
   if (!options.fromPendingQueue && now - (lastHomeRunAudioAttemptAt || 0) < 1200) return;
   if (homeRunAudioPlayInFlight) return;
@@ -26357,8 +27051,11 @@ function playHomeRunAudio(options = {}) {
 
   try {
     const audio = ensureHomeRunAudio();
-    audio.muted = false;
-    audio.volume = 1;
+    applyHomeRunAudioPreferences(audio);
+    if (audio.muted || audio.volume <= 0) {
+      homeRunAudioPlayInFlight = false;
+      return;
+    }
     audio.currentTime = 0;
     const playPromise = audio.play();
     if (playPromise?.then) {
@@ -29357,6 +30054,7 @@ function openTeamDetailOverlay(teamAbbrev = '', options = {}) {
     delete teamDetailOverlayEl.dataset.teamDetailOrder;
   }
   teamDetailOverlayEl.style.setProperty('--team-color', color || '#66d9ff');
+  applyTeamColorRoleVars(teamDetailOverlayEl, team);
   if (teamDetailTitleEl) teamDetailTitleEl.innerHTML = `<img class="team-detail-title-logo" src="${escapeHtml(logo || 'placeholder.png')}" alt="" /> ${escapeHtml(displayTeamAbbrev(team) || team)} Team Card`;
   if (teamDetailRecordEl) teamDetailRecordEl.textContent = 'Loading roster, splits, and staff...';
   if (teamDetailOpponentPitcherEl) {
@@ -29533,7 +30231,7 @@ function teamStatsRowHtml(row) {
       <td>
         <div class="team-stats-team" role="button" tabindex="0" data-team-detail-team="${escapeHtml(canonicalTeamAbbrev(row.abbrev || ''))}">
           <img src="${escapeHtml(row.logo)}" alt="${escapeHtml(row.abbrev)} logo" />
-          <span style="color:${escapeHtml(row.color)}">${escapeHtml(row.abbrev)}</span>
+          <span style="color:${escapeHtml(getTeamTextColor(row.abbrev))}">${escapeHtml(row.abbrev)}</span>
           <small>${escapeHtml(row.name)}</small>
         </div>
       </td>
@@ -44257,7 +44955,7 @@ function lineupHitsDisplay(game, side) {
   return inningHits > 0 ? String(inningHits) : '-';
 }
 
-function createLineupScoreCell(className, text, color = '') {
+function createLineupScoreCell(className, text, color = '', textColor = '') {
   const cell = document.createElement('span');
   cell.className = `lineup-score-cell ${className}`.trim();
   cell.textContent = text;
@@ -44265,6 +44963,7 @@ function createLineupScoreCell(className, text, color = '') {
     cell.style.setProperty('--lineup-team-color', color);
     cell.style.setProperty('--lineup-team-rgb', hexToRgb(color));
   }
+  if (textColor) cell.style.color = textColor;
   return cell;
 }
 
@@ -44308,7 +45007,7 @@ function renderLineupScoreboardInto(board, game) {
     const awayCode = document.createElement('span');
     awayCode.className = 'lineup-state-away-code';
     awayCode.textContent = displayTeamAbbrev(game.away);
-    awayCode.style.color = game.awayColor;
+    awayCode.style.color = getTeamTextColor(game.away);
     const awayScore = document.createElement('span');
     awayScore.className = 'lineup-state-score';
     awayScore.textContent = lineupTotalDisplay(game.awayScore);
@@ -44332,7 +45031,7 @@ function renderLineupScoreboardInto(board, game) {
     const homeCode = document.createElement('span');
     homeCode.className = 'lineup-state-home-code';
     homeCode.textContent = displayTeamAbbrev(game.home);
-    homeCode.style.color = game.homeColor;
+    homeCode.style.color = getTeamTextColor(game.home);
     const underBtn = createLineupOverUnderButton('under');
     const overBtn = createLineupOverUnderButton('over');
     const overUnderStack = document.createElement('span');
@@ -44367,7 +45066,7 @@ function renderLineupScoreboardInto(board, game) {
 
   const addTeamRow = (side, abbrev, score, color) => {
     const safeColor = color || '#66d9ff';
-    const team = createLineupScoreCell(`lineup-score-team lineup-score-team-${side} lineup-score-row-cell lineup-score-${side}`, displayTeamAbbrev(abbrev), safeColor);
+    const team = createLineupScoreCell(`lineup-score-team lineup-score-team-${side} lineup-score-row-cell lineup-score-${side}`, displayTeamAbbrev(abbrev), safeColor, getTeamTextColor(abbrev));
     wrap.appendChild(team);
     for (const inning of innings) {
       const cell = createLineupScoreCell(`lineup-score-run lineup-score-row-cell lineup-score-${side}`, lineupRunDisplay(inning?.[side]?.runs), safeColor);
@@ -45663,6 +46362,7 @@ function playerBattingWindowRows(windows = []) {
     ['SLG', ...windows.map((stats) => value(stats, 'slg', true))],
     ['OPS', ...windows.map((stats) => value(stats, 'ops', true))],
     ['HR', ...windows.map((stats) => value(stats, 'homeRuns'))],
+    ['SB', ...windows.map((stats) => value(stats, 'stolenBases'))],
     ['AB/HR', ...windows.map((stats) => stats ? formatAtBatsPerHomeRun(stats.atBats, stats.homeRuns) : '--')],
   ];
 }
@@ -49323,6 +50023,7 @@ async function openPlayerStatOverlay(playerId, game, options = {}) {
   playerStatOverlayEl.style.setProperty('--player-team-secondary', playerPalette[1]);
   playerStatOverlayEl.style.setProperty('--player-team-tertiary', playerPalette[2]);
   playerStatOverlayEl.style.setProperty('--player-team-text', getTeamTextColor(profile.teamAbbrev));
+  applyTeamColorRoleVars(playerStatOverlayEl, profile.teamAbbrev, 'player-team');
   if (playerStatJerseyEl) {
     const jersey = cleanSummary(profile.jersey || profile.jerseyNumber || '');
     playerStatJerseyEl.textContent = jersey;
@@ -50162,6 +50863,8 @@ function rosterStatusItemHtml(player, chip = '', meta = '', index = null) {
 function renderRosterSide(panel, teamAbbrev, color, data = {}) {
   if (!panel) return;
   panel.style.setProperty('--team-color', color || getTeamColor(teamAbbrev));
+  panel.style.setProperty('--team-text-color', getTeamTextColor(teamAbbrev));
+  applyTeamColorRoleVars(panel, teamAbbrev);
   const teamCodeEl = panel.querySelector('.lineup-roster-team-code');
   if (teamCodeEl) teamCodeEl.textContent = displayTeamAbbrev(teamAbbrev);
   const sittingList = panel.querySelector('.sitting-list');
@@ -50276,6 +50979,8 @@ async function syncLineupOverlay(game, options = {}) {
   lineupOverlayEl.style.setProperty('--home-color', getTeamTextColor(game.home));
   lineupOverlayEl.style.setProperty('--away-rgb', hexToRgb(game.awayColor || '#66d9ff'));
   lineupOverlayEl.style.setProperty('--home-rgb', hexToRgb(game.homeColor || '#f0da99'));
+  applyTeamColorRoleVars(lineupOverlayEl, game.away, 'away');
+  applyTeamColorRoleVars(lineupOverlayEl, game.home, 'home');
   const awayLineupPalette = getTeamUiPalette(game.away);
   const homeLineupPalette = getTeamUiPalette(game.home);
   lineupOverlayEl.style.setProperty('--away-secondary', awayLineupPalette[1]);
@@ -50370,6 +51075,8 @@ async function syncLineupOverlay(game, options = {}) {
   if (homePitchingPanel) homePitchingPanel.style.setProperty('--team-logo-bg', `url("${game.homeLogo}")`);
   if (awayRosterPanel) awayRosterPanel.style.setProperty('--team-logo-bg', `url("${game.awayLogo}")`);
   if (homeRosterPanel) homeRosterPanel.style.setProperty('--team-logo-bg', `url("${game.homeLogo}")`);
+  [awayTeamPanel, awayPitchingPanel, awayRosterPanel].filter(Boolean).forEach((panel) => applyTeamColorRoleVars(panel, game.away));
+  [homeTeamPanel, homePitchingPanel, homeRosterPanel].filter(Boolean).forEach((panel) => applyTeamColorRoleVars(panel, game.home));
   if (switchingLineupGame) {
     const earlyAwayLineupListEl = lineupOverlayEl.querySelector('.away-lineup-list');
     const earlyHomeLineupListEl = lineupOverlayEl.querySelector('.home-lineup-list');
@@ -51121,6 +51828,8 @@ function initLineupOverlay() {
   playerStatRecentGameWindow = savedPlayerStatRecentWindow();
   playerStatSeasonRecentDays = savedPlayerStatSeasonRecentDays();
   playerStatSeasonRecentAbWindow = savedPlayerStatSeasonRecentAbWindow();
+  savantPlayerCardActiveTab = savedSavantPlayerCardTab();
+  savantPlayerCardGraphWindow = savedSavantPlayerCardGraphWindow();
   syncPlayerStatRecentToggle();
   playerStatSeasonEl?.addEventListener('click', (e) => {
     const toggle = e.target.closest('[data-player-season-time-toggle], [data-player-season-ab-toggle]');
@@ -52841,6 +53550,8 @@ function upsertCard(game) {
   card.style.setProperty('--home-row-bg', homeRowBg);
   card.style.setProperty('--away-rgb', hexToRgb(game.awayColor || '#66d9ff'));
   card.style.setProperty('--home-rgb', hexToRgb(game.homeColor || '#f0da99'));
+  applyTeamColorRoleVars(card, game.away, 'away');
+  applyTeamColorRoleVars(card, game.home, 'home');
   const awayPalette = getTeamUiPalette(game.away);
   const homePalette = getTeamUiPalette(game.home);
   card.style.setProperty('--away-secondary', awayPalette[1]);
@@ -53925,7 +54636,7 @@ function initThemedTooltips() {
       clearPendingHoverShow();
       if (!target?.isConnected || !target.matches?.(':hover')) return;
       showTooltip(target, pointerEvent);
-    }, 1500);
+    }, tooltipHoverDelayMs());
   }
 
   function clearTouchTooltipHide() {
@@ -54255,7 +54966,9 @@ initOverlayKeyboardShortcuts();
 initDateKeyboardShortcuts();
 initOverlayDockControl();
 initScoreboardColumnsControl();
+initSiteOptionsControls();
 initGlobalPlayerSearch();
+initSavantPlayerTabs();
 initOverlayResizeControl();
 initLineupOverlay();
 initScoreboardLineupShortcuts();
