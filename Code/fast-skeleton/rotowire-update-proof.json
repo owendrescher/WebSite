@@ -1,5 +1,5 @@
 {
-  "generatedAt": "2026-08-27T23:36:49.8382271Z",
+  "generatedAt": "2026-08-28T09:39:08.8680365Z",
   "note": "Static RotoWire fallback refreshed from each team's current Default vs. RHP and Default vs. LHP batting-order sections; previous seed preserved only if a hand could not be resolved.",
   "sourcePattern": "https://www.rotowire.com/baseball/batting-orders.php?team={TEAM}",
   "teams": {
