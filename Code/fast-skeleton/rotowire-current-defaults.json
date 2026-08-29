@@ -18,8 +18,8 @@
       "Geraldo Perdomo",
       "Nolan Arenado",
       "Tim Tawa",
-      "Jordan Lawlar",
       "Jose Fernandez",
+      "Jordan Lawlar",
       "Ryan Waldschmidt"
     ]
   },
@@ -52,12 +52,12 @@
       "Drake Baldwin",
       "Ronald Acuna",
       "Matt Olson",
+      "Mauricio Dubon",
       "Michael Harris",
       "Ozzie Albies",
-      "Mauricio Dubon",
-      "Dominic Smith",
+      "Mike Yastrzemski",
       "Austin Riley",
-      "Mike Yastrzemski"
+      "Sean Murphy"
     ],
     "LHP": [
       "Ronald Acuna",
@@ -79,19 +79,19 @@
       "Samuel Basallo",
       "Coby Mayo",
       "Dylan Beavers",
-      "Christian Encarnacion-Strand",
+      "Blaze Alexander",
       "Colton Cowser",
       "Leody Taveras"
     ],
     "LHP": [
       "Jackson Holliday",
       "Pete Alonso",
-      "Coby Mayo",
-      "Tyler O'Neill",
       "Gunnar Henderson",
-      "Christian Encarnacion-Strand",
+      "Coby Mayo",
+      "Blaze Alexander",
       "Christian Franklin",
       "Leody Taveras",
+      "Dylan Beavers",
       "Carlos Narvaez"
     ]
   },
@@ -110,13 +110,13 @@
     "LHP": [
       "Jahmai Jones",
       "Ceddanne Rafaela",
-      "Willson Contreras",
       "Wilyer Abreu",
+      "Willson Contreras",
       "Adley Rutschman",
       "Caleb Durbin",
-      "Nick Sogard",
       "Andruw Monasterio",
-      "Eli White"
+      "Eli White",
+      "Nick Sogard"
     ]
   },
   "CHC": {
@@ -138,8 +138,8 @@
       "Michael Busch",
       "Nico Hoerner",
       "Tyrone Taylor",
-      "Pedro Ramirez",
       "Ian Happ",
+      "Matt Shaw",
       "Miguel Amaya"
     ]
   },
@@ -153,7 +153,7 @@
       "Eugenio Suarez",
       "Dane Myers",
       "Matt McLain",
-      "Ke'Bryan Hayes"
+      "Edwin Arroyo"
     ],
     "LHP": [
       "Elly De La Cruz",
@@ -220,11 +220,11 @@
       "Sam Antonacci",
       "Munetaka Murakami",
       "Miguel Vargas",
+      "Andrew Benintendi",
       "Braden Montgomery",
       "Colson Montgomery",
       "Chase Meidroth",
       "Tristan Peters",
-      "Randal Grichuk",
       "Drew Romo"
     ],
     "LHP": [
@@ -295,7 +295,7 @@
       "Salvador Perez",
       "Vinnie Pasquantino",
       "Nick Loftin",
-      "Michael Massey",
+      "Tyler Tolbert",
       "Isaac Collins",
       "Kyle Isbel"
     ],
@@ -315,12 +315,12 @@
     "RHP": [
       "Zach Neto",
       "Mike Trout",
+      "Wade Meckler",
       "Moises Ballesteros",
       "Vaughn Grissom",
       "Josh Lowe",
-      "Denzer Guzman",
-      "Gustavo Campero",
       "Christian Moore",
+      "Denzer Guzman",
       "Tyler Heineman"
     ],
     "LHP": [
@@ -328,11 +328,11 @@
       "Mike Trout",
       "Vaughn Grissom",
       "Moises Ballesteros",
-      "Jose Siri",
-      "Gustavo Campero",
-      "Denzer Guzman",
       "Christian Moore",
-      "Travis d'Arnaud"
+      "Jose Siri",
+      "Denzer Guzman",
+      "Travis d'Arnaud",
+      "Wade Meckler"
     ]
   },
   "LAD": {
@@ -343,8 +343,8 @@
       "Max Muncy",
       "Tommy Edman",
       "Kyle Tucker",
-      "Teoscar Hernandez",
       "Alek Thomas",
+      "Teoscar Hernandez",
       "Hunter Feduccia"
     ],
     "LHP": [
@@ -361,15 +361,15 @@
   },
   "MIA": {
     "RHP": [
-      "Xavier Edwards",
       "Kyle Stowers",
-      "Otto Lopez",
       "Griffin Conine",
-      "Owen Caissie",
       "Heriberto Hernandez",
+      "Xavier Edwards",
       "Jakob Marsee",
-      "Javier Sanoja",
-      "Joe Mack"
+      "Otto Lopez",
+      "Owen Caissie",
+      "Joe Mack",
+      "Javier Sanoja"
     ],
     "LHP": [
       "Otto Lopez",
@@ -392,8 +392,8 @@
       "Christian Yelich",
       "Garrett Mitchell",
       "Sal Frelick",
-      "David Hamilton",
-      "Cooper Pratt"
+      "Cooper Pratt",
+      "David Hamilton"
     ],
     "LHP": [
       "Jackson Chourio",
@@ -414,8 +414,8 @@
       "Josh Bell",
       "Ryan Jeffers",
       "Kody Clemens",
-      "Royce Lewis",
       "Trevor Larnach",
+      "Walker Jenkins",
       "Brooks Lee",
       "Kaelen Culpepper"
     ],
@@ -511,8 +511,8 @@
       "Esmerlyn Valdez",
       "Oneil Cruz",
       "Nick Gonzales",
-      "Rafael Flores",
       "Jake Mangum",
+      "Rafael Flores",
       "Jacob Gonzalez"
     ],
     "LHP": [
@@ -568,8 +568,8 @@
       "Dominic Canzone",
       "Julio Rodriguez",
       "Josh Naylor",
-      "Cal Raleigh",
       "Taylor Ward",
+      "Cal Raleigh",
       "Cole Young",
       "Weston Wilson",
       "J.P. Crawford"
@@ -579,22 +579,22 @@
     "RHP": [
       "Drew Gilbert",
       "Rafael Devers",
+      "Bryce Eldridge",
       "Jung Hoo Lee",
       "Turner Hill",
       "Drew Cavanaugh",
       "Nate Furman",
       "Shay Whitcomb",
-      "Grant McCray",
       "Christian Koss"
     ],
     "LHP": [
-      "Osleivis Basabe",
-      "Rafael Devers",
       "Jonah Cox",
+      "Rafael Devers",
+      "Bryce Eldridge",
+      "Osleivis Basabe",
       "Jung Hoo Lee",
-      "Shay Whitcomb",
       "Buddy Kennedy",
-      "Drew Gilbert",
+      "Turner Hill",
       "Andrew Knizner",
       "Christian Koss"
     ]
@@ -607,8 +607,8 @@
       "Jordan Walker",
       "Joshua Baez",
       "Nathan Church",
-      "Bryan Torres",
-      "Blaze Jordan",
+      "Jose Fermin",
+      "Nolan Gorman",
       "Jimmy Crooks"
     ],
     "LHP": [
@@ -617,7 +617,7 @@
       "Jordan Walker",
       "Alec Burleson",
       "Joshua Baez",
-      "Blaze Jordan",
+      "Thomas Saggese",
       "Jose Fermin",
       "Ramon Urias",
       "Pedro Pages"
@@ -656,8 +656,8 @@
       "Ezequiel Duran",
       "Evan Carter",
       "Jake Burger",
-      "Cody Freeman",
-      "Danny Jansen"
+      "Elias Diaz",
+      "Cody Freeman"
     ],
     "LHP": [
       "Justin Foscue",
@@ -674,14 +674,14 @@
   "TOR": {
     "RHP": [
       "Brett Bateman",
-      "Nathan Lukes",
       "Vladimir Guerrero",
-      "George Springer",
       "Alejandro Kirk",
+      "George Springer",
       "Jesus Sanchez",
       "Kazuma Okamoto",
-      "Andres Gimenez",
-      "Ernie Clement"
+      "Nathan Lukes",
+      "Ernie Clement",
+      "Andres Gimenez"
     ],
     "LHP": [
       "Brett Bateman",
