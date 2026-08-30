@@ -410,25 +410,25 @@
   "MIN": {
     "RHP": [
       "Luke Keaschall",
-      "Byron Buxton",
+      "Brooks Lee",
       "Josh Bell",
       "Ryan Jeffers",
       "Kody Clemens",
+      "Royce Lewis",
       "Trevor Larnach",
-      "Walker Jenkins",
-      "Brooks Lee",
-      "Kaelen Culpepper"
+      "Kaelen Culpepper",
+      "Walker Jenkins"
     ],
     "LHP": [
       "Luke Keaschall",
-      "Byron Buxton",
+      "Brooks Lee",
       "Ryan Jeffers",
       "Josh Bell",
       "Royce Lewis",
       "Kody Clemens",
       "Victor Caratini",
-      "Brooks Lee",
-      "Kaelen Culpepper"
+      "Kaelen Culpepper",
+      "Gabriel Gonzalez"
     ]
   },
   "NYM": {
@@ -535,18 +535,18 @@
       "Ty France",
       "Jackson Merrill",
       "Luis Campusano",
-      "Gavin Sheets",
+      "Austin Hays",
       "Xander Bogaerts",
-      "Luis Rengifo"
+      "Samad Taylor"
     ],
     "LHP": [
       "Fernando Tatis",
-      "Luis Rengifo",
       "Manny Machado",
       "Ty France",
       "Jackson Merrill",
       "Xander Bogaerts",
       "Luis Campusano",
+      "Samad Taylor",
       "Austin Hays",
       "Jake Cronenworth"
     ]
@@ -601,7 +601,7 @@
   },
   "STL": {
     "RHP": [
-      "JJ Wetherholt",
+      "Cesar Prieto",
       "Ivan Herrera",
       "Alec Burleson",
       "Jordan Walker",
@@ -612,7 +612,7 @@
       "Jimmy Crooks"
     ],
     "LHP": [
-      "JJ Wetherholt",
+      "Cesar Prieto",
       "Ivan Herrera",
       "Jordan Walker",
       "Alec Burleson",
