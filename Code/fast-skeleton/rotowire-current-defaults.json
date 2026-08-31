@@ -28,12 +28,12 @@
       "Henry Bolte",
       "Jeff McNeil",
       "Zack Gelof",
-      "Carlos Cortes",
       "Lawrence Butler",
       "Tommy White",
-      "Jonah Heim",
       "Donovan Walton",
-      "Max Muncy"
+      "Max Muncy",
+      "Carlos Cortes",
+      "Jonah Heim"
     ],
     "LHP": [
       "Henry Bolte",
@@ -55,9 +55,9 @@
       "Mauricio Dubon",
       "Michael Harris",
       "Ozzie Albies",
-      "Mike Yastrzemski",
+      "Sean Murphy",
       "Austin Riley",
-      "Sean Murphy"
+      "Mike Yastrzemski"
     ],
     "LHP": [
       "Ronald Acuna",
@@ -88,34 +88,34 @@
       "Pete Alonso",
       "Gunnar Henderson",
       "Coby Mayo",
-      "Colton Cowser",
-      "Jackson Holliday",
       "Christian Encarnacion-Strand",
+      "Luis Robert",
       "Leody Taveras",
+      "Jackson Holliday",
       "Carlos Narvaez"
     ]
   },
   "BOS": {
     "RHP": [
       "Roman Anthony",
+      "Mickey Gasper",
       "Ceddanne Rafaela",
       "Wilyer Abreu",
-      "Willson Contreras",
       "Adley Rutschman",
-      "Trevor Story",
+      "Nick Sogard",
       "Caleb Durbin",
       "Jarren Duran",
-      "Nick Sogard"
+      "Trevor Story"
     ],
     "LHP": [
       "Roman Anthony",
       "Ceddanne Rafaela",
       "Wilyer Abreu",
-      "Willson Contreras",
       "Adley Rutschman",
       "Trevor Story",
       "Caleb Durbin",
-      "Eli White",
+      "Jahmai Jones",
+      "Andruw Monasterio",
       "Nick Sogard"
     ]
   },
@@ -151,8 +151,8 @@
       "JJ Bleday",
       "Tyler Stephenson",
       "Eugenio Suarez",
-      "Dane Myers",
       "Matt McLain",
+      "TJ Friedl",
       "Edwin Arroyo"
     ],
     "LHP": [
@@ -241,26 +241,26 @@
   },
   "DET": {
     "RHP": [
-      "Gleyber Torres",
       "Colt Keith",
+      "Hao-Yu Lee",
       "Kevin McGonigle",
       "Dillon Dingler",
       "Brett Callahan",
       "Zach McKinstry",
       "Spencer Torkelson",
       "Max Clark",
-      "Hao-Yu Lee"
+      "John Peck"
     ],
     "LHP": [
       "Gleyber Torres",
-      "Hao-Yu Lee",
+      "John Peck",
       "Kevin McGonigle",
       "Dillon Dingler",
       "Eduardo Valencia",
       "Spencer Torkelson",
       "Ben Malgeri",
       "Max Clark",
-      "Javier Baez"
+      "Brett Callahan"
     ]
   },
   "HOU": {
@@ -362,23 +362,23 @@
   "MIA": {
     "RHP": [
       "Kyle Stowers",
+      "Heriberto Hernandez",
       "Griffin Conine",
-      "Heriberto Hernandez",
-      "Xavier Edwards",
-      "Jakob Marsee",
       "Otto Lopez",
-      "Owen Caissie",
-      "Joe Mack",
-      "Javier Sanoja"
-    ],
-    "LHP": [
-      "Otto Lopez",
-      "Heriberto Hernandez",
-      "Kyle Stowers",
-      "Agustin Ramirez",
-      "Xavier Edwards",
       "Jakob Marsee",
       "Javier Sanoja",
+      "Owen Caissie",
+      "Joe Mack",
+      "Leo Jimenez"
+    ],
+    "LHP": [
+      "Heriberto Hernandez",
+      "Otto Lopez",
+      "Agustin Ramirez",
+      "Javier Sanoja",
+      "Kyle Stowers",
+      "Leo Jimenez",
+      "Jakob Marsee",
       "Esteury Ruiz",
       "Brian Navarreto"
     ]
@@ -411,11 +411,11 @@
     "RHP": [
       "Luke Keaschall",
       "Brooks Lee",
-      "Josh Bell",
-      "Ryan Jeffers",
       "Kody Clemens",
-      "Royce Lewis",
+      "Ryan Jeffers",
+      "Josh Bell",
       "Trevor Larnach",
+      "Royce Lewis",
       "Kaelen Culpepper",
       "Walker Jenkins"
     ],
@@ -448,11 +448,11 @@
       "Juan Soto",
       "Bo Bichette",
       "Carson Benge",
-      "Francisco Alvarez",
+      "Mark Vientos",
       "Christopher Morel",
       "Marcus Semien",
       "A.J. Ewing",
-      "Nick Morabito"
+      "Francisco Alvarez"
     ]
   },
   "NYY": {
@@ -556,10 +556,10 @@
       "Randy Arozarena",
       "Dominic Canzone",
       "Julio Rodriguez",
-      "Josh Naylor",
       "Cal Raleigh",
+      "Josh Naylor",
       "Cole Young",
-      "Taylor Ward",
+      "Lazaro Montes",
       "J.P. Crawford",
       "Brock Rodden"
     ],
@@ -567,9 +567,9 @@
       "Randy Arozarena",
       "Dominic Canzone",
       "Julio Rodriguez",
+      "Cal Raleigh",
       "Josh Naylor",
       "Taylor Ward",
-      "Cal Raleigh",
       "Cole Young",
       "Weston Wilson",
       "J.P. Crawford"
@@ -583,8 +583,8 @@
       "Jung Hoo Lee",
       "Turner Hill",
       "Drew Cavanaugh",
-      "Nate Furman",
       "Shay Whitcomb",
+      "Nate Furman",
       "Christian Koss"
     ],
     "LHP": [
@@ -630,7 +630,7 @@
       "Junior Caminero",
       "Liam Hicks",
       "Chandler Simpson",
-      "Jonny DeLuca",
+      "Victor Mesa",
       "Cedric Mullins",
       "Richie Palacios",
       "Taylor Walls"
