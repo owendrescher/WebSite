@@ -4,22 +4,22 @@
       "Lars Nootbaar",
       "Corbin Carroll",
       "Gabriel Moreno",
+      "Ketel Marte",
       "Geraldo Perdomo",
       "Nolan Arenado",
       "Max Kepler",
       "Tim Tawa",
-      "Ildemaro Vargas",
       "Ryan Waldschmidt"
     ],
     "LHP": [
       "Ildemaro Vargas",
       "Corbin Carroll",
       "Gabriel Moreno",
+      "Ketel Marte",
       "Geraldo Perdomo",
       "Nolan Arenado",
       "Tim Tawa",
       "Jose Fernandez",
-      "Jordan Lawlar",
       "Ryan Waldschmidt"
     ]
   },
@@ -76,22 +76,22 @@
       "Jackson Holliday",
       "Pete Alonso",
       "Gunnar Henderson",
+      "Luis Robert",
       "Samuel Basallo",
-      "Coby Mayo",
+      "Christian Encarnacion-Strand",
       "Dylan Beavers",
-      "Blaze Alexander",
-      "Colton Cowser",
-      "Leody Taveras"
+      "Coby Mayo",
+      "Colton Cowser"
     ],
     "LHP": [
-      "Jackson Holliday",
+      "Blaze Alexander",
       "Pete Alonso",
       "Gunnar Henderson",
       "Coby Mayo",
+      "Colton Cowser",
+      "Jackson Holliday",
       "Christian Encarnacion-Strand",
-      "Christian Franklin",
       "Leody Taveras",
-      "Dylan Beavers",
       "Carlos Narvaez"
     ]
   },
@@ -241,11 +241,11 @@
   },
   "DET": {
     "RHP": [
-      "Brett Callahan",
-      "Kevin McGonigle",
       "Gleyber Torres",
       "Colt Keith",
+      "Kevin McGonigle",
       "Dillon Dingler",
+      "Brett Callahan",
       "Zach McKinstry",
       "Spencer Torkelson",
       "Max Clark",
@@ -425,10 +425,10 @@
       "Ryan Jeffers",
       "Josh Bell",
       "Royce Lewis",
-      "Kody Clemens",
+      "Gabriel Gonzalez",
       "Victor Caratini",
       "Kaelen Culpepper",
-      "Gabriel Gonzalez"
+      "Ryan Kreidler"
     ]
   },
   "NYM": {
@@ -439,7 +439,7 @@
       "Bo Bichette",
       "Carson Benge",
       "Jared Young",
-      "Luis Robert",
+      "Brett Baty",
       "Marcus Semien",
       "Francisco Alvarez"
     ],
@@ -447,12 +447,12 @@
       "Francisco Lindor",
       "Juan Soto",
       "Bo Bichette",
-      "Luis Robert",
       "Carson Benge",
       "Francisco Alvarez",
       "Christopher Morel",
       "Marcus Semien",
-      "A.J. Ewing"
+      "A.J. Ewing",
+      "Nick Morabito"
     ]
   },
   "NYY": {
@@ -534,10 +534,10 @@
       "Manny Machado",
       "Ty France",
       "Jackson Merrill",
-      "Luis Campusano",
-      "Austin Hays",
       "Xander Bogaerts",
-      "Samad Taylor"
+      "Dustin Harris",
+      "Freddy Fermin",
+      "Sung-Mun Song"
     ],
     "LHP": [
       "Fernando Tatis",
@@ -591,11 +591,11 @@
       "Jonah Cox",
       "Rafael Devers",
       "Bryce Eldridge",
-      "Osleivis Basabe",
       "Jung Hoo Lee",
       "Shay Whitcomb",
       "Turner Hill",
       "Andrew Knizner",
+      "Osleivis Basabe",
       "Christian Koss"
     ]
   },
@@ -612,15 +612,15 @@
       "Jimmy Crooks"
     ],
     "LHP": [
-      "Cesar Prieto",
+      "Jose Fermin",
       "Ivan Herrera",
       "Jordan Walker",
       "Alec Burleson",
       "Joshua Baez",
       "Thomas Saggese",
-      "Jose Fermin",
+      "Cesar Prieto",
       "Ramon Urias",
-      "Pedro Pages"
+      "Leo Bernal"
     ]
   },
   "TB": {
