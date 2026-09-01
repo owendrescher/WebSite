@@ -1,14 +1,14 @@
 {
   "ARI": {
     "RHP": [
-      "Lars Nootbaar",
+      "Geraldo Perdomo",
       "Corbin Carroll",
       "Gabriel Moreno",
       "Ketel Marte",
-      "Geraldo Perdomo",
+      "Lars Nootbaar",
       "Nolan Arenado",
-      "Max Kepler",
       "Tim Tawa",
+      "Ildemaro Vargas",
       "Ryan Waldschmidt"
     ],
     "LHP": [
@@ -19,7 +19,7 @@
       "Geraldo Perdomo",
       "Nolan Arenado",
       "Tim Tawa",
-      "Jose Fernandez",
+      "Lars Nootbaar",
       "Ryan Waldschmidt"
     ]
   },
@@ -341,22 +341,22 @@
       "Freddie Freeman",
       "Mookie Betts",
       "Max Muncy",
+      "Will Smith",
       "Tommy Edman",
       "Kyle Tucker",
-      "Alek Thomas",
       "Teoscar Hernandez",
-      "Hunter Feduccia"
+      "Alek Thomas"
     ],
     "LHP": [
       "Shohei Ohtani",
+      "Tommy Edman",
       "Mookie Betts",
       "Freddie Freeman",
+      "Will Smith",
       "Teoscar Hernandez",
-      "Tommy Edman",
-      "Kyle Tucker",
-      "Enrique Hernandez",
       "Miguel Rojas",
-      "Ben Rortvedt"
+      "Kyle Tucker",
+      "Enrique Hernandez"
     ]
   },
   "MIA": {
@@ -536,7 +536,7 @@
       "Jackson Merrill",
       "Xander Bogaerts",
       "Dustin Harris",
-      "Freddy Fermin",
+      "Ethan Salas",
       "Sung-Mun Song"
     ],
     "LHP": [
