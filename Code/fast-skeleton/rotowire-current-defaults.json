@@ -135,12 +135,12 @@
       "Pete Crow-Armstrong",
       "Seiya Suzuki",
       "Alex Bregman",
-      "Michael Busch",
-      "Nico Hoerner",
       "Tyrone Taylor",
-      "Ian Happ",
-      "Matt Shaw",
-      "Miguel Amaya"
+      "Nico Hoerner",
+      "Michael Busch",
+      "Pedro Ramirez",
+      "Miguel Amaya",
+      "Matt Shaw"
     ]
   },
   "CIN": {
@@ -242,10 +242,10 @@
   "DET": {
     "RHP": [
       "Colt Keith",
-      "Hao-Yu Lee",
       "Kevin McGonigle",
       "Dillon Dingler",
-      "Brett Callahan",
+      "Riley Greene",
+      "Hao-Yu Lee",
       "Zach McKinstry",
       "Spencer Torkelson",
       "Max Clark",
@@ -256,11 +256,11 @@
       "John Peck",
       "Kevin McGonigle",
       "Dillon Dingler",
+      "Riley Greene",
       "Eduardo Valencia",
       "Spencer Torkelson",
       "Ben Malgeri",
-      "Max Clark",
-      "Brett Callahan"
+      "Max Clark"
     ]
   },
   "HOU": {
@@ -271,9 +271,9 @@
       "Jose Altuve",
       "Daulton Varsho",
       "Christian Walker",
-      "LaMonte Wade",
-      "Cam Smith",
-      "Yainer Diaz"
+      "Yainer Diaz",
+      "Taylor Trammell",
+      "Cam Smith"
     ],
     "LHP": [
       "Jeremy Pena",
@@ -284,7 +284,7 @@
       "Daulton Varsho",
       "Yainer Diaz",
       "Cam Smith",
-      "Taylor Trammell"
+      "Nelson Velazquez"
     ]
   },
   "KC": {
@@ -392,8 +392,8 @@
       "Christian Yelich",
       "Garrett Mitchell",
       "Sal Frelick",
-      "Cooper Pratt",
-      "David Hamilton"
+      "David Hamilton",
+      "Cooper Pratt"
     ],
     "LHP": [
       "Jackson Chourio",
@@ -609,7 +609,7 @@
       "Nathan Church",
       "Jose Fermin",
       "Nolan Gorman",
-      "Jimmy Crooks"
+      "Leo Bernal"
     ],
     "LHP": [
       "Jose Fermin",
@@ -654,21 +654,21 @@
       "Wyatt Langford",
       "Brandon Nimmo",
       "Ezequiel Duran",
-      "Evan Carter",
       "Jake Burger",
-      "Elias Diaz",
-      "Cody Freeman"
+      "Evan Carter",
+      "Cody Freeman",
+      "Elias Diaz"
     ],
     "LHP": [
-      "Justin Foscue",
+      "Ezequiel Duran",
       "Corey Seager",
       "Wyatt Langford",
       "Brandon Nimmo",
-      "Ezequiel Duran",
       "Jake Burger",
-      "Cody Freeman",
+      "Justin Foscue",
       "Elias Diaz",
-      "Evan Carter"
+      "Cody Freeman",
+      "Danny Jansen"
     ]
   },
   "TOR": {
