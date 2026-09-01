@@ -4,28 +4,34 @@
     <meta charset="utf-8" />
     <meta name="viewport" content="width=device-width, initial-scale=1" />
     <meta name="color-scheme" content="dark" />
-    <title>NFL Game Center</title>
-    <meta name="description" content="Live NFL scoreboard, weekly matchups, team form, leaders, betting notes, and game detail dashboard." />
-    <link rel="stylesheet" href="styles.css?v=20260807-nfl-11" />
+    <title>NFL Probability Lab</title>
+    <meta name="description" content="NFL matchup forecasts built from situational play calling, play-caller history, opponent-adjusted units, coverage, and live game data." />
+    <link rel="stylesheet" href="styles.css?v=20260901-roster-model" />
   </head>
   <body>
     <div class="app-shell">
       <header class="topbar">
         <a class="home-link" href="../mlb/heavy_mlb.html" title="Back to MLB Game Center">MLB</a>
         <div class="brand">
-          <span>NFL GAME CENTER</span>
+          <span>NFL PROBABILITY LAB</span>
           <strong id="slateLabel">Loading slate</strong>
         </div>
         <div class="date-tools" aria-label="Slate controls">
           <button id="prevWeekBtn" type="button" title="Previous week">-W</button>
           <button id="prevDayBtn" type="button" title="Previous day" hidden>-D</button>
-          <input id="dateInput" type="text" inputmode="numeric" autocomplete="off" placeholder="NFL week" aria-label="NFL week, Thursday through Monday" />
+          <input id="dateInput" type="text" inputmode="numeric" autocomplete="off" hidden aria-label="NFL week start date" />
+          <button id="weekPickerBtn" class="nfl-week-picker" type="button" aria-label="Choose NFL season week" aria-expanded="false">
+            <span id="weekPhaseLabel" class="week-phase">NFL</span>
+            <strong id="weekNameLabel" class="week-name">Loading week</strong>
+            <small id="weekDatesLabel" class="week-dates">Wednesday–Tuesday</small>
+          </button>
           <button id="nextDayBtn" type="button" title="Next day" hidden>+D</button>
           <button id="nextWeekBtn" type="button" title="Next week">+W</button>
           <button id="todayBtn" type="button">Today</button>
         </div>
         <nav class="tabs" aria-label="NFL dashboard pages">
           <button type="button" class="active" data-page="scoreboard">Scoreboard</button>
+          <button type="button" data-page="forecast">Forecast Lab</button>
           <button type="button" data-page="teams">Teams</button>
           <button type="button" data-page="leaders">Leaders</button>
           <button type="button" data-page="matchups">WR vs Secondary</button>
@@ -38,6 +44,42 @@
           <div id="statusBar" class="status-bar">Loading NFL data...</div>
           <section id="scoreboardPage" class="page active" aria-label="Scoreboard">
             <div id="gamesGrid" class="games-grid"></div>
+          </section>
+          <section id="forecastPage" class="page" aria-label="Matchup forecast lab">
+            <div class="forecast-shell">
+              <header class="forecast-page-head">
+                <div>
+                  <span class="eyebrow">Decision dashboard</span>
+                  <h1>What is most likely to happen?</h1>
+                  <p>Situation-aware tendencies, portable play-caller fingerprints, and opponent-adjusted matchup edges.</p>
+                </div>
+                <div class="forecast-toolbar">
+                  <label>Matchup <select id="forecastGameSelect"></select></label>
+                  <label>Recent sample
+                    <select id="forecastSampleSize">
+                      <option value="4">4 games</option>
+                      <option value="6" selected>6 games</option>
+                      <option value="8">8 games</option>
+                    </select>
+                  </label>
+                  <button id="forecastAnalyzeBtn" type="button">Analyze matchup</button>
+                </div>
+              </header>
+              <div id="forecastStatus" class="forecast-status"></div>
+              <div id="forecastHero" class="forecast-hero"></div>
+              <div id="forecastLikely" class="forecast-likely-grid"></div>
+              <div id="forecastTendencies" class="forecast-section"></div>
+              <div id="forecastUnits" class="forecast-section"></div>
+              <div id="forecastCoverage" class="forecast-section"></div>
+              <div id="forecastCoaches" class="forecast-section"></div>
+              <section class="forecast-method">
+                <div>
+                  <span class="eyebrow">Evidence policy</span>
+                  <strong>Observed, adjusted, and charted are kept separate</strong>
+                </div>
+                <p>Public play-by-play supports situation, result, pressure proxy, and run/pass analysis. Man/zone and named coverage are shown only when charted participation data is loaded. Likelihoods are model leans, not sportsbook odds.</p>
+              </section>
+            </div>
           </section>
           <section id="teamsPage" class="page" aria-label="Team stats">
             <div class="section-head">
@@ -161,15 +203,16 @@
     </dialog>
 
     <template id="gameCardTemplate">
-      <article class="game-card">
+      <article class="game-card compact-game-card">
         <button class="watch-btn" type="button" title="Watch game">+</button>
         <div class="game-meta"></div>
-        <div class="madden-scoreboard"></div>
-        <div class="game-state-strip"></div>
+        <div class="compact-matchup"></div>
+        <div class="compact-forecast"></div>
         <div class="game-card-footer"></div>
       </article>
     </template>
 
-    <script src="app.js?v=20260807-nfl-11"></script>
+    <script src="nfl-evidence-snapshot.js?v=20260901-roster-model"></script>
+    <script src="app.js?v=20260901-roster-model"></script>
   </body>
 </html>

@@ -33881,6 +33881,11 @@ function playerNameProfileTooltipHtml(profile = {}, fallbackName = '', playerId 
 }
 
 function hydratePlayerNameProfileTooltip(target) {
+  const mobileOrTouch = Boolean(
+    window.matchMedia?.('(hover: none), (pointer: coarse), (max-width: 760px)')?.matches
+    || window.innerWidth <= 760
+  );
+  if (mobileOrTouch) return;
   const nameTarget = target?.closest?.('.lineup-name-text, .pitcher-identity-name, .pitcher-priority-name, .pitching-card-name, .bullpen-name, .player-card-link');
   const link = nameTarget?.closest?.('[data-player-id]');
   if (!link || (link.dataset.themeTooltipHtml && link.dataset.playerProfileTooltip !== '1')) return;
@@ -54875,6 +54880,7 @@ function initThemedTooltips() {
 
   function showTooltip(el, event = null) {
     if (!el || el === tooltipEl || tooltipEl.contains(el) || suppressesThemeTooltip(el)) return;
+    if (smallScreenTooltipTapEnabled() && el.dataset?.playerProfileTooltip === '1') return;
     stripNativeTooltip(el);
     const title = readableTitle(el);
     if (!title) return;

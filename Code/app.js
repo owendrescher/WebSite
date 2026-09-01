@@ -15,7 +15,7 @@ const tools = [
   },
   {
     title: "Baseball",
-    href: "mlb/heavy_mlb.html",
+    href: "mlb/light_mlb.html",
     preview: "baseballtrack.png",
     previewType: "image",
     description: "Baseball tracking dashboard and overlays",
@@ -49,11 +49,11 @@ const tools = [
     description: "Timed math practice from arithmetic to calculus",
   },
   {
-    title: "Nutrition",
-    href: "Nutrition and Cost Analysis/Nutrition.html",
-    preview: "nutritioninfo.png",
+    title: "NFL",
+    href: "NFL/database.html",
+    preview: "football.png",
     previewType: "image",
-    description: "Nutrition labels, costs, and food comparisons",
+    description: "NFL team and player information",
   },
   {
     title: "Ping Pong",
@@ -97,13 +97,7 @@ const tools = [
     previewType: "image",
     description: "Daily tasks, routines, and planning",
   },
-  {
-    title: "Lyrics",
-    href: "Song Translation/app/index.html",
-    preview: "songtranslation.png",
-    previewType: "image",
-    description: "Lyrics, translation, and listening practice",
-  },
+
 ];
 
 const panels = Array.from(document.querySelectorAll("[data-tool-index]"));
