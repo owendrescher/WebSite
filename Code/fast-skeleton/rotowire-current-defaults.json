@@ -31,20 +31,20 @@
       "Lawrence Butler",
       "Tommy White",
       "Donovan Walton",
-      "Max Muncy",
+      "Jonah Heim",
       "Carlos Cortes",
-      "Jonah Heim"
+      "Denzel Clarke"
     ],
     "LHP": [
       "Henry Bolte",
       "Zack Gelof",
-      "Jeff McNeil",
+      "Lawrence Butler",
       "Jonah Heim",
       "Tommy White",
-      "Lawrence Butler",
       "Max Muncy",
       "Alika Williams",
-      "Darell Hernaiz"
+      "Darell Hernaiz",
+      "Denzel Clarke"
     ]
   },
   "ATL": {
@@ -601,15 +601,15 @@
   },
   "STL": {
     "RHP": [
-      "Cesar Prieto",
+      "Jose Fermin",
       "Ivan Herrera",
       "Alec Burleson",
       "Jordan Walker",
       "Joshua Baez",
-      "Nathan Church",
-      "Jose Fermin",
       "Nolan Gorman",
-      "Leo Bernal"
+      "Nathan Church",
+      "Leo Bernal",
+      "Thomas Saggese"
     ],
     "LHP": [
       "Jose Fermin",
@@ -617,10 +617,10 @@
       "Jordan Walker",
       "Alec Burleson",
       "Joshua Baez",
-      "Thomas Saggese",
-      "Cesar Prieto",
+      "Leo Bernal",
       "Ramon Urias",
-      "Leo Bernal"
+      "Thomas Saggese",
+      "Nathan Church"
     ]
   },
   "TB": {
