@@ -14462,6 +14462,80 @@ function battingContextHtml(splits = null, matchupHand = '') {
   `;
 }
 
+const catcherThrowingStatCache = new Map();
+
+function isCatcherProfile(profile = {}) {
+  return [profile?.rawPosition, profile?.position, profile?.primaryPosition?.abbreviation]
+    .some((value) => /^(?:C|CATCHER)$/i.test(cleanSummary(value)));
+}
+
+function averageFiniteValues(rows = [], key = '') {
+  const values = listify(rows).map((row) => row?.[key]).filter((value) => value != null && value !== '').map(Number).filter(Number.isFinite);
+  return values.length ? values.reduce((sum, value) => sum + value, 0) / values.length : null;
+}
+
+async function getCatcherThrowingStats(playerId, game = null) {
+  const id = Number(playerId);
+  if (!(id > 0)) return null;
+  const targetDate = playerStatTargetDate(game);
+  const season = seasonForDate(targetDate);
+  const cacheKey = `${id}:${season}:${targetDate}:catcher-throwing-v1`;
+  if (catcherThrowingStatCache.has(cacheKey)) return catcherThrowingStatCache.get(cacheKey);
+  const promise = (async () => {
+    const url = new URL(`https://baseballsavant.mlb.com/leaderboard/services/catcher-throwing/${id}`);
+    url.searchParams.set('game_type', 'Regular');
+    url.searchParams.set('n', '1');
+    url.searchParams.set('season_start', String(season));
+    url.searchParams.set('season_end', String(season));
+    url.searchParams.set('split', 'no');
+    url.searchParams.set('target_base', 'All');
+    url.searchParams.set('type', 'Cat');
+    url.searchParams.set('with_team_only', '1');
+    const payload = await getJson(url.toString());
+    const attempts = listify(payload?.data).filter((row) => {
+      const date = calendarDateOnly(row?.game_date || '');
+      return !date || !targetDate || date <= targetDate;
+    });
+    if (!attempts.length) return null;
+    const caught = attempts.reduce((sum, row) => sum + statNumber(row?.is_runner_cs), 0);
+    const expectedCaught = attempts.reduce((sum, row) => sum + (Number(row?.exp_cs) || 0), 0);
+    const csaa = attempts.reduce((sum, row) => sum + (Number(row?.cs_aa) || 0), 0);
+    const runs = attempts.reduce((sum, row) => sum + (Number(row?.cs_raa) || 0), 0);
+    return {
+      attempts: attempts.length, caught, expectedCaught, csaa, runs,
+      csPct: caught / attempts.length,
+      expectedCsPct: expectedCaught / attempts.length,
+      perThrow: csaa / attempts.length,
+      popTime: averageFiniteValues(attempts, 'pop_time'),
+      exchangeTime: averageFiniteValues(attempts, 'pos2_f_exchange'),
+      armStrength: averageFiniteValues(attempts, 'pos2_f_arm_strength'),
+    };
+  })().catch((error) => {
+    catcherThrowingStatCache.delete(cacheKey);
+    throw error;
+  });
+  catcherThrowingStatCache.set(cacheKey, promise);
+  return promise;
+}
+
+function catcherThrowingStatsHtml(stats = undefined, team = '') {
+  if (stats === undefined) return '<section class="catcher-throwing-card is-loading"><strong>CATCHER THROWING</strong><span>Loading Statcast throwing data…</span></section>';
+  if (!stats) return '<section class="catcher-throwing-card is-empty"><strong>CATCHER THROWING</strong><span>No tracked steal attempts</span></section>';
+  const signed = (value, digits = 1) => `${Number(value) > 0 ? '+' : ''}${Number(value).toFixed(digits)}`;
+  const pct = (value) => `${Math.round(Number(value) * 100)}%`;
+  const metric = (label, value, unit = '') => `<span><small>${label}</small><b>${value}${unit}</b></span>`;
+  return `<section class="catcher-throwing-card" style="--catcher-team:${escapeHtml(getTeamTextColor(team) || getTeamColor(team) || '#7bd0ff')}">
+    <header><strong>CATCHER THROWING</strong><em>STATCAST</em></header>
+    <div class="catcher-throwing-lead"><b>${signed(stats.csaa)}</b><span>CS ABOVE AVG</span><small>${signed(stats.runs)} runs</small></div>
+    <div class="catcher-throwing-grid">
+      ${metric('ATT', stats.attempts)}${metric('CS', stats.caught)}${metric('CS%', pct(stats.csPct))}${metric('xCS%', pct(stats.expectedCsPct))}
+      ${metric('POP', Number.isFinite(stats.popTime) ? stats.popTime.toFixed(2) : '--', Number.isFinite(stats.popTime) ? 's' : '')}
+      ${metric('EXCH', Number.isFinite(stats.exchangeTime) ? stats.exchangeTime.toFixed(2) : '--', Number.isFinite(stats.exchangeTime) ? 's' : '')}
+      ${metric('ARM', Number.isFinite(stats.armStrength) ? stats.armStrength.toFixed(1) : '--', Number.isFinite(stats.armStrength) ? ' mph' : '')}
+    </div>
+    <small class="catcher-throwing-note">Actual caught stealings compared with Statcast expectation for the attempts faced.</small>
+  </section>`;
+}
 function formatProjectedSeasonTotal(total, games) {
   const count = statNumber(total);
   const played = statNumber(games);
@@ -16333,11 +16407,13 @@ function renderPlayerHandedSplits(profile, game, token) {
   let handed = null;
   let starterSplits = null;
   let starterRecentHand = null;
+  let catcherThrowing = undefined;
   const paint = () => {
     if (!playerStatExtraEl || playerStatExtraEl.dataset.splitToken !== token) return;
     updatePlayerSeasonArchetypeTable('');
     const matchupArsenal = savantArsenalShell('batter', profile.id, matchupPitcherId || matchupPitcher?.id || '');
-    playerStatExtraEl.innerHTML = `${battingContextHtml(handed, matchupHand)}${batterStarterHandednessHtml(matchupPitcher, starterSplits, profile?.bats, starterRecentHand, profile?.id)}${matchupArsenal}`;
+    const catcherCard = isCatcherProfile(profile) ? catcherThrowingStatsHtml(catcherThrowing, profile?.teamAbbrev) : '';
+    playerStatExtraEl.innerHTML = `${battingContextHtml(handed, matchupHand)}${catcherCard}${batterStarterHandednessHtml(matchupPitcher, starterSplits, profile?.bats, starterRecentHand, profile?.id)}${matchupArsenal}`;
     hydratePitcherFireStreaks(playerStatExtraEl);
     hydratePitcherColdStreaks(playerStatExtraEl);
     hydratePitcherLastStartHrMarkers(playerStatExtraEl);
@@ -16346,6 +16422,17 @@ function renderPlayerHandedSplits(profile, game, token) {
     hydrateSavantArsenalShells(profile, game, token);
   };
   paint();
+  if (isCatcherProfile(profile)) {
+    getCatcherThrowingStats(profile.id, game).then((stats) => {
+      if (!playerStatExtraEl || playerStatExtraEl.dataset.splitToken !== token) return;
+      catcherThrowing = stats;
+      paint();
+    }).catch(() => {
+      if (!playerStatExtraEl || playerStatExtraEl.dataset.splitToken !== token) return;
+      catcherThrowing = null;
+      paint();
+    });
+  }
   Promise.allSettled([
     getPlayerHandedBattingSplits(profile.id),
     getPlayerRecentBattingDetails(profile.id, game),

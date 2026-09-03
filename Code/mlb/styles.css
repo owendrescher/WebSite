@@ -17503,3 +17503,89 @@ body.dashboard-page .scoreboard-main > .score-state-strip .score-mini-inning.is-
   justify-self: end;
   margin-left: auto;
 }
+.catcher-throwing-card {
+  margin-top: 0.55rem;
+  padding: 0.55rem;
+  border: 1px solid color-mix(in srgb, var(--catcher-team, var(--accent)) 62%, var(--line));
+  border-radius: 8px;
+  background: linear-gradient(135deg, color-mix(in srgb, var(--catcher-team, var(--accent)) 18%, var(--panel-bg)), color-mix(in srgb, var(--panel-bg) 94%, black));
+  box-shadow: inset 3px 0 0 color-mix(in srgb, var(--catcher-team, var(--accent)) 84%, white 16%);
+}
+
+.catcher-throwing-card header,
+.catcher-throwing-card .catcher-throwing-lead {
+  display: flex;
+  align-items: baseline;
+  justify-content: space-between;
+  gap: 0.45rem;
+}
+
+.catcher-throwing-card header strong,
+.catcher-throwing-card header em,
+.catcher-throwing-lead span,
+.catcher-throwing-grid small {
+  font-family: var(--font-display);
+  font-size: 0.55rem;
+  letter-spacing: 0.08em;
+}
+
+.catcher-throwing-card header em {
+  color: var(--catcher-team, var(--accent));
+  font-style: normal;
+}
+
+.catcher-throwing-lead {
+  margin: 0.38rem 0;
+  justify-content: flex-start;
+}
+
+.catcher-throwing-lead > b {
+  color: var(--catcher-team, var(--accent));
+  font-size: 1.45rem;
+  line-height: 1;
+}
+
+.catcher-throwing-lead > small {
+  margin-left: auto;
+  color: var(--muted);
+}
+
+.catcher-throwing-grid {
+  display: grid;
+  grid-template-columns: repeat(4, minmax(0, 1fr));
+  gap: 3px;
+}
+
+.catcher-throwing-grid > span {
+  display: grid;
+  gap: 1px;
+  padding: 0.3rem 0.24rem;
+  border: 1px solid color-mix(in srgb, var(--catcher-team, var(--accent)) 22%, var(--line));
+  border-radius: 4px;
+  background: rgba(2, 10, 18, 0.42);
+}
+
+.catcher-throwing-grid b {
+  font-size: 0.72rem;
+  white-space: nowrap;
+}
+
+.catcher-throwing-grid small,
+.catcher-throwing-note {
+  color: var(--muted);
+}
+
+.catcher-throwing-note {
+  display: block;
+  margin-top: 0.35rem;
+  font-size: 0.54rem;
+  line-height: 1.25;
+}
+
+.catcher-throwing-card.is-loading,
+.catcher-throwing-card.is-empty {
+  display: flex;
+  justify-content: space-between;
+  gap: 0.5rem;
+  color: var(--muted);
+}

@@ -50,7 +50,7 @@ const tools = [
   },
   {
     title: "NFL",
-    href: "NFL/database.html",
+    href: "nfl/database.html",
     preview: "football.png",
     previewType: "image",
     description: "NFL team and player information",

@@ -401,12 +401,12 @@ function teamPalette(teamOrAbbrev) {
   const abbrev = normalizedNflTeam(typeof teamOrAbbrev === 'string' ? teamOrAbbrev : teamOrAbbrev?.abbrev);
   const source = NFL_TEAM_COLORS[abbrev] || [teamColor(teamOrAbbrev), teamColor({ color: teamOrAbbrev?.alternateColor }, '#17324D'), '#A5ACAF'];
   const [primary, secondary, tertiary] = source;
-  return { primary, secondary, tertiary, lightText: '#F7FAFF', darkText: '#06111D', onPrimary: colorLuminance(primary) > .42 ? '#06111D' : '#F7FAFF', onSecondary: colorLuminance(secondary) > .42 ? '#06111D' : '#F7FAFF', onTertiary: colorLuminance(tertiary) > .42 ? '#06111D' : '#F7FAFF' };
+  return { primary, secondary, tertiary, accentText:readableTeamColor(secondary), lightText: '#F7FAFF', darkText: '#06111D', onPrimary: colorLuminance(primary) > .42 ? '#06111D' : '#F7FAFF', onSecondary: colorLuminance(secondary) > .42 ? '#06111D' : '#F7FAFF', onTertiary: colorLuminance(tertiary) > .42 ? '#06111D' : '#F7FAFF' };
 }
 
 function teamPaletteVars(away, home = away) {
   const a = teamPalette(away); const h = teamPalette(home);
-  return `--away-primary:${a.primary};--away-secondary:${a.secondary};--away-tertiary:${a.tertiary};--away-on-primary:${a.onPrimary};--away-light-text:${a.lightText};--away-dark-text:${a.darkText};--home-primary:${h.primary};--home-secondary:${h.secondary};--home-tertiary:${h.tertiary};--home-on-primary:${h.onPrimary};--home-light-text:${h.lightText};--home-dark-text:${h.darkText}`;
+  return `--away-primary:${a.primary};--away-secondary:${a.secondary};--away-tertiary:${a.tertiary};--away-accent-text:${a.accentText};--away-on-primary:${a.onPrimary};--away-light-text:${a.lightText};--away-dark-text:${a.darkText};--home-primary:${h.primary};--home-secondary:${h.secondary};--home-tertiary:${h.tertiary};--home-accent-text:${h.accentText};--home-on-primary:${h.onPrimary};--home-light-text:${h.lightText};--home-dark-text:${h.darkText}`;
 }
 
 function readableTeamColor(color) {
@@ -555,7 +555,7 @@ async function fetchSeasonScoreboard(season, seasonType = '2') {
   url.searchParams.set('seasontype', String(seasonType));
   url.searchParams.set('limit', '1000');
   const data = await getJson(url.toString());
-  return (data.events || []).map(normalizeGame);
+  return (data.events || []).map(normalizeGame).filter((game) => Number(game.season?.year) === Number(season) && Number(game.season?.type) === Number(seasonType));
 }
 
 async function findMostRecentSlateDate(anchorDate) {
@@ -1250,15 +1250,15 @@ function teamUnitMatchup(offense, defense) {
 
 function playerGradeMatchup(personnel, offenseSide, defenseSide) {
   if (!personnel?.starters?.[offenseSide] || !personnel?.starters?.[defenseSide]) return { passAttack:68,passStop:68,runAttack:68,runStop:68,passEdge:0,runEdge:0,edge:0,pointAdjustment:0 };
-  const qb=starterGradeAverage(personnel,offenseSide,'offense',/^QB$/); const targets=starterGradeAverage(personnel,offenseSide,'offense',/^(WR|LWR|RWR|SWR|SLWR|SRWR|TE)$/); const backs=starterGradeAverage(personnel,offenseSide,'offense',/^(RB|HB|FB)$/); const line=starterGradeAverage(personnel,offenseSide,'offense',/^(LT|LG|C|RG|RT|T|OT|G|OG|OL)$/); const front=starterGradeAverage(personnel,defenseSide,'defense',/^(DE|LDE|RDE|DT|LDT|RDT|NT|DL|EDGE|LB|ILB|MLB|OLB|WLB|SLB)$/); const coverage=starterGradeAverage(personnel,defenseSide,'defense',/^(CB|LCB|RCB|SCB|NB|DB|S|FS|SS)$/);
-  const passAttack=average([qb,targets,line]); const passStop=average([front,coverage]); const runAttack=average([backs,line]); const runStop=front; const passEdge=passAttack-passStop; const runEdge=runAttack-runStop; const edge=passEdge*.62+runEdge*.38;
-  return { qb,targets,backs,line,front,coverage,passAttack,passStop,runAttack,runStop,passEdge,runEdge,edge,pointAdjustment:clamp(edge*.05,-2.2,2.2) };
+  const qbPlayer=(personnel.starters[offenseSide].offense||[]).find((player)=>String(player.position).toUpperCase()==='QB'); const qb=starterGradeAverage(personnel,offenseSide,'offense',/^QB$/); const targetRows=receivingThreatRows(personnel,offenseSide); const targetWeightTotal=targetRows.reduce((sum,player)=>sum+targetOpportunityWeight(player),0); const targets=targetRows.length ? targetRows.reduce((sum,player)=>sum+(Number(player.evaluation?.grade)||68)*targetOpportunityWeight(player),0)/Math.max(.01,targetWeightTotal) : starterGradeAverage(personnel,offenseSide,'offense',/^(WR|LWR|RWR|SWR|SLWR|SRWR|TE)$/); const tightEnds=gradeAverage(targetRows.filter((player)=>depthPositionGroup(player.position)==='TE'),68); const targetFit=targetTreeVerticalFit(qbPlayer,targetRows); const backs=gradeAverage(topRoleRows(personnel?.[offenseSide],/^(RB|HB|FB)$/,2),starterGradeAverage(personnel,offenseSide,'offense',/^(RB|HB|FB)$/)); const line=starterGradeAverage(personnel,offenseSide,'offense',/^(LT|LG|C|RG|RT|T|OT|G|OG|OL)$/); const front=starterGradeAverage(personnel,defenseSide,'defense',/^(DE|LDE|RDE|DT|LDT|RDT|NT|DL|EDGE|LB|ILB|LILB|RILB|MLB|OLB|WLB|SLB)$/); const coverage=starterGradeAverage(personnel,defenseSide,'defense',/^(CB|LCB|RCB|SCB|NB|DB|S|FS|SS)$/);
+  const passAttack=average([qb,targets,line])+targetFit; const passStop=average([front,coverage]); const runAttack=average([backs,line]); const runStop=front; const passEdge=passAttack-passStop; const runEdge=runAttack-runStop; const edge=passEdge*.62+runEdge*.38;
+  return { qb,targets,tightEnds,targetFit,backs,line,front,coverage,passAttack,passStop,runAttack,runStop,passEdge,runEdge,edge,pointAdjustment:clamp(edge*.05,-2.35,2.35) };
 }
 
 function matchupModel(game, away, home, personnel = null) {
   const teamProjection = (offense, defense, offenseSide, defenseSide, homeField = 0) => {
     const rosterOffense = Number(offense.roster?.offenseAdjustment) || 0; const rosterDefense = Number(defense.roster?.defenseAdjustment) || 0; const lineDelta = Number(offense.roster?.lineDelta) || 0; const opponentFrontDelta = Number(defense.roster?.frontDelta) || 0; const skillDelta = Number(offense.roster?.skillDelta) || 0; const opponentSecondaryDelta = Number(defense.roster?.secondaryDelta) || 0; const offenseContinuity=Number(offense.roster?.offenseContinuity) || 1; const defenseContinuity=Number(defense.roster?.defenseContinuity) || 1;
-    const continuityAdjustedFor=offense.scoring.pointsFor*offenseContinuity+22*(1-offenseContinuity); const continuityAdjustedAgainst=defense.scoring.pointsAgainst*defenseContinuity+22*(1-defenseContinuity); const baselinePoints = (continuityAdjustedFor * .52) + (continuityAdjustedAgainst * .48) + ((offense.sos - defense.sos) * .12) + homeField;
+    const neutralPoints=22; const continuityAdjustedFor=offense.scoring.pointsFor*offenseContinuity+neutralPoints*(1-offenseContinuity); const continuityAdjustedAgainst=defense.scoring.pointsAgainst*defenseContinuity+neutralPoints*(1-defenseContinuity); const sosPointAdjustment=(offense.sos-defense.sos)*.12; const baselinePoints = (continuityAdjustedFor * .52) + (continuityAdjustedAgainst * .48) + sosPointAdjustment + homeField;
     const rosterPointAdjustment = rosterOffense * .32 - rosterDefense * .28;
     const schemeMatchup=schemePassMatchup(offense,defense); const unitMatchup=teamUnitMatchup(offense,defense); const playerMatchup=playerGradeMatchup(personnel,offenseSide,defenseSide); const schemePointAdjustment=schemeMatchup.pointAdjustment; const unitPointAdjustment=unitMatchup.pointAdjustment; const playerPointAdjustment=playerMatchup.pointAdjustment; const matchupPointAdjustment=schemePointAdjustment+unitPointAdjustment+playerPointAdjustment;
     const points = clamp(baselinePoints + rosterPointAdjustment + matchupPointAdjustment,8,42);
@@ -1269,12 +1269,13 @@ function matchupModel(game, away, home, personnel = null) {
     const explosivePass = clamp(offense.offense.explosivePassRate * .55 + defense.defense.explosivePassRate * .45 + (skillDelta-opponentSecondaryDelta)*.0012 + schemeMatchup.coverageEdge*.001, .05, .28);
     const turnover = clamp(offense.offense.turnoverRate * .55 + defense.defense.turnoverRate * .45, .008, .09);
     const redZonePass = clamp(offense.offense.redZonePassRate * .6 + defense.defense.redZonePassRate * .4, .25, .75);
-    return { points, baselinePoints, rosterPointAdjustment, schemePointAdjustment,unitPointAdjustment,playerPointAdjustment,matchupPointAdjustment,schemeMatchup,unitMatchup,playerMatchup,offenseContinuity,defenseContinuity,passRate, earlyPass, pressure, runSuccess, explosivePass, turnover, redZonePass };
+    return { points,baselinePoints,neutralPoints,offenseScoringRaw:offense.scoring.pointsFor,opponentAllowanceRaw:defense.scoring.pointsAgainst,continuityAdjustedFor,continuityAdjustedAgainst,sosPointAdjustment,homeField,rosterPointAdjustment,schemePointAdjustment,unitPointAdjustment,playerPointAdjustment,matchupPointAdjustment,schemeMatchup,unitMatchup,playerMatchup,offenseContinuity,defenseContinuity,passRate, earlyPass, pressure, runSuccess, explosivePass, turnover, redZonePass };
   };
   const awayProjection = teamProjection(away, home, 'away', 'home');
   const homeProjection = teamProjection(home, away, 'home', 'away', 1.35);
   const margin = homeProjection.points - awayProjection.points;
-  const homeWin = clamp(1 / (1 + Math.exp(-margin / 6.5)), .08, .92);
+  const weekContext=nflWeekContext(game.date||state.selectedDate); const winScale=weekContext.phase==='PRESEASON'?8.4:weekContext.phase==='REGULAR SEASON'&&weekContext.week===1?7.8:weekContext.phase==='REGULAR SEASON'&&weekContext.week<=4?7.1:6.5;
+  const homeWin = clamp(1 / (1 + Math.exp(-margin / winScale)), .08, .92);
   const outcomes = [];
   const addDirectional = (team, metric, value, highLabel, lowLabel, explanation, formula, definition = 'Matchup index, not a betting probability.') => {
     const high = value >= .5;
@@ -1288,7 +1289,7 @@ function matchupModel(game, away, home, personnel = null) {
     addDirectional(name,'PRESSURE',clamp(.50+(projection.pressure-.07)*4.2,.36,.79),`${name} QB pressured`,`${name} QB kept cleaner`,'Pass protection matched with the opposing rush.',`48% ${name} sack exposure (${percent(profile.offense.sackRate,1)}) + 52% ${opponent.team.abbrev} sack creation (${percent(opponent.defense.sackRate,1)}) = ${percent(projection.pressure,1)} raw risk; 7% raw risk is centered at a 50 index.`);
     addDirectional(name,'EXPLOSIVE',clamp(.50+(projection.explosivePass-.14)*2.7,.35,.78),`${name} explosive pass`,`${name} explosive passing limited`,'15+ yard pass production matched with explosives allowed.',`55% ${name} explosive rate (${percent(profile.offense.explosivePassRate,1)}) + 45% ${opponent.team.abbrev} allowed (${percent(opponent.defense.explosivePassRate,1)}) = ${percent(projection.explosivePass,1)} raw; 14% is centered at a 50 index.`);
   }
-  return { away: awayProjection, home: homeProjection, homeWin, outcomes: outcomes.sort((a, b) => Math.abs(b.probability - .5) - Math.abs(a.probability - .5)).slice(0, 6) };
+  return { away: awayProjection, home: homeProjection, homeWin, winScale, outcomes: outcomes.sort((a, b) => Math.abs(b.probability - .5) - Math.abs(a.probability - .5)).slice(0, 6) };
 }
 
 function compactForecastFromDeep(result) {
@@ -1417,9 +1418,9 @@ function renderForecast() {
 function forecastEmptyHero(game) {
   if (!game) return '';
   return `<section class="forecast-matchup-card is-empty" style="--away-color:${escapeHtml(game.away.color)};--home-color:${escapeHtml(game.home.color)}">
-    <div class="forecast-team"><img src="${escapeHtml(game.away.logo)}" alt=""><strong>${escapeHtml(game.away.abbrev)}</strong><span>${escapeHtml(game.away.record || 'Away')}</span></div>
+    <div class="forecast-team"><img src="${escapeHtml(game.away.logo)}" alt="" width="64" height="64"><strong>${escapeHtml(game.away.abbrev)}</strong><span>${escapeHtml(game.away.record || 'Away')}</span></div>
     <div class="forecast-vs"><span>Pregame model</span><b>VS</b><small>Run the analysis to reveal the strongest signals</small></div>
-    <div class="forecast-team home"><img src="${escapeHtml(game.home.logo)}" alt=""><strong>${escapeHtml(game.home.abbrev)}</strong><span>${escapeHtml(game.home.record || 'Home')}</span></div>
+    <div class="forecast-team home"><img src="${escapeHtml(game.home.logo)}" alt="" width="64" height="64"><strong>${escapeHtml(game.home.abbrev)}</strong><span>${escapeHtml(game.home.record || 'Home')}</span></div>
   </section>`;
 }
 
@@ -1429,10 +1430,10 @@ function forecastHeroHtml(result) {
   const favorite = model.homeWin >= .5 ? game.home.abbrev : game.away.abbrev;
   const favoriteWin = Math.max(model.homeWin, awayWin);
   return `<section class="forecast-matchup-card" style="--away-color:${escapeHtml(game.away.color)};--home-color:${escapeHtml(game.home.color)}">
-    <div class="forecast-team"><img src="${escapeHtml(game.away.logo)}" alt=""><strong>${escapeHtml(game.away.abbrev)}</strong><span>${model.away.points.toFixed(1)} projected · ${percent(awayWin)}</span></div>
+    <div class="forecast-team"><img src="${escapeHtml(game.away.logo)}" alt="" width="64" height="64"><strong>${escapeHtml(game.away.abbrev)}</strong><span>${model.away.points.toFixed(1)} projected · ${percent(awayWin)}</span></div>
     <div class="forecast-vs">${probabilityRing(favoriteWin, `${favorite} win lean`)}<strong>${escapeHtml(favorite)} has the clearer path</strong><small>Expected band: ${Math.max(0, model.away.points - 6).toFixed(0)}–${(model.away.points + 6).toFixed(0)} vs ${Math.max(0, model.home.points - 6).toFixed(0)}–${(model.home.points + 6).toFixed(0)}</small></div>
-    <div class="forecast-team home"><img src="${escapeHtml(game.home.logo)}" alt=""><strong>${escapeHtml(game.home.abbrev)}</strong><span>${model.home.points.toFixed(1)} projected · ${percent(model.homeWin)}</span></div>
-  </section>`;
+    <div class="forecast-team home"><img src="${escapeHtml(game.home.logo)}" alt="" width="64" height="64"><strong>${escapeHtml(game.home.abbrev)}</strong><span>${model.home.points.toFixed(1)} projected · ${percent(model.homeWin)}</span></div>
+  </section>${scoreBuildHtml(result)}`;
 }
 
 function forecastOutcomeHtml(outcome) {
@@ -1733,7 +1734,7 @@ function evidenceForPlayer(player, evidence) {
 function positionUnit(position) {
   const pos = String(position || '').toUpperCase();
   if (/^(QB|RB|HB|FB|WR|LWR|RWR|SWR|SLWR|SRWR|TE|LT|LG|C|RG|RT|T|OT|G|OG|OL)$/.test(pos)) return 'offense';
-  if (/^(DE|LDE|RDE|DT|LDT|RDT|NT|DL|EDGE|LB|ILB|MLB|OLB|WLB|SLB|CB|LCB|RCB|SCB|NB|DB|S|FS|SS)$/.test(pos)) return 'defense';
+  if (/^(DE|LDE|RDE|DT|LDT|RDT|NT|DL|EDGE|LB|ILB|LILB|RILB|MLB|OLB|WLB|SLB|CB|LCB|RCB|SCB|NB|DB|S|FS|SS)$/.test(pos)) return 'defense';
   return 'special';
 }
 
@@ -1750,10 +1751,10 @@ function playerGrade(player, evidence) {
     value = 55 + (clamp(ypc,2,6.5) - 3.8) * 4.3 * efficiencyWeight + scrim / 11 + rushEpa * 28 * efficiencyWeight + (firstDownRate - .20) * 35 + (perGame('rushingtouchdowns') + perGame('receivingtouchdowns')) * 3;
     metrics.push(['Scrim yds / game',scrim],['Yards / carry',ypc],['Rush EPA / carry',rushEpa],['1st-down rate',firstDownRate]); basis = 'rushing value, down-to-down efficiency, first downs and receiving production';
   } else if (pos === 'WR' || pos === 'TE') {
-    const targets = Number(s.targets) || 0; const ypt = rate(s.receivingyards,targets); const targetShare = Number(e.targetshare) || 0; const receivingEpa = rate(s.receivingepa,targets); const firstDownRate = rate(s.receivingfirstdowns,targets);
-    const efficiencyWeight = clamp((s.targets || 0) / 40, .06, 1);
-    value = 53 + perGame('receivingyards') / 7 + (clamp(ypt,3,13) - 6.5) * 2.2 * efficiencyWeight + targetShare * 25 + receivingEpa * 14 * efficiencyWeight + (firstDownRate - .32) * 20 + perGame('receivingtouchdowns') * 4;
-    metrics.push(['Rec yds / game',perGame('receivingyards')],['Yards / target',ypt],['EPA / target',receivingEpa],['Target share',targetShare]); basis = 'target earning, EPA per target, first-down creation and after-catch value';
+    const targets = Number(s.targets) || 0; const yardsPerGame=perGame('receivingyards'); const ypt = rate(s.receivingyards,targets); const rawTargetShare=Number(e.targetshare); const targetShare=Number.isFinite(rawTargetShare)&&rawTargetShare>0?rawTargetShare:null; const receivingEpa = rate(s.receivingepa,targets); const firstDownRate = rate(s.receivingfirstdowns,targets); const tightEnd=pos==='TE';
+    const efficiencyWeight = clamp(targets / 100, .08, 1); const yardBaseline=tightEnd?22:35; const shareBaseline=tightEnd?.12:.16; const snapRole=(Number(e.offenseSnapShare)||0)*3;
+    value = (tightEnd?63:66) + (yardsPerGame-yardBaseline)*.22 + (targetShare==null?0:(targetShare-shareBaseline)*35) + (clamp(ypt,3,13)-7.2)*1.8*efficiencyWeight + receivingEpa*8*efficiencyWeight + (firstDownRate-.35)*12*efficiencyWeight + perGame('receivingtouchdowns')*3 + snapRole;
+    metrics.push(['Rec yds / game',yardsPerGame],['Targets',targets],['Yards / target',ypt],['EPA / target',receivingEpa],['Target share',targetShare==null?'—':targetShare]); basis = 'receiving volume and target earning, with efficiency regressed by target sample before EPA, first downs and scoring are added';
   } else if (/^(LT|LG|C|RG|RT|T|OT|G|OG|OL)$/.test(String(player.position || '').toUpperCase())) {
     const share = e.offenseSnapShare || 0; const startRate = rate(e.offenseStarts || 0, e.snapGameCount || 0); const evidenceTeam = e.previousTeams?.[0] || player.team; const protectionRank = teamMetricRank(evidenceTeam,'pocketProtection')?.rank; const runRank = teamMetricRank(evidenceTeam,'runGame')?.rank; const protectionBoost = protectionRank ? (33-protectionRank)/32*8 : 4; const runBoost = runRank ? (33-runRank)/32*4 : 2;
     value = 53 + share * 14 + startRate * 5 + Math.min(3,(e.offenseSnaps || 0)/300) + protectionBoost + runBoost;
@@ -1794,7 +1795,7 @@ function playerGrade(player, evidence) {
   return { grade, label, confidence, basis, metrics, season: e.season || analysisSeasonForGame(null), hasEvidence };
 }
 
-function unavailableForStarter(player) { return /\b(IR|PUP|NFI|OUT|SUSP|SUS|RES|RESERVE|INACTIVE)\b/i.test(String(player.status || '')); }
+function unavailableForStarter(player) { const status=String(player.status || '').trim(); return /\b(IR|PUP|NFI|OUT|SUSP|SUS|RES|RESERVE|INACTIVE|CUT|WAI|WAIVED|PRACTICE)\b/i.test(status) || /^W\d+$/i.test(status); }
 function starterScore(player) {
   const e = player.evidence || {}; const unit = positionUnit(player.position); const snapShare = unit === 'offense' ? e.offenseSnapShare : e.defenseSnapShare;
   return player.evaluation.grade + (snapShare || 0) * 16 + (player.depth === 1 ? 8 : player.depth === 2 ? 3 : 0) - (unavailableForStarter(player) ? 100 : 0);
@@ -1807,18 +1808,18 @@ function defensiveBaseFront(rows) {
   const snapshot = teamSchemeRecord(rows[0]?.team); return String(snapshot?.baseFront || '').replace('-', '–') || 'Multiple';
 }
 
-function expectedStarters(rows, baseFront = 'Multiple') {
+function expectedStarters(rows, baseFront = 'Multiple', score = starterScore) {
   const selected = new Set(); const pick = (role, predicate, count = 1) => {
-    const candidates = rows.filter((player) => !selected.has(player) && predicate(String(player.position || '').toUpperCase())).sort((a, b) => starterScore(b) - starterScore(a) || a.depth - b.depth || a.name.localeCompare(b.name));
+    const candidates = rows.filter((player) => !selected.has(player) && predicate(String(player.position || '').toUpperCase())).sort((a, b) => score(b) - score(a) || a.depth - b.depth || a.name.localeCompare(b.name));
     candidates.slice(0, count).forEach((player, index) => { selected.add(player); player.expectedStarter = true; player.expectedRole = count > 1 ? `${role}${index + 1}` : role; });
   };
   pick('QB', (pos) => pos === 'QB'); pick('RB', (pos) => /^(RB|HB|FB)$/.test(pos)); pick('WR', (pos) => /^(WR|LWR|RWR|SWR|SLWR|SRWR)$/.test(pos), 3); pick('TE', (pos) => pos === 'TE');
   pick('LT', (pos) => /^(LT|T|OT|OL)$/.test(pos)); pick('LG', (pos) => /^(LG|G|OG|OL)$/.test(pos)); pick('C', (pos) => pos === 'C'); pick('RG', (pos) => /^(RG|G|OG|OL)$/.test(pos)); pick('RT', (pos) => /^(RT|T|OT|OL)$/.test(pos));
   const offense = [...selected].filter((player) => positionUnit(player.position) === 'offense');
-  if (offense.length < 11) rows.filter((player) => positionUnit(player.position) === 'offense' && !selected.has(player)).sort((a,b) => starterScore(b) - starterScore(a)).slice(0, 11 - offense.length).forEach((player) => { selected.add(player); player.expectedStarter = true; player.expectedRole = player.position; offense.push(player); });
-  const threeFour = /3[–-]4/.test(baseFront); pick('DL', (pos) => /^(DE|LDE|RDE|DT|LDT|RDT|NT|DL|EDGE)$/.test(pos), threeFour ? 3 : 4); pick('LB', (pos) => /^(LB|ILB|MLB|OLB|WLB|SLB)$/.test(pos), threeFour ? 4 : 3); pick('CB', (pos) => /^(CB|LCB|RCB|SCB|NB|DB)$/.test(pos), 2); pick('S', (pos) => /^(S|FS|SS|DB)$/.test(pos), 2);
+  if (offense.length < 11) rows.filter((player) => positionUnit(player.position) === 'offense' && !selected.has(player)).sort((a,b) => score(b) - score(a)).slice(0, 11 - offense.length).forEach((player) => { selected.add(player); player.expectedStarter = true; player.expectedRole = player.position; offense.push(player); });
+  const threeFour = /3[–-]4/.test(baseFront); pick('DL', (pos) => /^(DE|LDE|RDE|DT|LDT|RDT|NT|DL|EDGE)$/.test(pos), threeFour ? 3 : 4); pick('LB', (pos) => /^(LB|ILB|LILB|RILB|MLB|OLB|WLB|SLB)$/.test(pos), threeFour ? 4 : 3); pick('CB', (pos) => /^(CB|LCB|RCB|SCB|NB|DB)$/.test(pos), 2); pick('S', (pos) => /^(S|FS|SS|DB)$/.test(pos), 2);
   const defense = [...selected].filter((player) => positionUnit(player.position) === 'defense');
-  if (defense.length < 11) rows.filter((player) => positionUnit(player.position) === 'defense' && !selected.has(player)).sort((a,b) => starterScore(b) - starterScore(a)).slice(0, 11 - defense.length).forEach((player) => { selected.add(player); player.expectedStarter = true; player.expectedRole = player.position; defense.push(player); });
+  if (defense.length < 11) rows.filter((player) => positionUnit(player.position) === 'defense' && !selected.has(player)).sort((a,b) => score(b) - score(a)).slice(0, 11 - defense.length).forEach((player) => { selected.add(player); player.expectedStarter = true; player.expectedRole = player.position; defense.push(player); });
   return { offense: offense.slice(0, 11), defense: defense.slice(0, 11) };
 }
 
@@ -1860,19 +1861,29 @@ function loadMatchupPersonnel(game) {
 function priorTeamsForPlayer(player) { return [...new Set((player?.evidence?.previousTeams || []).map(normalizedNflTeam).filter(Boolean))]; }
 function playerReturnedToTeam(player, team) { return priorTeamsForPlayer(player).includes(normalizedNflTeam(team?.abbrev || team)); }
 function personnelIdentity(player) { return player?.gsisId || player?.espnId || player?.pfrId || normalizedPlayerName(player?.name); }
+function relaxedPersonnelName(value) { const parts=String(value||'').trim().split(/\s+/).filter(Boolean); while(parts.length&&['jr','sr','ii','iii','iv','v'].includes(normalizeStatKey(parts.at(-1)))) parts.pop(); return parts.length>1?`${normalizeStatKey(parts[0])[0]||''}${normalizeStatKey(parts.at(-1))}`:normalizeStatKey(value); }
+function personnelMatchKeys(player) { return [...new Set([player?.gsisId&&`g:${player.gsisId}`,player?.espnId&&`e:${player.espnId}`,player?.pfrId&&`p:${player.pfrId}`,`n:${normalizedPlayerName(player?.name)}`,`r:${relaxedPersonnelName(player?.name)}`].filter(Boolean))]; }
 function gradeAverage(rows, fallback = 68) { return rows?.length ? average(rows.map((player) => Number(player.evaluation?.grade) || playerGrade(player,player.evidence).grade),fallback) : fallback; }
+function priorStarterScore(player) { const evidence=player?.evidence||{}; const unit=positionUnit(player?.position); const share=Number(unit==='defense'?evidence.defenseSnapShare:evidence.offenseSnapShare)||0; const starts=Number(unit==='defense'?evidence.defenseStarts:evidence.offenseStarts)||0; const games=Math.max(1,Number(evidence.snapGameCount)||Number(evidence.games)||17); const startRate=starts/games; const seasonRate=Math.min(1,games/17); return share*52+startRate*25+seasonRate*6+(Number(player?.evaluation?.grade)||68)*.24; }
+function topRoleRows(rows, matcher, count, scorer = starterScore) { return (rows||[]).filter((player)=>!unavailableForStarter(player)&&matcher.test(String(player.position||'').toUpperCase())).sort((a,b)=>scorer(b)-scorer(a)||a.depth-b.depth||a.name.localeCompare(b.name)).slice(0,count); }
+function skillRotationRows(rows, scorer = starterScore) { return [...topRoleRows(rows,/^QB$/,1,scorer),...topRoleRows(rows,/^(RB|HB|FB)$/,2,scorer),...topRoleRows(rows,/^(WR|LWR|RWR|SWR|SLWR|SRWR)$/,4,scorer),...topRoleRows(rows,/^TE$/,2,scorer)]; }
+function skillRotationGrade(rows, scorer = starterScore, fallback = 68) {
+  const groupGrade=(matcher,count,weights)=>{const selected=topRoleRows(rows,matcher,count,scorer); if(!selected.length)return null; const selectedWeights=weights.slice(0,selected.length); const total=selectedWeights.reduce((sum,value)=>sum+value,0)||1; return selected.reduce((sum,player,index)=>sum+(Number(player.evaluation?.grade)||playerGrade(player,player.evidence).grade)*selectedWeights[index],0)/total;};
+  const groups=[[groupGrade(/^QB$/,1,[1]),.32],[groupGrade(/^(RB|HB|FB)$/,2,[.65,.35]),.18],[groupGrade(/^(WR|LWR|RWR|SWR|SLWR|SRWR)$/,4,[.38,.29,.2,.13]),.38],[groupGrade(/^TE$/,2,[.7,.3]),.12]].filter(([grade])=>Number.isFinite(grade)); const weight=groups.reduce((sum,[,share])=>sum+share,0); return weight?groups.reduce((sum,[grade,share])=>sum+grade*share,0)/weight:fallback;
+}
+function uniquePersonnel(rows) { const seen=new Set(); return (rows||[]).filter((player)=>{const keyValue=personnelIdentity(player); if(seen.has(keyValue))return false; seen.add(keyValue); return true;}); }
 
 function priorTeamLineup(team) {
   const teamAbbrev = normalizedNflTeam(team?.abbrev || team); const snapshot = window.NFL_EVIDENCE_SNAPSHOT; const evidence = (snapshot?.evidence || []).filter((record) => (record.previousTeams || []).map(normalizedNflTeam).includes(teamAbbrev) && record.position);
   const rows = evidence.map((record) => { const player={ id:record.gsisId || record.pfrId || normalizedPlayerName(record.name), gsisId:record.gsisId || '', pfrId:record.pfrId || '', name:record.name, position:String(record.position || '').toUpperCase(), team:teamAbbrev, depth:1, status:'2025 sample', evidence:record }; player.evaluation=playerGrade(player,record); return player; });
-  return { ...expectedStarters(rows,String(teamSchemeRecord(teamAbbrev)?.baseFront || 'Multiple').replace('-', '–')), all:rows };
+  return { ...expectedStarters(rows,String(teamSchemeRecord(teamAbbrev)?.baseFront || 'Multiple').replace('-', '–'),priorStarterScore), all:rows };
 }
 
 function rosterEvolution(profile, personnel, side) {
-  const current = personnel?.starters?.[side] || { offense:[],defense:[] }; const prior = priorTeamLineup(profile.team); const currentRows=personnel?.[side] || []; const currentIds=new Set(currentRows.map(personnelIdentity)); const line=/^(LT|LG|C|RG|RT|T|OT|G|OG|OL)$/; const skill=/^(QB|RB|HB|FB|WR|LWR|RWR|SWR|SLWR|SRWR|TE)$/; const front=/^(DE|LDE|RDE|DT|LDT|RDT|NT|DL|EDGE|LB|ILB|MLB|OLB|WLB|SLB)$/; const secondary=/^(CB|LCB|RCB|SCB|NB|DB|S|FS|SS)$/;
-  const currentOff=current.offense || []; const currentDef=current.defense || []; const priorOff=prior.offense || []; const priorDef=prior.defense || []; const group=(rows,matcher)=>rows.filter((player)=>matcher.test(String(player.position||'').toUpperCase())); const currentOl=group(currentOff,line); const priorOl=group(priorOff,line); const currentSkill=group(currentOff,skill); const priorSkill=group(priorOff,skill); const currentFront=group(currentDef,front); const priorFront=group(priorDef,front); const currentSecondary=group(currentDef,secondary); const priorSecondary=group(priorDef,secondary);
-  const unavailable=[...currentOff,...currentDef].filter(unavailableForStarter); const olUnavailable=currentOl.filter(unavailableForStarter); const olHealthy=currentOl.length>=5 && !olUnavailable.length; const additions=[...currentOff,...currentDef].filter((player)=>{const teams=priorTeamsForPlayer(player); return teams.length ? !teams.includes(normalizedNflTeam(profile.team.abbrev)) : !player.evaluation?.hasEvidence;}); const departures=[...priorOff,...priorDef].filter((player)=>!currentIds.has(personnelIdentity(player))); const offenseReturning=currentOff.filter((player)=>playerReturnedToTeam(player,profile.team)).length; const defenseReturning=currentDef.filter((player)=>playerReturnedToTeam(player,profile.team)).length; const offenseContinuity=clamp(offenseReturning/Math.max(11,currentOff.length),.35,1); const defenseContinuity=clamp(defenseReturning/Math.max(11,currentDef.length),.35,1);
-  const offenseDelta=gradeAverage(currentOff)-gradeAverage(priorOff,gradeAverage(currentOff)); const defenseDelta=gradeAverage(currentDef)-gradeAverage(priorDef,gradeAverage(currentDef)); const lineDelta=gradeAverage(currentOl)-gradeAverage(priorOl,gradeAverage(currentOl)); const skillDelta=gradeAverage(currentSkill)-gradeAverage(priorSkill,gradeAverage(currentSkill)); const frontDelta=gradeAverage(currentFront)-gradeAverage(priorFront,gradeAverage(currentFront)); const secondaryDelta=gradeAverage(currentSecondary)-gradeAverage(priorSecondary,gradeAverage(currentSecondary)); const offenseUnavailable=currentOff.filter(unavailableForStarter).length; const defenseUnavailable=currentDef.filter(unavailableForStarter).length; const priorOlStartCoverage=priorOl.length?average(priorOl.map((player)=>clamp((Number(player.evidence?.offenseStarts)||0)/Math.max(1,Number(player.evidence?.snapGameCount)||17)))):.8; const priorOlStartersUsed=group(prior.all||priorOff,line).filter((player)=>Number(player.evidence?.offenseStarts)>0).length; const currentOlAvailability=clamp((currentOl.length-olUnavailable.length)/5); const olChurnRecovery=olHealthy?clamp((priorOlStartersUsed-5)*.6,0,3):0; const olHealthAdjustment=(currentOlAvailability-priorOlStartCoverage)*7+(olHealthy ? .8 : 0)+olChurnRecovery-olUnavailable.length*1.2;
+  const current = personnel?.starters?.[side] || { offense:[],defense:[] }; const prior = priorTeamLineup(profile.team); const currentRows=personnel?.[side] || []; const currentActiveRows=currentRows.filter((player)=>!unavailableForStarter(player)); const currentIds=new Set(currentActiveRows.flatMap(personnelMatchKeys)); const line=/^(LT|LG|C|RG|RT|T|OT|G|OG|OL)$/; const front=/^(DE|LDE|RDE|DT|LDT|RDT|NT|DL|EDGE|LB|ILB|LILB|RILB|MLB|OLB|WLB|SLB)$/; const secondary=/^(CB|LCB|RCB|SCB|NB|DB|S|FS|SS)$/;
+  const currentOff=current.offense || []; const currentDef=current.defense || []; const priorOff=prior.offense || []; const priorDef=prior.defense || []; const group=(rows,matcher)=>rows.filter((player)=>matcher.test(String(player.position||'').toUpperCase())); const currentOl=group(currentOff,line); const priorOl=group(priorOff,line); const currentFront=group(currentDef,front); const priorFront=group(priorDef,front); const currentSecondary=group(currentDef,secondary); const priorSecondary=group(priorDef,secondary); const currentImpact=uniquePersonnel([...currentOff,...currentDef,...skillRotationRows(currentActiveRows)]); const priorImpact=uniquePersonnel([...priorOff,...priorDef,...skillRotationRows(prior.all,priorStarterScore)]);
+  const unavailable=[...currentOff,...currentDef].filter(unavailableForStarter); const olUnavailable=currentOl.filter(unavailableForStarter); const olHealthy=currentOl.length>=5 && !olUnavailable.length; const additions=currentImpact.filter((player)=>{const teams=priorTeamsForPlayer(player); return teams.length ? !teams.includes(normalizedNflTeam(profile.team.abbrev)) : !player.evaluation?.hasEvidence;}).sort((a,b)=>(b.evaluation?.grade||0)-(a.evaluation?.grade||0)); const departures=priorImpact.filter((player)=>!personnelMatchKeys(player).some((keyValue)=>currentIds.has(keyValue))).sort((a,b)=>(b.evaluation?.grade||0)-(a.evaluation?.grade||0)); const offenseReturning=currentOff.filter((player)=>playerReturnedToTeam(player,profile.team)).length; const defenseReturning=currentDef.filter((player)=>playerReturnedToTeam(player,profile.team)).length; const offenseContinuity=clamp(offenseReturning/Math.max(11,currentOff.length),.35,1); const defenseContinuity=clamp(defenseReturning/Math.max(11,currentDef.length),.35,1);
+  const currentSkillGrade=skillRotationGrade(currentActiveRows); const priorSkillGrade=skillRotationGrade(prior.all,priorStarterScore,currentSkillGrade); const offenseDelta=gradeAverage(currentOff)-gradeAverage(priorOff,gradeAverage(currentOff)); const defenseDelta=gradeAverage(currentDef)-gradeAverage(priorDef,gradeAverage(currentDef)); const lineDelta=gradeAverage(currentOl)-gradeAverage(priorOl,gradeAverage(currentOl)); const skillDelta=currentSkillGrade-priorSkillGrade; const frontDelta=gradeAverage(currentFront)-gradeAverage(priorFront,gradeAverage(currentFront)); const secondaryDelta=gradeAverage(currentSecondary)-gradeAverage(priorSecondary,gradeAverage(currentSecondary)); const offenseUnavailable=currentOff.filter(unavailableForStarter).length; const defenseUnavailable=currentDef.filter(unavailableForStarter).length; const priorOlStartCoverage=priorOl.length?average(priorOl.map((player)=>clamp((Number(player.evidence?.offenseStarts)||0)/Math.max(1,Number(player.evidence?.snapGameCount)||17)))):.8; const priorOlStartersUsed=group(prior.all||priorOff,line).filter((player)=>Number(player.evidence?.offenseStarts)>0).length; const currentOlAvailability=clamp((currentOl.length-olUnavailable.length)/5); const olChurnRecovery=olHealthy?clamp((priorOlStartersUsed-5)*.6,0,3):0; const olHealthAdjustment=(currentOlAvailability-priorOlStartCoverage)*7+(olHealthy ? .8 : 0)+olChurnRecovery-olUnavailable.length*1.2;
   const offenseAdjustment=clamp(offenseDelta*.5+lineDelta*.25+skillDelta*.25+olHealthAdjustment-offenseUnavailable*.9,-7,7); const defenseAdjustment=clamp(defenseDelta*.55+frontDelta*.25+secondaryDelta*.2-defenseUnavailable*.9,-7,7); const returning=[...currentOff,...currentDef].filter((player)=>playerReturnedToTeam(player,profile.team));
   return { currentOffenseGrade:gradeAverage(currentOff),priorOffenseGrade:gradeAverage(priorOff,gradeAverage(currentOff)),currentDefenseGrade:gradeAverage(currentDef),priorDefenseGrade:gradeAverage(priorDef,gradeAverage(currentDef)),offenseDelta,defenseDelta,lineDelta,skillDelta,frontDelta,secondaryDelta,offenseAdjustment,defenseAdjustment,olHealthAdjustment,olChurnRecovery,priorOlStartersUsed,priorOlStartCoverage,currentOlAvailability,offenseReturning,defenseReturning,offenseContinuity,defenseContinuity,olHealthy,olAvailable:currentOl.length-olUnavailable.length,olCount:currentOl.length,unavailable,additions,departures,returning: returning.length,starterCount:currentOff.length+currentDef.length };
 }
@@ -1951,7 +1962,7 @@ function projectedPairRow(receiver, defender, offense, defense) {
 
 function projectedSideHtml(offense, offenseRows, defense, defenseRows) {
   const receivers = matchupDepthOrder(offenseRows,/^(WR|LWR|RWR|SWR|SLWR|SRWR)$/,'WR',4); const corners = matchupDepthOrder(defenseRows,/^(CB|LCB|RCB|SCB|NB)$/,'CB',4);
-  const tightEnds = matchupDepthOrder(offenseRows,/^TE$/,'TE',2); const tightEndDefenders = matchupDepthOrder(defenseRows,/^(S|FS|SS|LB|ILB|MLB|OLB|WLB|SLB)$/,'COV',2);
+  const tightEnds = matchupDepthOrder(offenseRows,/^TE$/,'TE',2); const tightEndDefenders = matchupDepthOrder(defenseRows,/^(S|FS|SS|LB|ILB|LILB|RILB|MLB)$/,'COV',2);
   const count = Math.max(receivers.length, corners.length);
   if (!count) return `<section class="coverage-side"><header><strong>${escapeHtml(offense.abbrev)} receivers vs ${escapeHtml(defense.abbrev)} secondary</strong><span class="status-pill projected">Projected</span></header><div class="empty">Pregame personnel is not available in this ESPN game payload yet. Import verified history below or reopen near kickoff.</div></section>`;
   return `<section class="coverage-side"><header><strong>${escapeHtml(offense.abbrev)} WR depth vs ${escapeHtml(defense.abbrev)} CB depth</strong><span class="status-pill projected">Role aligned</span></header><p class="source-note">WR1 is compared with CB1, WR2 with CB2, through WR4/CB4. These are depth-corresponding matchup lanes, not a claim of shadow coverage.</p><div class="alignment-list">${Array.from({ length: count }, (_, index) => projectedPairRow(receivers[index],corners[index],offense,defense)).join('')}</div>${tightEnds.length ? `<div class="tight-end-coverage"><strong>TE coverage lanes</strong><small>Safety/linebacker role comparison</small>${tightEnds.map((tightEnd,index)=>projectedPairRow(tightEnd,tightEndDefenders[index],offense,defense)).join('')}</div>` : ''}</section>`;
@@ -1992,7 +2003,7 @@ function relevantStatCategories(position, categories = []) {
     : /^(QB)$/.test(pos) ? ['passing','rushing']
     : /^(RB|HB|FB)$/.test(pos) ? ['rushing','receiving']
     : isSecondaryPosition(pos) ? ['defensive','interceptions','fumbles']
-    : /^(DE|LDE|RDE|DT|LDT|RDT|NT|DL|EDGE|LB|ILB|MLB|OLB|WLB|SLB)$/.test(pos) ? ['defensive','sacks','fumbles','interceptions']
+    : /^(DE|LDE|RDE|DT|LDT|RDT|NT|DL|EDGE|LB|ILB|LILB|RILB|MLB|OLB|WLB|SLB)$/.test(pos) ? ['defensive','sacks','fumbles','interceptions']
     : /^(K|PK)$/.test(pos) ? ['kicking'] : /^(P)$/.test(pos) ? ['punting'] : [];
   const selected = categories.filter((category) => wanted.some((name) => normalizeStatKey(category.name).includes(normalizeStatKey(name))));
   return selected.length ? selected : categories.slice(0, 3);
@@ -2170,7 +2181,7 @@ function quickGameForecast(game) {
 
 function compactTeamRowHtml(team, side, projected, game) {
   const palette = teamPalette(team); const isFinal = game.status?.type?.completed; const selected=teamPickSelected(game,side); const score = isFinal || game.status?.type?.state === 'in' ? team.score : projected.toFixed(1);
-  return `<button type="button" class="compact-team ${side} ${selected?'is-selected':''}" data-side="${side}" style="--team-primary:${palette.primary};--team-secondary:${palette.secondary};--team-tertiary:${palette.tertiary};--team-on-primary:${palette.onPrimary}"><i class="compact-team-logo"><img src="${escapeHtml(team.logo)}" alt=""></i><span><strong>${escapeHtml(team.abbrev)}</strong><small>${escapeHtml(team.record || '--')}</small></span><b>${escapeHtml(score)}</b><em>${selected?'PICKED':isFinal || game.status?.type?.state === 'in' ? 'score' : 'proj'}</em></button>`;
+  return `<button type="button" class="compact-team ${side} ${selected?'is-selected':''}" data-side="${side}" style="--team-primary:${palette.primary};--team-secondary:${palette.secondary};--team-tertiary:${palette.tertiary};--team-on-primary:${palette.onPrimary}"><i class="compact-team-logo"><img src="${escapeHtml(team.logo)}" alt="" width="25" height="25"></i><span><strong>${escapeHtml(team.abbrev)}</strong><small>${escapeHtml(team.record || '--')}</small></span><b>${escapeHtml(score)}</b><em>${selected?'PICKED':isFinal || game.status?.type?.state === 'in' ? 'score' : 'proj'}</em></button>`;
 }
 
 function compactForecastHtml(game, forecast) {
@@ -2312,7 +2323,7 @@ function teamTableHtml(teams) {
       <tbody>
         ${teams.map((team) => `
           <tr>
-            <td><div class="team-cell"><img src="${escapeHtml(team.logo)}" alt="${escapeHtml(team.abbrev)} logo" /><div><strong style="color:${escapeHtml(readableTeamColor(team.color))}">${escapeHtml(team.abbrev)}</strong><span>${escapeHtml(team.name)}</span></div></div></td>
+            <td><div class="team-cell"><img src="${escapeHtml(team.logo)}" alt="${escapeHtml(team.abbrev)} logo" width="34" height="34" /><div><strong style="color:${escapeHtml(readableTeamColor(team.color))}">${escapeHtml(team.abbrev)}</strong><span>${escapeHtml(team.name)}</span></div></div></td>
             <td>${escapeHtml(team.record)}</td>
             <td>${escapeHtml(displayPct(team.winPct || numberFromRecord(team.record)))}</td>
             <td>${escapeHtml(team.pointsFor)}</td>
@@ -2785,10 +2796,10 @@ function forecastStarterBoard(forecast, personnel) {
 }
 
 function percentageGuideHtml(forecast) {
-  const margin = Math.abs(forecast.model.home.points-forecast.model.away.points); return `<section class="percentage-guide"><strong>MODEL KEY</strong><span><b>WIN %</b> score lean</span><span><b>CALL %</b> expected share</span><span><b>EDGE %</b> 50 = even</span><em>${margin.toFixed(1)}-pt gap</em></section>`;
+  const margin = Math.abs(forecast.model.home.points-forecast.model.away.points); const lowSample=forecast.model.winScale>6.5?' · W1 WIDE':' '; return `<section class="percentage-guide"><strong>MODEL KEY</strong><span><b>WIN %</b> score lean</span><span><b>CALL %</b> expected share</span><span><b>EDGE %</b> 50 = even</span><span><b>EVENT %</b> chance of 1+</span><em>${margin.toFixed(1)}-pt${lowSample}</em></section>`;
 }
 
-function rosterChangeNames(rows, limit = 3) { return rows?.length ? rows.slice(0,limit).map((player)=>player.name).join(', ') : 'None'; }
+function rosterChangeNames(rows, limit = 3) { return rows?.length ? rows.slice(0,limit).map((player)=>`${player.name} ${player.evaluation?.grade || '—'}`).join(' · ') : 'None'; }
 function signedGrade(value) { const amount=Number(value)||0; return `${amount>=0?'+':''}${amount.toFixed(1)}`; }
 function rosterEvolutionCard(profile, projection) {
   const roster=profile.roster; if (!roster) return `<article class="roster-evolution-card" style="${teamPaletteVars(profile.team)}"><div class="empty">Current-roster correction unavailable.</div></article>`; const totalDelta=roster.offenseAdjustment+roster.defenseAdjustment; const tone=totalDelta>=2?'upgrade':totalDelta<=-2?'downgrade':'steady';
@@ -2810,7 +2821,12 @@ function scoreBuildRow(team, projection) {
   return `<div class="score-build-row" style="${teamPaletteVars(team)}"><img src="${escapeHtml(team.logo)}" alt=""><strong>${escapeHtml(team.abbrev)} ${projection.points.toFixed(1)}</strong><span>BASE <b>${projection.baselinePoints.toFixed(1)}</b></span><span>ROSTER <b>${signedGrade(projection.rosterPointAdjustment)}</b></span><span>SCHEME <b>${signedGrade(projection.schemePointAdjustment)}</b></span><span>UNITS <b>${signedGrade(projection.unitPointAdjustment)}</b></span><span>PLAYERS <b>${signedGrade(projection.playerPointAdjustment)}</b></span></div>`;
 }
 
-function scoreBuildHtml(forecast) { return `<section class="score-build"><header>SCORE BUILD</header>${scoreBuildRow(forecast.game.away,forecast.model.away)}${scoreBuildRow(forecast.game.home,forecast.model.home)}</section>`; }
+function baselineMathRow(team, opponent, projection) {
+  const offenseBase=Number(projection.continuityAdjustedFor)||Number(projection.offenseScoringRaw)||22; const allowanceBase=Number(projection.continuityAdjustedAgainst)||Number(projection.opponentAllowanceRaw)||22; const sos=Number(projection.sosPointAdjustment)||0; const home=Number(projection.homeField)||0;
+  return `<div class="baseline-math-row" style="${teamPaletteVars(team)}"><strong>${escapeHtml(team.abbrev)} BASE ${projection.baselinePoints.toFixed(1)}</strong><span>52% × ${offenseBase.toFixed(1)} OFF + 48% × ${allowanceBase.toFixed(1)} ${escapeHtml(opponent.abbrev)} ALLOW + ${signedGrade(sos)} SOS + ${signedGrade(home)} HOME</span><small>raw ${Number(projection.offenseScoringRaw||22).toFixed(1)} PF @ ${percent(Number(projection.offenseContinuity)||1,0)} continuity · ${Number(projection.opponentAllowanceRaw||22).toFixed(1)} PA @ ${percent(Number(projection.defenseContinuity)||1,0)} continuity · regressed toward 22.0</small></div>`;
+}
+
+function scoreBuildHtml(forecast) { return `<section class="score-build"><header>SCORE BUILD</header>${scoreBuildRow(forecast.game.away,forecast.model.away)}${scoreBuildRow(forecast.game.home,forecast.model.home)}<div class="baseline-math"><b>WHY THE BASES DIFFER</b>${baselineMathRow(forecast.game.away,forecast.game.home,forecast.model.away)}${baselineMathRow(forecast.game.home,forecast.game.away,forecast.model.home)}</div></section>`; }
 
 function forecastDialogOverview(forecast, personnel) {
   const { game, away, home, model } = forecast; const awayWin = 1 - model.homeWin; const favorite = model.homeWin >= .5 ? game.home : game.away; const favoriteWin = Math.max(model.homeWin, awayWin);
@@ -2854,7 +2870,7 @@ function runDirectionRows(profile) {
 function forecastDialogRun(forecast, personnel) {
   const { game, away, home, model } = forecast;
   const awayBacks = forecastPersonnelRows(personnel,'away',/^(RB|HB|FB)$/, 'offense', 3,{includeBackups:true}); const homeBacks = forecastPersonnelRows(personnel,'home',/^(RB|HB|FB)$/, 'offense',3,{includeBackups:true});
-  const awayFront = forecastPersonnelRows(personnel,'away',/^(DE|LDE|RDE|DT|LDT|RDT|NT|DL|EDGE|LB|ILB|MLB|OLB|WLB|SLB)$/, 'defense',7); const homeFront = forecastPersonnelRows(personnel,'home',/^(DE|LDE|RDE|DT|LDT|RDT|NT|DL|EDGE|LB|ILB|MLB|OLB|WLB|SLB)$/, 'defense',7);
+  const awayFront = forecastPersonnelRows(personnel,'away',/^(DE|LDE|RDE|DT|LDT|RDT|NT|DL|EDGE|LB|ILB|LILB|RILB|MLB|OLB|WLB|SLB)$/, 'defense',7); const homeFront = forecastPersonnelRows(personnel,'home',/^(DE|LDE|RDE|DT|LDT|RDT|NT|DL|EDGE|LB|ILB|LILB|RILB|MLB|OLB|WLB|SLB)$/, 'defense',7);
   return `<div class="dialog-unit-hero"><article><span>${escapeHtml(game.away.abbrev)} rushing outlook</span><strong>${percent(model.away.runSuccess)} success lean</strong><small>OL ${Math.round(away.units.offenseLine)} vs ${game.home.abbrev} front ${Math.round(home.units.defenseFront)}</small><div class="run-direction-strip">${runDirectionRows(away)}</div></article><article><span>${escapeHtml(game.home.abbrev)} rushing outlook</span><strong>${percent(model.home.runSuccess)} success lean</strong><small>OL ${Math.round(home.units.offenseLine)} vs ${game.away.abbrev} front ${Math.round(away.units.defenseFront)}</small><div class="run-direction-strip">${runDirectionRows(home)}</div></article></div><div class="forecast-personnel-grid">${forecastPersonnelPanel(game.away,'Backfield hierarchy',awayBacks)}${forecastPersonnelPanel(game.home,'Defensive front',homeFront)}${forecastPersonnelPanel(game.home,'Backfield hierarchy',homeBacks)}${forecastPersonnelPanel(game.away,'Defensive front',awayFront)}</div>${forecastStageFooter(['ranks','League ranks'],['pass','Pass game'])}`;
 }
 
@@ -2872,26 +2888,68 @@ function forecastDialogReceiving(forecast, box, personnel) {
 
 function leagueUnitAverage(path, fallback) { const values=snapshotTeamUnits().map((row)=>nestedNumber(row,path)).filter(Number.isFinite); return average(values,fallback); }
 function matchupRankFactor(team, metric, scale = .012) { const rank=teamMetricRank(team,metric)?.rank || 16.5; return 1+(rank-16.5)*scale; }
-function atLeastOneTouchdown(lambda) { return clamp(1-Math.exp(-Math.max(0,lambda)),.02,.88); }
+function atLeastOneEvent(lambda, floor = .005, ceiling = .88) { return clamp(1-Math.exp(-Math.max(0,lambda)),floor,ceiling); }
+function atLeastOneTouchdown(lambda) { return atLeastOneEvent(lambda,.02,.88); }
+function probabilityHeatClass(value, hot = .34, warm = .20) { return Number(value)>=hot?'metric-hot':Number(value)>=warm?'metric-warm':''; }
 function playerEvidenceGames(player) { return Math.max(1,Number(player.evidence?.games)||Number(player.evidence?.snapGameCount)||0); }
 
-function projectPlayerEdge(player, position, profile, opponent, projection, defender = null) {
-  const s=player.evidence?.sums || {}; const games=playerEvidenceGames(player); const pointsFactor=clamp(Number(projection.points||22)/Math.max(15,Number(profile.scoring.pointsFor)||22),.72,1.32); const passDefenseFactor=matchupRankFactor(opponent.team,'passDefense'); const runDefenseFactor=matchupRankFactor(opponent.team,'runDefense'); let yardage=0; let yardageType='yards'; let tdLambda=.08; let formula='';
+function receiverRolePrior(player) {
+  const position=depthPositionGroup(player?.position); const role=String(player?.matchupRole||player?.expectedRole||''); const depth=Math.max(1,Number(role.match(/(\d+)/)?.[1])||Number(player?.depth)||1);
+  if (position==='TE') return [0,.145,.075,.035][Math.min(depth,3)] || .025;
+  return [0,.235,.17,.105,.06][Math.min(depth,4)] || .04;
+}
+
+function historicalTargetShare(player) {
+  const evidence=player?.evidence||{}; const recorded=Number(evidence.targetshare); if (recorded>=.006&&recorded<=.52) return recorded;
+  const targets=Number(evidence.sums?.targets)||0; const games=playerEvidenceGames(player); return targets ? clamp((targets/games)/34,.006,.42) : null;
+}
+
+function targetOpportunityWeight(player) {
+  const prior=receiverRolePrior(player); const historical=historicalTargetShare(player); if (!Number.isFinite(historical)) return prior;
+  const targets=Number(player?.evidence?.sums?.targets)||0; const reliability=clamp(targets/(targets+48),.18,.78); return historical*reliability+prior*(1-reliability);
+}
+
+function receivingThreatRows(personnel, side) {
+  return [...matchupDepthOrder(personnel?.[side]||[],/^(WR|LWR|RWR|SWR|SLWR|SRWR)$/,'WR',4),...matchupDepthOrder(personnel?.[side]||[],/^TE$/,'TE',2)];
+}
+
+function playerProjectionKey(player) { return String(player?.id||player?.gsisId||player?.espnId||normalizedPlayerName(player?.name||'')); }
+function targetShareAllocation(players) {
+  const weighted=players.map((player)=>({player,weight:Math.max(.012,targetOpportunityWeight(player))})); const total=weighted.reduce((sum,row)=>sum+row.weight,0); const budget=.79;
+  return new Map(weighted.map((row)=>[playerProjectionKey(row.player),budget*row.weight/Math.max(.01,total)]));
+}
+
+function projectedPassAttempts(personnel, side, profile, projection) {
+  const quarterback=forecastPersonnelRows(personnel,side,/^QB$/,'offense',1)[0]; const attempts=Number(quarterback?.evidence?.sums?.attempts)||0; const games=playerEvidenceGames(quarterback||{}); const historical=attempts ? attempts/games : 33; const historicalPassRate=Math.max(.38,Number(profile?.offense?.passRate)||.56); const volume=clamp(Number(projection?.passRate||.56)/historicalPassRate,.82,1.22);
+  return { quarterback, attempts:clamp(historical*volume,25,46) };
+}
+
+function quarterbackVerticalFactor(quarterback, receiver, projection) {
+  const sums=quarterback?.evidence?.sums||{}; const attempts=Number(sums.attempts)||0; const ypa=attempts?Number(sums.passingyards||0)/attempts:7; const epa=attempts?Number(sums.passingepa||0)/attempts:.04; const targets=Number(receiver?.evidence?.sums?.targets)||0; const adot=targets?Number(receiver.evidence.sums.receivingairyards||0)/targets:(depthPositionGroup(receiver?.position)==='TE'?7.2:10.5); const verticalDemand=clamp((adot-7)/8,0,1); const quarterbackFit=(ypa-7)*.045+(epa-.04)*.13+(Number(projection?.explosivePass||.14)-.14)*.75;
+  return { adot, factor:clamp(1+quarterbackFit*verticalDemand,.86,1.18), ypa, epa };
+}
+
+function targetTreeVerticalFit(quarterback, receivers) {
+  const sums=quarterback?.evidence?.sums||{}; const attempts=Number(sums.attempts)||0; if (!attempts||!receivers.length) return 0; const ypa=Number(sums.passingyards||0)/attempts; const epa=Number(sums.passingepa||0)/attempts; const weights=receivers.map((player)=>targetOpportunityWeight(player)); const weightTotal=weights.reduce((sum,value)=>sum+value,0); const weightedAdot=receivers.reduce((sum,player,index)=>{const targets=Number(player.evidence?.sums?.targets)||0;const adot=targets?Number(player.evidence.sums.receivingairyards||0)/targets:(depthPositionGroup(player.position)==='TE'?7.2:10.5);return sum+adot*weights[index];},0)/Math.max(.01,weightTotal); const verticalQuality=(ypa-7)*1.8+(epa-.04)*10; const verticalDemand=clamp((weightedAdot-7)/7,0,1); return clamp(verticalQuality*verticalDemand,-3.5,5.5);
+}
+
+function projectPlayerEdge(player, position, profile, opponent, projection, defender = null, context = {}) {
+  const s=player.evidence?.sums || {}; const games=playerEvidenceGames(player); const pointsFactor=clamp(Number(projection.points||22)/Math.max(15,Number(profile.scoring.pointsFor)||22),.72,1.32); const passDefenseFactor=matchupRankFactor(opponent.team,'passDefense'); const runDefenseFactor=matchupRankFactor(opponent.team,'runDefense'); let yardage=0; let yardageType='yards'; let tdLambda=.08; let formula=''; let projectedTargets=null; let projectedTargetShare=null; let aDot=null; let fitFactor=null;
   if (position === 'QB') {
     const base=(Number(s.passingyards)||0)/games || 210; const volume=clamp(Number(projection.passRate||.56)/.56,.78,1.26); const pressure=clamp(1-(Number(projection.pressure||.07)-.07)*2.2,.78,1.16); yardage=base*volume*passDefenseFactor*pressure; yardageType='pass yards'; const tdBase=(Number(s.passingtouchdowns||0)+.5)/(games+1); const tdAllowed=Number(opponent.baselineUnits?.passDefense?.touchdownRate); const tdLeague=leagueUnitAverage('passDefense.touchdownRate',.045); tdLambda=tdBase*pointsFactor*clamp(tdAllowed/tdLeague,.72,1.35); formula=`${base.toFixed(0)} pass yds/game × volume ${volume.toFixed(2)} × pass-D ${passDefenseFactor.toFixed(2)} × pressure ${pressure.toFixed(2)}`;
-  } else if (position === 'WR') {
-    const base=(Number(s.receivingyards)||0)/games || (player.matchupRole==='WR1'?52:player.matchupRole==='WR2'?38:26); const volume=clamp(Number(projection.passRate||.56)/.56,.80,1.24); const receiverGrade=Number(player.evaluation?.grade)||68; const defenderGrade=Number(defender?.evaluation?.grade)||68; const coverageFactor=clamp(1+(receiverGrade-defenderGrade)*.008,.78,1.24); yardage=base*volume*passDefenseFactor*coverageFactor; yardageType='rec yards'; const tdBase=(Number(s.receivingtouchdowns||0)+.25)/(games+.75); const tdAllowed=Number(opponent.baselineUnits?.passDefense?.touchdownRate); const tdLeague=leagueUnitAverage('passDefense.touchdownRate',.045); tdLambda=tdBase*pointsFactor*clamp(tdAllowed/tdLeague,.72,1.35)*coverageFactor; formula=`${base.toFixed(0)} rec yds/game × volume ${volume.toFixed(2)} × pass-D ${passDefenseFactor.toFixed(2)} × WR/CB ${coverageFactor.toFixed(2)}`;
+  } else if (position === 'WR' || position === 'TE') {
+    projectedTargetShare=Number(context.targetShare)||receiverRolePrior(player); projectedTargets=(Number(context.passAttempts)||33)*projectedTargetShare; const targetSample=Number(s.targets)||0; const roleYpt=position==='TE'?7.25:8.15; const historicalYpt=targetSample?Number(s.receivingyards||0)/targetSample:roleYpt; const sampleWeight=clamp(targetSample/(targetSample+38),0,.78); const yardsPerTarget=roleYpt*(1-sampleWeight)+historicalYpt*sampleWeight; const receiverGrade=Number(player.evaluation?.grade)||68; const defenderGrade=Number(defender?.evaluation?.grade)||68; const coverageFactor=clamp(1+(receiverGrade-defenderGrade)*.0075,.80,1.23); const vertical=quarterbackVerticalFactor(context.quarterback,player,projection); const schemeFactor=clamp(1+Number(projection.schemeMatchup?.coverageEdge||0)*.004,.88,1.12); aDot=vertical.adot; fitFactor=vertical.factor*schemeFactor; yardage=projectedTargets*yardsPerTarget*passDefenseFactor*coverageFactor*fitFactor; yardageType='rec yards'; const touchdownRate=(Number(s.receivingtouchdowns||0)+.45)/(targetSample+12); const tdAllowed=Number(opponent.baselineUnits?.passDefense?.touchdownRate); const tdLeague=leagueUnitAverage('passDefense.touchdownRate',.045); tdLambda=projectedTargets*touchdownRate*pointsFactor*clamp(tdAllowed/tdLeague,.72,1.35)*coverageFactor; formula=`${projectedTargets.toFixed(1)} targets (${percent(projectedTargetShare,1)}) × ${yardsPerTarget.toFixed(1)} Y/T × coverage ${coverageFactor.toFixed(2)} × vertical/scheme ${fitFactor.toFixed(2)}`;
   } else {
     const base=((Number(s.rushingyards)||0)+(Number(s.receivingyards)||0))/games || (player.matchupRole==='RB1'?72:38); const success=clamp(Number(projection.runSuccess||.41)/.41,.72,1.34); const trench=clamp(1+(Number(profile.units.offenseLine)-Number(opponent.units.defenseFront))*.008,.78,1.24); yardage=base*success*runDefenseFactor*trench; yardageType='scrim yards'; const tdBase=(Number(s.rushingtouchdowns||0)+Number(s.receivingtouchdowns||0)+.25)/(games+.75); const tdAllowed=Number(opponent.baselineUnits?.runDefense?.firstDownRate); const tdLeague=leagueUnitAverage('runDefense.firstDownRate',.22); tdLambda=tdBase*pointsFactor*clamp(tdAllowed/tdLeague,.76,1.30)*trench; formula=`${base.toFixed(0)} scrim yds/game × run success ${success.toFixed(2)} × run-D ${runDefenseFactor.toFixed(2)} × trench ${trench.toFixed(2)}`;
   }
-  return { player,team:profile.team,opponent:opponent.team,defender,position,yardage:Math.round(clamp(yardage,8,position==='QB'?390:160)),yardageType,tdMean:clamp(tdLambda,.01,3.5),tdProbability:atLeastOneTouchdown(tdLambda),formula,score:yardage+(atLeastOneTouchdown(tdLambda)*55) };
+  return { player,team:profile.team,opponent:opponent.team,defender,position,yardage:Math.round(clamp(yardage,8,position==='QB'?390:180)),yardageType,tdMean:clamp(tdLambda,.01,3.5),tdProbability:atLeastOneTouchdown(tdLambda),projectedTargets,projectedTargetShare,historicalTargetShare:historicalTargetShare(player),aDot,fitFactor,formula,score:yardage+(atLeastOneTouchdown(tdLambda)*55) };
 }
 
 function playerEdgeRows(forecast, personnel, position) {
   const output=[]; for (const [side,opponentSide,profile,opponent,projection] of [['away','home',forecast.away,forecast.home,forecast.model.away],['home','away',forecast.home,forecast.away,forecast.model.home]]) {
     if (position==='QB') forecastPersonnelRows(personnel,side,/^QB$/,'offense',1).forEach((player)=>output.push(projectPlayerEdge(player,'QB',profile,opponent,projection)));
     if (position==='RB') matchupDepthOrder(personnel?.[side]||[],/^(RB|HB|FB)$/,'RB',3).forEach((player)=>output.push(projectPlayerEdge(player,'RB',profile,opponent,projection)));
-    if (position==='WR') { const receivers=matchupDepthOrder(personnel?.[side]||[],/^(WR|LWR|RWR|SWR|SLWR|SRWR)$/,'WR',4); const corners=matchupDepthOrder(personnel?.[opponentSide]||[],/^(CB|LCB|RCB|SCB|NB)$/,'CB',4); receivers.forEach((player,index)=>output.push(projectPlayerEdge(player,'WR',profile,opponent,projection,corners[index]))); }
+    if (position==='REC') { const threats=receivingThreatRows(personnel,side); const shares=targetShareAllocation(threats); const passVolume=projectedPassAttempts(personnel,side,profile,projection); const corners=matchupDepthOrder(personnel?.[opponentSide]||[],/^(CB|LCB|RCB|SCB|NB)$/,'CB',4); const tightEndCoverage=matchupDepthOrder(personnel?.[opponentSide]||[],/^(S|FS|SS|LB|ILB|LILB|RILB|MLB)$/,'COV',2); let wrIndex=0; let teIndex=0; threats.forEach((player)=>{ const role=depthPositionGroup(player.position)==='TE'?'TE':'WR'; const defender=role==='TE'?tightEndCoverage[teIndex++]:corners[wrIndex++]; output.push(projectPlayerEdge(player,role,profile,opponent,projection,defender,{targetShare:shares.get(playerProjectionKey(player)),passAttempts:passVolume.attempts,quarterback:passVolume.quarterback})); }); }
   } return output;
 }
 
@@ -2899,24 +2957,71 @@ function selectedPlayerEdgeRows(rows) { const selected=[]; for (const team of [.
 
 function playerEdgeCard(row, allRows) {
   const bestYards=Math.max(...allRows.map((item)=>item.yardage)); const bestTd=Math.max(...allRows.map((item)=>item.tdProbability)); const defender=row.defender ? ` vs ${row.defender.matchupRole || row.defender.position} ${row.defender.name} (${row.defender.evaluation?.grade || '--'})` : ''; const touchdownLabel=row.position==='QB'?'1+ pass TD':'1+ touchdown';
-  return `<article class="player-edge-card" style="${teamPaletteVars(row.team)}"><header><img src="${escapeHtml(row.team.logo)}" alt=""><div><span>${escapeHtml(row.team.abbrev)} ${escapeHtml(row.position)} MATCHUP</span><strong>${playerButtonHtml(row.player,row.team)}</strong></div><b>${row.player.evaluation?.grade || '--'} OVR</b></header><div class="edge-projection"><div><span>YARDAGE LEAN</span><b>${row.yardage}</b><small>${escapeHtml(row.yardageType)}</small></div><div><span>PROJECTED TD</span><b>${row.tdMean.toFixed(2)}</b><small>${row.position==='QB'?'pass touchdowns':'total touchdowns'}</small></div><div><span>${row.position==='QB'?'PASS-TD CHANCE':'ANY-TD CHANCE'}</span><b>${percent(row.tdProbability)}</b><small>${touchdownLabel}</small></div></div><div class="edge-badges">${row.yardage===bestYards?'<em>BEST YARDAGE</em>':''}${row.tdProbability===bestTd?'<em>BEST TD</em>':''}</div><p>${escapeHtml(row.formula)}${escapeHtml(defender)}</p><footer>Projected TD is the model’s expected count (λ). The 1+ TD chance is 1−e<sup>−λ</sup>; neither is a market price.</footer></article>`;
+  return `<article class="player-edge-card" style="${teamPaletteVars(row.team)}"><header><img src="${escapeHtml(row.team.logo)}" alt=""><div><span>${escapeHtml(row.team.abbrev)} ${escapeHtml(row.position)}</span><strong>${playerButtonHtml(row.player,row.team)}</strong></div><b>${row.player.evaluation?.grade || '--'} OVR</b></header><div class="edge-projection"><div><span>YARDS</span><b>${row.yardage}</b><small>${escapeHtml(row.yardageType)}</small></div><div class="${probabilityHeatClass(row.tdProbability)}"><span>1+ TD</span><b>${percent(row.tdProbability)}</b><small>${touchdownLabel}</small></div><div><span>xTD</span><b>${row.tdMean.toFixed(2)}</b><small>expected count</small></div></div><div class="edge-badges">${row.yardage===bestYards?'<em>BEST YARDS</em>':''}${row.tdProbability===bestTd?'<em>BEST TD</em>':''}</div><details><summary>Inputs</summary><p>${escapeHtml(row.formula)}${escapeHtml(defender)}</p></details></article>`;
 }
 
 function playerEdgePanel(forecast, personnel, position) { const rows=playerEdgeRows(forecast,personnel,position); const selected=selectedPlayerEdgeRows(rows); return `<div class="player-edge-grid">${selected.map((row)=>playerEdgeCard(row,rows)).join('')}</div>`; }
 
+function receivingThreatRowHtml(row, teamRows) {
+  const bestYards=Math.max(...teamRows.map((item)=>item.yardage)); const bestTd=Math.max(...teamRows.map((item)=>item.tdProbability)); const role=row.player.matchupRole||row.position; const matchup=row.defender?`${row.defender.matchupRole||row.defender.position} ${row.defender.name} · ${row.defender.evaluation?.grade||'--'}`:'coverage TBD'; const status=row.player.evaluation?.confidence||'PROJECTED';
+  return `<article class="receiving-threat-row ${row.yardage===bestYards?'best-yardage':''}" style="${teamPaletteVars(row.team)}"><div class="receiving-player"><span>${escapeHtml(role)}</span><strong>${playerButtonHtml(row.player,row.team)}</strong><small>${row.player.evaluation?.grade||'--'} OVR · ${escapeHtml(status)}</small></div><div class="receiving-volume"><span>TGT SHARE</span><b>${percent(row.projectedTargetShare,1)}</b><small>${row.projectedTargets.toFixed(1)} targets · prior ${row.historicalTargetShare==null?'new role':percent(row.historicalTargetShare,1)}</small></div><div><span>YARDS</span><b>${row.yardage}</b><small>aDOT ${row.aDot.toFixed(1)}</small></div><div class="${probabilityHeatClass(row.tdProbability)}"><span>1+ TD</span><b>${percent(row.tdProbability)}</b><small>${row.tdMean.toFixed(2)} xTD</small></div><div class="receiving-matchup"><span>MATCHUP</span><b>${escapeHtml(matchup)}</b><small>fit ×${row.fitFactor.toFixed(2)}</small></div><div class="receiving-flags">${row.yardage===bestYards?'<em>YARDS</em>':''}${row.tdProbability===bestTd?'<em>TD</em>':''}</div><details><summary>Inputs</summary><p>${escapeHtml(row.formula)}</p></details></article>`;
+}
+
+function receivingThreatPanel(forecast, personnel) {
+  const rows=playerEdgeRows(forecast,personnel,'REC'); const teams=[forecast.away.team,forecast.home.team];
+  return `<div class="receiving-threat-grid">${teams.map((team)=>{ const teamRows=rows.filter((row)=>row.team.abbrev===team.abbrev).sort((a,b)=>(b.projectedTargetShare||0)-(a.projectedTargetShare||0)); return `<section class="receiving-team-board" style="${teamPaletteVars(team)}"><header><img src="${escapeHtml(team.logo)}" alt=""><div><span>${escapeHtml(team.abbrev)} TARGET TREE</span><strong>WR + TE · ${teamRows.length} THREATS</strong></div><small>79% pass-target pool</small></header><div>${teamRows.length?teamRows.map((row)=>receivingThreatRowHtml(row,teamRows)).join(''):'<div class="empty">Receiving personnel unavailable.</div>'}</div></section>`; }).join('')}</div>`;
+}
+
+function weakestBlockerForDefender(player, line, baseFront) {
+  const group=depthPositionGroup(player?.position); const role=`${player?.position||''}|${player?.expectedRole||''}`.toUpperCase(); const threeFour=/3\D*4/.test(String(baseFront||'')); let lanes=[];
+  if (group==='DT'||group==='NT'||group==='DL'||(group==='DE'&&threeFour)) lanes=['LG','C','RG'];
+  else if (group==='DE'||group==='EDGE'||(group==='LB'&&/(OLB|WLB|SLB)/.test(role))) lanes=/^R/.test(role)?['LT']:/^L/.test(role)?['RT']:['LT','RT'];
+  else if (group==='LB') lanes=['LG','C','RG'];
+  const candidates=line.filter((blocker)=>lanes.includes(String(blocker.position||'').toUpperCase())); return candidates.sort((a,b)=>(Number(a.evaluation?.grade)||68)-(Number(b.evaluation?.grade)||68))[0]||null;
+}
+
+function defensiveMatchupAssignments(personnel, defenseSide, offenseSide) {
+  const assignments=new Map(); const corners=matchupDepthOrder(personnel?.[defenseSide]||[],/^(CB|LCB|RCB|SCB|NB)$/,'CB',4); const receivers=matchupDepthOrder(personnel?.[offenseSide]||[],/^(WR|LWR|RWR|SWR|SLWR|SRWR)$/,'WR',4); corners.forEach((defender,index)=>assignments.set(playerProjectionKey(defender),receivers[index]||receivers[0])); const linebackers=matchupDepthOrder(personnel?.[defenseSide]||[],/^(LB|ILB|LILB|RILB|MLB)$/,'COV',4); const tightEnds=matchupDepthOrder(personnel?.[offenseSide]||[],/^TE$/,'TE',2); linebackers.forEach((defender,index)=>{ if (tightEnds.length) assignments.set(playerProjectionKey(defender),tightEnds[index%tightEnds.length]); }); return assignments;
+}
+
+function defensivePlayerProjection(player, defense, offense, offenseProjection, context) {
+  const sums=player.evidence?.sums||{}; const games=Math.max(0,Number(player.evidence?.games)||Number(player.evidence?.snapGameCount)||0); const group=depthPositionGroup(player.position); const grade=Number(player.evaluation?.grade)||68; const snapShare=clamp(Number(player.evidence?.defenseSnapShare)||.72,.28,1); const blocker=weakestBlockerForDefender(player,context.line,context.baseFront); const blockerGrade=Number(blocker?.evaluation?.grade)||68; const assignment=context.assignments.get(playerProjectionKey(player)); const quarterback=context.quarterback; const qbSums=quarterback?.evidence?.sums||{}; const qbAttempts=Number(qbSums.attempts)||0; const qbInterceptionRate=qbAttempts?Number(qbSums.interceptions||0)/qbAttempts:.022; const passVolume=clamp(context.passAttempts/33,.76,1.35); const protection=matchupRankFactor(offense.team,'pocketProtection',.015); const pressureContext=clamp(Math.sqrt(Number(offenseProjection.pressure||.07)/.07),.72,1.42); const mismatch=clamp(1+(grade-blockerGrade)*.018,.64,1.48);
+  const edgeRusher=group==='DE'||group==='EDGE'||group==='DT'||group==='NT'||group==='DL'||(group==='LB'&&/(OLB|WLB|SLB)/.test(`${player.position||''}|${player.expectedRole||''}`)); const rushRole=edgeRusher?(group==='DT'||group==='NT'||group==='DL'? .72:group==='LB'?.84:1):.18; const sackBase=(Number(sums.sacks||0)+.12)/(games+2.8)+(Number(sums.qbhits||0)/(games+4))*.018; const sacks=clamp(sackBase*passVolume*protection*pressureContext*mismatch*rushRole,.005,1.65);
+  const interceptions=Number(sums.defensiveinterceptions||sums.interceptions)||0; const passDefended=Number(sums.passdefended)||0; const coverageRole=/^(CB|S|FS|SS|DB|LB)$/.test(group)?(group==='LB'?.58:1):.08; const riskFactor=clamp(.48+(qbInterceptionRate/.022)*.36+(Number(offenseProjection.turnover||.025)/.025)*.16,.66,1.62); const ballhawk=clamp(1+(grade-68)*.012+(passDefended/Math.max(6,games)-.45)*.22,.72,1.42); const interceptionMean=clamp(((interceptions+.10)/(games+4))*passVolume*riskFactor*ballhawk*coverageRole*.68,.004,.48);
+  const assists=Number(sums.tackleassists)||Number(sums.tackleswithassist)||0; const tacklesRecorded=Number(sums.tacklessolo||0)+assists; const tackleBaseline=group==='LB'?6.2:/^(S|FS|SS|DB)$/.test(group)?5:/^CB$/.test(group)?3.7:2.8; const baseTackles=(tacklesRecorded+tackleBaseline*3)/(games+3); const runShare=1-Number(offenseProjection.passRate||.56); const runFit=/^(LB|DE|EDGE|DT|NT|DL)$/.test(group)?clamp(.88+runShare*.32,.96,1.12):clamp(1.08-runShare*.18,.98,1.08); const tackles=clamp(baseTackles*clamp(snapShare/.76,.7,1.2)*runFit,.4,12.5);
+  const blockerText=blocker?`${blocker.position} ${blocker.name} ${blockerGrade}`:'OL unit'; const coverageText=assignment?`${assignment.matchupRole||assignment.position} ${assignment.name}`:`QB ${quarterback?.name||'risk profile'}`; const sackProbability=atLeastOneEvent(sacks,.005,.82); const interceptionProbability=atLeastOneEvent(interceptionMean,.003,.62); return {player,team:defense.team,opponent:offense.team,grade,blocker,assignment,sacks,sackProbability,interceptionMean,interceptionProbability,tackles,sackMatchup:blockerText,coverageMatchup:coverageText,qbInterceptionRate,score:sacks*22+interceptionMean*36+tackles};
+}
+
+function defensiveProjectionRows(forecast, personnel, defenseSide) {
+  const offenseSide=defenseSide==='away'?'home':'away'; const defense=forecast[defenseSide]; const offense=forecast[offenseSide]; const offenseProjection=forecast.model[offenseSide]; const starters=personnel?.starters?.[defenseSide]?.defense||forecastPersonnelRows(personnel,defenseSide,/^(DE|LDE|RDE|DT|LDT|RDT|NT|DL|EDGE|LB|ILB|LILB|RILB|MLB|OLB|WLB|SLB|CB|LCB|RCB|SCB|NB|DB|S|FS|SS)$/,'defense',11); const passVolume=projectedPassAttempts(personnel,offenseSide,offense,offenseProjection); const context={line:offensiveLineRows(personnel,offenseSide),baseFront:personnel?.schemes?.[defenseSide]?.baseFront||defense.coverage?.baseFront||'',assignments:defensiveMatchupAssignments(personnel,defenseSide,offenseSide),quarterback:passVolume.quarterback,passAttempts:passVolume.attempts}; return starters.map((player)=>defensivePlayerProjection(player,defense,offense,offenseProjection,context));
+}
+
+function selectedDefensiveProjectionRows(rows) {
+  const selected=[]; const add=(row)=>{if(row&&!selected.includes(row))selected.push(row);}; add([...rows].sort((a,b)=>b.sacks-a.sacks)[0]); add([...rows].sort((a,b)=>b.interceptionMean-a.interceptionMean)[0]); add([...rows].sort((a,b)=>b.tackles-a.tackles)[0]); [...rows].sort((a,b)=>b.score-a.score).forEach((row)=>{if(selected.length<6)add(row);}); return selected;
+}
+
+function defensiveProjectionRowHtml(row, allRows) {
+  const topSack=Math.max(...allRows.map((item)=>item.sacks)); const topInt=Math.max(...allRows.map((item)=>item.interceptionMean)); const topTackle=Math.max(...allRows.map((item)=>item.tackles)); const mainMatchup=row.sacks>=row.interceptionMean*8?`rush vs ${row.sackMatchup}`:`coverage vs ${row.coverageMatchup}`;
+  return `<article class="defensive-projection-row" style="${teamPaletteVars(row.team)}"><div class="defensive-player"><span>${escapeHtml(row.player.position||row.player.expectedRole)}</span><strong>${playerButtonHtml(row.player,row.team)}</strong><small>${row.grade} OVR · ${escapeHtml(mainMatchup)}</small></div><div class="${probabilityHeatClass(row.sackProbability,.30,.17)}"><span>1+ SACK</span><b>${percent(row.sackProbability)}</b><small>${row.sacks.toFixed(2)} xSCK</small></div><div class="${probabilityHeatClass(row.interceptionProbability,.18,.09)}"><span>1+ INT</span><b>${percent(row.interceptionProbability)}</b><small>${row.interceptionMean.toFixed(2)} xINT</small></div><div><span>TKL</span><b>${row.tackles.toFixed(1)}</b><small>expected</small></div><div class="defensive-flags">${row.sacks===topSack?'<em>SACK</em>':''}${row.interceptionMean===topInt?'<em>INT</em>':''}${row.tackles===topTackle?'<em>TKL</em>':''}</div><details><summary>Why</summary><p>Sack: ${escapeHtml(row.sackMatchup)} · INT: ${escapeHtml(row.coverageMatchup)} · opponent QB INT rate ${percent(row.qbInterceptionRate,1)}</p></details></article>`;
+}
+
+function defensivePlayerBoard(forecast, personnel) {
+  return `<div class="defensive-player-grid">${['away','home'].map((side)=>{ const allRows=defensiveProjectionRows(forecast,personnel,side); const rows=selectedDefensiveProjectionRows(allRows); const team=forecast[side].team; return `<section class="defensive-team-board" style="${teamPaletteVars(team)}"><header><img src="${escapeHtml(team.logo)}" alt=""><div><span>${escapeHtml(team.abbrev)} PLAYMAKERS</span><strong>SACK % · INT % · TACKLES</strong></div><small>matchup adjusted</small></header><div>${rows.length?rows.map((row)=>defensiveProjectionRowHtml(row,allRows)).join(''):'<div class="empty">Defensive personnel unavailable.</div>'}</div></section>`; }).join('')}</div>`;
+}
+
 function defenseImbalanceCard(defense, offense, personnel, side, opponentSide, opponentProjection) {
   const passStop=average([leagueRankStrength(defense.team,'passDefense'),leagueRankStrength(defense.team,'passRush'),defense.units.secondary])+(defense.roster?.defenseAdjustment||0); const passAttack=average([leagueRankStrength(offense.team,'passGame'),leagueRankStrength(offense.team,'pocketProtection')])+(offense.roster?.offenseAdjustment||0); const runStop=average([leagueRankStrength(defense.team,'runDefense'),defense.units.defenseFront])+(defense.roster?.defenseAdjustment||0); const runAttack=average([leagueRankStrength(offense.team,'runGame'),offense.units.offenseLine])+(offense.roster?.offenseAdjustment||0); const passEdge=passStop-passAttack; const runEdge=runStop-runAttack; const bestEdge=Math.max(passEdge,runEdge); const overallEdge=average([passEdge,runEdge]); const family=passEdge>=runEdge?'dropback game':'run game'; const headline=overallEdge>=7?`${defense.team.abbrev} defense outclasses this offense`:overallEdge<=-7?`${offense.team.abbrev} offense outclasses this defense`:bestEdge>=6?`${defense.team.abbrev} owns the ${family}, not the whole matchup`:'No overwhelming suppression edge'; const index=clamp(.5+overallEdge/70+(22-Number(opponentProjection.points||22))*.009,.18,.82); const defenders=[...(personnel?.starters?.[side]?.defense||[])].sort((a,b)=>(b.evaluation?.grade||0)-(a.evaluation?.grade||0)).slice(0,3);
-  return `<article class="defense-imbalance-card ${overallEdge>=7?'outclasses':overallEdge<=-7?'outclassed':'competitive'}" style="${teamPaletteVars(defense.team)}"><header><img src="${escapeHtml(defense.team.logo)}" alt=""><div><span>${escapeHtml(defense.team.abbrev)} DEFENSIVE IMBALANCE</span><strong>${escapeHtml(headline)}</strong></div><b>${percent(index)}<small>suppression index</small></b></header><div class="defense-equations"><p><span>PASS</span><strong>${Math.round(passStop)} ${passEdge>=0?'>':'<'} ${Math.round(passAttack)}</strong><small>${defense.team.abbrev} Pass D/Rush vs ${offense.team.abbrev} Pass O/Protection</small></p><p><span>RUN</span><strong>${Math.round(runStop)} ${runEdge>=0?'>':'<'} ${Math.round(runAttack)}</strong><small>${defense.team.abbrev} Front/Run D vs ${offense.team.abbrev} OL/Run O</small></p></div><div class="imbalance-players">${defenders.map((player)=>`<span>${playerButtonHtml(player,defense.team)} <b>${player.evaluation?.grade||'--'}</b></span>`).join('')}</div><footer>The suppression index uses the average pass/run unit edge plus projected scoring context. A one-dimensional edge is no longer labeled as domination of the entire offense.</footer></article>`;
+  return `<article class="defense-imbalance-card ${overallEdge>=7?'outclasses':overallEdge<=-7?'outclassed':'competitive'}" style="${teamPaletteVars(defense.team)}"><header><img src="${escapeHtml(defense.team.logo)}" alt=""><div><span>${escapeHtml(defense.team.abbrev)} DEFENSE</span><strong>${escapeHtml(headline)}</strong></div><b>${percent(index)}<small>SUPPRESS</small></b></header><div class="defense-equations"><p><span>PASS</span><strong>${Math.round(passStop)} ${passEdge>=0?'>':'<'} ${Math.round(passAttack)}</strong><small>${defense.team.abbrev} D vs ${offense.team.abbrev} O</small></p><p><span>RUN</span><strong>${Math.round(runStop)} ${runEdge>=0?'>':'<'} ${Math.round(runAttack)}</strong><small>${defense.team.abbrev} D vs ${offense.team.abbrev} O</small></p></div><div class="imbalance-players">${defenders.map((player)=>`<span>${playerButtonHtml(player,defense.team)} <b>${player.evaluation?.grade||'--'}</b></span>`).join('')}</div></article>`;
 }
 
 function offenseDefenseMismatch(offense, defense) {
   const offenseAdjustment=offense.roster?.offenseAdjustment||0; const defenseAdjustment=defense.roster?.defenseAdjustment||0; const passAttack=average([leagueRankStrength(offense.team,'passGame'),leagueRankStrength(offense.team,'pocketProtection'),offense.units.offenseLine])+offenseAdjustment; const passStop=average([leagueRankStrength(defense.team,'passDefense'),leagueRankStrength(defense.team,'passRush'),defense.units.secondary])+defenseAdjustment; const runAttack=average([leagueRankStrength(offense.team,'runGame'),offense.units.offenseLine])+offenseAdjustment; const runStop=average([leagueRankStrength(defense.team,'runDefense'),defense.units.defenseFront])+defenseAdjustment; const edge=average([passAttack-passStop,runAttack-runStop]); const tone=edge>=7?'offense':edge<=-7?'defense':'even'; const headline=tone==='offense'?`${offense.team.abbrev} offense outclasses ${defense.team.abbrev} defense`:tone==='defense'?`${defense.team.abbrev} defense outclasses ${offense.team.abbrev} offense`:'Neither side clearly outclasses the other'; return {offense,defense,passAttack,passStop,runAttack,runStop,edge,tone,headline};
 }
-function offenseDefenseMismatchCard(row) { return `<article class="outclassed-card ${row.tone}" style="${teamPaletteVars(row.offense.team,row.defense.team)}"><header><div><span>${escapeHtml(row.offense.team.abbrev)} OFFENSE vs ${escapeHtml(row.defense.team.abbrev)} DEFENSE</span><strong>${escapeHtml(row.headline)}</strong></div><b>${row.edge>=0?'+':''}${row.edge.toFixed(1)}<small>overall edge</small></b></header><div><p><span>PASS</span><strong>${Math.round(row.passAttack)} ${row.passAttack>=row.passStop?'>':'<'} ${Math.round(row.passStop)}</strong><small>Pass O/Protection/OL vs Pass D/Rush/Secondary</small></p><p><span>RUN</span><strong>${Math.round(row.runAttack)} ${row.runAttack>=row.runStop?'>':'<'} ${Math.round(row.runStop)}</strong><small>Run O/OL vs Run D/Front</small></p></div><footer>Current-roster offense and defense corrections are included. “Outclasses” requires a seven-point average unit edge, not one favorable category.</footer></article>`; }
-function outclassedMatchupHtml(forecast) { return `<section class="outclassed-section"><header><span class="eyebrow">Is either side actually outclassed?</span><strong>Current offense vs current defense</strong></header><div>${offenseDefenseMismatchCard(offenseDefenseMismatch(forecast.away,forecast.home))}${offenseDefenseMismatchCard(offenseDefenseMismatch(forecast.home,forecast.away))}</div></section>`; }
+function offenseDefenseMismatchCard(row) { return `<article class="outclassed-card ${row.tone}" style="${teamPaletteVars(row.offense.team,row.defense.team)}"><header><div><span>${escapeHtml(row.offense.team.abbrev)} O vs ${escapeHtml(row.defense.team.abbrev)} D</span><strong>${escapeHtml(row.headline)}</strong></div><b>${row.edge>=0?'+':''}${row.edge.toFixed(1)}<small>EDGE</small></b></header><div><p><span>PASS</span><strong>${Math.round(row.passAttack)} ${row.passAttack>=row.passStop?'>':'<'} ${Math.round(row.passStop)}</strong></p><p><span>RUN</span><strong>${Math.round(row.runAttack)} ${row.runAttack>=row.runStop?'>':'<'} ${Math.round(row.runStop)}</strong></p></div><footer>7+ = OUTCLASSED</footer></article>`; }
+function outclassedMatchupHtml(forecast) { return `<section class="outclassed-section"><header><span class="eyebrow">OUTCLASSED?</span><strong>OFFENSE vs DEFENSE</strong></header><div>${offenseDefenseMismatchCard(offenseDefenseMismatch(forecast.away,forecast.home))}${offenseDefenseMismatchCard(offenseDefenseMismatch(forecast.home,forecast.away))}</div></section>`; }
 
 function forecastDialogEdges(forecast, personnel) {
-  return `<section class="player-edges-shell"><header><div><span class="eyebrow">Best individual matchups</span><strong>Yardage, touchdown and suppression leans</strong></div><small>Prior-season player rates × projected volume × current roster × opponent unit/scheme</small></header><div class="player-edge-tabs" role="tablist"><button type="button" class="active" data-matchup-edge-tab="qb">QB</button><button type="button" data-matchup-edge-tab="wr">WR</button><button type="button" data-matchup-edge-tab="rb">RB</button><button type="button" data-matchup-edge-tab="defense">Defensive imbalances</button></div><div class="matchup-edge-panel active" data-matchup-edge-panel="qb">${playerEdgePanel(forecast,personnel,'QB')}</div><div class="matchup-edge-panel" data-matchup-edge-panel="wr">${playerEdgePanel(forecast,personnel,'WR')}</div><div class="matchup-edge-panel" data-matchup-edge-panel="rb">${playerEdgePanel(forecast,personnel,'RB')}</div><div class="matchup-edge-panel" data-matchup-edge-panel="defense"><div class="defense-imbalance-grid">${defenseImbalanceCard(forecast.away,forecast.home,personnel,'away','home',forecast.model.home)}${defenseImbalanceCard(forecast.home,forecast.away,personnel,'home','away',forecast.model.away)}</div></div></section>${forecastStageFooter(['overview','Overview'],['ranks','League ranks'])}`;
+  return `<section class="player-edges-shell"><header><span class="eyebrow">PLAYER EDGES</span><strong>VOLUME · YARDS · TD · DEFENSE</strong></header><div class="player-edge-tabs" role="tablist"><button type="button" class="active" data-matchup-edge-tab="qb">QB</button><button type="button" data-matchup-edge-tab="wr">WR + TE</button><button type="button" data-matchup-edge-tab="rb">RB</button><button type="button" data-matchup-edge-tab="defense">Defense</button></div><div class="matchup-edge-panel active" data-matchup-edge-panel="qb">${playerEdgePanel(forecast,personnel,'QB')}</div><div class="matchup-edge-panel" data-matchup-edge-panel="wr">${receivingThreatPanel(forecast,personnel)}</div><div class="matchup-edge-panel" data-matchup-edge-panel="rb">${playerEdgePanel(forecast,personnel,'RB')}</div><div class="matchup-edge-panel" data-matchup-edge-panel="defense"><div class="defense-imbalance-grid">${defenseImbalanceCard(forecast.away,forecast.home,personnel,'away','home',forecast.model.home)}${defenseImbalanceCard(forecast.home,forecast.away,personnel,'home','away',forecast.model.away)}</div>${defensivePlayerBoard(forecast,personnel)}</div></section>${forecastStageFooter(['overview','Overview'],['ranks','League ranks'])}`;
 }
 
 function schemeAlignmentSignals(offense, defense) {
@@ -2924,7 +3029,7 @@ function schemeAlignmentSignals(offense, defense) {
   const add = (name, usage, offenseResult, defenseResult, evidence) => {
     if (!Number.isFinite(Number(usage)) || !Number.isFinite(Number(offenseResult)) || !Number.isFinite(Number(defenseResult))) return;
     const edge = Number(offenseResult) - Number(defenseResult); const tone = edge >= .04 ? 'positive' : edge <= -.04 ? 'negative' : 'neutral';
-    const headline = tone === 'positive' ? `${offenseName} can press this tendency` : tone === 'negative' ? `${defenseName} can punish this tendency` : 'No clear scheme winner';
+    const headline = `${offenseName} ${tone==='positive'?'>':tone==='negative'?'<':'='} ${defenseName}`;
     rows.push({ name, usage, edge, tone, headline, evidence });
   };
   add('SHOTGUN', offense.offense.shotgunRate, offense.offense.shotgunSuccessRate, defense.defense.shotgunSuccessRate, `${offenseName} uses it ${percent(offense.offense.shotgunRate)} · offense success ${percent(offense.offense.shotgunSuccessRate)} · ${defenseName} allows ${percent(defense.defense.shotgunSuccessRate)}`);
@@ -2936,7 +3041,7 @@ function schemeAlignmentSignals(offense, defense) {
 }
 
 function schemeSignalHtml(signal) {
-  return `<article class="scheme-signal ${signal.tone}"><header><span>${escapeHtml(signal.name)}</span><b>${signal.edge >= 0 ? '+' : ''}${Math.round(signal.edge * 100)} edge</b></header><strong>${escapeHtml(signal.headline)}</strong><div class="scheme-usage"><i style="width:${Math.round(clamp(signal.usage) * 100)}%"></i></div><p>${escapeHtml(signal.evidence)}</p></article>`;
+  return `<article class="scheme-signal ${signal.tone}"><header><span>${escapeHtml(signal.name)}</span><b>${signal.edge >= 0 ? '+' : ''}${Math.round(signal.edge * 100)}</b></header><strong>${escapeHtml(signal.headline)}</strong><div class="scheme-usage"><i style="width:${Math.round(clamp(signal.usage) * 100)}%"></i></div><small>${escapeHtml(signal.evidence)}</small></article>`;
 }
 
 function rankedRate(team, field, label, value) {
@@ -2945,7 +3050,7 @@ function rankedRate(team, field, label, value) {
 
 function defenseIdentityCard(profile, personnelSide) {
   const coverage = profile.coverage || {}; const front = personnelSide?.baseFront || coverage.baseFront || 'Multiple';
-  return `<article class="defense-identity-card" style="--team-color:${escapeHtml(profile.team.color)}"><header><img src="${escapeHtml(profile.team.logo)}" alt=""><div><span>${escapeHtml(profile.team.abbrev)} DEFENSIVE IDENTITY</span><strong>Base ${escapeHtml(front)}</strong></div><em>${escapeHtml(coverage.dataSource || 'season baseline')}</em></header><div>${rankedRate(profile.team,'blitzRate','Blitz rate',coverage.blitzRate)}${rankedRate(profile.team,'defenseManRate','Man rate',coverage.defenseManRate)}${rankedRate(profile.team,'defenseZoneRate','Zone rate',coverage.defenseZoneRate)}${rankedRate(profile.team,'pressureRate','Pressure rate',coverage.pressureRate)}</div><footer>Blitz = FTN charted additional rushers; man/zone and pressure = nflverse participation charting.</footer></article>`;
+  return `<article class="defense-identity-card" style="${teamPaletteVars(profile.team)};--team-color:var(--away-primary)"><header><img src="${escapeHtml(profile.team.logo)}" alt=""><div><span>${escapeHtml(profile.team.abbrev)} DEFENSE</span><strong>${escapeHtml(front)}</strong></div><em>2025</em></header><div>${rankedRate(profile.team,'blitzRate','Blitz',coverage.blitzRate)}${rankedRate(profile.team,'defenseManRate','Man',coverage.defenseManRate)}${rankedRate(profile.team,'defenseZoneRate','Zone',coverage.defenseZoneRate)}${rankedRate(profile.team,'pressureRate','Pressure',coverage.pressureRate)}</div></article>`;
 }
 
 function schemeSplitLine(label, split, successLabel = 'success') {
@@ -2954,7 +3059,7 @@ function schemeSplitLine(label, split, successLabel = 'success') {
 }
 
 function offenseSchemeCard(profile) {
-  const scheme = profile.scheme || {}; return `<article class="offense-scheme-card" style="--team-color:${escapeHtml(profile.team.color)}"><header><img src="${escapeHtml(profile.team.logo)}" alt=""><div><span>${escapeHtml(profile.team.abbrev)} PASSING SPLITS</span><strong>Performance by coverage</strong></div></header>${schemeSplitLine('vs man',scheme.passVsMan)}${schemeSplitLine('vs zone',scheme.passVsZone)}<div class="front-split-title">Current opponent front classification</div>${schemeSplitLine('Pass vs 4–3',scheme.vs43?.pass,'1st-down rate')}${schemeSplitLine('Run vs 4–3',scheme.vs43?.run,'1st-down rate')}${schemeSplitLine('Pass vs 3–4',scheme.vs34?.pass,'1st-down rate')}${schemeSplitLine('Run vs 3–4',scheme.vs34?.run,'1st-down rate')}<footer>2025 results grouped by each opponent’s current listed base front; front labels are context, not a claim that every snap used that personnel.</footer></article>`;
+  const scheme = profile.scheme || {}; return `<article class="offense-scheme-card" style="${teamPaletteVars(profile.team)};--team-color:var(--away-primary)"><header><img src="${escapeHtml(profile.team.logo)}" alt=""><div><span>${escapeHtml(profile.team.abbrev)} PASS</span><strong>MAN vs ZONE</strong></div></header>${schemeSplitLine('MAN',scheme.passVsMan)}${schemeSplitLine('ZONE',scheme.passVsZone)}<div class="front-split-title">vs FRONT</div>${schemeSplitLine('PASS 4–3',scheme.vs43?.pass,'1D')}${schemeSplitLine('RUN 4–3',scheme.vs43?.run,'1D')}${schemeSplitLine('PASS 3–4',scheme.vs34?.pass,'1D')}${schemeSplitLine('RUN 3–4',scheme.vs34?.run,'1D')}</article>`;
 }
 
 function unitRawText(row, metric) {
@@ -2974,12 +3079,12 @@ function rankComparisonRow(metric, awayTeam, homeTeam) {
 
 function forecastDialogRanks(forecast) {
   const { game } = forecast; const keys = Object.keys(TEAM_RANK_DEFINITIONS);
-  return `<section class="league-ranks-card"><header><div><span class="eyebrow">Pure-number comparison</span><strong>2025 regular-season league ranks</strong></div><div><b>${escapeHtml(game.away.abbrev)}</b><b>${escapeHtml(game.home.abbrev)}</b></div></header><div class="league-rank-team-head"><span><img src="${escapeHtml(game.away.logo)}" alt="">${escapeHtml(game.away.name)}</span><span>Metric</span><span>${escapeHtml(game.home.name)}<img src="${escapeHtml(game.home.logo)}" alt=""></span></div>${keys.map((metric) => rankComparisonRow(metric,game.away,game.home)).join('')}<footer>These are deliberately the unmodified 2025 ranks; the Overall tab separately shows how the current roster changes the team. EPA leads Run/Pass Game and Run/Pass Defense; sack rate leads Protection and Pass Rush. Lower rank number is better.</footer></section>${forecastStageFooter(['edges','Player edges'],['run','Run game'])}`;
+  return `<section class="league-ranks-card"><header><div><span class="eyebrow">2025</span><strong>LEAGUE RANKS</strong></div><div><b>${escapeHtml(game.away.abbrev)}</b><b>${escapeHtml(game.home.abbrev)}</b></div></header><div class="league-rank-team-head"><span><img src="${escapeHtml(game.away.logo)}" alt="">${escapeHtml(game.away.name)}</span><span>Metric</span><span>${escapeHtml(game.home.name)}<img src="${escapeHtml(game.home.logo)}" alt=""></span></div>${keys.map((metric) => rankComparisonRow(metric,game.away,game.home)).join('')}<footer>#1 = best · roster changes are in Overall</footer></section>${forecastStageFooter(['edges','Player edges'],['run','Run game'])}`;
 }
 
 function forecastDialogDefense(forecast, personnel) {
   const { game, away, home } = forecast; const awaySignals = schemeAlignmentSignals(away,home); const homeSignals = schemeAlignmentSignals(home,away);
-  return `${outclassedMatchupHtml(forecast)}<div class="defense-identity-grid">${defenseIdentityCard(away,personnel?.schemes?.away)}${defenseIdentityCard(home,personnel?.schemes?.home)}</div><div class="offense-scheme-grid">${offenseSchemeCard(away)}${offenseSchemeCard(home)}</div><div class="scheme-direction-head"><span>${escapeHtml(game.away.abbrev)} offense vs ${escapeHtml(game.home.abbrev)} defense</span><span>${escapeHtml(game.home.abbrev)} offense vs ${escapeHtml(game.away.abbrev)} defense</span></div><div class="scheme-signal-grid"><div>${awaySignals.map(schemeSignalHtml).join('')}</div><div>${homeSignals.map(schemeSignalHtml).join('')}</div></div><section class="dialog-layer-card coordinator-layer"><header><span class="eyebrow">Defensive play callers</span></header><div class="coach-grid">${coachCard(away,'defense')}${coachCard(home,'defense')}</div></section><div class="coverage-availability charted"><strong>Season scheme baseline active</strong><span>${forecast.coverageRows ? `${forecast.coverageRows} matchup-window participation rows also joined.` : 'Man/zone, FTN blitz, pressure and coverage performance come from the local 2025 season snapshot.'}</span></div>${forecastStageFooter(['receiving','Receiving matchups'],null)}`;
+  return `${outclassedMatchupHtml(forecast)}<div class="defense-identity-grid">${defenseIdentityCard(away,personnel?.schemes?.away)}${defenseIdentityCard(home,personnel?.schemes?.home)}</div><div class="offense-scheme-grid">${offenseSchemeCard(away)}${offenseSchemeCard(home)}</div><div class="scheme-direction-head"><span>${escapeHtml(game.away.abbrev)} O vs ${escapeHtml(game.home.abbrev)} D</span><span>${escapeHtml(game.home.abbrev)} O vs ${escapeHtml(game.away.abbrev)} D</span></div><div class="scheme-signal-grid"><div>${awaySignals.map(schemeSignalHtml).join('')}</div><div>${homeSignals.map(schemeSignalHtml).join('')}</div></div><section class="dialog-layer-card coordinator-layer"><header><span class="eyebrow">DEFENSIVE CALLERS</span></header><div class="coach-grid">${coachCard(away,'defense')}${coachCard(home,'defense')}</div></section><div class="coverage-availability charted"><strong>2025 SCHEME DATA</strong><span>FTN + nflverse</span></div>${forecastStageFooter(['receiving','Receiving'],null)}`;
 }
 
 function forecastGameDialogHtml(game, summary, personnel, forecast) {
@@ -3042,7 +3147,7 @@ function dialogDepthChartsHtml(game, box, personnel = null) {
   const away = depthChartForTeam(playerGroups, game.away);
   const home = depthChartForTeam(playerGroups, game.home);
   const offense = (rows) => rows.filter((row) => isReceiverPosition(row.position) || /^(QB|RB|FB|LT|LG|C|RG|RT|OL)$/.test(row.position));
-  const defense = (rows) => rows.filter((row) => isSecondaryPosition(row.position) || /^(DE|LDE|RDE|DT|LDT|RDT|DL|NT|LB|ILB|MLB|WLB|SLB|OLB|EDGE)$/.test(row.position));
+  const defense = (rows) => rows.filter((row) => isSecondaryPosition(row.position) || /^(DE|LDE|RDE|DT|LDT|RDT|DL|NT|LB|ILB|LILB|RILB|MLB|WLB|SLB|OLB|EDGE)$/.test(row.position));
   const gameHasParticipants = game?.status?.type?.state !== 'pre';
   const resolveUnit = (participants, roster, filter, unit) => {
     const eligibleRoster = filter(roster || []);
@@ -3134,7 +3239,7 @@ function depthMatchupHtml(offenseTeam, offenseRows, defenseTeam, defenseRows, ga
 function footballPositionRank(position, unit = '') {
   const keyName = String(position || '').toUpperCase();
   const offense = ['QB','RB','HB','FB','LWR','WR','RWR','SWR','SLWR','SRWR','TE','LT','LG','C','RG','RT','OL'];
-  const defense = ['LDE','DE','RDE','LDT','DT','RDT','NT','DL','EDGE','WLB','OLB','MLB','ILB','LB','SLB','LCB','CB','RCB','SCB','NB','FS','SS','S','DB'];
+  const defense = ['LDE','DE','RDE','LDT','DT','RDT','NT','DL','EDGE','WLB','OLB','MLB','ILB','LILB','RILB','LB','SLB','LCB','CB','RCB','SCB','NB','FS','SS','S','DB'];
   const special = ['K','PK','P','LS','H','KR','PR'];
   const order = unit === 'offense' ? offense : unit === 'defense' ? defense : [...offense, ...defense, ...special];
   const index = order.indexOf(keyName); return index < 0 ? 999 : index;
@@ -3146,7 +3251,7 @@ function depthPositionGroup(position) {
   if (/^(HB|RB)$/.test(pos)) return 'RB';
   if (/^(LDE|RDE|DE)$/.test(pos)) return 'DE';
   if (/^(LDT|RDT|DT|NT)$/.test(pos)) return 'DT';
-  if (/^(WLB|SLB|MLB|ILB|OLB|LB)$/.test(pos)) return 'LB';
+  if (/^(WLB|SLB|MLB|ILB|LILB|RILB|OLB|LB)$/.test(pos)) return 'LB';
   if (/^(LCB|RCB|SCB|CB|NB)$/.test(pos)) return 'CB';
   return pos;
 }
