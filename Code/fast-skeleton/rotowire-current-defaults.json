@@ -7,7 +7,7 @@
       "Ketel Marte",
       "Lars Nootbaar",
       "Nolan Arenado",
-      "Max Kepler",
+      "Jordan Lawlar",
       "Tim Tawa",
       "Ryan Waldschmidt"
     ],
@@ -62,59 +62,59 @@
     "LHP": [
       "Ronald Acuna",
       "Drake Baldwin",
-      "Matt Olson",
       "Ozzie Albies",
+      "Matt Olson",
       "Lane Thomas",
-      "Michael Harris",
       "Mauricio Dubon",
+      "Sean Murphy",
       "Austin Riley",
-      "Sean Murphy"
+      "Ha-Seong Kim"
     ]
   },
   "BAL": {
     "RHP": [
       "Jackson Holliday",
-      "Pete Alonso",
+      "Blaze Alexander",
       "Gunnar Henderson",
-      "Luis Robert",
+      "Pete Alonso",
       "Samuel Basallo",
       "Christian Encarnacion-Strand",
-      "Dylan Beavers",
       "Coby Mayo",
+      "Dylan Beavers",
       "Colton Cowser"
     ],
     "LHP": [
       "Blaze Alexander",
       "Pete Alonso",
-      "Gunnar Henderson",
       "Coby Mayo",
       "Christian Encarnacion-Strand",
-      "Luis Robert",
-      "Leody Taveras",
+      "Gunnar Henderson",
+      "Rece Hinds",
       "Jackson Holliday",
-      "Carlos Narvaez"
+      "Carlos Narvaez",
+      "Leody Taveras"
     ]
   },
   "BOS": {
     "RHP": [
       "Roman Anthony",
       "Mickey Gasper",
-      "Ceddanne Rafaela",
-      "Wilyer Abreu",
       "Adley Rutschman",
+      "Wilyer Abreu",
+      "Trevor Story",
       "Nick Sogard",
       "Caleb Durbin",
       "Jarren Duran",
-      "Trevor Story"
+      "Eli White"
     ],
     "LHP": [
       "Roman Anthony",
-      "Ceddanne Rafaela",
-      "Wilyer Abreu",
+      "Jahmai Jones",
       "Adley Rutschman",
+      "Wilyer Abreu",
       "Trevor Story",
       "Caleb Durbin",
-      "Jahmai Jones",
+      "Eli White",
       "Andruw Monasterio",
       "Nick Sogard"
     ]
@@ -156,14 +156,14 @@
       "Carlos Jorge"
     ],
     "LHP": [
+      "Dane Myers",
       "Elly De La Cruz",
       "Sal Stewart",
-      "Dane Myers",
       "Tyler Stephenson",
       "Eugenio Suarez",
-      "Matt McLain",
       "JJ Bleday",
-      "Jose Trevino",
+      "Matt McLain",
+      "Juan Brito",
       "Hector Rodriguez"
     ]
   },
@@ -320,8 +320,8 @@
       "Moises Ballesteros",
       "Christian Moore",
       "Josh Lowe",
-      "Oswald Peraza",
-      "Tyler Heineman"
+      "Adam Frazier",
+      "Oswald Peraza"
     ],
     "LHP": [
       "Zach Neto",
@@ -498,22 +498,22 @@
       "Luis Arraez",
       "Alec Bohm",
       "Edmundo Sosa",
-      "Bryson Stott",
       "J.T. Realmuto",
+      "Bryson Stott",
       "Derek Hill"
     ]
   },
   "PIT": {
     "RHP": [
-      "Spencer Horwitz",
+      "Konnor Griffin",
       "Brandon Lowe",
       "Bryan Reynolds",
       "Nick Gonzales",
       "Oneil Cruz",
-      "Konnor Griffin",
-      "Rafael Flores",
       "Esmerlyn Valdez",
-      "Jared Triolo"
+      "Spencer Horwitz",
+      "Rafael Flores",
+      "Jacob Gonzalez"
     ],
     "LHP": [
       "Nick Gonzales",
@@ -524,7 +524,7 @@
       "Rafael Flores",
       "Oneil Cruz",
       "Jake Mangum",
-      "Nick Yorke"
+      "Henry Davis"
     ]
   },
   "SD": {
