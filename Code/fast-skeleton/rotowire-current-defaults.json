@@ -385,25 +385,25 @@
   },
   "MIL": {
     "RHP": [
-      "Brice Turang",
-      "Jackson Chourio",
-      "Jake Bauers",
-      "William Contreras",
-      "Christian Yelich",
-      "Garrett Mitchell",
       "Sal Frelick",
-      "David Hamilton",
-      "Cooper Pratt"
+      "Jake Bauers",
+      "Jackson Chourio",
+      "Christian Yelich",
+      "William Contreras",
+      "Brice Turang",
+      "Garrett Mitchell",
+      "Cooper Pratt",
+      "David Hamilton"
     ],
     "LHP": [
       "Jackson Chourio",
-      "Brice Turang",
-      "Andrew Vaughn",
-      "William Contreras",
-      "Jake Bauers",
       "Luis Lara",
-      "Gary Sanchez",
+      "William Contreras",
+      "Andrew Vaughn",
+      "Brice Turang",
       "Joey Ortiz",
+      "Garrett Mitchell",
+      "Gary Sanchez",
       "Cooper Pratt"
     ]
   },
