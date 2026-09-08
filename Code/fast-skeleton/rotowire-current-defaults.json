@@ -343,9 +343,9 @@
       "Max Muncy",
       "Will Smith",
       "Tommy Edman",
-      "Kyle Tucker",
       "Teoscar Hernandez",
-      "Enrique Hernandez"
+      "Kyle Tucker",
+      "Alex Freeland"
     ],
     "LHP": [
       "Shohei Ohtani",
@@ -458,11 +458,11 @@
   "NYY": {
     "RHP": [
       "Ben Rice",
+      "Aaron Judge",
       "Cody Bellinger",
       "Luis Garcia",
       "Spencer Jones",
       "Jazz Chisholm",
-      "Jasson Dominguez",
       "George Lombard",
       "Ryan McMahon",
       "Austin Wells"
@@ -470,12 +470,12 @@
     "LHP": [
       "Paul Goldschmidt",
       "Ben Rice",
-      "Amed Rosario",
+      "Aaron Judge",
       "Cody Bellinger",
       "Heliot Ramos",
+      "Amed Rosario",
       "Jazz Chisholm",
       "George Lombard",
-      "Jose Caballero",
       "Ali Sanchez"
     ]
   },
