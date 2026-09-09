@@ -74,25 +74,25 @@
   "BAL": {
     "RHP": [
       "Jackson Holliday",
-      "Blaze Alexander",
-      "Gunnar Henderson",
       "Pete Alonso",
+      "Gunnar Henderson",
+      "Coby Mayo",
       "Samuel Basallo",
       "Christian Encarnacion-Strand",
-      "Coby Mayo",
       "Dylan Beavers",
-      "Colton Cowser"
+      "Colton Cowser",
+      "Leody Taveras"
     ],
     "LHP": [
-      "Blaze Alexander",
-      "Pete Alonso",
       "Jackson Holliday",
+      "Pete Alonso",
       "Coby Mayo",
       "Gunnar Henderson",
       "Christian Encarnacion-Strand",
       "Rece Hinds",
+      "Leody Taveras",
       "Carlos Narvaez",
-      "Leody Taveras"
+      "Jeremiah Jackson"
     ]
   },
   "BOS": {
@@ -462,10 +462,10 @@
       "Aaron Judge",
       "Luis Garcia",
       "Spencer Jones",
-      "Jazz Chisholm",
       "George Lombard",
       "Ryan McMahon",
-      "Austin Wells"
+      "Austin Wells",
+      "Jose Caballero"
     ],
     "LHP": [
       "Paul Goldschmidt",
@@ -474,8 +474,8 @@
       "Cody Bellinger",
       "Heliot Ramos",
       "Amed Rosario",
-      "Jazz Chisholm",
       "George Lombard",
+      "Jose Caballero",
       "Ali Sanchez"
     ]
   },
