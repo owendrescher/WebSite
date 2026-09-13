@@ -98,25 +98,25 @@
   "BOS": {
     "RHP": [
       "Roman Anthony",
-      "Mickey Gasper",
-      "Adley Rutschman",
+      "Willson Contreras",
       "Wilyer Abreu",
+      "Adley Rutschman",
       "Trevor Story",
-      "Nick Sogard",
+      "Mickey Gasper",
       "Jarren Duran",
-      "Caleb Durbin",
-      "Isiah Kiner-Falefa"
+      "Nick Sogard",
+      "Caleb Durbin"
     ],
     "LHP": [
       "Roman Anthony",
       "Jahmai Jones",
-      "Adley Rutschman",
       "Wilyer Abreu",
+      "Willson Contreras",
+      "Adley Rutschman",
       "Trevor Story",
       "Caleb Durbin",
-      "Nate Eaton",
-      "Andruw Monasterio",
-      "Nick Sogard"
+      "Nick Sogard",
+      "Nate Eaton"
     ]
   },
   "CHC": {
@@ -366,8 +366,8 @@
       "Griffin Conine",
       "Otto Lopez",
       "Jakob Marsee",
+      "Xavier Edwards",
       "Javier Sanoja",
-      "Owen Caissie",
       "Graham Pauley",
       "Joe Mack"
     ],
@@ -376,10 +376,10 @@
       "Otto Lopez",
       "Kyle Stowers",
       "Agustin Ramirez",
+      "Xavier Edwards",
       "Javier Sanoja",
       "Jakob Marsee",
       "Esteury Ruiz",
-      "Jared Serna",
       "Brian Navarreto"
     ]
   },
@@ -578,22 +578,22 @@
   "SF": {
     "RHP": [
       "Drew Gilbert",
-      "Rafael Devers",
       "Bryce Eldridge",
       "Jonah Cox",
       "Turner Hill",
       "Jung Hoo Lee",
       "Shay Whitcomb",
+      "Osleivis Basabe",
       "Drew Cavanaugh",
       "Christian Koss"
     ],
     "LHP": [
       "Jonah Cox",
-      "Rafael Devers",
+      "Shay Whitcomb",
       "Bryce Eldridge",
       "Osleivis Basabe",
       "Turner Hill",
-      "Shay Whitcomb",
+      "Brett Harris",
       "Jung Hoo Lee",
       "Andrew Knizner",
       "Christian Koss"
