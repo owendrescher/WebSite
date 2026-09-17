@@ -660,15 +660,15 @@
       "Elias Diaz"
     ],
     "LHP": [
-      "Ezequiel Duran",
+      "Justin Foscue",
       "Corey Seager",
       "Josh Jung",
-      "Justin Foscue",
+      "Jake Burger",
       "Brandon Nimmo",
       "Wyatt Langford",
-      "Jake Burger",
-      "Danny Jansen",
-      "Cody Freeman"
+      "Ezequiel Duran",
+      "Elias Diaz",
+      "Danny Jansen"
     ]
   },
   "TOR": {
@@ -679,8 +679,8 @@
       "Alejandro Kirk",
       "Nathan Lukes",
       "Kazuma Okamoto",
-      "Josh Smith",
       "Andres Gimenez",
+      "Josh Smith",
       "Ernie Clement"
     ],
     "LHP": [
@@ -698,25 +698,25 @@
   "WSH": {
     "RHP": [
       "James Wood",
+      "Daylen Lile",
       "Abimelec Ortiz",
-      "Dylan Crews",
       "CJ Abrams",
       "Brady House",
-      "Daylen Lile",
+      "Dylan Crews",
       "Keibert Ruiz",
       "Jorbit Vivas",
       "Jacob Young"
     ],
     "LHP": [
       "James Wood",
-      "Dylan Crews",
       "Andres Chaparro",
-      "CJ Abrams",
       "Brady House",
+      "CJ Abrams",
+      "Dylan Crews",
       "Yohandy Morales",
       "Harry Ford",
       "Jacob Young",
-      "Jorbit Vivas"
+      "Nasim Nunez"
     ]
   }
 }
