@@ -77,11 +77,11 @@
       "Pete Alonso",
       "Gunnar Henderson",
       "Coby Mayo",
-      "Christian Encarnacion-Strand",
       "Samuel Basallo",
+      "Christian Encarnacion-Strand",
+      "Colton Cowser",
       "Jeremiah Jackson",
-      "Leody Taveras",
-      "Colton Cowser"
+      "Leody Taveras"
     ],
     "LHP": [
       "Rece Hinds",
@@ -242,13 +242,13 @@
   "DET": {
     "RHP": [
       "Kevin McGonigle",
+      "Gleyber Torres",
       "Hao-Yu Lee",
-      "Colt Keith",
       "Riley Greene",
       "Dillon Dingler",
       "Max Clark",
       "Spencer Torkelson",
-      "Zach McKinstry",
+      "Brett Callahan",
       "John Peck"
     ],
     "LHP": [
@@ -578,24 +578,24 @@
   "SF": {
     "RHP": [
       "Drew Gilbert",
-      "Bryce Eldridge",
+      "Brett Harris",
       "Jonah Cox",
-      "Jung Hoo Lee",
+      "Marcelo Mayer",
       "Turner Hill",
-      "Shay Whitcomb",
+      "Victor Bericoto",
       "Drew Cavanaugh",
       "Grant McCray",
       "Christian Koss"
     ],
     "LHP": [
       "Jonah Cox",
-      "Bryce Eldridge",
       "Brett Harris",
-      "Jung Hoo Lee",
       "Shay Whitcomb",
+      "Marcelo Mayer",
+      "Osleivis Basabe",
       "Turner Hill",
       "Andrew Knizner",
-      "Scott Bandura",
+      "Bo Davidson",
       "Christian Koss"
     ]
   },
@@ -674,13 +674,13 @@
   "TOR": {
     "RHP": [
       "Brett Bateman",
-      "George Springer",
       "Vladimir Guerrero",
       "Alejandro Kirk",
+      "George Springer",
       "Nathan Lukes",
       "Kazuma Okamoto",
-      "Andres Gimenez",
       "Josh Smith",
+      "Andres Gimenez",
       "Ernie Clement"
     ],
     "LHP": [
@@ -701,10 +701,10 @@
       "Daylen Lile",
       "Abimelec Ortiz",
       "CJ Abrams",
-      "Brady House",
       "Dylan Crews",
-      "Keibert Ruiz",
       "Jorbit Vivas",
+      "Brady House",
+      "Keibert Ruiz",
       "Jacob Young"
     ],
     "LHP": [
