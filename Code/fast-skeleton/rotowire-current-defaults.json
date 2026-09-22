@@ -339,9 +339,9 @@
     "RHP": [
       "Mookie Betts",
       "Freddie Freeman",
-      "Will Smith",
-      "Max Muncy",
       "Andy Pages",
+      "Max Muncy",
+      "Will Smith",
       "Kyle Tucker",
       "Teoscar Hernandez",
       "Josue De Paula",
@@ -350,9 +350,9 @@
     "LHP": [
       "Tommy Edman",
       "Mookie Betts",
-      "Will Smith",
-      "Freddie Freeman",
       "Andy Pages",
+      "Freddie Freeman",
+      "Will Smith",
       "Teoscar Hernandez",
       "Kyle Tucker",
       "Alex Call",
@@ -578,24 +578,24 @@
   "SF": {
     "RHP": [
       "Drew Gilbert",
-      "Brett Harris",
-      "Jonah Cox",
-      "Marcelo Mayer",
       "Turner Hill",
-      "Victor Bericoto",
+      "Jonah Cox",
+      "Bo Davidson",
+      "Marcelo Mayer",
+      "Brett Harris",
       "Drew Cavanaugh",
-      "Grant McCray",
+      "Shay Whitcomb",
       "Christian Koss"
     ],
     "LHP": [
       "Jonah Cox",
+      "Victor Bericoto",
       "Brett Harris",
-      "Shay Whitcomb",
-      "Marcelo Mayer",
-      "Osleivis Basabe",
-      "Turner Hill",
       "Andrew Knizner",
-      "Bo Davidson",
+      "Turner Hill",
+      "Shay Whitcomb",
+      "Scott Bandura",
+      "Osleivis Basabe",
       "Christian Koss"
     ]
   },
