@@ -5,11 +5,11 @@
       "Ketel Marte",
       "Gabriel Moreno",
       "Geraldo Perdomo",
-      "Corbin Carroll",
-      "Nolan Arenado",
-      "Tim Tawa",
       "Pavin Smith",
-      "Jordan Lawlar"
+      "Nolan Arenado",
+      "Corbin Carroll",
+      "Jesus Sanchez",
+      "Tim Tawa"
     ],
     "LHP": [
       "Ildemaro Vargas",
@@ -98,7 +98,7 @@
   "BOS": {
     "RHP": [
       "Roman Anthony",
-      "Mickey Gasper",
+      "Ceddanne Rafaela",
       "Adley Rutschman",
       "Willson Contreras",
       "Wilyer Abreu",
@@ -109,14 +109,14 @@
     ],
     "LHP": [
       "Roman Anthony",
-      "Jahmai Jones",
+      "Ceddanne Rafaela",
       "Wilyer Abreu",
       "Willson Contreras",
       "Adley Rutschman",
       "Caleb Durbin",
       "Trevor Story",
-      "Nick Sogard",
-      "Nate Eaton"
+      "Jahmai Jones",
+      "Nick Sogard"
     ]
   },
   "CHC": {
@@ -337,26 +337,26 @@
   },
   "LAD": {
     "RHP": [
+      "Shohei Ohtani",
       "Mookie Betts",
       "Freddie Freeman",
-      "Andy Pages",
       "Max Muncy",
       "Will Smith",
       "Kyle Tucker",
       "Teoscar Hernandez",
-      "Josue De Paula",
+      "Andy Pages",
       "Tommy Edman"
     ],
     "LHP": [
-      "Tommy Edman",
+      "Shohei Ohtani",
       "Mookie Betts",
       "Andy Pages",
       "Freddie Freeman",
       "Will Smith",
       "Teoscar Hernandez",
       "Kyle Tucker",
-      "Alex Call",
-      "Enrique Hernandez"
+      "Enrique Hernandez",
+      "Tommy Edman"
     ]
   },
   "MIA": {
