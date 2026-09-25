@@ -340,8 +340,8 @@
       "Shohei Ohtani",
       "Mookie Betts",
       "Freddie Freeman",
-      "Max Muncy",
       "Will Smith",
+      "Max Muncy",
       "Kyle Tucker",
       "Teoscar Hernandez",
       "Andy Pages",
@@ -355,7 +355,7 @@
       "Teoscar Hernandez",
       "Kyle Tucker",
       "Andy Pages",
-      "Enrique Hernandez",
+      "Max Muncy",
       "Tommy Edman"
     ]
   },
@@ -578,8 +578,8 @@
   "SF": {
     "RHP": [
       "Drew Gilbert",
-      "Turner Hill",
       "Jonah Cox",
+      "Turner Hill",
       "Bo Davidson",
       "Marcelo Mayer",
       "Brett Harris",
@@ -589,12 +589,12 @@
     ],
     "LHP": [
       "Jonah Cox",
-      "Victor Bericoto",
-      "Brett Harris",
-      "Andrew Knizner",
       "Turner Hill",
+      "Victor Bericoto",
+      "Bo Davidson",
+      "Andrew Knizner",
+      "Brett Harris",
       "Shay Whitcomb",
-      "Scott Bandura",
       "Osleivis Basabe",
       "Christian Koss"
     ]
