@@ -49,15 +49,15 @@
   },
   "ATL": {
     "RHP": [
-      "Drake Baldwin",
+      "Michael Harris",
       "Ronald Acuna",
       "Matt Olson",
-      "Michael Harris",
+      "Drake Baldwin",
       "Mauricio Dubon",
-      "Austin Riley",
-      "Mike Yastrzemski",
       "Ozzie Albies",
-      "Ha-Seong Kim"
+      "Mike Yastrzemski",
+      "Austin Riley",
+      "Sean Murphy"
     ],
     "LHP": [
       "Ronald Acuna",
@@ -110,13 +110,13 @@
     "LHP": [
       "Roman Anthony",
       "Jahmai Jones",
-      "Wilyer Abreu",
-      "Willson Contreras",
       "Adley Rutschman",
+      "Willson Contreras",
+      "Wilyer Abreu",
       "Ceddanne Rafaela",
+      "Nick Sogard",
       "Caleb Durbin",
-      "Trevor Story",
-      "Nick Sogard"
+      "Trevor Story"
     ]
   },
   "CHC": {
@@ -126,8 +126,8 @@
       "Michael Busch",
       "Alex Bregman",
       "Ian Happ",
-      "Nico Hoerner",
       "Michael Conforto",
+      "Nico Hoerner",
       "Carson Kelly",
       "Dansby Swanson"
     ],
@@ -223,8 +223,8 @@
       "Munetaka Murakami",
       "Andrew Benintendi",
       "Tristan Peters",
-      "Colson Montgomery",
       "Chase Meidroth",
+      "Colson Montgomery",
       "Braden Montgomery"
     ],
     "LHP": [
@@ -233,10 +233,10 @@
       "Randal Grichuk",
       "Munetaka Murakami",
       "Chase Meidroth",
-      "Kyle Teel",
       "Brenton Doyle",
-      "Colson Montgomery",
-      "Braden Montgomery"
+      "Kyle Teel",
+      "Braden Montgomery",
+      "Luisangel Acuna"
     ]
   },
   "DET": {
@@ -271,9 +271,9 @@
       "Jose Altuve",
       "Yainer Diaz",
       "Christian Walker",
-      "Taylor Trammell",
+      "Lucas Spence",
       "Cam Smith",
-      "Lucas Spence"
+      "Taylor Trammell"
     ],
     "LHP": [
       "Jeremy Pena",
@@ -284,7 +284,7 @@
       "Christian Walker",
       "Cam Smith",
       "Lucas Spence",
-      "Nelson Velazquez"
+      "Jorge Barrosa"
     ]
   },
   "KC": {
@@ -481,15 +481,15 @@
   },
   "PHI": {
     "RHP": [
-      "Kyle Schwarber",
       "Trea Turner",
+      "Kyle Schwarber",
       "Bryce Harper",
-      "Alec Bohm",
       "Bryson Stott",
+      "Alec Bohm",
       "Brandon Marsh",
+      "Edmundo Sosa",
       "Justin Crawford",
-      "J.T. Realmuto",
-      "Edmundo Sosa"
+      "J.T. Realmuto"
     ],
     "LHP": [
       "Kyle Schwarber",
@@ -530,14 +530,14 @@
   "SD": {
     "RHP": [
       "Fernando Tatis",
-      "Jake Cronenworth",
+      "Dustin Harris",
       "Manny Machado",
-      "Ty France",
       "Jackson Merrill",
-      "Xander Bogaerts",
+      "Ty France",
       "Gavin Sheets",
-      "Luis Campusano",
-      "Samad Taylor"
+      "Xander Bogaerts",
+      "Jake Cronenworth",
+      "Ethan Salas"
     ],
     "LHP": [
       "Fernando Tatis",
