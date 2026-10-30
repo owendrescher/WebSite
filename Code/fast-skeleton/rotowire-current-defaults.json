@@ -31,9 +31,9 @@
       "Tyler Soderstrom",
       "Brent Rooker",
       "Zack Gelof",
-      "Jeff McNeil",
       "Jacob Wilson",
-      "Lawrence Butler"
+      "Lawrence Butler",
+      "Joshua Kuroda-Grauer"
     ],
     "LHP": [
       "Henry Bolte",
@@ -43,8 +43,8 @@
       "Tyler Soderstrom",
       "Zack Gelof",
       "Jacob Wilson",
-      "Jeff McNeil",
-      "Lawrence Butler"
+      "Lawrence Butler",
+      "Joshua Kuroda-Grauer"
     ]
   },
   "ATL": {
@@ -235,7 +235,7 @@
       "Kyle Teel",
       "Braden Montgomery",
       "Colson Montgomery",
-      "Tristan Peters",
+      "Brooks Baldwin",
       "Luisangel Acuna"
     ]
   },
@@ -247,8 +247,8 @@
       "Dillon Dingler",
       "Max Clark",
       "Spencer Torkelson",
+      "Kerry Carpenter",
       "Eduardo Valencia",
-      "Brett Callahan",
       "John Peck"
     ],
     "LHP": [
@@ -560,19 +560,19 @@
       "Brendan Donovan",
       "Cole Young",
       "Lazaro Montes",
-      "Michael Arroyo",
-      "Brock Rodden"
+      "Luke Raley",
+      "Colt Emerson"
     ],
     "LHP": [
       "Dominic Canzone",
       "Cal Raleigh",
       "Julio Rodriguez",
       "Josh Naylor",
-      "Michael Arroyo",
+      "Weston Wilson",
       "Brendan Donovan",
       "Cole Young",
-      "Weston Wilson",
-      "Brock Rodden"
+      "Michael Toglia",
+      "Colt Emerson"
     ]
   },
   "SF": {
@@ -649,7 +649,6 @@
   },
   "TEX": {
     "RHP": [
-      "Joc Pederson",
       "Wyatt Langford",
       "Corey Seager",
       "Brandon Nimmo",
@@ -657,7 +656,8 @@
       "Jake Burger",
       "Ezequiel Duran",
       "Evan Carter",
-      "Danny Jansen"
+      "Danny Jansen",
+      "Justin Foscue"
     ],
     "LHP": [
       "Justin Foscue",
@@ -702,10 +702,10 @@
       "Abimelec Ortiz",
       "CJ Abrams",
       "Dylan Crews",
-      "Jorbit Vivas",
       "Brady House",
       "Keibert Ruiz",
-      "Jacob Young"
+      "Jacob Young",
+      "Nasim Nunez"
     ],
     "LHP": [
       "James Wood",
