@@ -122,14 +122,14 @@
   "CHC": {
     "RHP": [
       "Pete Crow-Armstrong",
-      "Michael Busch",
       "Alex Bregman",
+      "Michael Busch",
+      "Teruaki Sato",
       "Nico Hoerner",
+      "Pedro Ramirez",
       "Dansby Swanson",
       "Matt Shaw",
-      "Pedro Ramirez",
-      "Miguel Amaya",
-      "Joey Bart"
+      "Miguel Amaya"
     ],
     "LHP": [
       "Pete Crow-Armstrong",
@@ -138,9 +138,9 @@
       "Michael Busch",
       "Matt Shaw",
       "Dansby Swanson",
+      "Teruaki Sato",
       "Joey Bart",
-      "Pedro Ramirez",
-      "Miguel Amaya"
+      "Pedro Ramirez"
     ]
   },
   "CIN": {
@@ -249,7 +249,7 @@
       "Spencer Torkelson",
       "Kerry Carpenter",
       "Eduardo Valencia",
-      "John Peck"
+      "Ha-Seong Kim"
     ],
     "LHP": [
       "Kevin McGonigle",
@@ -260,7 +260,7 @@
       "Spencer Torkelson",
       "Eduardo Valencia",
       "Max Clark",
-      "John Peck"
+      "Ha-Seong Kim"
     ]
   },
   "HOU": {
